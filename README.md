@@ -63,9 +63,16 @@ docs/todo.md          Offene Punkte
 
 **Für Eltern:** Das Spiel lässt sich wie eine App auf den Home-Bildschirm legen, von der Startseite oder vom Spiel aus. Danach startet es direkt im Spiel, ohne Adressleiste, und läuft auch ohne Internet. Wichtig: Ohne Internet geht es erst, nachdem das Spiel einmal mit Internet geöffnet war. Wer von der Startseite aus installiert, startet die App also einmal mit Internet (oder öffnet vorher das Spiel), bevor es auf die Autofahrt geht.
 
-- iPhone und iPad (Safari): Teilen → „Zum Home-Bildschirm“. Die App hat einen eigenen Speicher, getrennt von Safari: Ein Spielstand aus Safari erscheint einmalig nicht in der App. Dafür räumt Safari den Speicher von Apps auf dem Home-Bildschirm nicht nach 7 Tagen ohne Besuch weg.
-- Android (Chrome): Menü → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.
-- Am Computer (Chrome, Edge): Symbol „Installieren“ in der Adressleiste.
+| Gerät | Browser | So geht's |
+| --- | --- | --- |
+| iPad, iPhone | Safari, ab iOS 16.4 auch Chrome, Edge, Firefox | Teilen → „Zum Home-Bildschirm“ |
+| Mac | Safari (ab macOS Sonoma) | Ablage → „Zum Dock hinzufügen“ |
+| Mac, Windows, Linux, ChromeOS | Chrome, Edge | Symbol „Installieren“ rechts in der Adressleiste oder Menü → „Seite als App installieren“ (Bezeichnung je nach Version) |
+| Android | Chrome, Samsung Internet, Edge | Menü → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“ |
+| Android | Firefox | Menü → „Zum Startbildschirm hinzufügen“ |
+| Computer | Firefox | keine Installation, das Spiel läuft im Tab |
+
+Spielstände: Mit Safari (iPad, iPhone, Mac) hat die installierte App einen eigenen Speicher, getrennt vom Browser – ein Spielstand aus dem Browser erscheint einmalig nicht in der App. Dafür räumt Safari den Speicher von Apps auf dem Home-Bildschirm nicht nach 7 Tagen ohne Besuch weg. Mit Chrome und Edge teilen sich App und Browser den Speicher, der Spielstand ist derselbe.
 
 Das Spiel dreht sich mit dem Gerät, hoch und quer. Neue Versionen lädt die App still im Hintergrund; sie gelten beim nächsten Start, ein laufendes Spiel wird nie neu geladen.
 
