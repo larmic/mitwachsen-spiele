@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cacheKey, serviceWorkerSource, staleCaches } from './sw';
+import { cacheKey, olderKey, serviceWorkerSource, staleCaches } from './sw';
 
 const ORIGIN = 'https://www.example.de';
 const FILES = ['/_astro/game.js', '/_astro/three.js', '/manifest.webmanifest', '/spielen/'];
@@ -19,22 +19,46 @@ describe('Service Worker: Entscheidungen', () => {
   });
 
   it('räumt nur eigene alte Caches weg', () => {
-    expect(staleCaches(['mitwachsen-a', 'mitwachsen-b', 'fremd'], 'mitwachsen-', 'mitwachsen-b')).toEqual([
-      'mitwachsen-a',
-    ]);
+    const keys = ['mitwachsen-a', 'mitwachsen-b', 'fremd'];
+    expect(staleCaches(keys, 'mitwachsen-', 'mitwachsen-b', [], null)).toEqual(['mitwachsen-a']);
+  });
+
+  it('räumt nicht, solange außer der neu ladenden Seite noch eine Spielseite offen ist', () => {
+    const keys = ['mitwachsen-a', 'mitwachsen-b'];
+    expect(staleCaches(keys, 'mitwachsen-', 'mitwachsen-b', ['tab1'], 'tab1')).toEqual(['mitwachsen-a']);
+    expect(staleCaches(keys, 'mitwachsen-', 'mitwachsen-b', ['tab1', 'tab2'], 'tab1')).toEqual([]);
+    expect(staleCaches(keys, 'mitwachsen-', 'mitwachsen-b', ['tab1'], null)).toEqual([]);
+  });
+
+  it('sucht in älteren Caches nur GET auf der eigenen Seite', () => {
+    expect(olderKey(`${ORIGIN}/_astro/alt.js?x=1`, 'GET', ORIGIN)).toBe('/_astro/alt.js');
+    expect(olderKey(`${ORIGIN}/_astro/alt.js`, 'POST', ORIGIN)).toBeNull();
+    expect(olderKey('https://cdn.example.com/x.js', 'GET', ORIGIN)).toBeNull();
+    expect(olderKey('kaputt', 'GET', ORIGIN)).toBeNull();
   });
 });
 
 type Handler = (event: Record<string, unknown>) => void;
+type Files = Map<string, string>;
+/** Geteilte Umgebung: Caches und offene Seiten (Kennung und Adresse) */
+type Env = { store: Map<string, Files>; windows: { id: string; url: string }[] };
 
 /** Führt den erzeugten Service Worker in einer kleinen Nachbildung der Browser-Umgebung aus */
-function runServiceWorker(version: string, store: Map<string, Map<string, string>>) {
+function runServiceWorker(version: string, env: Env, files = FILES) {
+  const { store } = env;
   const handlers = new Map<string, Handler>();
   const log: string[] = [];
+  const registration = { waiting: null as unknown, installing: null as unknown };
   const self = {
     location: { origin: ORIGIN },
+    registration,
     addEventListener: (type: string, fn: Handler) => handlers.set(type, fn),
-    clients: { claim: () => (log.push('claim'), Promise.resolve()) },
+    skipWaiting: () => (log.push('skipWaiting'), Promise.resolve()),
+    clients: {
+      claim: () => (log.push('claim'), Promise.resolve()),
+      matchAll: (opts: { type: string; includeUncontrolled: boolean }) =>
+        Promise.resolve(opts.type === 'window' && opts.includeUncontrolled ? env.windows : []),
+    },
   };
   const cacheOf = (name: string) => {
     const entries = store.get(name) ?? new Map<string, string>();
@@ -65,14 +89,14 @@ function runServiceWorker(version: string, store: Map<string, Map<string, string
       return this.init.cache;
     }
   }
-  const source = serviceWorkerSource({ version, files: FILES, scope: '/spielen/', prefix: 'mitwachsen-' });
+  const source = serviceWorkerSource({ version, files, scope: '/spielen/', prefix: 'mitwachsen-' });
   // eslint-disable-next-line @typescript-eslint/no-implied-eval
-  const run = new Function('self', 'caches', 'fetch', 'Request', source) as (...env: unknown[]) => void;
-  run(self, caches, fetch, Request);
+  const run = new Function('self', 'caches', 'fetch', 'Request', 'URL', source) as (...env: unknown[]) => void;
+  run(self, caches, fetch, Request, URL);
 
-  const waitUntil = async (type: string) => {
+  const waitUntil = async (type: string, event: Record<string, unknown> = {}) => {
     let done: Promise<unknown> = Promise.resolve();
-    handlers.get(type)!({ waitUntil: (p: Promise<unknown>) => (done = p) });
+    handlers.get(type)!({ ...event, waitUntil: (p: Promise<unknown>) => (done = p) });
     await done;
   };
   const request = async (url: string, method = 'GET') => {
@@ -80,13 +104,24 @@ function runServiceWorker(version: string, store: Map<string, Map<string, string
     handlers.get('fetch')!({ request: { url, method }, respondWith: (p: Promise<unknown>) => (answer.p = p) });
     return answer.p === null ? 'durchgereicht' : await answer.p;
   };
-  return { install: () => waitUntil('install'), activate: () => waitUntil('activate'), request, log };
+  const message = (data: unknown, from: string | null) =>
+    waitUntil('message', { data, source: from === null ? null : { id: from } });
+  return {
+    install: () => waitUntil('install'),
+    activate: () => waitUntil('activate'),
+    message,
+    request,
+    log,
+    registration,
+  };
 }
+
+const page = (id: string) => ({ id, url: `${ORIGIN}/spielen/` });
 
 describe('Service Worker: Ablauf', () => {
   it('speichert beim Installieren alles am HTTP-Cache vorbei und antwortet danach aus dem Cache', async () => {
-    const store = new Map<string, Map<string, string>>();
-    const sw = runServiceWorker('v1', store);
+    const store = new Map<string, Files>();
+    const sw = runServiceWorker('v1', { store, windows: [] });
     await sw.install();
     expect(sw.log).toContain('lade /_astro/three.js (reload)');
     expect([...store.keys()]).toEqual(['mitwachsen-v1']);
@@ -101,11 +136,12 @@ describe('Service Worker: Ablauf', () => {
   });
 
   it('eine neue Version lässt die alte stehen, bis sie aktiv wird, und räumt erst dann auf', async () => {
-    const store = new Map<string, Map<string, string>>([['fremd', new Map()]]);
-    const old = runServiceWorker('v1', store);
+    const store = new Map<string, Files>([['fremd', new Map()]]);
+    const env: Env = { store, windows: [] };
+    const old = runServiceWorker('v1', env);
     await old.install();
     await old.activate();
-    const next = runServiceWorker('v2', store);
+    const next = runServiceWorker('v2', env);
     await next.install();
     // Die alte Seite läuft noch und holt Three.js erst jetzt: Es kommt aus ihrem Cache
     expect([...store.keys()].sort()).toEqual(['fremd', 'mitwachsen-v1', 'mitwachsen-v2']);
@@ -115,8 +151,65 @@ describe('Service Worker: Ablauf', () => {
     expect(await next.request(`${ORIGIN}/spielen/`)).toBe('v2:/spielen/');
   });
 
-  it('wartet ohne skipWaiting auf das Ende der alten Seiten', () => {
-    const source = serviceWorkerSource({ version: 'v', files: [], scope: '/s/', prefix: 'p-' });
-    expect(source).not.toContain('skipWaiting');
+  it('wartet von sich aus auf das Ende der alten Seiten und wird nur auf Bitte des Spiels sofort aktiv', async () => {
+    const sw = runServiceWorker('v1', { store: new Map(), windows: [] });
+    await sw.install();
+    expect(sw.log).not.toContain('skipWaiting');
+    await sw.message({ type: 'etwas anderes' }, 'tab1');
+    await sw.message(null, 'tab1');
+    expect(sw.log).not.toContain('skipWaiting');
+    await sw.message({ type: 'skip-waiting' }, 'tab1');
+    expect(sw.log).toContain('skipWaiting');
+  });
+});
+
+describe('Service Worker: Übernehmen an einer sicheren Stelle', () => {
+  // Version 2 hat ein neues Three.js; die alte Seite kennt nur das alte
+  const NEXT = ['/_astro/game.js', '/_astro/three-2.js', '/manifest.webmanifest', '/spielen/'];
+
+  async function updateWhileOpen(windows: { id: string; url: string }[]) {
+    const store = new Map<string, Files>();
+    const env: Env = { store, windows };
+    const old = runServiceWorker('v1', env);
+    await old.install();
+    await old.activate();
+    const next = runServiceWorker('v2', env, NEXT);
+    await next.install();
+    await next.message({ type: 'skip-waiting' }, 'tab1'); // das Spiel in tab1 schläft und lädt gleich neu
+    await next.activate();
+    return { store, env, next };
+  }
+
+  it('nur die neu ladende Seite offen: Die alten Caches gehen sofort', async () => {
+    const { store } = await updateWhileOpen([page('tab1'), { id: 'start', url: `${ORIGIN}/` }]);
+    expect([...store.keys()]).toEqual(['mitwachsen-v2']);
+  });
+
+  it('ein zweiter alter Tab bekommt sein spät geladenes Three.js weiter aus dem alten Cache', async () => {
+    const { store, env, next } = await updateWhileOpen([page('tab1'), page('tab2')]);
+    expect([...store.keys()].sort()).toEqual(['mitwachsen-v1', 'mitwachsen-v2']);
+    // Der alte Tab hängt jetzt am neuen Service Worker; die Datei gibt es nur noch im alten Cache
+    expect(await next.request(`${ORIGIN}/_astro/three.js`)).toBe('v1:/_astro/three.js');
+    expect(await next.request(`${ORIGIN}/_astro/unbekannt.js`)).toBe(`netz:${ORIGIN}/_astro/unbekannt.js`);
+    expect(await next.request(`${ORIGIN}/_astro/three.js`, 'POST')).toBe('durchgereicht');
+    expect(await next.request('https://cdn.example.com/x.js')).toBe('durchgereicht');
+    // Der alte Tab ist zu, die neue Seite meldet sich: Jetzt ist aufgeräumt
+    env.windows = [page('tab3')];
+    await next.message({ type: 'tidy' }, 'tab3');
+    expect([...store.keys()]).toEqual(['mitwachsen-v2']);
+  });
+
+  it('„tidy“ räumt nicht, solange eine andere Spielseite offen ist oder schon eine neuere Version wartet', async () => {
+    const { store, env, next } = await updateWhileOpen([page('tab1'), page('tab2')]);
+    env.windows = [page('tab2'), page('tab3')];
+    await next.message({ type: 'tidy' }, 'tab3');
+    expect(store.has('mitwachsen-v1')).toBe(true);
+    env.windows = [page('tab3')];
+    next.registration.waiting = {};
+    await next.message({ type: 'tidy' }, 'tab3');
+    expect(store.has('mitwachsen-v1')).toBe(true);
+    next.registration.waiting = null;
+    await next.message({ type: 'tidy' }, null);
+    expect(store.has('mitwachsen-v1')).toBe(true);
   });
 });

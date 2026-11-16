@@ -33,6 +33,8 @@ import { createWorld, standHeight, type World } from './mitwachsen-world';
 import { weatherLook, windAt } from './mitwachsen-weather';
 import { idlePose, type Pose } from './mitwachsen-tired';
 import { advance, evening, freshDay, loadTired, saveTired, type Tired, type TiredEvent } from './mitwachsen-tired';
+import { SLEEP_EVENT, type GameMoment } from './pwa-update';
+import { browserStore } from './browser-store';
 
 const TICK_MS = 100; // Takt der Regeln
 const SAVE_EVERY_MS = 10_000; // Position regelmäßig sichern
@@ -53,23 +55,6 @@ const FREE_KEYS = new Set([
   'ContextMenu',
 ]);
 
-/** localStorage, falls erlaubt – sonst ein Speicher, der nur bis zum Neuladen hält */
-function browserStore(): Store {
-  try {
-    const s = window.localStorage;
-    const probe = 'larmic.games.probe';
-    s.setItem(probe, '1');
-    s.removeItem(probe);
-    return s;
-  } catch {
-    const mem = new Map<string, string>();
-    return {
-      getItem: (k) => mem.get(k) ?? null,
-      setItem: (k, v) => void mem.set(k, v),
-      removeItem: (k) => void mem.delete(k),
-    };
-  }
-}
 const randomSeed = () => crypto.getRandomValues(new Uint32Array(1))[0]!;
 const randomId = () => randomSeed().toString(36) + Date.now().toString(36);
 
@@ -105,7 +90,7 @@ class LarmicMitwachsen extends HTMLElement {
   private gates = new Map<string, number>(); // Zeitpunkt, an dem ein Tor aufging (0 = schon offen)
   private floats: (Float & { born: number; who?: string })[] = [];
   private particles: Particle[] = [];
-  private nightSince = 0;
+  private nightSince = 0; // seit wann die Figur schläft (performance.now): für die Überblendung und App-Updates
   private dayAt = 0;
   private resize: ResizeObserver | null = null;
   private readonly reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -128,7 +113,7 @@ class LarmicMitwachsen extends HTMLElement {
     this.mapCtx = this.map.getContext('2d')!;
     this.touchUi = this.querySelector('.mw-touch')!;
     this.renderer = new Renderer(this.ctx);
-    this.store = browserStore();
+    this.store = browserStore().store;
     this.sfx.muted = this.store.getItem('larmic.games.muted') === '1';
     this.tired = loadTired(this.store, Date.now());
     this.openWorld(loadIndex(this.store).current);
@@ -218,7 +203,8 @@ class LarmicMitwachsen extends HTMLElement {
     this.floats = [];
     this.particles = [];
     this.gates = new Map(this.state.openGates.map((g) => [g, 0]));
-    this.nightSince = 0;
+    // Eine Welt öffnet nachts (die Figur schläft im Bett): gleich dunkel, ohne Überblendung beim Laden
+    this.nightSince = -Infinity;
     this.dayAt = 0;
     this.renderName();
     this.renderMenu();
@@ -230,6 +216,17 @@ class LarmicMitwachsen extends HTMLElement {
     saveWorld(this.store, this.saved);
     saveTired(this.store, this.tired);
     this.lastSave = performance.now();
+  }
+
+  /** Für Updates der App (pwa-register.ts): Was im Spiel gerade los ist; entschieden wird in pwa-update.ts */
+  updateMoment(): GameMoment {
+    return {
+      sleeping: this.state.sleeping,
+      sleepingFor: performance.now() - this.nightSince, // eine Welt öffnet schlafend: dann unendlich
+      menuOpen: this.menu.open,
+      infoOpen: this.info.open,
+      firstInfo: this.info.open && this.store.getItem(INFO_KEY) !== '1',
+    };
   }
 
   /** Menü oder Hinweis offen: Das Spiel ruht */
@@ -545,13 +542,7 @@ class LarmicMitwachsen extends HTMLElement {
           this.float('note', 'player', GAME_COLORS.note, now);
           break;
         case 'sleep':
-          this.story.stop();
-          this.sfx.lullaby();
-          this.nightSince = now;
-          // Ins Bett gebracht: Der Tag ist zu Ende, morgen ist die Figur wieder ausgeschlafen
-          this.tired = freshDay(Date.now());
-          this.sitUntil = 0;
-          this.bubble.hidden = true;
+          this.goodNight(now);
           persist = true;
           break;
         case 'wake':
@@ -562,6 +553,18 @@ class LarmicMitwachsen extends HTMLElement {
       }
     }
     if (persist) this.save();
+  }
+
+  /** Ins Bett gebracht: Schlaflied, Nacht; der Tag ist zu Ende, morgen ist die Figur wieder ausgeschlafen */
+  private goodNight(now: number) {
+    this.story.stop();
+    this.sfx.lullaby();
+    this.nightSince = now;
+    this.tired = freshDay(Date.now());
+    this.sitUntil = 0;
+    this.bubble.hidden = true;
+    // Gute Nacht: eine sichere Stelle, um eine neue Version der App zu übernehmen (pwa-register.ts)
+    this.dispatchEvent(new CustomEvent(SLEEP_EVENT, { bubbles: true }));
   }
 
   private float(kind: Float['kind'], who: string, color: string, born: number) {

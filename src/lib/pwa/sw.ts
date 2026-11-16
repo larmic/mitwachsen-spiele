@@ -1,17 +1,23 @@
-// Der Service Worker, beim Build als Text erzeugt (kein Workbox). Die Entscheidungen stecken in zwei reinen Funktionen,
+// Der Service Worker, beim Build als Text erzeugt (kein Workbox). Die Entscheidungen stecken in reinen Funktionen,
 // die hier getestet werden und wörtlich in den Service Worker kommen (`toString()`): Sie dürfen daher nichts
 // importieren und nur auf ihre Parameter zugreifen.
 //
 // Strategie:
-// – install: alle Dateien der Liste in einen Cache dieser Version laden (am HTTP-Cache vorbei). Kein skipWaiting:
-//   Eine neue Version wartet, bis keine Seite der alten mehr offen ist. Ein laufendes Spiel wird nie neu geladen,
-//   und eine alte Seite bekommt bis zuletzt ihre alten Dateien (auch Three.js, das sie erst später per import() holt).
-// – activate: Jetzt ist keine Seite der alten Version mehr offen, also sind ihre Caches überflüssig und werden
-//   gelöscht (nur die eigenen, erkennbar am Präfix). clients.claim() übernimmt Seiten ohne Service Worker, etwa beim
-//   allerersten Besuch.
+// – install: alle Dateien der Liste in einen Cache dieser Version laden (am HTTP-Cache vorbei). Von sich aus kein
+//   skipWaiting: Eine neue Version wartet, bis keine Seite der alten mehr offen ist.
+// – message „skip-waiting“: Nur das Spiel selbst bittet darum, und nur an einer sicheren Stelle (Gute Nacht, Rückkehr
+//   nach langer Pause, src/scripts/games/pwa-update.ts). Dann wird die neue Version sofort aktiv, die bittende Seite
+//   lädt neu. Der Service Worker merkt sich, welche Seite das war.
+// – activate: Alte eigene Caches (Präfix) werden nur gelöscht, wenn außer der bittenden Seite keine Seite mehr offen
+//   ist. Eine andere, noch offene alte Seite (zweiter Tab) holt ihre Dateien mit Hash im Namen – etwa ein spät per
+//   import() geladenes Three.js – sonst aus einem Cache, den es nicht mehr gibt; auf dem Server sind sie dann schon
+//   weg. Was so stehen bleibt, räumt „tidy“ weg: Jede Spielseite meldet sich nach dem Laden, und ist sie die einzige
+//   offene Seite und dieser Service Worker der neueste, gehen die alten Caches. clients.claim() übernimmt Seiten
+//   ohne Service Worker, etwa beim allerersten Besuch.
 // – fetch: nur GET auf der eigenen Seite. Dateien der Liste kommen aus dem Cache (sonst aus dem Netz), ein Aufruf der
-//   Spielseite selbst bekommt ihr gespeichertes HTML – so startet das Spiel auch ohne Netz. Alles andere geht
-//   unverändert ins Netz und wird nicht gespeichert.
+//   Spielseite selbst bekommt ihr gespeichertes HTML – so startet das Spiel auch ohne Netz. Andere Pfade der eigenen
+//   Seite sucht er in älteren eigenen Caches (für alte, noch offene Seiten), sonst gehen sie unverändert ins Netz und
+//   werden nicht gespeichert. Fremde Adressen gehen immer unverändert ins Netz.
 
 /** Schlüssel im Cache für eine Anfrage, oder `null`: dann kümmert sich der Service Worker nicht darum */
 export function cacheKey(url: string, method: string, origin: string, files: string[], scope: string): string | null {
@@ -27,9 +33,36 @@ export function cacheKey(url: string, method: string, origin: string, files: str
   return files.indexOf(path) >= 0 ? path : null;
 }
 
-/** Caches, die weg können: eigene (Präfix) außer dem aktuellen. Fremde Caches derselben Seite bleiben unberührt */
-export function staleCaches(keys: string[], prefix: string, current: string): string[] {
+/** Pfad einer Anfrage, die vielleicht in einem älteren eigenen Cache liegt: GET auf der eigenen Seite, sonst `null` */
+export function olderKey(url: string, method: string, origin: string): string | null {
+  if (method !== 'GET') return null;
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  return u.origin === origin ? u.pathname : null;
+}
+
+/** Eigene Caches (Präfix) außer dem aktuellen, älteste zuerst. Fremde Caches derselben Seite bleiben unberührt */
+export function olderCaches(keys: string[], prefix: string, current: string): string[] {
   return keys.filter((k) => k.indexOf(prefix) === 0 && k !== current);
+}
+
+/**
+ * Caches, die weg können: alle älteren eigenen – aber nur, wenn außer `leaving` keine Seite mehr offen ist (`windows`:
+ * Kennungen der offenen Seiten, `leaving`: die Seite, die gleich neu lädt oder sich gerade meldet). Sonst keiner.
+ */
+export function staleCaches(
+  keys: string[],
+  prefix: string,
+  current: string,
+  windows: string[],
+  leaving: string | null,
+): string[] {
+  for (const id of windows) if (id !== leaving) return [];
+  return olderCaches(keys, prefix, current);
 }
 
 export type ServiceWorkerOptions = {
@@ -48,7 +81,20 @@ const CACHE = PREFIX + ${JSON.stringify(version)};
 const SCOPE = ${JSON.stringify(scope)};
 const FILES = ${JSON.stringify(files, null, 2)};
 const cacheKey = ${cacheKey.toString()};
+const olderKey = ${olderKey.toString()};
+const olderCaches = ${olderCaches.toString()};
 const staleCaches = ${staleCaches.toString()};
+let leaving = null; // die Seite, die um skipWaiting gebeten hat und gleich neu lädt
+
+// Alte eigene Caches löschen, wenn außer „except“ keine Spielseite offen ist. Auch Seiten ohne Service Worker zählen:
+// Eine Seite, die gerade erst aufgerufen wird, ist noch nicht dabei, eine alte, noch offene immer.
+const tidy = (except) =>
+  Promise.all([caches.keys(), self.clients.matchAll({ type: 'window', includeUncontrolled: true })]).then(
+    ([keys, all]) => {
+      const windows = all.filter((w) => new URL(w.url).pathname.indexOf(SCOPE) === 0).map((w) => w.id);
+      return Promise.all(staleCaches(keys, PREFIX, CACHE, windows, except).map((k) => caches.delete(k)));
+    },
+  );
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -56,22 +102,44 @@ self.addEventListener('install', (event) => {
   );
 });
 
+self.addEventListener('message', (event) => {
+  const type = event.data && event.data.type;
+  const from = event.source && event.source.id ? event.source.id : null;
+  if (type === 'skip-waiting') {
+    leaving = from;
+    event.waitUntil(self.skipWaiting());
+  } else if (type === 'tidy' && from && !self.registration.waiting && !self.registration.installing) {
+    event.waitUntil(tidy(from));
+  }
+});
+
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(staleCaches(keys, PREFIX, CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
-  );
+  event.waitUntil(tidy(leaving).then(() => self.clients.claim()));
 });
 
 self.addEventListener('fetch', (event) => {
   const key = cacheKey(event.request.url, event.request.method, self.location.origin, FILES, SCOPE);
-  if (key === null) return;
+  if (key !== null) {
+    event.respondWith(
+      caches
+        .open(CACHE)
+        .then((cache) => cache.match(key))
+        .then((hit) => hit || fetch(event.request)),
+    );
+    return;
+  }
+  const old = olderKey(event.request.url, event.request.method, self.location.origin);
+  if (old === null) return;
+  // Eine alte, noch offene Seite holt eine Datei, die es nur in ihrer Version gab: aus ihrem Cache, sonst aus dem Netz
   event.respondWith(
     caches
-      .open(CACHE)
-      .then((cache) => cache.match(key))
+      .keys()
+      .then((keys) =>
+        olderCaches(keys, PREFIX, CACHE).reduce(
+          (found, name) => found.then((hit) => hit || caches.open(name).then((c) => c.match(old))),
+          Promise.resolve(undefined),
+        ),
+      )
       .then((hit) => hit || fetch(event.request)),
   );
 });

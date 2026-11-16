@@ -14,7 +14,7 @@ export default defineConfig({
       include: [
         'src/lib/**/*.ts',
         'src/data/games/*.ts',
-        'src/scripts/games/input-pace.ts',
+        'src/scripts/games/{input-pace,pwa-update}.ts',
         'src/scripts/games/mitwachsen-{fog,growth,save,state,tired,weather,world}.ts',
         'scripts/{bundles,dist,pwa}.ts',
       ],
