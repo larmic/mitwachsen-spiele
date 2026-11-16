@@ -1,6 +1,6 @@
 // Texte der Startseite (/), alle an einer Stelle.
 //
-// PLATZHALTER: Die Texte hier sind vorläufig. Sie stammen aus dem Text für Eltern (src/content/games/mitwachsen.md,
+// PLATZHALTER: Die Texte hier sind vorläufig. Sie stammen aus dem Text für Eltern auf larmic.de (/spiele/mitwachsen/,
 // docs/games/README.md) und sollen nur zeigen, wie viel Text wohin passt. Jede Stelle mit „Platzhalter“ ist zu
 // ersetzen. Die Eckdaten (Alter, Steuerung, …) kommen weiter aus src/content/games/mitwachsen.md.
 //

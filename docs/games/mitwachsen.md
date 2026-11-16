@@ -259,7 +259,7 @@ Bei `prefers-reduced-motion`: Die Kamera springt feldweise mit, ohne Nachgleiten
 
 Das Spiel lief zuerst auf larmic.de unter `/spiele/mitwachsen/` und hat jetzt eine eigene Seite: mitwachsen-spiele.de. Spielstände von larmic.de ziehen nicht mit (andere Domain, eigener Browser-Speicher).
 
-- **`/`** ist die Seite für Eltern: für wen, warum es das Spiel gibt, worauf geachtet ist, ein Standbild, „Spiel starten“. Der Text steht als Markdown in `src/content/games/mitwachsen.md`.
+- **`/`** ist die Seite für Eltern: für wen, warum es das Spiel gibt, worauf geachtet ist, ein Standbild, „Spiel starten“. Alle Texte stehen in `src/data/landing.ts`, die Eckdaten (Alter, Steuerung …) im Frontmatter von `src/content/games/mitwachsen.md`.
 - **`/spielen/`** ist das Spiel selbst, ohne Zurück-Button; der Weg zur Startseite liegt im Menü für Eltern. `noindex`, nicht in der Sitemap.
 - Dazu Impressum, Datenschutz und eine 404-Seite.
 

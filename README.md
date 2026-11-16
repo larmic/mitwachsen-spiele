@@ -37,7 +37,8 @@ src/
   pages/              / (Seite für Eltern), /spielen/ (das Spiel, noindex), /impressum/, /datenschutz/, 404,
                       dazu favicon, apple-touch-icon und og.png (beim Build erzeugt)
   layouts/            BaseLayout (Kopfdaten; die Startseite baut darauf direkt auf), PlainPage (Himmel, Inhalt auf Papier, Footer)
-  content/games/      Text für Eltern als Markdown, Schema in content.config.ts
+  content/games/      Eckdaten des Spiels im Frontmatter (Alter, Steuerung …), Schema in content.config.ts;
+                      alle Texte der Startseite stehen in data/landing.ts
   components/         MitwachsenGame (Spielfläche), MitwachsenParentInfo (Hinweis für Eltern), Kopf, Footer …
   scripts/games/      das Spiel im Browser: Welt, Regeln, Speichern (rein, getestet), Web Component,
                       2D- und 3D-Ansicht (Three.js, per import() nachgeladen), Töne
