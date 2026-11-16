@@ -15,7 +15,7 @@ Umgesetzt ist es in reinen, getesteten Teilen und einer Web Component:
 | Ruhiger Takt der Eingabe | [`src/scripts/games/input-pace.ts`](../../src/scripts/games/input-pace.ts) | `input-pace.test.ts` |
 | Nebel (erkundete Felder) | [`src/scripts/games/mitwachsen-fog.ts`](../../src/scripts/games/mitwachsen-fog.ts) | `mitwachsen-fog.test.ts` |
 | Karte | [`src/scripts/games/mitwachsen-map.ts`](../../src/scripts/games/mitwachsen-map.ts) | – (Zeichnen) |
-| App: Manifest, Icons, Service Worker, Updates | [`src/data/pwa.ts`](../../src/data/pwa.ts), [`src/lib/pwa/`](../../src/lib/pwa/) (`manifest.ts`, `precache.ts`, `sw.ts`), [`src/integrations/service-worker.ts`](../../src/integrations/service-worker.ts), Anmeldung und Updates in [`pwa-register.ts`](../../src/scripts/games/pwa-register.ts), Entscheidungen in [`pwa-update.ts`](../../src/scripts/games/pwa-update.ts) | `precache.test.ts`, `sw.test.ts`, `manifest.test.ts`, `pwa-update.test.ts`, `pwa.test.ts` (Daten und App-Gate), `e2e/pwa.spec.ts` |
+| App: Manifest, Icons, Service Worker, Updates | [`src/data/pwa.ts`](../../src/data/pwa.ts), [`src/lib/pwa/`](../../src/lib/pwa/) (`manifest.ts`, `precache.ts`, `sw.ts`), [`src/integrations/service-worker.ts`](../../src/integrations/service-worker.ts), Anmeldung und Updates in [`pwa-register.ts`](../../src/scripts/games/pwa-register.ts), Entscheidungen in [`pwa-update.ts`](../../src/scripts/games/pwa-update.ts) | `precache.test.ts`, `sw.test.ts`, `manifest.test.ts`, `pwa-update.test.ts`, `pwa.test.ts` (Daten und App-Gate), `e2e/pwa.spec.ts`, `e2e/pwa-update.spec.ts` |
 | Browser: Tastatur, Takt, Kamera, Töne, Menü | [`larmic-mitwachsen.ts`](../../src/scripts/games/larmic-mitwachsen.ts), [`mitwachsen-render.ts`](../../src/scripts/games/mitwachsen-render.ts) (2D und Ebene darüber), [`mitwachsen-3d.ts`](../../src/scripts/games/mitwachsen-3d.ts) (3D mit Three.js), [`sfx.ts`](../../src/scripts/games/sfx.ts) | – |
 
 Bei Änderungen am Verhalten Spec und Tests mitziehen.
@@ -191,9 +191,9 @@ Das Spiel lässt sich als App auf den Home-Bildschirm legen und startet danach a
 | Manifest | `/manifest.webmanifest`, beim Build erzeugt: Name „Mitwachsen“, `lang` de, `start_url` und `id` `/spielen/`, `scope` `/` (so installiert „Zum Home-Bildschirm“ auch von der Startseite aus das Spiel), `display` standalone (Uhr und Akku bleiben sichtbar, Vollbild gibt es im Menü), Farben `--sky-1`. **Keine `orientation`:** Das Spiel dreht sich mit dem Gerät |
 | Icons | Grasblock auf Himmel (`--sky-2`), beim Build gerendert: 192 und 512 px, dazu je eine maskierbare Fassung mit Rand (Würfel auf 60 %, bleibt im sicheren Kreis von 80 %); dazu wie bisher `apple-touch-icon` |
 | Kopfdaten | Jede Seite verweist auf das Manifest, setzt `theme-color` und `apple-mobile-web-app-*`. Das ist kein JavaScript: Die Startseite lädt weiterhin keine einzige JavaScript-Datei |
-| Service Worker | `/spielen/sw.js`, Gültigkeit (`scope`) nur `/spielen/`. Angemeldet nur von der Spielseite, nach dem Laden, nur im fertigen Build; Fehler bleiben still, das Spiel läuft auch ohne |
+| Service Worker | `/spielen/sw.js`, Gültigkeit (`scope`) nur `/spielen/`. Angemeldet nur von der Spielseite, nach dem Laden, nur im fertigen Build, mit `updateViaCache: 'none'` (die Frage nach einer neuen Version geht nie über den HTTP-Cache); Fehler bleiben still, das Spiel läuft auch ohne |
 | Erster Start | Ohne Netz läuft die App erst, nachdem die Spielseite einmal mit Netz geöffnet war: Die Startseite lädt kein JavaScript und meldet deshalb keinen Service Worker an. Wer von der Startseite aus installiert, startet die App einmal mit Netz (oder öffnet vorher das Spiel) |
-| Vorab gespeichert | alles, was `/spielen/` braucht: die Seite selbst, Skripte (auch das per `import()` nachgeladene Three.js), Stylesheets, Schriften, Icons, Manifest, Aufnahmen der Klangsteine. Die Liste wird nach dem Build aus der fertigen Seite gesammelt (Verweise in HTML, CSS, Manifest und JavaScript), nie von Hand gepflegt |
+| Vorab gespeichert | alles, was `/spielen/` braucht: die Seite selbst, Skripte (auch das per `import()` nachgeladene Three.js), Stylesheets, Schriften, Icons, Manifest, Aufnahmen der Klangsteine. Die Liste wird nach dem Build aus der fertigen Seite gesammelt (Verweise in HTML, CSS, Manifest und JavaScript), nie von Hand gepflegt. Zusammen höchstens `PRECACHE_BUDGET` (960 KiB, `scripts/verify-pwa.ts`; heute rund 894 KiB, gut 550 KiB davon Three.js): Jedes Gerät lädt alles mit jeder neuen Version ganz, auch über Mobilfunk |
 | Anfragen | nur GET auf der eigenen Seite. Dateien der Liste kommen aus dem Cache, fehlt dort etwas, aus dem Netz. Ein Aufruf von `/spielen/` (auch mit `?…` oder `index.html`) bekommt das gespeicherte HTML. Andere Pfade der eigenen Seite kommen aus einem älteren `mitwachsen-*`-Cache, falls es sie dort gibt (für eine alte, noch offene Seite), sonst aus dem Netz, und werden nie gespeichert. Fremde Adressen gehen unverändert ins Netz |
 | Neue Version | Cache-Name `mitwachsen-<Version>`, die Version ist ein Hash über Pfade und Inhalte. Die neue Version lädt im Hintergrund und wartet; von sich aus gilt sie ab dem nächsten echten Start (keine Seite der alten mehr offen). Installierte Apps werden aber meist nur angehalten und fortgesetzt, ohne neu zu laden – darum übernimmt das Spiel eine wartende Version selbst, an zwei sicheren Stellen (siehe „Updates an sicheren Stellen“) |
 | Aufräumen | beim Aktivieren der neuen Version werden die alten `mitwachsen-*`-Caches gelöscht, aber nur, wenn außer der Seite, die gerade für das Update neu lädt, keine Spielseite mehr offen ist (gezählt werden alle Fenster unter `/spielen/`, auch ohne Service Worker). Ist noch eine offen (zweiter Tab mit der alten Version), bleiben sie: Diese Seite holt ihre Dateien mit Hash im Namen, auch ein spät nachgeladenes Three.js, bis zuletzt aus ihrem Cache – auf dem Server gibt es sie dann nicht mehr. Jede Spielseite meldet sich nach dem Laden beim Service Worker („tidy“); ist sie die einzige offene Spielseite und wartet keine neuere Version, räumt er die alten Caches dann weg. Fremde Caches bleiben immer |
@@ -202,7 +202,7 @@ Das Spiel lässt sich als App auf den Home-Bildschirm legen und startet danach a
 
 ### Updates an sicheren Stellen
 
-Rein in `pwa-update.ts`, angewandt in `pwa-register.ts`. Kein Hinweis für das Kind, Eltern müssen nichts tun.
+Rein in `pwa-update.ts`, angewandt in `pwa-register.ts`. Kein Hinweis für das Kind, Eltern müssen nichts tun. Die mit „e2e“ bezeichneten Tests stehen in `e2e/pwa-update.spec.ts`.
 
 | Regel | Test |
 | --- | --- |
@@ -214,7 +214,7 @@ Rein in `pwa-update.ts`, angewandt in `pwa-register.ts`. Kein Hinweis für das K
 | **Keine Schleife:** Neu geladen wird nur, wenn die Seite selbst um `skipWaiting` gebeten hat (beim ersten Besuch übernimmt `clients.claim()` die Seite ohne Neuladen), und höchstens einmal in `APPLY_GAP` (10 Minuten, gemerkt im `sessionStorage`) | „lädt nicht in einer Schleife neu“, e2e (kein zweites Neuladen) |
 | **Mehrere Tabs:** Nur der Tab, der schlafen ging, lädt neu. Ein anderer offener Tab läuft mit seiner alten Version ungestört weiter und bekommt seine Dateien weiter (siehe „Aufräumen“) | „ein zweiter alter Tab bekommt …“ (`sw.test.ts`), e2e „ein zweiter, alter Tab …“ |
 
-Für den Browser-Test liefert der Test-Server (`e2e/serve.ts`) mit dem Cookie `mw-sw=<n>` einen Service Worker mit anderer Version, so als wäre eine neue Fassung erschienen.
+Der Browser-Test arbeitet mit zwei echten Fassungen der Seite: Vor dem Test leitet `e2e/versions.ts` aus dem Build in `dist/` eine zweite ab (`.e2e/v2`): Die 3D-Datei mit Three.js bekommt neuen Inhalt und einen neuen Namen, die alte fehlt auf dem Server, und der Service Worker wird mit demselben Code wie beim Build neu geschrieben (`writeServiceWorker`). Kein zweiter Build, nichts Testspezifisches in der Seite. Der Test-Server (`e2e/serve.ts`) liefert einem Browser-Kontext mit dem Cookie `mw-version=2` die zweite Fassung, so laufen die Tests parallel und in der Pipeline genauso wie lokal.
 
 Invarianten:
 
@@ -223,6 +223,11 @@ Invarianten:
 - Die Version passt zum Inhalt: Ändert sich eine Datei, ändert sich der Service Worker, und Geräte bekommen die neue Fassung. *App-Gate, „ändert die Version mit jedem Inhalt“ (`precache.test.ts`)*
 - Eine neue Version löscht beim Installieren nichts; alte Caches verschwinden erst beim Aktivieren, und nur, wenn keine andere Spielseite mehr offen ist. *„eine neue Version lässt die alte stehen …“, „räumt nicht, solange …“, „„tidy“ räumt nicht …“ (`sw.test.ts`)*
 - Der Service Worker ruft `skipWaiting` nie von sich aus, nur auf die Bitte des Spiels; das Spiel bittet nur an einer sicheren Stelle und lädt nie mitten im Spiel neu. *„wartet von sich aus …“ (`sw.test.ts`), `pwa-update.test.ts`, e2e „mitten im Spiel wird nie neu geladen …“*
+- Eine neue Fassung wartet, solange eine Seite der alten offen ist; die alte Seite spielt weiter und bekommt ihr altes Three.js auch ohne Netz, obwohl der Server es nicht mehr hat. Sind alle Seiten zu, gilt beim nächsten Öffnen die neue, und die alten Caches sind weg. *„Zwei Fassungen: die offene alte Seite läuft weiter …“ (`e2e/pwa-update.spec.ts`)*
+- Das Gute-Nacht-Ritual übernimmt eine wartende Fassung und lädt genau einmal neu, in die Nacht im Bett. *„nach dem Gute-Nacht-Ritual kommt die wartende Fassung …“ (`e2e/pwa-update.spec.ts`)*
+- Startseite und Spielseite sind für Chromium installierbar: keine Einwände (`Page.getInstallabilityErrors`), Manifest ohne Fehler (`Page.getAppManifest`). *„Seite … ist für Chromium installierbar“ (`e2e/pwa.spec.ts`)*
+- Die Anmeldung fragt am HTTP-Cache vorbei nach neuen Versionen (`updateViaCache` nie `'all'`). *„fragt am HTTP-Cache vorbei …“ (`pwa-update.test.ts`), `e2e/pwa.spec.ts` (Spiel ohne Netz)*
+- Was vorab gespeichert wird, bleibt im Budget `PRECACHE_BUDGET`. *App-Gate, „lässt genau das Budget durch …“ (`scripts/pwa.test.ts`)*
 - Ohne Netz startet `/spielen/` neu, mit 3D, ohne Fehler in der Konsole. *„Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotzdem“ (`e2e/pwa.spec.ts`)*
 
 ## Speichern

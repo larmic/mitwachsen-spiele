@@ -1,5 +1,5 @@
 // Das Spiel als App: installierbar von der Startseite und vom Spiel aus, der Service Worker steuert nur das Spiel,
-// und ohne Netz startet es trotzdem. Spec: docs/specs/mitwachsen.md („App“).
+// und ohne Netz startet es trotzdem. Updates: e2e/pwa-update.spec.ts. Spec: docs/specs/mitwachsen.md („App“).
 import { expect, test, type Page } from '@playwright/test';
 
 /** Sammelt Fehler der Seite; am Ende des Tests muss die Liste leer sein */
@@ -33,6 +33,19 @@ for (const path of ['/', '/spielen/'])
     }
   });
 
+// Was Chromium selbst zur Installierbarkeit sagt (DevTools-Protokoll): keine Einwände, Manifest ohne Fehler
+for (const path of ['/', '/spielen/'])
+  test(`Seite ${path} ist für Chromium installierbar`, async ({ page }) => {
+    await page.goto(path);
+    await page.waitForLoadState('load');
+    const cdp = await page.context().newCDPSession(page);
+    const manifest = (await cdp.send('Page.getAppManifest')) as { url: string; errors: { message: string }[] };
+    expect(new URL(manifest.url).pathname).toBe('/manifest.webmanifest');
+    expect(manifest.errors).toEqual([]);
+    const { installabilityErrors } = await cdp.send('Page.getInstallabilityErrors');
+    expect(installabilityErrors).toEqual([]);
+  });
+
 test('Startseite meldet keinen Service Worker an', async ({ page }) => {
   await page.goto('/');
   await page.waitForLoadState('load');
@@ -45,8 +58,12 @@ test('Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotz
   await page.goto('/spielen/');
   await page.getByRole('button', { name: /Verstanden/ }).click();
   // Bereit heißt: alles gespeichert (install) und aktiv; clients.claim() übernimmt die offene Seite
-  const scope = await page.evaluate(() => navigator.serviceWorker.ready.then((r) => r.scope));
-  expect(new URL(scope).pathname).toBe('/spielen/');
+  const reg = await page.evaluate(() =>
+    navigator.serviceWorker.ready.then((r) => ({ scope: r.scope, updateViaCache: r.updateViaCache })),
+  );
+  expect(new URL(reg.scope).pathname).toBe('/spielen/');
+  // Die Frage nach einer neuen Version geht am HTTP-Cache vorbei, nie 'all'
+  expect(['none', 'imports']).toContain(reg.updateViaCache);
   await expect
     .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null))
     .toMatch(/\/spielen\/sw\.js$/);
@@ -68,126 +85,4 @@ test('Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotz
   await expect.poll(sleeping).toBe(false);
   await context.setOffline(false);
   expect(errors).toEqual([]);
-});
-
-// App-Updates: Der Test-Server (e2e/serve.ts) liefert mit dem Cookie `mw-sw` einen Service Worker mit neuer Version
-type GameEl = { state: { sleeping: boolean }; apply(cmd: { type: string }): void };
-
-/** Spiel öffnen, Hinweis schließen, warten, bis der Service Worker die Seite steuert */
-async function openGame(page: Page, firstTime = true) {
-  await page.goto('/spielen/');
-  if (firstTime) await page.getByRole('button', { name: /Verstanden/ }).click();
-  await expect
-    .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null))
-    .toMatch(/\/spielen\/sw\.js$/);
-  const game = page.locator('larmic-mitwachsen');
-  const sleeping = () => game.evaluate((el) => (el as unknown as GameEl).state.sleeping);
-  let loads = 0;
-  page.on('load', () => loads++);
-  return { game, sleeping, loads: () => loads };
-}
-
-const newVersion = (page: Page) =>
-  page.context().addCookies([{ name: 'mw-sw', value: '2', url: 'http://localhost:4321' }]);
-const cacheNames = (page: Page) => page.evaluate(() => caches.keys());
-
-test('App-Update: nach dem Gute-Nacht-Ritual kommt die neue Version, das Spiel schläft weiter', async ({ page }) => {
-  const errors = watchErrors(page);
-  const { game, sleeping, loads } = await openGame(page);
-  await page.keyboard.press('ArrowDown');
-  await expect.poll(sleeping).toBe(false);
-  await newVersion(page);
-  // Ins Bett (wie Hineinlaufen): Schlaflied, Nacht, gespeichert – danach fragt das Spiel nach einer neuen Version
-  await game.evaluate((el) => (el as unknown as GameEl).apply({ type: 'action' }));
-  await expect.poll(sleeping).toBe(true);
-  await expect.poll(loads, { timeout: 30_000 }).toBe(1);
-  await expect(game).toHaveClass(/ready/);
-  expect(await sleeping()).toBe(true);
-  await expect(page.locator('dialog.mw-info')).not.toHaveAttribute('open');
-  // Neue Version aktiv, alte Caches weg (keine andere Spielseite offen)
-  await expect.poll(() => cacheNames(page)).toEqual([expect.stringMatching(/^mitwachsen-.+-2$/)]);
-  // Kein zweites Neuladen
-  await page.waitForTimeout(6000);
-  expect(loads()).toBe(1);
-  expect(await sleeping()).toBe(true);
-  expect(errors).toEqual([]);
-});
-
-test('App-Update: zurück nach langer Pause, das Spiel schläft noch – die neue Version kommt', async ({ page }) => {
-  const errors = watchErrors(page);
-  const { sleeping, loads } = await openGame(page);
-  await newVersion(page);
-  await page.waitForTimeout(4500); // die Figur schläft seit dem Laden länger als das Ritual
-  // Seite verborgen, eine halbe Stunde vergeht, Seite wieder sichtbar
-  await page.evaluate(() => {
-    let state = 'hidden';
-    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
-    document.dispatchEvent(new Event('visibilitychange'));
-    const real = Date.now.bind(Date);
-    Date.now = () => real() + 31 * 60_000;
-    state = 'visible';
-    document.dispatchEvent(new Event('visibilitychange'));
-  });
-  await expect.poll(loads, { timeout: 30_000 }).toBe(1);
-  expect(await sleeping()).toBe(true);
-  await expect.poll(() => cacheNames(page)).toEqual([expect.stringMatching(/-2$/)]);
-  expect(errors).toEqual([]);
-});
-
-test('App-Update: mitten im Spiel wird nie neu geladen, die neue Version wartet', async ({ page }) => {
-  const errors = watchErrors(page);
-  const { sleeping, loads } = await openGame(page);
-  await page.keyboard.press('ArrowDown');
-  await expect.poll(sleeping).toBe(false);
-  await newVersion(page);
-  await page.evaluate(() => navigator.serviceWorker.getRegistration('/spielen/').then((r) => r?.update()));
-  await expect
-    .poll(() => page.evaluate(() => navigator.serviceWorker.getRegistration('/spielen/').then((r) => !!r?.waiting)))
-    .toBe(true);
-  // Auslöser wie beim Einschlafen und nach langer Pause – aber die Figur ist wach
-  await page.evaluate(() => {
-    document.dispatchEvent(new Event('mitwachsen-sleep'));
-    let state = 'hidden';
-    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
-    document.dispatchEvent(new Event('visibilitychange'));
-    const real = Date.now.bind(Date);
-    Date.now = () => real() + 31 * 60_000;
-    state = 'visible';
-    document.dispatchEvent(new Event('visibilitychange'));
-  });
-  await page.waitForTimeout(6000);
-  expect(loads()).toBe(0);
-  expect(await sleeping()).toBe(false);
-  expect(
-    await page.evaluate(() => navigator.serviceWorker.getRegistration('/spielen/').then((r) => !!r?.waiting)),
-  ).toBe(true);
-  expect(errors).toEqual([]);
-});
-
-test('App-Update: ein zweiter, alter Tab spielt ungestört weiter, seine Dateien bleiben bis zuletzt', async ({
-  page,
-  context,
-}) => {
-  const errors = watchErrors(page);
-  const a = await openGame(page);
-  const other = await context.newPage();
-  const otherErrors = watchErrors(other);
-  const b = await openGame(other, false);
-  await other.keyboard.press('ArrowDown');
-  await expect.poll(b.sleeping).toBe(false);
-  await page.keyboard.press('ArrowDown');
-  await expect.poll(a.sleeping).toBe(false);
-  await newVersion(page);
-  await a.game.evaluate((el) => (el as unknown as GameEl).apply({ type: 'action' }));
-  await expect.poll(a.loads, { timeout: 30_000 }).toBe(1);
-  // Der Tab, der schlafen ging, hat die neue Version; der andere spielt weiter und lädt nicht neu
-  expect(b.loads()).toBe(0);
-  expect(await b.sleeping()).toBe(false);
-  // Der alte Cache bleibt, solange der andere Tab offen ist …
-  expect((await cacheNames(page)).length).toBe(2);
-  // … und geht, sobald eine Spielseite allein offen ist und sich meldet
-  await other.close();
-  await page.reload();
-  await expect.poll(() => cacheNames(page)).toEqual([expect.stringMatching(/-2$/)]);
-  expect([...errors, ...otherErrors]).toEqual([]);
 });

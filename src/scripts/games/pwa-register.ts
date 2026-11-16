@@ -12,7 +12,15 @@
 // keinen Hinweis, Eltern müssen nichts tun.
 import { SERVICE_WORKER } from '../../data/pwa';
 import { browserStore } from './browser-store';
-import { RITUAL_MS, SLEEP_EVENT, longPause, safeMoment, shouldApply, type GameMoment } from './pwa-update';
+import {
+  RITUAL_MS,
+  SLEEP_EVENT,
+  longPause,
+  registrationOptions,
+  safeMoment,
+  shouldApply,
+  type GameMoment,
+} from './pwa-update';
 
 /** Zuletzt übernommen (sessionStorage, übersteht das Neuladen): gegen eine Schleife von Neuladen */
 const APPLIED_KEY = 'larmic.games.mitwachsen.updated';
@@ -99,7 +107,7 @@ export function registerServiceWorker() {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
   const start = () => {
     navigator.serviceWorker
-      .register(SERVICE_WORKER.url, { scope: SERVICE_WORKER.scope })
+      .register(SERVICE_WORKER.url, registrationOptions(SERVICE_WORKER.scope))
       .then((reg) => {
         watchUpdates(reg);
         // Die Seite meldet sich: Ist sie die einzige Spielseite, räumt der Service Worker alte Caches weg

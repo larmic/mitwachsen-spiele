@@ -1,5 +1,6 @@
 # Erzeugtes und Fremdes
 dist/
+.e2e/
 .astro/
 node_modules/
 package-lock.json

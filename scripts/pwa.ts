@@ -5,6 +5,8 @@
 // – Seine Version passt zum Inhalt: Sonst bekämen Geräte eine neue Fassung nie.
 // – Das Manifest startet im Spiel, hat Icons in den Größen, die es angibt, und legt die Drehung nicht fest.
 // – Jede Seite verweist auf das Manifest.
+// – Was vorab gespeichert wird, bleibt im Budget: Jedes Gerät lädt es bei jeder neuen Version ganz (am HTTP-Cache
+//   vorbei), auch über das Mobilfunknetz. Wächst es, fällt das Gate; dann bewusst entscheiden und das Budget anheben.
 import { cacheVersion, distFile, htmlRefs, precacheList, type ReadFile } from '../src/lib/pwa/precache.ts';
 
 export type PwaOptions = {
@@ -62,6 +64,21 @@ export function checkServiceWorker(read: ReadFile, scripts: string[], opts: PwaO
   const expected = opts.sw.prefix + cacheVersion(sw.files, read);
   if (sw.cache !== expected) problems.push(`${opts.sw.url}: Version ${sw.cache} passt nicht zum Inhalt (${expected})`);
   return problems;
+}
+
+/** Gesamtgröße der vorab gespeicherten Dateien in Bytes; fehlende Dateien zählen nicht (meldet checkServiceWorker) */
+export function precacheBytes(files: string[], read: ReadFile): number {
+  return files.reduce((sum, f) => sum + (read(distFile(f))?.byteLength ?? 0), 0);
+}
+
+/** Verstoß, wenn die vorab gespeicherten Dateien zusammen größer sind als `budget` Bytes */
+export function checkPrecacheSize(files: string[], read: ReadFile, budget: number): string[] {
+  const bytes = precacheBytes(files, read);
+  return bytes > budget
+    ? [
+        `Service Worker speichert ${bytes} Bytes vorab, erlaubt sind ${budget} (PRECACHE_BUDGET in scripts/verify-pwa.ts)`,
+      ]
+    : [];
 }
 
 type Manifest = {

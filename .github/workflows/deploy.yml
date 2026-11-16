@@ -54,7 +54,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Guard-Gate – HTML und interne Links der fertigen Seite
+      - name: Guard-Gate – Fertige Seite (HTML, Links, Bundles, externe Ressourcen, App)
         run: npm run verify
 
       - name: Browser für den Smoke-Test installieren

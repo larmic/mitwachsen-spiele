@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   checkManifest,
   checkManifestLinks,
+  checkPrecacheSize,
   checkServiceWorker,
   parseServiceWorker,
   pngSize,
+  precacheBytes,
   type PwaOptions,
 } from './pwa.ts';
 import { cacheVersion } from '../src/lib/pwa/precache.ts';
@@ -158,6 +160,25 @@ describe('App-Gate: Verweis aufs Manifest', () => {
     expect(checkManifestLinks(pages, '/manifest.webmanifest')).toEqual([
       'spielen/index.html: kein <link rel="manifest" href="/manifest.webmanifest">',
       'x.html: kein <link rel="manifest" href="/manifest.webmanifest">',
+    ]);
+  });
+});
+
+describe('App-Gate: Budget für vorab Gespeichertes', () => {
+  const sizes: Record<string, number> = { 'spielen/index.html': 300, '_astro/a.js': 600, '_astro/b.css': 100 };
+  const read = (path: string) => (path in sizes ? new Uint8Array(sizes[path]!) : null);
+  const files = ['/spielen/', '/_astro/a.js', '/_astro/b.css'];
+
+  it('zählt alle Dateien der Liste zusammen, die Spielseite als index.html', () => {
+    expect(precacheBytes(files, read)).toBe(1000);
+    expect(precacheBytes([...files, '/fehlt.js'], read)).toBe(1000);
+    expect(precacheBytes([], read)).toBe(0);
+  });
+
+  it('lässt genau das Budget durch und meldet jedes Byte darüber', () => {
+    expect(checkPrecacheSize(files, read, 1000)).toEqual([]);
+    expect(checkPrecacheSize(files, read, 999)).toEqual([
+      'Service Worker speichert 1000 Bytes vorab, erlaubt sind 999 (PRECACHE_BUDGET in scripts/verify-pwa.ts)',
     ]);
   });
 });

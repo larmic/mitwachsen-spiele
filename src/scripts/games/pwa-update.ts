@@ -54,3 +54,10 @@ export function shouldApply(c: Chance): boolean {
   if (c.now - c.armedAt > ARM_MS || c.now < c.armedAt) return false;
   return c.lastApplied <= 0 || c.now - c.lastApplied >= APPLY_GAP || c.now < c.lastApplied;
 }
+
+/**
+ * Optionen der Anmeldung. `updateViaCache: 'none'`: Die Frage nach einer neuen Version geht immer am HTTP-Cache vorbei
+ * ins Netz, für sw.js und alles, was er einmal importieren sollte. Nie 'all' – dann hielte der HTTP-Cache eine neue
+ * Version zurück, und alle Mühe an den sicheren Stellen ginge ins Leere.
+ */
+export const registrationOptions = (scope: string): RegistrationOptions => ({ scope, updateViaCache: 'none' });

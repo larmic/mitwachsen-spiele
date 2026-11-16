@@ -5,6 +5,7 @@ import {
   LONG_PAUSE,
   RITUAL_MS,
   longPause,
+  registrationOptions,
   safeMoment,
   shouldApply,
   type Chance,
@@ -83,5 +84,13 @@ describe('App-Update: übernehmen', () => {
     expect(shouldApply({ ...chance, lastApplied: now - 5000 })).toBe(false);
     expect(shouldApply({ ...chance, lastApplied: now - APPLY_GAP })).toBe(true);
     expect(shouldApply({ ...chance, lastApplied: now + 5000 })).toBe(true); // Uhr zurückgestellt
+  });
+});
+
+describe('Anmeldung', () => {
+  it('fragt am HTTP-Cache vorbei nach einer neuen Version, nie über den Cache', () => {
+    const opts = registrationOptions('/spielen/');
+    expect(opts).toEqual({ scope: '/spielen/', updateViaCache: 'none' });
+    expect(opts.updateViaCache).not.toBe('all');
   });
 });
