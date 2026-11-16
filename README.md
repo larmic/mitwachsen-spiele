@@ -34,7 +34,7 @@ Die Seite läuft dann unter http://localhost:4321 und lädt Änderungen sofort n
 
 ```
 src/
-  pages/              / (Seite für Eltern), /spielen/ (das Spiel, noindex), /impressum/, /datenschutz/, 404,
+  pages/              / (Seite für Eltern), /spielen/ (das Spiel, noindex), /datenschutz/, 404,
                       dazu favicon, apple-touch-icon und og.png (beim Build erzeugt)
   layouts/            BaseLayout (Kopfdaten; die Startseite baut darauf direkt auf), PlainPage (Himmel, Inhalt auf Papier, Footer)
   content/games/      Eckdaten des Spiels im Frontmatter (Alter, Steuerung …), Schema in content.config.ts;
@@ -102,10 +102,9 @@ Diese Einstellungen stehen nicht im Code und müssen einmal von Hand gesetzt wer
 
 ## Datenschutz und Recht
 
-- Impressum (`/impressum/`) nach § 5 DDG und § 18 Abs. 2 MStV, Datenschutzerklärung unter `/datenschutz/`.
+- Impressum und Kontakt liegen auf larmic.de (`https://larmic.de/impressum/`, der Footer verlinkt dorthin); das Impressum dort gilt ausdrücklich auch für mitwachsen-spiele.de. Die Datenschutzerklärung ist eigen, unter `/datenschutz/`, weil sie nur beschreibt, was auf dieser Seite passiert.
 - Beim Laden der Seite wird nichts von Dritten nachgeladen: Schriften sind lokal gebündelt, keine Cookies, kein Tracking.
 - Der Spielstand bleibt im Browser (`localStorage`) und wird nicht übertragen.
-- Keine Mail-Adresse steht am Stück im HTML: Der Link entsteht erst im Browser (`MailLink.astro`), ohne JavaScript steht „mail[at]larmic.de“ da.
 
 ## Design
 

@@ -12,7 +12,7 @@ function watchErrors(page: Page) {
   return errors;
 }
 
-for (const path of ['/', '/impressum/', '/datenschutz/'])
+for (const path of ['/', '/datenschutz/'])
   test(`Seite ${path} lädt ohne Fehler`, async ({ page }) => {
     const errors = watchErrors(page);
     const res = await page.goto(path);
@@ -39,7 +39,11 @@ test('Startseite: Aufbau, Bild, Footer mit Impressum und Datenschutz', async ({ 
   await shot.scrollIntoViewIfNeeded();
   await expect.poll(() => shot.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
   const footer = page.locator('footer.site-footer');
-  await expect(footer.getByRole('link', { name: 'Impressum' })).toHaveAttribute('href', '/impressum/');
+  // Impressum und Kontakt liegen auf larmic.de, das Impressum dort gilt auch für diese Seite
+  await expect(footer.getByRole('link', { name: 'Impressum und Kontakt' })).toHaveAttribute(
+    'href',
+    'https://larmic.de/impressum/',
+  );
   await expect(footer.getByRole('link', { name: 'Datenschutz' })).toHaveAttribute('href', '/datenschutz/');
   // „Mehr für Eltern“ springt zum ersten Abschnitt
   await page.getByRole('link', { name: 'Mehr für Eltern' }).click();

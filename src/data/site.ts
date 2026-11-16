@@ -4,5 +4,4 @@ export const SITE = {
   description:
     'Mitwachsen: ein ruhiges Spiel für Kinder ab 3 Jahren, gespielt zusammen mit Mama oder Papa. Ohne Werbung, ohne Punkte, kostenlos im Browser.',
   url: 'https://www.mitwachsen-spiele.de',
-  mail: 'mail@larmic.de', // nur per JavaScript als Link (MailLink.astro)
 };

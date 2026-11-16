@@ -15,7 +15,7 @@ async function violations(page: Page) {
   );
 }
 
-for (const path of ['/', '/impressum/', '/datenschutz/', '/gibt-es-nicht/'])
+for (const path of ['/', '/datenschutz/', '/gibt-es-nicht/'])
   test(`Barrierefrei: ${path}`, async ({ page }) => {
     await page.goto(path);
     expect(await violations(page)).toEqual([]);

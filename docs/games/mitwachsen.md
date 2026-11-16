@@ -261,7 +261,7 @@ Das Spiel lief zuerst auf larmic.de unter `/spiele/mitwachsen/` und hat jetzt ei
 
 - **`/`** ist die Seite für Eltern: für wen, warum es das Spiel gibt, worauf geachtet ist, ein Standbild, „Spiel starten“. Alle Texte stehen in `src/data/landing.ts`, die Eckdaten (Alter, Steuerung …) im Frontmatter von `src/content/games/mitwachsen.md`.
 - **`/spielen/`** ist das Spiel selbst, ohne Zurück-Button; der Weg zur Startseite liegt im Menü für Eltern. `noindex`, nicht in der Sitemap.
-- Dazu Impressum, Datenschutz und eine 404-Seite.
+- Dazu Datenschutz und eine 404-Seite. Impressum und Kontakt liegen auf larmic.de, das Impressum dort gilt auch für mitwachsen-spiele.de.
 
 Fest:
 

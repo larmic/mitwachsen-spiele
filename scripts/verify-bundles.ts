@@ -11,7 +11,7 @@ const DIST = 'dist';
 const GAME_CODE = /larmic-mitwachsen|Mitwachsen|WebGLRenderer|three\.module/;
 
 export const RULES: Rule[] = [
-  // Die Startseite holt keine einzige JavaScript-Datei; erlaubt ist nur das kleine eingebettete Skript des Mail-Links
+  // Die Startseite holt keine einzige JavaScript-Datei
   { name: 'Startseite ohne JavaScript-Datei', pages: /^index\.html$/, budget: 0, forbidden: GAME_CODE },
   { name: 'Startseite ohne Spiel', pages: /^(?!spielen\/)/, budget: 32 * 1024, forbidden: GAME_CODE },
   {
