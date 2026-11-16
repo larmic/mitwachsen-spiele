@@ -192,6 +192,7 @@ Das Spiel lässt sich als App auf den Home-Bildschirm legen und startet danach a
 | Icons | Grasblock auf Himmel (`--sky-2`), beim Build gerendert: 192 und 512 px, dazu je eine maskierbare Fassung mit Rand (Würfel auf 60 %, bleibt im sicheren Kreis von 80 %); dazu wie bisher `apple-touch-icon` |
 | Kopfdaten | Jede Seite verweist auf das Manifest, setzt `theme-color` und `apple-mobile-web-app-*`. Das ist kein JavaScript: Die Startseite lädt weiterhin keine einzige JavaScript-Datei |
 | Service Worker | `/spielen/sw.js`, Gültigkeit (`scope`) nur `/spielen/`. Angemeldet nur von der Spielseite, nach dem Laden, nur im fertigen Build; Fehler bleiben still, das Spiel läuft auch ohne |
+| Erster Start | Ohne Netz läuft die App erst, nachdem die Spielseite einmal mit Netz geöffnet war: Die Startseite lädt kein JavaScript und meldet deshalb keinen Service Worker an. Wer von der Startseite aus installiert, startet die App einmal mit Netz (oder öffnet vorher das Spiel) |
 | Vorab gespeichert | alles, was `/spielen/` braucht: die Seite selbst, Skripte (auch das per `import()` nachgeladene Three.js), Stylesheets, Schriften, Icons, Manifest, Aufnahmen der Klangsteine. Die Liste wird nach dem Build aus der fertigen Seite gesammelt (Verweise in HTML, CSS, Manifest und JavaScript), nie von Hand gepflegt |
 | Anfragen | nur GET auf der eigenen Seite und nur Dateien der Liste: aus dem Cache, fehlt dort etwas, aus dem Netz. Ein Aufruf von `/spielen/` (auch mit `?…` oder `index.html`) bekommt das gespeicherte HTML. Fremde Adressen und alles andere gehen unverändert ins Netz und werden nie gespeichert |
 | Neue Version | Cache-Name `mitwachsen-<Version>`, die Version ist ein Hash über Pfade und Inhalte. Ohne `skipWaiting`: Die neue Version lädt im Hintergrund und wartet, bis keine Seite der alten mehr offen ist; sie gilt ab dem nächsten Start. Nichts wird neu geladen, kein Hinweis unterbricht das Kind |
@@ -201,7 +202,7 @@ Das Spiel lässt sich als App auf den Home-Bildschirm legen und startet danach a
 
 Invarianten:
 
-- Die Startseite meldet keinen Service Worker an und lädt kein JavaScript. *Bundle-Gate (`serviceWorker` ist außerhalb von `/spielen/` verboten), `e2e/pwa.spec.ts`*
+- Die Startseite meldet keinen Service Worker an und lädt kein JavaScript. *Bundle-Gate (Startseite: Budget 0 für Skriptdateien und eingebettete Skripte; `serviceWorker` ist außerhalb von `/spielen/` verboten, auch eingebettet; „meldet Verbotenes in einem eingebetteten Skript“ in `scripts/bundles.test.ts`), `e2e/pwa.spec.ts`*
 - Die Liste enthält alles, was `/spielen/` lädt, und jede JavaScript-Datei der Seite; jeder Eintrag ist ein Pfad der eigenen Seite und existiert; der Service Worker speichert sich nicht selbst. *App-Gate `npm run verify:pwa` (`scripts/pwa.ts`)*
 - Die Version passt zum Inhalt: Ändert sich eine Datei, ändert sich der Service Worker, und Geräte bekommen die neue Fassung. *App-Gate, „ändert die Version mit jedem Inhalt“ (`precache.test.ts`)*
 - Eine neue Version löscht beim Installieren nichts; alte Caches verschwinden erst beim Aktivieren. *„eine neue Version lässt die alte stehen …“ (`sw.test.ts`)*

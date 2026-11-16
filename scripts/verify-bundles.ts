@@ -1,5 +1,5 @@
 // Guard-Gate nach dem Build (Teil von npm run verify): Die Startseite bleibt schnell und ohne Ballast.
-// Die Startseite lädt gar keine JavaScript-Datei. Seiten außerhalb von /spielen/ laden kein Spiel und kein Three.js und bleiben unter einem festen Budget.
+// Die Startseite lädt gar kein JavaScript, weder als Datei noch eingebettet. Seiten außerhalb von /spielen/ laden kein Spiel und kein Three.js und bleiben unter einem festen Budget.
 // Die Spielseite lädt beim Start nur ihren eigenen Code; Three.js darf nur nachträglich (import()) kommen.
 // Logik und Tests: scripts/bundles.ts, scripts/bundles.test.ts
 
@@ -12,8 +12,8 @@ const DIST = 'dist';
 const GAME_CODE = /larmic-mitwachsen|Mitwachsen|WebGLRenderer|three\.module|serviceWorker/;
 
 export const RULES: Rule[] = [
-  // Die Startseite holt keine einzige JavaScript-Datei
-  { name: 'Startseite ohne JavaScript-Datei', pages: /^index\.html$/, budget: 0, forbidden: GAME_CODE },
+  // Die Startseite holt kein JavaScript: keine Datei, kein eingebettetes Skript (Budget 0)
+  { name: 'Startseite ohne JavaScript', pages: /^index\.html$/, budget: 0, forbidden: GAME_CODE },
   { name: 'Startseite ohne Spiel', pages: /^(?!spielen\/)/, budget: 32 * 1024, forbidden: GAME_CODE },
   {
     name: 'Spiel lädt 3D erst bei Bedarf',

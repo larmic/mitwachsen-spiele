@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { check, loaded, scriptsOf, staticImports, type Rule } from './bundles.ts';
+import { check, inlineScriptsOf, loaded, scriptsOf, staticImports, type Rule } from './bundles.ts';
 
 const files: Record<string, string> = {
   '/_astro/home.js': 'import{a as b}from"./shared.js";console.log(b)',
@@ -43,6 +43,25 @@ describe('Bundle-Gate', () => {
     expect(check('spielen/index.html', page('/_astro/game.js'), read, RULES)).toEqual([]);
     const eager = check('spielen/index.html', page('/_astro/game.js', '/_astro/three.module.js'), read, RULES);
     expect(eager.length).toBeGreaterThan(0);
+  });
+
+  it('findet eingebettete Skripte, aber keine Dateien und keine Daten', () => {
+    const html =
+      '<script>a()</script><script type="module" src="/_astro/a.js"></script>' +
+      '<script type="application/ld+json">{"game":1}</script><script type="module">\n  b()\n</script><script></script>';
+    expect(inlineScriptsOf(html)).toEqual(['a()', '\n  b()\n']);
+  });
+
+  it('meldet Verbotenes in einem eingebetteten Skript', () => {
+    const html = '<script>navigator.game.register("/x.js")</script>';
+    const problems = check('index.html', html, read, RULES);
+    expect(problems.some((p) => p.includes('eingebettetes Skript 1'))).toBe(true);
+  });
+
+  it('rechnet eingebettete Skripte ins Budget', () => {
+    const none: Rule[] = [{ name: 'ohne JavaScript', pages: /^index\.html$/, budget: 0, forbidden: /game/ }];
+    expect(check('index.html', '<script>x()</script>', read, none)[0]).toMatch(/3 Bytes JavaScript/);
+    expect(check('index.html', '<p>ohne Skript</p>', read, none)).toEqual([]);
   });
 
   it('meldet fehlende Dateien', () => {

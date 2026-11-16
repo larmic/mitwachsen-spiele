@@ -25,7 +25,7 @@ Die Seite läuft dann unter http://localhost:4321 und lädt Änderungen sofort n
 | `npm run format` / `format:check` | Prettier formatiert bzw. prüft den Code. `format:check` ist Guard-Gate |
 | `npm run arch` | Architekturregeln (dependency-cruiser, `.dependency-cruiser.cjs`): Schichten `lib` → `data` → Oberfläche, Browser-Code ohne Build-Code. Guard-Gate |
 | `npm run build` | Erzeugt die fertige Seite in `dist/` |
-| `npm run verify` | Prüft die fertige Seite in `dist/`: gültiges HTML (html-validate), keine toten internen Links und Sprungmarken (linkinator), das Bundle-Gate (Startseite ohne JavaScript-Datei, übrige Seiten ohne Spiel und im JavaScript-Budget), das Seiten-Gate (keine externen Ressourcen ohne Klick) und das App-Gate (Manifest und Icons gültig, der Service Worker speichert alles, was das Spiel braucht, in einer Version, die zum Inhalt passt). Guard-Gate nach dem Build |
+| `npm run verify` | Prüft die fertige Seite in `dist/`: gültiges HTML (html-validate), keine toten internen Links und Sprungmarken (linkinator), das Bundle-Gate (Startseite ohne JavaScript, weder als Datei noch eingebettet, übrige Seiten ohne Spiel und im JavaScript-Budget), das Seiten-Gate (keine externen Ressourcen ohne Klick) und das App-Gate (Manifest und Icons gültig, der Service Worker speichert alles, was das Spiel braucht, in einer Version, die zum Inhalt passt). Guard-Gate nach dem Build |
 | `npm run test:e2e` | Smoke-Test im Browser (Playwright, `e2e/`): Startseite (Weg ins Spiel, Aufbau, 320 px ohne seitliches Scrollen), Rechtliches, 404 und das Spiel, ohne Fehler in der Konsole; das Spiel als App (Manifest, Service Worker, Start ohne Netz), dazu Barrierefreiheit jeder Seite nach WCAG 2.2 AA (axe-core). Guard-Gate nach dem Build; einmalig `npx playwright install chromium` |
 | `npm run preview` | Zeigt den gebauten Stand aus `dist/` lokal an |
 | `npm run gates` | Alle Guard-Gates in der Reihenfolge der Pipeline, inklusive Build |
@@ -61,7 +61,7 @@ docs/todo.md          Offene Punkte
 
 ## Installieren
 
-**Für Eltern:** Das Spiel lässt sich wie eine App auf den Home-Bildschirm legen, von der Startseite oder vom Spiel aus. Danach startet es direkt im Spiel, ohne Adressleiste, und läuft auch ohne Internet.
+**Für Eltern:** Das Spiel lässt sich wie eine App auf den Home-Bildschirm legen, von der Startseite oder vom Spiel aus. Danach startet es direkt im Spiel, ohne Adressleiste, und läuft auch ohne Internet. Wichtig: Ohne Internet geht es erst, nachdem das Spiel einmal mit Internet geöffnet war. Wer von der Startseite aus installiert, startet die App also einmal mit Internet (oder öffnet vorher das Spiel), bevor es auf die Autofahrt geht.
 
 - iPhone und iPad (Safari): Teilen → „Zum Home-Bildschirm“. Die App hat einen eigenen Speicher, getrennt von Safari: Ein Spielstand aus Safari erscheint einmalig nicht in der App. Dafür räumt Safari den Speicher von Apps auf dem Home-Bildschirm nicht nach 7 Tagen ohne Besuch weg.
 - Android (Chrome): Menü → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.

@@ -1,6 +1,6 @@
 // Prüflogik für das Bundle-Gate (npm run verify:bundles) – rein, ohne Dateisystem, damit testbar.
-// Ermittelt, welches JavaScript eine fertige Seite beim Laden holt: die Skripte im HTML und alles, was diese
-// statisch importieren. Dynamische Importe (`import("…")`) zählen nicht, sie laden erst später und nur bei Bedarf.
+// Ermittelt, welches JavaScript eine fertige Seite beim Laden holt: die Skripte im HTML (eingebettet und als Datei) und
+// alles, was diese statisch importieren. Dynamische Importe (`import("…")`) zählen nicht, sie laden erst später und nur bei Bedarf.
 
 export type Rule = {
   name: string;
@@ -15,6 +15,19 @@ export function scriptsOf(html: string): string[] {
   for (const m of html.matchAll(/<script\b[^>]*\bsrc="([^"]+\.js)"/g)) out.add(m[1]!);
   for (const m of html.matchAll(/<link\b[^>]*\brel="modulepreload"[^>]*\bhref="([^"]+\.js)"/g)) out.add(m[1]!);
   return [...out];
+}
+
+/** Inhalt der eingebetteten Skripte (<script> ohne src); Daten wie JSON-LD sind kein JavaScript und fallen weg */
+export function inlineScriptsOf(html: string): string[] {
+  const out: string[] = [];
+  for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+    const attrs = m[1] ?? '';
+    if (/\bsrc\s*=/i.test(attrs)) continue;
+    if (/\btype\s*=\s*["']?application\/(?:ld\+)?json/i.test(attrs)) continue;
+    const body = m[2] ?? '';
+    if (body.trim()) out.push(body);
+  }
+  return out;
 }
 
 /** Statische, relative Importe eines (auch minifizierten) Moduls; `import("…")` wird ausgelassen */
@@ -65,6 +78,14 @@ export function check(page: string, html: string, read: (path: string) => string
       bytes += new TextEncoder().encode(code).length;
       if (rule.forbidden.test(code) || rule.forbidden.test(f))
         problems.push(`${page}: ${f} enthält Verbotenes für „${rule.name}“ (${rule.forbidden})`);
+    }
+    // Eingebettete Skripte zählen mit: ins Budget und bei Verbotenem (z. B. eine Anmeldung des Service Workers)
+    for (const [i, code] of inlineScriptsOf(html).entries()) {
+      bytes += new TextEncoder().encode(code).length;
+      if (rule.forbidden.test(code))
+        problems.push(
+          `${page}: eingebettetes Skript ${i + 1} enthält Verbotenes für „${rule.name}“ (${rule.forbidden})`,
+        );
     }
     if (bytes > rule.budget)
       problems.push(`${page}: ${bytes} Bytes JavaScript beim Laden, erlaubt sind ${rule.budget} („${rule.name}“)`);
