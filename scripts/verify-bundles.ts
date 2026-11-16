@@ -8,7 +8,8 @@ import { join, relative } from 'node:path';
 import { check, type Rule } from './bundles.ts';
 
 const DIST = 'dist';
-const GAME_CODE = /larmic-mitwachsen|Mitwachsen|WebGLRenderer|three\.module/;
+// Spielcode, Three.js und die Anmeldung des Service Workers (die gibt es nur auf der Spielseite)
+const GAME_CODE = /larmic-mitwachsen|Mitwachsen|WebGLRenderer|three\.module|serviceWorker/;
 
 export const RULES: Rule[] = [
   // Die Startseite holt keine einzige JavaScript-Datei

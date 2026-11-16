@@ -16,6 +16,8 @@ const TYPES: Record<string, string> = {
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.xml': 'application/xml',
+  '.webmanifest': 'application/manifest+json',
+  '.json': 'application/json',
   '.txt': 'text/plain',
 };
 

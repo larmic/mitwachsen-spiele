@@ -39,6 +39,10 @@ Beide Schriften sind über `@fontsource` lokal gebündelt.
 
 Animationen nutzen meist `steps()` für den Pixel-Look. Auf den Seiten bewegen sich nur die Wolken und die Insel auf der Startseite (schwebt in vier Stufen auf und ab). Bei `prefers-reduced-motion` sind alle Animationen aus, auch im Spiel.
 
+## Icons
+
+Seiten-Icon und App-Icon ist ein Grasblock aus der eigenen Würfel-Grafik (`src/lib/voxel/icon.ts`), beim Build gerendert: `favicon.svg` und `favicon.ico` transparent, `apple-touch-icon.png` (180 px) und die Icons der App (192 und 512 px) auf `--sky-2`. Die maskierbaren Icons (`icon-maskable-*.png`) tragen den Würfel auf 60 % der Kante, damit runde Masken nichts abschneiden. `theme-color` und Hintergrund der App sind `--sky-1`. Die Werte stehen in `src/data/pwa.ts`, ein Test hält sie gleich mit `tokens.css`.
+
 ## Voxel-Technik
 
 Die Blöcke der Seiten entstehen beim Build als SVG (`src/lib/voxel/`).

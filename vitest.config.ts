@@ -16,7 +16,7 @@ export default defineConfig({
         'src/data/games/*.ts',
         'src/scripts/games/input-pace.ts',
         'src/scripts/games/mitwachsen-{fog,growth,save,state,tired,weather,world}.ts',
-        'scripts/{bundles,dist}.ts',
+        'scripts/{bundles,dist,pwa}.ts',
       ],
       reporter: [['text', { skipFull: true }], 'text-summary'],
       // Knapp unter dem gemessenen Stand: Sinkt die Abdeckung, fällt das Gate. Steigt sie, die Schwellen mitziehen.

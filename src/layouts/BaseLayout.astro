@@ -9,6 +9,7 @@ import '@fontsource/nunito/latin-800.css';
 import '../styles/global.css';
 import '../styles/sections.css';
 import { SITE } from '../data/site';
+import { APP } from '../data/pwa';
 import { cubeDefs, textureCss } from '../lib/voxel/blocks';
 
 interface Props {
@@ -32,7 +33,13 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="theme-color" content="#79c7ea" />
+    <meta name="theme-color" content={APP.themeColor} />
+    <!-- Installierbar („Zum Home-Bildschirm“) von jeder Seite aus, die App startet im Spiel (src/data/pwa.ts) -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content={APP.shortName} />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />

@@ -12,8 +12,8 @@ npm run lint     # Guard-Gate: ESLint – muss grün sein
 npm run format   # Prettier; `npm run format:check` ist das Guard-Gate
 npm run arch     # Guard-Gate: Architekturregeln (dependency-cruiser) – muss grün sein
 npm run build    # statische Seite nach dist/
-npm run verify   # Guard-Gate nach dem Build: gültiges HTML, keine toten internen Links und Sprungmarken, Bundle-Gate (Startseite ohne Spiel, JS-Budget), Seiten-Gate (keine externen Ressourcen)
-npm run test:e2e # Guard-Gate nach dem Build: Smoke-Test im Browser (Playwright, e2e/): Seiten, Spiel, 404, ohne Konsolenfehler; Barrierefreiheit nach WCAG 2.2 AA (axe-core, e2e/a11y.spec.ts); einmalig: npx playwright install chromium
+npm run verify   # Guard-Gate nach dem Build: gültiges HTML, keine toten internen Links und Sprungmarken, Bundle-Gate (Startseite ohne Spiel, JS-Budget), Seiten-Gate (keine externen Ressourcen), App-Gate (Manifest, Icons, Service Worker speichert alles fürs Spiel)
+npm run test:e2e # Guard-Gate nach dem Build: Smoke-Test im Browser (Playwright, e2e/): Seiten, Spiel, 404, ohne Konsolenfehler; App: Manifest, Service Worker, Spiel ohne Netz (e2e/pwa.spec.ts); Barrierefreiheit nach WCAG 2.2 AA (axe-core, e2e/a11y.spec.ts); einmalig: npx playwright install chromium
 npm run gates    # alle Gates in der Reihenfolge der Pipeline
 # Git-Hook .githooks/pre-commit (aktiviert durch npm install) prüft vor jedem Commit Formatierung, Lint, Architektur, Tests
 ```
@@ -22,19 +22,20 @@ Vor jedem Commit `npm run format`, `npm run lint`, `npm run arch`, `npm run chec
 
 ## Aufbau
 
-- `src/pages/` – Seiten: `/` (Startseite für Eltern mit „Spiel starten“; Texte in `src/data/landing.ts`, noch Platzhalter, Eckdaten aus `src/content/games/mitwachsen.md`, Styles in `src/styles/landing.css`), `/spielen/` (das Spiel, `noindex`, nicht in der Sitemap), `/datenschutz/`, 404 (Impressum und Kontakt liegen auf larmic.de, der Footer verlinkt dorthin); dazu `favicon.*`, `[icon].png.ts`, `og.png.ts` (beim Build erzeugt)
+- `src/pages/` – Seiten: `/` (Startseite für Eltern mit „Spiel starten“; Texte in `src/data/landing.ts`, noch Platzhalter, Eckdaten aus `src/content/games/mitwachsen.md`, Styles in `src/styles/landing.css`), `/spielen/` (das Spiel, `noindex`, nicht in der Sitemap), `/datenschutz/`, 404 (Impressum und Kontakt liegen auf larmic.de, der Footer verlinkt dorthin); dazu `favicon.*`, `[icon].png.ts` (apple-touch-icon und Icons der App), `og.png.ts`, `manifest.webmanifest.ts` (beim Build erzeugt)
 - `src/layouts/BaseLayout.astro` – Kopfdaten, Schriften, Würfel-Symbole; `PlainPage.astro` – Himmel, Inhalt auf Papier, Footer
 - `src/content/` – Eckdaten des Spiels im Frontmatter von `src/content/games/mitwachsen.md` (Rumpf wird nicht gezeigt), Schema in `src/content.config.ts`; alle Texte der Startseite stehen in `src/data/landing.ts`
 - `src/components/` – `MitwachsenGame.astro` (Spielfläche), `MitwachsenParentInfo.astro` (Hinweis für Eltern), Kopf, Footer
 - Spiel: `src/lib/games/` (Zufall, Stücke, Ansicht von vorn – generisch, läuft im Browser), `src/data/games/mitwachsen.ts` (Gegenden, Tiere, Figur), `src/scripts/games/` (Welt, Regeln und Speichern rein und getestet; `larmic-mitwachsen.ts` Web Component, `mitwachsen-3d.ts` 3D-Ansicht mit Three.js (wird per `import()` nachgeladen; dazu `mitwachsen-geo.ts` Textur-Atlas und Baukasten, `mitwachsen-gatehouse.ts` Torhäuser und Portale), `mitwachsen-tired.ts` Müde werden (Medienzeit), `mitwachsen-render.ts` 2D-Ansicht und Ebene darüber, `input-pace.ts` ruhiger Takt, `sfx.ts` Töne)
-- `src/lib/voxel/` – Würfel-Grafik, läuft beim Build: `textures.ts` (Pixel-Raster, auch vom Spiel genutzt), `render.ts`, `cube.ts`, `blocks.ts` (Würfel-Symbole, Texturen als CSS, Insel `ISLAND` und Säulen `tower` für Startseite und Vorschaubild), `icon.ts` (Favicon)
+- App (installierbar, ohne Netz spielbar): `src/data/pwa.ts` (Name, Farben, Icons, Ort des Service Workers), `src/lib/pwa/` (`manifest.ts`, `precache.ts` sammelt aus der fertigen Seite, was das Spiel braucht, `sw.ts` Quelltext und Entscheidungen des Service Workers, alles rein und getestet), `src/integrations/service-worker.ts` (schreibt nach dem Build `dist/spielen/sw.js`), `src/scripts/games/pwa-register.ts` (Anmeldung, nur auf der Spielseite)
+- `src/lib/voxel/` – Würfel-Grafik, läuft beim Build: `textures.ts` (Pixel-Raster, auch vom Spiel genutzt), `render.ts`, `cube.ts`, `blocks.ts` (Würfel-Symbole, Texturen als CSS, Insel `ISLAND` und Säulen `tower` für Startseite und Vorschaubild), `icon.ts` (Favicon und Icons der App)
 - `src/data/site.ts` – Titel, Adresse, Kontakt; `src/data/landing.ts` – alle Texte der Startseite
 - `src/styles/` – `tokens.css` (Design-Tokens), `global.css`, `sections.css`
-- `scripts/` – Gates nach dem Build: `bundles.ts` (Bundle-Gate), `dist.ts` (Seiten-Gate)
+- `scripts/` – Gates nach dem Build: `bundles.ts` (Bundle-Gate), `dist.ts` (Seiten-Gate), `pwa.ts` (App-Gate)
 - `docs/design-system.md` – Farben, Typografie, Bausteine
 - `docs/games/` – Mitwachsen, wächst mit meinem Sohn: `README.md` (Einleitung, Altersstufen, gemeinsame Regeln), `mitwachsen.md` (Konzept der Stufe ab 3). Vor Arbeiten am Spiel lesen
 - `docs/specs/mitwachsen.md` – Spec des Spiels (Regeln, Invarianten, zugehörige Tests). Bei Änderungen am Verhalten Spec und Tests mitziehen
-- `docs/todo.md` – offene Punkte vor dem Livegang
+- `docs/todo.md` – offene Punkte
 
 ## Regeln
 
@@ -45,6 +46,7 @@ Vor jedem Commit `npm run format`, `npm run lint`, `npm run arch`, `npm run chec
 - Keine externen Ressourcen ohne Klick des Nutzers (Schriften lokal). Geprüft durch `npm run verify:dist` (Logik in `scripts/dist.ts`).
 - Animationen respektieren `prefers-reduced-motion`.
 - Die Startseite bleibt schlank (geprüft durch `npm run verify:bundles`, Logik in `scripts/bundles.ts`): die Startseite lädt kein JavaScript, Seiten außerhalb von `/spielen/` laden kein Spiel und kein Three.js und höchstens 32 KB JavaScript; die Spielseite lädt 3D nur nachträglich per `import()`.
+- Der Service Worker gehört nur dem Spiel (`scope` `/spielen/`) und wird nur von der Spielseite angemeldet. Kein `skipWaiting`, kein Neuladen: Eine neue Version gilt ab dem nächsten Start, alte Caches löscht erst die aktive neue Version. Die Liste der gespeicherten Dateien entsteht beim Build, nie von Hand (geprüft durch `npm run verify:pwa`). Das Manifest legt die Drehung nicht fest.
 - Keine Navigation per View Transitions (`ClientRouter`): Jede Seite lädt neu, das Spiel startet und endet sauber.
 - TypeScript prüft jeden Index-Zugriff (`noUncheckedIndexedAccess`): fehlende Einträge behandeln; Auswahl aus Listen über `pick`/`cycle` (`src/lib/games/rng.ts`), Feld-Schlüssel über `fromKey` (`chunks.ts`). `!` nur, wo die Stelle selbst zeigt, dass der Eintrag existiert, und in Tests.
 - Spielstände liegen nur im `localStorage` (Präfix `larmic.games.`, von larmic.de übernommen). Ändert sich das Format, gehört eine Migration in `mitwachsen-save.ts` mit Test.

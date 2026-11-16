@@ -9,8 +9,25 @@ export function iconSvg(size?: number): string {
   return `<svg xmlns="http://www.w3.org/2000/svg"${dims} viewBox="${CUBE_VIEWBOX}">${cubeFaces(GRASS_TOP, GRASS_SIDE, GRASS_SIDE, PAL_GRASS)}</svg>`;
 }
 
-/** Quadratisches PNG; `background` z. B. für das apple-touch-icon, das keine Transparenz mag. */
-export function iconPng(size: number, background?: string): Promise<Buffer> {
+/**
+ * Der Würfel mittig auf einer Fläche: Er nimmt den Anteil `fill` der Kantenlänge ein (z. B. 0,6 für Icons mit Maske,
+ * deren sichere Zone ein Kreis über 80 % ist).
+ */
+export function framedIconSvg(size: number, background: string, fill: number): string {
+  const inner = Math.round(size * Math.min(1, Math.max(0, fill)));
+  const at = Math.round((size - inner) / 2);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="${background}"/><svg x="${at}" y="${at}" width="${inner}" height="${inner}" viewBox="${CUBE_VIEWBOX}">${cubeFaces(GRASS_TOP, GRASS_SIDE, GRASS_SIDE, PAL_GRASS)}</svg></svg>`;
+}
+
+/**
+ * Quadratisches PNG; `background` z. B. für das apple-touch-icon, das keine Transparenz mag. Mit `fill` sitzt der
+ * Würfel kleiner mittig auf dem Hintergrund (Icons der App).
+ */
+export function iconPng(size: number, background?: string, fill?: number): Promise<Buffer> {
+  if (background && fill !== undefined)
+    return sharp(Buffer.from(framedIconSvg(size, background, fill)))
+      .png()
+      .toBuffer();
   const img = sharp(Buffer.from(iconSvg(size)));
   return (background ? img.flatten({ background }) : img).png().toBuffer();
 }

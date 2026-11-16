@@ -15,6 +15,7 @@ Umgesetzt ist es in reinen, getesteten Teilen und einer Web Component:
 | Ruhiger Takt der Eingabe | [`src/scripts/games/input-pace.ts`](../../src/scripts/games/input-pace.ts) | `input-pace.test.ts` |
 | Nebel (erkundete Felder) | [`src/scripts/games/mitwachsen-fog.ts`](../../src/scripts/games/mitwachsen-fog.ts) | `mitwachsen-fog.test.ts` |
 | Karte | [`src/scripts/games/mitwachsen-map.ts`](../../src/scripts/games/mitwachsen-map.ts) | – (Zeichnen) |
+| App: Manifest, Icons, Service Worker | [`src/data/pwa.ts`](../../src/data/pwa.ts), [`src/lib/pwa/`](../../src/lib/pwa/) (`manifest.ts`, `precache.ts`, `sw.ts`), [`src/integrations/service-worker.ts`](../../src/integrations/service-worker.ts), Anmeldung in [`pwa-register.ts`](../../src/scripts/games/pwa-register.ts) | `precache.test.ts`, `sw.test.ts`, `manifest.test.ts`, `pwa.test.ts` (Daten und App-Gate), `e2e/pwa.spec.ts` |
 | Browser: Tastatur, Takt, Kamera, Töne, Menü | [`larmic-mitwachsen.ts`](../../src/scripts/games/larmic-mitwachsen.ts), [`mitwachsen-render.ts`](../../src/scripts/games/mitwachsen-render.ts) (2D und Ebene darüber), [`mitwachsen-3d.ts`](../../src/scripts/games/mitwachsen-3d.ts) (3D mit Three.js), [`sfx.ts`](../../src/scripts/games/sfx.ts) | – |
 
 Bei Änderungen am Verhalten Spec und Tests mitziehen.
@@ -180,6 +181,31 @@ In der 3D-Ansicht liegen in Torhäusern, Portalen und ihren Sockeln nie zwei Fl�
 Auch zwischen Torhaus und Gelände nicht: Die zwei Reihen hinter den Türmen, die das Torhaus ganz umschließt, sind im Felsring so flach wie das Turmfeld; hohe Felsblöcke dort stellten ihre Wände genau in die inneren Turmwände (Rückmeldung: Torseiten flackern). *Test: „Torhaus und Felsring“ (`mitwachsen-world.test.ts`)*
 
 Schatten flimmern nicht beim Laufen: Die Schattenkamera folgt der Figur nur in ganzen Pixeln ihrer Schattenkarte (quer zum Licht eingerastet), und ein kleiner Versatz entlang der Flächen (`normalBias`) verhindert Streifen auf Wänden, die die Sonne schräg trifft (Rückmeldung: Flackern an den Seiten der Baumstämme). *Test: „Schatten rasten ein“ (`mitwachsen-geo.test.ts`)*
+
+## App (installieren und ohne Netz spielen)
+
+Das Spiel lässt sich als App auf den Home-Bildschirm legen und startet danach auch ohne Netz.
+
+| Was | Regel |
+| --- | --- |
+| Manifest | `/manifest.webmanifest`, beim Build erzeugt: Name „Mitwachsen“, `lang` de, `start_url` und `id` `/spielen/`, `scope` `/` (so installiert „Zum Home-Bildschirm“ auch von der Startseite aus das Spiel), `display` standalone (Uhr und Akku bleiben sichtbar, Vollbild gibt es im Menü), Farben `--sky-1`. **Keine `orientation`:** Das Spiel dreht sich mit dem Gerät |
+| Icons | Grasblock auf Himmel (`--sky-2`), beim Build gerendert: 192 und 512 px, dazu je eine maskierbare Fassung mit Rand (Würfel auf 60 %, bleibt im sicheren Kreis von 80 %); dazu wie bisher `apple-touch-icon` |
+| Kopfdaten | Jede Seite verweist auf das Manifest, setzt `theme-color` und `apple-mobile-web-app-*`. Das ist kein JavaScript: Die Startseite lädt weiterhin keine einzige JavaScript-Datei |
+| Service Worker | `/spielen/sw.js`, Gültigkeit (`scope`) nur `/spielen/`. Angemeldet nur von der Spielseite, nach dem Laden, nur im fertigen Build; Fehler bleiben still, das Spiel läuft auch ohne |
+| Vorab gespeichert | alles, was `/spielen/` braucht: die Seite selbst, Skripte (auch das per `import()` nachgeladene Three.js), Stylesheets, Schriften, Icons, Manifest, Aufnahmen der Klangsteine. Die Liste wird nach dem Build aus der fertigen Seite gesammelt (Verweise in HTML, CSS, Manifest und JavaScript), nie von Hand gepflegt |
+| Anfragen | nur GET auf der eigenen Seite und nur Dateien der Liste: aus dem Cache, fehlt dort etwas, aus dem Netz. Ein Aufruf von `/spielen/` (auch mit `?…` oder `index.html`) bekommt das gespeicherte HTML. Fremde Adressen und alles andere gehen unverändert ins Netz und werden nie gespeichert |
+| Neue Version | Cache-Name `mitwachsen-<Version>`, die Version ist ein Hash über Pfade und Inhalte. Ohne `skipWaiting`: Die neue Version lädt im Hintergrund und wartet, bis keine Seite der alten mehr offen ist; sie gilt ab dem nächsten Start. Nichts wird neu geladen, kein Hinweis unterbricht das Kind |
+| Aufräumen | erst beim Aktivieren der neuen Version – dann ist keine Seite der alten mehr offen – werden die alten `mitwachsen-*`-Caches gelöscht; fremde Caches bleiben. Eine alte, noch offene Seite bekommt bis zuletzt ihre eigenen Dateien, auch ein spät nachgeladenes Three.js |
+| Speicher | Als installierte App (display-mode standalone) bittet die Spielseite still um dauerhaften Speicher (`navigator.storage.persist()`), damit Spielstände nicht weggeräumt werden; im Browser-Tab nicht, weil manche Browser dort nachfragen |
+| iPhone und iPad | Die App vom Home-Bildschirm hat einen eigenen Speicher, getrennt von Safari: Ein in Safari begonnener Spielstand erscheint einmalig nicht in der App (Welt-Code im Menü hilft, die Landschaft mitzunehmen). Dafür gilt für Apps auf dem Home-Bildschirm die Löschung nach 7 Tagen ohne Besuch nicht |
+
+Invarianten:
+
+- Die Startseite meldet keinen Service Worker an und lädt kein JavaScript. *Bundle-Gate (`serviceWorker` ist außerhalb von `/spielen/` verboten), `e2e/pwa.spec.ts`*
+- Die Liste enthält alles, was `/spielen/` lädt, und jede JavaScript-Datei der Seite; jeder Eintrag ist ein Pfad der eigenen Seite und existiert; der Service Worker speichert sich nicht selbst. *App-Gate `npm run verify:pwa` (`scripts/pwa.ts`)*
+- Die Version passt zum Inhalt: Ändert sich eine Datei, ändert sich der Service Worker, und Geräte bekommen die neue Fassung. *App-Gate, „ändert die Version mit jedem Inhalt“ (`precache.test.ts`)*
+- Eine neue Version löscht beim Installieren nichts; alte Caches verschwinden erst beim Aktivieren. *„eine neue Version lässt die alte stehen …“ (`sw.test.ts`)*
+- Ohne Netz startet `/spielen/` neu, mit 3D, ohne Fehler in der Konsole. *„Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotzdem“ (`e2e/pwa.spec.ts`)*
 
 ## Speichern
 
