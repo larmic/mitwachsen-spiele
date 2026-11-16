@@ -43,7 +43,7 @@ import PlainPage from '../layouts/PlainPage.astro';
     .
   </p>
 
-  <h2>Kinderspiel Mitwachsen: Speichern im Browser</h2>
+  <h2>Kinderspiel Mitwachsen: Speichern im Browser und ohne Internet</h2>
   <p>
     Das Kinderspiel Mitwachsen merkt sich im lokalen Speicher deines Browsers (localStorage), was zum Weiterspielen
     nötig ist: die angelegten Welten mit Namen, gefundenen Tieren und erkundeten Gegenden, ob der Ton an ist, wie lange
@@ -51,11 +51,21 @@ import PlainPage from '../layouts/PlainPage.astro';
     wurde. Cookies setzt das Spiel nicht.
   </p>
   <p>
-    Diese Angaben bleiben auf deinem Gerät. Sie werden nicht an mich oder andere übertragen, ich kann sie nicht sehen,
-    und sie enthalten nichts, was dich als Person erkennbar macht. Gespeichert wird nur, weil du das Spiel nutzt und es
-    deinen Spielstand behalten soll; ohne den Speicher läuft das Spiel trotzdem, vergisst aber alles beim Neuladen (§ 25
-    Abs. 2 Nr. 2 TDDDG). Löschen kannst du einzelne Welten im Menü des Spiels oder alles, indem du die Websitedaten von
-    mitwachsen-spiele.de in deinem Browser löschst.
+    Damit das Spiel auch ohne Internet startet, etwa als App auf dem Home-Bildschirm, legt dein Browser beim Öffnen des
+    Spiels eine Kopie seiner Dateien auf deinem Gerät ab (Service Worker mit Cache): die Spielseite, Skripte, Schriften,
+    Bilder und Töne. Diese Kopie ist für alle gleich und enthält nichts über dich oder deinen Spielstand. Ob es eine
+    neue Version gibt, fragt der Browser wie beim normalen Aufruf bei GitHub Pages nach (siehe oben); alte Versionen
+    räumt er selbst weg. Als installierte App bittet das Spiel den Browser außerdem, diesen Speicher nicht von sich aus
+    zu leeren, damit Spielstände nicht verloren gehen.
+  </p>
+  <p>
+    Spielstand und Kopie bleiben auf deinem Gerät. Sie werden nicht an mich oder andere übertragen, ich kann sie nicht
+    sehen, und sie enthalten nichts, was dich als Person erkennbar macht. Gespeichert wird nur, weil du das Spiel nutzt,
+    es deinen Spielstand behalten und auch ohne Internet starten soll; ohne den Speicher läuft das Spiel trotzdem,
+    braucht dann aber Internet und vergisst alles beim Neuladen (§ 25 Abs. 2 Nr. 2 TDDDG). Löschen kannst du einzelne
+    Welten im Menü des Spiels oder alles, indem du die Websitedaten von mitwachsen-spiele.de in deinem Browser löschst.
+    Auf iPhone und iPad hat die App vom Home-Bildschirm einen eigenen Speicher; er verschwindet mit der App, wenn du sie
+    vom Home-Bildschirm löschst.
   </p>
 
   <h2>Kontakt per E-Mail oder Telefon</h2>
