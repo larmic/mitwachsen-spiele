@@ -1,6 +1,6 @@
 ---
-// Einfache Seiten (Startseite, Impressum, Datenschutz, 404): Himmel mit Titel (und Zurück-Button außer auf der
-// Startseite), darunter der Inhalt auf Papier.
+// Einfache Seiten (Impressum, Datenschutz, 404): Himmel mit Titel und Zurück-Button,
+// darunter der Inhalt auf Papier. Die Startseite (index.astro) hat ihren eigenen Aufbau.
 import BaseLayout from './BaseLayout.astro';
 import SubHero from '../components/SubHero.astro';
 import SiteFooter from '../components/SiteFooter.astro';
@@ -10,13 +10,12 @@ interface Props {
   heading?: string; // Überschrift auf der Seite, falls anders als der Titel
   description?: string;
   noindex?: boolean;
-  home?: boolean; // Startseite: kein Zurück-Button
 }
-const { title, heading = title ?? '', description, noindex, home = false } = Astro.props;
+const { title, heading = title ?? '', description, noindex } = Astro.props;
 ---
 
 <BaseLayout title={title} description={description} noindex={noindex}>
-  <SubHero title={heading} back={!home} />
+  <SubHero title={heading} />
   <div class="grass-edge" aria-hidden="true"></div>
   <main id="inhalt" tabindex="-1" class="ground">
     <div class="doc">

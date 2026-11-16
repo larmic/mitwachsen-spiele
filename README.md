@@ -25,8 +25,8 @@ Die Seite läuft dann unter http://localhost:4321 und lädt Änderungen sofort n
 | `npm run format` / `format:check` | Prettier formatiert bzw. prüft den Code. `format:check` ist Guard-Gate |
 | `npm run arch` | Architekturregeln (dependency-cruiser, `.dependency-cruiser.cjs`): Schichten `lib` → `data` → Oberfläche, Browser-Code ohne Build-Code. Guard-Gate |
 | `npm run build` | Erzeugt die fertige Seite in `dist/` |
-| `npm run verify` | Prüft die fertige Seite in `dist/`: gültiges HTML (html-validate), keine toten internen Links und Sprungmarken (linkinator), das Bundle-Gate (Startseite ohne Spiel, JavaScript-Budget) und das Seiten-Gate (keine externen Ressourcen ohne Klick). Guard-Gate nach dem Build |
-| `npm run test:e2e` | Smoke-Test im Browser (Playwright, `e2e/`): Startseite, Rechtliches, 404 und das Spiel, ohne Fehler in der Konsole, dazu Barrierefreiheit jeder Seite nach WCAG 2.2 AA (axe-core). Guard-Gate nach dem Build; einmalig `npx playwright install chromium` |
+| `npm run verify` | Prüft die fertige Seite in `dist/`: gültiges HTML (html-validate), keine toten internen Links und Sprungmarken (linkinator), das Bundle-Gate (Startseite ohne JavaScript-Datei, übrige Seiten ohne Spiel und im JavaScript-Budget) und das Seiten-Gate (keine externen Ressourcen ohne Klick). Guard-Gate nach dem Build |
+| `npm run test:e2e` | Smoke-Test im Browser (Playwright, `e2e/`): Startseite (Weg ins Spiel, Aufbau, 320 px ohne seitliches Scrollen), Rechtliches, 404 und das Spiel, ohne Fehler in der Konsole, dazu Barrierefreiheit jeder Seite nach WCAG 2.2 AA (axe-core). Guard-Gate nach dem Build; einmalig `npx playwright install chromium` |
 | `npm run preview` | Zeigt den gebauten Stand aus `dist/` lokal an |
 | `npm run gates` | Alle Guard-Gates in der Reihenfolge der Pipeline, inklusive Build |
 
@@ -36,7 +36,7 @@ Die Seite läuft dann unter http://localhost:4321 und lädt Änderungen sofort n
 src/
   pages/              / (Seite für Eltern), /spielen/ (das Spiel, noindex), /impressum/, /datenschutz/, 404,
                       dazu favicon, apple-touch-icon und og.png (beim Build erzeugt)
-  layouts/            BaseLayout (Kopfdaten), PlainPage (Himmel, Inhalt auf Papier, Footer)
+  layouts/            BaseLayout (Kopfdaten; die Startseite baut darauf direkt auf), PlainPage (Himmel, Inhalt auf Papier, Footer)
   content/games/      Text für Eltern als Markdown, Schema in content.config.ts
   components/         MitwachsenGame (Spielfläche), MitwachsenParentInfo (Hinweis für Eltern), Kopf, Footer …
   scripts/games/      das Spiel im Browser: Welt, Regeln, Speichern (rein, getestet), Web Component,
@@ -45,7 +45,8 @@ src/
   lib/voxel/          Würfel-Grafik beim Build: Texturen, Würfel, Szene, Icon
   data/games/         Gegenden, Tiere, Figur, Geschichten
   data/site.ts        Titel, Adresse, Kontakt
-  styles/             tokens.css (Design-Tokens), global.css, sections.css
+  data/landing.ts     alle Texte der Startseite (noch Platzhalter)
+  styles/             tokens.css (Design-Tokens), global.css, sections.css, landing.css (Startseite)
 scripts/              Gates nach dem Build: Bundle-Gate, Seiten-Gate
 e2e/                  Smoke-Test und Barrierefreiheit (Playwright)
 docs/games/           Konzept des Spiels, Altersstufen, gemeinsame Regeln

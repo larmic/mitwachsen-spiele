@@ -22,13 +22,13 @@ Vor jedem Commit `npm run format`, `npm run lint`, `npm run arch`, `npm run chec
 
 ## Aufbau
 
-- `src/pages/` – Seiten: `/` (Seite für Eltern mit „Spiel starten“, Text aus `src/content/games/mitwachsen.md`), `/spielen/` (das Spiel, `noindex`, nicht in der Sitemap), `/impressum/`, `/datenschutz/`, 404; dazu `favicon.*`, `[icon].png.ts`, `og.png.ts` (beim Build erzeugt)
+- `src/pages/` – Seiten: `/` (Startseite für Eltern mit „Spiel starten“; Texte in `src/data/landing.ts`, noch Platzhalter, Eckdaten aus `src/content/games/mitwachsen.md`, Styles in `src/styles/landing.css`), `/spielen/` (das Spiel, `noindex`, nicht in der Sitemap), `/impressum/`, `/datenschutz/`, 404; dazu `favicon.*`, `[icon].png.ts`, `og.png.ts` (beim Build erzeugt)
 - `src/layouts/BaseLayout.astro` – Kopfdaten, Schriften, Würfel-Symbole; `PlainPage.astro` – Himmel, Inhalt auf Papier, Footer
 - `src/content/` – Text für Eltern als Markdown, Schema in `src/content.config.ts`
 - `src/components/` – `MitwachsenGame.astro` (Spielfläche), `MitwachsenParentInfo.astro` (Hinweis für Eltern), Kopf, Footer, `MailLink.astro`
 - Spiel: `src/lib/games/` (Zufall, Stücke, Ansicht von vorn – generisch, läuft im Browser), `src/data/games/mitwachsen.ts` (Gegenden, Tiere, Figur), `src/scripts/games/` (Welt, Regeln und Speichern rein und getestet; `larmic-mitwachsen.ts` Web Component, `mitwachsen-3d.ts` 3D-Ansicht mit Three.js (wird per `import()` nachgeladen; dazu `mitwachsen-geo.ts` Textur-Atlas und Baukasten, `mitwachsen-gatehouse.ts` Torhäuser und Portale), `mitwachsen-tired.ts` Müde werden (Medienzeit), `mitwachsen-render.ts` 2D-Ansicht und Ebene darüber, `input-pace.ts` ruhiger Takt, `sfx.ts` Töne)
-- `src/lib/voxel/` – Würfel-Grafik, läuft beim Build: `textures.ts` (Pixel-Raster, auch vom Spiel genutzt), `render.ts`, `cube.ts`, `blocks.ts` (Würfel-Symbole, Texturen als CSS, kleine Szene), `icon.ts` (Favicon)
-- `src/data/site.ts` – Titel, Adresse, Kontakt
+- `src/lib/voxel/` – Würfel-Grafik, läuft beim Build: `textures.ts` (Pixel-Raster, auch vom Spiel genutzt), `render.ts`, `cube.ts`, `blocks.ts` (Würfel-Symbole, Texturen als CSS, Insel `ISLAND` und Säulen `tower` für Startseite und Vorschaubild), `icon.ts` (Favicon)
+- `src/data/site.ts` – Titel, Adresse, Kontakt; `src/data/landing.ts` – alle Texte der Startseite
 - `src/styles/` – `tokens.css` (Design-Tokens), `global.css`, `sections.css`
 - `scripts/` – Gates nach dem Build: `bundles.ts` (Bundle-Gate), `dist.ts` (Seiten-Gate)
 - `docs/design-system.md` – Farben, Typografie, Bausteine
@@ -44,7 +44,7 @@ Vor jedem Commit `npm run format`, `npm run lint`, `npm run arch`, `npm run chec
 - Keine Logos, Figuren oder Texturen aus Minecraft oder Hytale – nur eigene Voxel-Grafik.
 - Keine externen Ressourcen ohne Klick des Nutzers (Schriften lokal). Geprüft durch `npm run verify:dist` (Logik in `scripts/dist.ts`).
 - Animationen respektieren `prefers-reduced-motion`.
-- Die Startseite bleibt schlank (geprüft durch `npm run verify:bundles`, Logik in `scripts/bundles.ts`): Seiten außerhalb von `/spielen/` laden kein Spiel und kein Three.js und höchstens 32 KB JavaScript; die Spielseite lädt 3D nur nachträglich per `import()`.
+- Die Startseite bleibt schlank (geprüft durch `npm run verify:bundles`, Logik in `scripts/bundles.ts`): die Startseite lädt keine JavaScript-Datei (nur das eingebettete Skript des Mail-Links), Seiten außerhalb von `/spielen/` laden kein Spiel und kein Three.js und höchstens 32 KB JavaScript; die Spielseite lädt 3D nur nachträglich per `import()`.
 - Keine Navigation per View Transitions (`ClientRouter`): Jede Seite lädt neu, das Spiel startet und endet sauber.
 - TypeScript prüft jeden Index-Zugriff (`noUncheckedIndexedAccess`): fehlende Einträge behandeln; Auswahl aus Listen über `pick`/`cycle` (`src/lib/games/rng.ts`), Feld-Schlüssel über `fromKey` (`chunks.ts`). `!` nur, wo die Stelle selbst zeigt, dass der Eintrag existiert, und in Tests.
 - Spielstände liegen nur im `localStorage` (Präfix `larmic.games.`, von larmic.de übernommen). Ändert sich das Format, gehört eine Migration in `mitwachsen-save.ts` mit Test.

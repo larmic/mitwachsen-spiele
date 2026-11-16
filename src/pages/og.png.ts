@@ -1,15 +1,15 @@
-// Vorschaubild für Messenger & Co. (og:image, 1200 × 630): Himmel, Wolken und rechts die kleine Wiese mit Baum und
-// Pilz, beim Build mit sharp in ein PNG gerendert.
+// Vorschaubild für Messenger & Co. (og:image, 1200 × 630): Himmel, Wolken und rechts die schwebende Insel der Startseite
+// (Baum, Pilz, Brett), beim Build mit sharp in ein PNG gerendert.
 import sharp from 'sharp';
-import { MEADOW, cubeDefs, sceneSvg } from '../lib/voxel/blocks';
+import { ISLAND, cubeDefs, sceneSvg } from '../lib/voxel/blocks';
 
 const W = 1200;
 const H = 630;
 
 export async function GET() {
-  const scene = sceneSvg(MEADOW);
-  const size = H - 90;
-  const sceneBox = `<svg x="${W - size - 90}" y="45" width="${size}" height="${size}" viewBox="${scene.viewBox}">${scene.uses}</svg>`;
+  const scene = sceneSvg(ISLAND);
+  const size = H - 60;
+  const sceneBox = `<svg x="${W - size - 90}" y="30" width="${size}" height="${size}" viewBox="${scene.viewBox}">${scene.uses}</svg>`;
   const cloud = (x: number, y: number, w: number) =>
     `<g fill="#ffffff" opacity="0.92"><rect x="${x}" y="${y}" width="${w}" height="28"/><rect x="${x + w * 0.2}" y="${y - 22}" width="${w * 0.5}" height="22"/></g>`;
 

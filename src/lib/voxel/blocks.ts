@@ -24,17 +24,29 @@ export function textureCss(): string {
 /** Ein Block der kleinen Szene: Lage im Raster (i, j, Ebene k) und Symbol. */
 export type Block = { i: number; j: number; k: number; sym: string };
 
-/** Kleine Wiese mit Baum und Pilz – die Szene für Vorschaubild und Seiten. */
-export const MEADOW: Block[] = [
-  ...[0, 1, 2].flatMap((i) => [0, 1, 2].map((j) => ({ i, j, k: 0, sym: 'grass' }))),
+/** Schwebende Insel für die Startseite und das Vorschaubild: Wiese auf Erde und Stein, hinten der Baum, vorn der Pilz. */
+export const ISLAND: Block[] = [
+  ...[0, 1, 2, 3].flatMap((i) => [0, 1, 2].map((j) => ({ i, j, k: 0, sym: 'grass' }))),
+  ...[0, 1, 2, 3].flatMap((i) => [0, 1, 2].map((j) => ({ i, j, k: -1, sym: 'dirt' }))),
+  ...[1, 2].flatMap((i) => [1, 2].map((j) => ({ i, j, k: -2, sym: 'stone' }))),
+  { i: 2, j: 2, k: -3, sym: 'stone' },
   { i: 0, j: 0, k: 1, sym: 'log' },
   { i: 0, j: 0, k: 2, sym: 'log' },
-  { i: 0, j: 0, k: 3, sym: 'leaves' },
-  { i: 1, j: 0, k: 3, sym: 'leaves' },
-  { i: 0, j: 1, k: 3, sym: 'leaves' },
+  ...[0, 1].flatMap((i) => [0, 1].map((j) => ({ i, j, k: 3, sym: 'leaves' }))),
   { i: 0, j: 0, k: 4, sym: 'leaves' },
-  { i: 2, j: 1, k: 1, sym: 'pilz' },
+  { i: 3, j: 1, k: 1, sym: 'pilz' },
+  { i: 2, j: 2, k: 1, sym: 'plank' },
 ];
+
+/** Säule aus `height` Blöcken: Erde, oben Gras – zeigt, wie das Spiel mit dem Kind wächst. */
+export function tower(height: number): Block[] {
+  return Array.from({ length: Math.max(1, height) }, (_, k) => ({
+    i: 0,
+    j: 0,
+    k,
+    sym: k === Math.max(1, height) - 1 ? 'grass' : 'dirt',
+  }));
+}
 
 /** Blöcke als <use>-Elemente, von hinten nach vorn sortiert; dazu die viewBox, die alle umschließt. */
 export function sceneSvg(blocks: Block[]): { viewBox: string; uses: string } {

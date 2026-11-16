@@ -8,7 +8,7 @@
 - [ ] Renovate-App für das Repo freischalten
 - [ ] Datenschutzerklärung prüfen lassen
 - [ ] Seite in der Search Console anmelden
-- [ ] Startseite für Eltern ausbauen (bisher vorläufig)
+- [ ] Texte der Startseite schreiben: Platzhalter in `src/data/landing.ts` ersetzen (Form und Aufbau stehen)
 
 ## Später
 

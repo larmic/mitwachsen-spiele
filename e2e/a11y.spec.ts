@@ -29,3 +29,9 @@ test('Barrierefrei: Spiel mit Hinweis für Eltern und danach', async ({ page }) 
   await expect(page.locator('larmic-mitwachsen')).toHaveClass(/ready/);
   expect(await violations(page)).toEqual([]);
 });
+
+test('Barrierefrei: Startseite auf dem Handy (320 px)', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto('/');
+  expect(await violations(page)).toEqual([]);
+});
