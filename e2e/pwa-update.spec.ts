@@ -149,6 +149,56 @@ test('App-Update: nach dem Gute-Nacht-Ritual kommt die wartende Fassung, einmal 
   expect(errors).toEqual([]);
 });
 
+test('App-Update: weckt das Kind die Figur zwischen Bitte und Übernahme, wird erst beim nächsten Schlafen neu geladen', async ({
+  page,
+  context,
+}) => {
+  // Das Kind tippt genau, nachdem die Seite um skipWaiting gebeten hat; die Übernahme dauert (ruhender Service Worker)
+  await page.addInitScript(() => {
+    const post = Object.getOwnPropertyDescriptor(ServiceWorker.prototype, 'postMessage')!.value as (
+      this: ServiceWorker,
+      ...args: unknown[]
+    ) => void;
+    ServiceWorker.prototype.postMessage = function (this: ServiceWorker, ...args: unknown[]) {
+      if ((args[0] as { type?: string } | null)?.type !== 'skip-waiting') return post.apply(this, args);
+      const el = document.querySelector('larmic-mitwachsen') as unknown as GameEl;
+      el.apply({ type: 'action' });
+      setTimeout(() => post.apply(this, args), 1000);
+    } as ServiceWorker['postMessage'];
+  });
+  const [v1, v2] = [version('1'), version('2')];
+  const errors = watchErrors(page);
+  const { game, sleeping, loads } = await openGame(page);
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(sleeping).toBe(false);
+  await goLive(context);
+  await askForUpdate(page);
+  await expect.poll(() => registration(page)).toEqual({ waiting: 'installed', active: 'activated' });
+  await game.evaluate((el) => (el as unknown as GameEl).apply({ type: 'action' }));
+  await expect.poll(sleeping).toBe(true);
+  // Nach dem Ritual: Bitte, das Kind weckt die Figur, dann übernimmt Fassung 2 – aber die Seite lädt nicht neu
+  await expect.poll(sleeping, { timeout: 15_000 }).toBe(false);
+  await expect.poll(() => registration(page)).toEqual({ waiting: null, active: 'activated' });
+  await page.waitForTimeout(3000);
+  expect(loads()).toBe(0);
+  expect(await sleeping()).toBe(false);
+  // Die Seite läuft noch mit Fassung 1: Ihr alter Cache bleibt, ihr altes Three.js kommt auch ohne Netz
+  expect((await cacheNames(page)).sort()).toEqual([v1.cache, v2.cache].sort());
+  await context.setOffline(true);
+  expect(await fetchBytes(page, v1.chunk)).toBe(v1.chunkBytes);
+  await context.setOffline(false);
+  // Wieder ins Bett: nach dem Ritual einmal neu geladen, in die Nacht
+  await game.evaluate((el) => (el as unknown as GameEl).apply({ type: 'action' }));
+  await expect.poll(sleeping).toBe(true);
+  await expect.poll(loads, { timeout: 30_000 }).toBe(1);
+  await expect(game).toHaveClass(/ready/);
+  expect(await sleeping()).toBe(true);
+  await expect.poll(() => cacheNames(page)).toEqual([v2.cache]);
+  await page.waitForTimeout(6000);
+  expect(loads()).toBe(1);
+  expect(errors).toEqual([]);
+});
+
 test('App-Update: zurück nach langer Pause, das Spiel schläft noch – die neue Fassung kommt', async ({
   page,
   context,

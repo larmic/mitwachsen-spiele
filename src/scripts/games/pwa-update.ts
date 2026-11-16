@@ -55,6 +55,24 @@ export function shouldApply(c: Chance): boolean {
   return c.lastApplied <= 0 || c.now - c.lastApplied >= APPLY_GAP || c.now < c.lastApplied;
 }
 
+export type Takeover = {
+  taken: boolean; // die neue Version steuert die Seite, auf Bitte der Seite (controllerchange nach skipWaiting)
+  safe: boolean; // safeMoment(…), jetzt erneut geprüft
+  armedAt: number; // Zeitpunkt des letzten Auslösers, 0: keiner
+  now: number;
+};
+
+/**
+ * Jetzt neu laden? Zwischen der Bitte um skipWaiting und der Übernahme vergeht Zeit (ein ruhender Service Worker
+ * startet auf dem Tablet erst), und das Kind kann die Figur genau dann wecken. Darum gilt der sichere Moment noch
+ * einmal: Ist er vorbei, lädt die Seite erst beim nächsten Auslöser in einem sicheren Moment neu. Bis dahin spielt
+ * sie weiter, die neue Version liefert ihr die alten Dateien aus dem alten Cache (Aufräumen wartet auf offene Seiten).
+ */
+export function shouldReload(t: Takeover): boolean {
+  if (!t.taken || !t.safe || t.armedAt <= 0) return false;
+  return t.now >= t.armedAt && t.now - t.armedAt <= ARM_MS;
+}
+
 /**
  * Optionen der Anmeldung. `updateViaCache: 'none'`: Die Frage nach einer neuen Version geht immer am HTTP-Cache vorbei
  * ins Netz, für sw.js und alles, was er einmal importieren sollte. Nie 'all' – dann hielte der HTTP-Cache eine neue

@@ -7,9 +7,10 @@
 // laden – eine wartende Version käme so wochenlang nicht an. Darum übernimmt die Seite sie selbst, aber nur an zwei
 // sicheren Stellen (Entscheidungen rein und getestet in pwa-update.ts): nach dem Gute-Nacht-Ritual im Bett und beim
 // Zurückkommen nach langer Pause, wenn das Spiel dann schläft oder noch nicht begonnen hat. Dann fragt sie nach einer
-// neuen Version, bittet eine wartende um skipWaiting und lädt einmal neu, sobald diese die Seite übernimmt. Das Spiel
-// kommt danach im selben Zustand zurück (Nacht, Figur im Bett). Mitten im Spiel wird nie neu geladen, das Kind sieht
-// keinen Hinweis, Eltern müssen nichts tun.
+// neuen Version, bittet eine wartende um skipWaiting und lädt einmal neu, sobald diese die Seite übernimmt – aber nur,
+// wenn der Moment dann noch sicher ist (das Kind kann die Figur dazwischen wecken); sonst erst beim nächsten Auslöser
+// in einem sicheren Moment. Das Spiel kommt danach im selben Zustand zurück (Nacht, Figur im Bett). Mitten im Spiel
+// wird nie neu geladen, das Kind sieht keinen Hinweis, Eltern müssen nichts tun.
 import { SERVICE_WORKER } from '../../data/pwa';
 import { browserStore } from './browser-store';
 import {
@@ -19,6 +20,7 @@ import {
   registrationOptions,
   safeMoment,
   shouldApply,
+  shouldReload,
   type GameMoment,
 } from './pwa-update';
 
@@ -51,28 +53,38 @@ const remember = (now: number) => {
 function watchUpdates(reg: ServiceWorkerRegistration) {
   let armedAt = 0; // letzter Auslöser
   let hiddenAt = 0; // seit wann die Seite verborgen ist
-  let applying = false;
+  let applying = false; // um skipWaiting gebeten, die Übernahme steht aus
+  let taken = false; // die neue Version steuert die Seite, neu geladen wird im nächsten sicheren Moment
 
-  const tryApply = () => {
-    const waiting = reg.waiting;
-    if (applying || !waiting || !navigator.serviceWorker.controller) return;
+  const safeNow = () => {
     const inGame = game()?.updateMoment();
-    const now = Date.now();
-    const safe =
+    return (
       !!inGame &&
       safeMoment({
         ...inGame,
         persistent: browserStore().persistent, // ohne localStorage ginge der Spielstand mit dem Neuladen verloren
         fullscreen: !!document.fullscreenElement, // Neuladen beendete das Vollbild
         visible: document.visibilityState === 'visible',
-      });
-    if (!shouldApply({ waiting: true, armedAt, lastApplied: lastApplied(), now, safe })) return;
+      })
+    );
+  };
+  const tryReload = () => {
+    if (!shouldReload({ taken, safe: safeNow(), armedAt, now: Date.now() })) return;
+    taken = false;
+    location.reload();
+  };
+  const tryApply = () => {
+    const waiting = reg.waiting;
+    if (applying || taken || !waiting || !navigator.serviceWorker.controller) return;
+    const now = Date.now();
+    if (!shouldApply({ waiting: true, armedAt, lastApplied: lastApplied(), now, safe: safeNow() })) return;
     applying = true;
     remember(now);
     waiting.postMessage({ type: 'skip-waiting' });
   };
   const trigger = () => {
     armedAt = Date.now();
+    tryReload();
     tryApply();
     // Nach einer neuen Version fragen; ist eine da, lädt sie im Hintergrund und meldet sich über updatefound
     reg.update().then(tryApply, () => {});
@@ -85,10 +97,12 @@ function watchUpdates(reg: ServiceWorkerRegistration) {
     });
   });
   // Nur wenn die Seite selbst darum gebeten hat: Beim allerersten Besuch übernimmt clients.claim() die Seite auch
+  // Zwischen Bitte und Übernahme kann das Kind die Figur geweckt haben: dann noch nicht, erst beim nächsten Auslöser
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!applying) return;
     applying = false;
-    location.reload();
+    taken = true;
+    tryReload();
   });
   // 1. Gute Nacht: wenn das Schlaflied verklungen ist
   document.addEventListener(SLEEP_EVENT, () => setTimeout(trigger, RITUAL_MS + 250));

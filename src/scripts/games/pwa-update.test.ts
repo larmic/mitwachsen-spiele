@@ -8,7 +8,9 @@ import {
   registrationOptions,
   safeMoment,
   shouldApply,
+  shouldReload,
   type Chance,
+  type Takeover,
   type Moment,
 } from './pwa-update';
 
@@ -84,6 +86,29 @@ describe('App-Update: übernehmen', () => {
     expect(shouldApply({ ...chance, lastApplied: now - 5000 })).toBe(false);
     expect(shouldApply({ ...chance, lastApplied: now - APPLY_GAP })).toBe(true);
     expect(shouldApply({ ...chance, lastApplied: now + 5000 })).toBe(true); // Uhr zurückgestellt
+  });
+});
+
+describe('App-Update: neu laden nach der Übernahme', () => {
+  const now = 2_000_000_000;
+  const takeover: Takeover = { taken: true, safe: true, armedAt: now - 1000, now };
+
+  it('lädt neu, wenn die neue Version übernommen hat und der Moment noch sicher ist', () => {
+    expect(shouldReload(takeover)).toBe(true);
+    expect(shouldReload({ ...takeover, armedAt: now - ARM_MS })).toBe(true);
+  });
+
+  it('nicht, wenn das Kind die Figur zwischen Bitte und Übernahme geweckt hat – dann beim nächsten Auslöser', () => {
+    expect(shouldReload({ ...takeover, safe: false })).toBe(false);
+    // Später: wieder im Bett, neuer Auslöser
+    expect(shouldReload({ ...takeover, armedAt: now + 600_000, now: now + 601_000 })).toBe(true);
+  });
+
+  it('nie ohne eigene Bitte, ohne Auslöser oder lange danach', () => {
+    expect(shouldReload({ ...takeover, taken: false })).toBe(false);
+    expect(shouldReload({ ...takeover, armedAt: 0 })).toBe(false);
+    expect(shouldReload({ ...takeover, armedAt: now - ARM_MS - 1 })).toBe(false);
+    expect(shouldReload({ ...takeover, armedAt: now + 1 })).toBe(false);
   });
 });
 

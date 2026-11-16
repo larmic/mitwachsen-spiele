@@ -1,5 +1,5 @@
 // Das Spiel als App: installierbar von der Startseite und vom Spiel aus, der Service Worker steuert nur das Spiel,
-// und ohne Netz startet es trotzdem. Updates: e2e/pwa-update.spec.ts. Spec: docs/specs/mitwachsen.md („App“).
+// und ohne Netz startet es trotzdem. Installierbar laut Chromium: e2e/installable.spec.ts, Updates: e2e/pwa-update.spec.ts. Spec: docs/specs/mitwachsen.md („App“).
 import { expect, test, type Page } from '@playwright/test';
 
 /** Sammelt Fehler der Seite; am Ende des Tests muss die Liste leer sein */
@@ -31,19 +31,6 @@ for (const path of ['/', '/spielen/'])
       expect(img.ok(), icon.src).toBe(true);
       expect(img.headers()['content-type']).toBe('image/png');
     }
-  });
-
-// Was Chromium selbst zur Installierbarkeit sagt (DevTools-Protokoll): keine Einwände, Manifest ohne Fehler
-for (const path of ['/', '/spielen/'])
-  test(`Seite ${path} ist für Chromium installierbar`, async ({ page }) => {
-    await page.goto(path);
-    await page.waitForLoadState('load');
-    const cdp = await page.context().newCDPSession(page);
-    const manifest = (await cdp.send('Page.getAppManifest')) as { url: string; errors: { message: string }[] };
-    expect(new URL(manifest.url).pathname).toBe('/manifest.webmanifest');
-    expect(manifest.errors).toEqual([]);
-    const { installabilityErrors } = await cdp.send('Page.getInstallabilityErrors');
-    expect(installabilityErrors).toEqual([]);
   });
 
 test('Startseite meldet keinen Service Worker an', async ({ page }) => {

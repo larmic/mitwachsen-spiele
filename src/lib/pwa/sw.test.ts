@@ -23,7 +23,7 @@ describe('Service Worker: Entscheidungen', () => {
     expect(staleCaches(keys, 'mitwachsen-', 'mitwachsen-b', [], null)).toEqual(['mitwachsen-a']);
   });
 
-  it('räumt nicht, solange außer der neu ladenden Seite noch eine Spielseite offen ist', () => {
+  it('räumt nicht, solange außer der sich meldenden Seite noch eine Spielseite offen ist', () => {
     const keys = ['mitwachsen-a', 'mitwachsen-b'];
     expect(staleCaches(keys, 'mitwachsen-', 'mitwachsen-b', ['tab1'], 'tab1')).toEqual(['mitwachsen-a']);
     expect(staleCaches(keys, 'mitwachsen-', 'mitwachsen-b', ['tab1', 'tab2'], 'tab1')).toEqual([]);
@@ -180,8 +180,14 @@ describe('Service Worker: Übernehmen an einer sicheren Stelle', () => {
     return { store, env, next };
   }
 
-  it('nur die neu ladende Seite offen: Die alten Caches gehen sofort', async () => {
-    const { store } = await updateWhileOpen([page('tab1'), { id: 'start', url: `${ORIGIN}/` }]);
+  it('die bittende Seite behält ihren alten Cache, bis sie neu geladen hat und sich meldet', async () => {
+    const { store, env, next } = await updateWhileOpen([page('tab1'), { id: 'start', url: `${ORIGIN}/` }]);
+    // Hat das Kind die Figur zwischen Bitte und Übernahme geweckt, spielt tab1 noch mit der alten Fassung weiter
+    expect([...store.keys()].sort()).toEqual(['mitwachsen-v1', 'mitwachsen-v2']);
+    expect(await next.request(`${ORIGIN}/_astro/three.js`)).toBe('v1:/_astro/three.js');
+    // Neu geladen (neue Kennung), meldet sich: Jetzt geht der alte Cache
+    env.windows = [page('tab1-neu'), { id: 'start', url: `${ORIGIN}/` }];
+    await next.message({ type: 'tidy' }, 'tab1-neu');
     expect([...store.keys()]).toEqual(['mitwachsen-v2']);
   });
 

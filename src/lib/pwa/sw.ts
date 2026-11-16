@@ -7,12 +7,13 @@
 //   skipWaiting: Eine neue Version wartet, bis keine Seite der alten mehr offen ist.
 // – message „skip-waiting“: Nur das Spiel selbst bittet darum, und nur an einer sicheren Stelle (Gute Nacht, Rückkehr
 //   nach langer Pause, src/scripts/games/pwa-update.ts). Dann wird die neue Version sofort aktiv, die bittende Seite
-//   lädt neu. Der Service Worker merkt sich, welche Seite das war.
-// – activate: Alte eigene Caches (Präfix) werden nur gelöscht, wenn außer der bittenden Seite keine Seite mehr offen
-//   ist. Eine andere, noch offene alte Seite (zweiter Tab) holt ihre Dateien mit Hash im Namen – etwa ein spät per
-//   import() geladenes Three.js – sonst aus einem Cache, den es nicht mehr gibt; auf dem Server sind sie dann schon
-//   weg. Was so stehen bleibt, räumt „tidy“ weg: Jede Spielseite meldet sich nach dem Laden, und ist sie die einzige
-//   offene Seite und dieser Service Worker der neueste, gehen die alten Caches. clients.claim() übernimmt Seiten
+//   lädt neu – oder, hat das Kind die Figur inzwischen geweckt, erst beim nächsten sicheren Moment.
+// – activate: Alte eigene Caches (Präfix) werden nur gelöscht, wenn keine Spielseite mehr offen ist – auch die
+//   bittende zählt, denn sie lädt vielleicht erst später neu. Eine noch offene alte Seite (die bittende oder ein
+//   zweiter Tab) holt ihre Dateien mit Hash im Namen – etwa ein spät per import() geladenes Three.js – sonst aus einem
+//   Cache, den es nicht mehr gibt; auf dem Server sind sie dann schon weg. Was so stehen bleibt, räumt „tidy“ weg:
+//   Jede Spielseite meldet sich nach dem Laden (auch die neu geladene bittende), und ist sie die einzige offene Seite
+//   und dieser Service Worker der neueste, gehen die alten Caches. clients.claim() übernimmt Seiten
 //   ohne Service Worker, etwa beim allerersten Besuch.
 // – fetch: nur GET auf der eigenen Seite. Dateien der Liste kommen aus dem Cache (sonst aus dem Netz), ein Aufruf der
 //   Spielseite selbst bekommt ihr gespeichertes HTML – so startet das Spiel auch ohne Netz. Andere Pfade der eigenen
@@ -52,7 +53,7 @@ export function olderCaches(keys: string[], prefix: string, current: string): st
 
 /**
  * Caches, die weg können: alle älteren eigenen – aber nur, wenn außer `leaving` keine Seite mehr offen ist (`windows`:
- * Kennungen der offenen Seiten, `leaving`: die Seite, die gleich neu lädt oder sich gerade meldet). Sonst keiner.
+ * Kennungen der offenen Seiten, `leaving`: die Seite, die sich gerade meldet, beim Aktivieren keine). Sonst keiner.
  */
 export function staleCaches(
   keys: string[],
@@ -84,7 +85,6 @@ const cacheKey = ${cacheKey.toString()};
 const olderKey = ${olderKey.toString()};
 const olderCaches = ${olderCaches.toString()};
 const staleCaches = ${staleCaches.toString()};
-let leaving = null; // die Seite, die um skipWaiting gebeten hat und gleich neu lädt
 
 // Alte eigene Caches löschen, wenn außer „except“ keine Spielseite offen ist. Auch Seiten ohne Service Worker zählen:
 // Eine Seite, die gerade erst aufgerufen wird, ist noch nicht dabei, eine alte, noch offene immer.
@@ -106,7 +106,6 @@ self.addEventListener('message', (event) => {
   const type = event.data && event.data.type;
   const from = event.source && event.source.id ? event.source.id : null;
   if (type === 'skip-waiting') {
-    leaving = from;
     event.waitUntil(self.skipWaiting());
   } else if (type === 'tidy' && from && !self.registration.waiting && !self.registration.installing) {
     event.waitUntil(tidy(from));
@@ -114,7 +113,7 @@ self.addEventListener('message', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(tidy(leaving).then(() => self.clients.claim()));
+  event.waitUntil(tidy(null).then(() => self.clients.claim()));
 });
 
 self.addEventListener('fetch', (event) => {
