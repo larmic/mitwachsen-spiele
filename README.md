@@ -86,6 +86,19 @@ Es gibt vorerst nur diese eine Stufe. Eine Teststufe ist für später geplant.
 
 Renovate hält Abhängigkeiten und Actions aktuell. Neue Versionen werden erst nach drei Tagen vorgeschlagen (`minimumReleaseAge`). Minor- und Patch-Updates übernimmt Renovate automatisch, aber nur, wenn alle Guard-Gates grün sind. Major-Updates kommen als Pull Request zur Prüfung.
 
+### Einmalig einrichten
+
+Diese Einstellungen stehen nicht im Code und müssen einmal von Hand gesetzt werden (Stand in `docs/todo.md`):
+
+1. **DNS** beim Domain-Anbieter für `mitwachsen-spiele.de`:
+   - `www` als `CNAME` auf `larmic.github.io`
+   - die Domain ohne `www` (`@`) mit `A`-Einträgen auf `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`
+   - und `AAAA`-Einträgen auf `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153`
+2. **Domain verifizieren** (Profil → Settings → Pages → „Add a domain“, TXT-Eintrag): Dann kann kein fremdes Repo die Domain übernehmen.
+3. **GitHub Pages** (Repo → Settings → Pages): Quelle „GitHub Actions“, Custom domain `www.mitwachsen-spiele.de`, nach dem DNS-Check „Enforce HTTPS“ anhaken. Die Domain ohne `www` leitet GitHub dann selbst auf `www` weiter.
+4. **Renovate**: der Renovate-App (GitHub App „Renovate“ von Mend) Zugriff auf dieses Repo geben.
+5. **Branch-Schutz** für `main` (Settings → Rules oder Branches): Pflicht-Check „Guard-Gates und Build“. Ohne ihn übernimmt Renovate Updates per Automerge, ohne dass die Gates grün sein müssen.
+
 ## Datenschutz und Recht
 
 - Impressum (`/impressum/`) nach § 5 DDG und § 18 Abs. 2 MStV, Datenschutzerklärung unter `/datenschutz/`.
