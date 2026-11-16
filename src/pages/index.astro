@@ -1,0 +1,46 @@
+---
+// Vorläufige Startseite: worum es geht, für wen, worauf geachtet ist – und der Weg ins Spiel.
+import { getEntry, render } from 'astro:content';
+import PlainPage from '../layouts/PlainPage.astro';
+import VoxelIcon from '../components/VoxelIcon.astro';
+
+const g = await getEntry('games', 'mitwachsen');
+if (!g) throw new Error('Inhalt src/content/games/mitwachsen.md fehlt');
+const { Content } = await render(g);
+const play = '/spielen/';
+const facts = [
+  ['Alter', g.data.age],
+  ['Gespielt', g.data.together],
+  ['Steuerung', g.data.controls],
+  ['Läuft', g.data.device],
+  ['Kosten', 'kostenlos, ohne Werbung'],
+  ['Spielstand', 'bleibt im eigenen Browser'],
+];
+---
+
+<PlainPage heading={g.data.title} description={g.data.teaser} home>
+  <div class="panel-head">
+    <VoxelIcon block="pilz" size={64} />
+    <p>{g.data.teaser}</p>
+  </div>
+  <p>
+    <a class="pxbtn" href={play}>
+      Spiel starten
+    </a>
+  </p>
+  <dl class="facts">
+    {facts.map(([term, value]) => (
+      <div>
+        <dt>{term}</dt>
+        <dd>{value}</dd>
+      </div>
+    ))}
+  </dl>
+  {g.data.claim && <p class="claim pxsm th-spiel">{g.data.claim}</p>}
+  <Content />
+  <p>
+    <a class="pxbtn" href={play}>
+      Spiel starten
+    </a>
+  </p>
+</PlainPage>

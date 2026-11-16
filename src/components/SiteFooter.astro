@@ -1,0 +1,16 @@
+---
+import MailLink from './MailLink.astro';
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="inner">
+    <p class="pxf footer-name">mitwachsen-spiele.de</p>
+    <p class="footer-links">
+      <MailLink label="Kontakt" />
+      <a href="/impressum/">Impressum</a>
+      <a href="/datenschutz/">Datenschutz</a>
+      <span>© {year} Lars Michaelis</span>
+    </p>
+  </div>
+</footer>
