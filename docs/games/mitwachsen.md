@@ -16,7 +16,7 @@ Hintergrund, Altersstufen und gemeinsame Regeln: [README](README.md). Dieses Dok
 | Eingabe | Wirkung |
 | --- | --- |
 | Pfeiltasten | Figur geht ein Feld in Bildschirmrichtung (→ nach rechts, ↑ nach oben). Gedrückt halten: höchstens etwa 4 Felder pro Sekunde, Autorepeat des Systems wird ignoriert. |
-| Leertaste und andere Tasten | Ab 3 ohne Wirkung. Alles geht durch Hineinlaufen: in ein Tier (es folgt), ins Bett (schlafen), in ein Portal (reisen). |
+| Leertaste und andere Tasten | Ab 3 ohne Wirkung. Alles geht durch Hineinlaufen: in ein Tier (es folgt), ins Bett (schlafen), auf die Mitte einer Portal-Plattform (reisen). |
 | Maus | Nur für das Menü (Zahnrad). Das Kind spielt mit der Tastatur und öffnet es nicht aus Versehen. |
 | Touch | Auf Handy und Tablet: Steuerkreuz unten links, im selben ruhigen Takt. |
 
@@ -70,67 +70,67 @@ Die Lichtung ist das Zuhause mit dem Bett. Hinter jedem der acht großen Tore li
 
 - **Die Welt wächst beim Laufen:** Alles entsteht aus dem Seed, Stück für Stück, wenn die Figur dorthin kommt. Derselbe Seed ergibt immer dieselbe Welt, ein anderer eine andere: Die Tore stehen in jeder Welt woanders und in anderer Reihenfolge. In Richtung jedes Tors liegt seine Welt, endlos.
 - **Mächtiges Torhaus:** Neun Felder breit, hohe Türme, eine geschlossene Doppeltür mit leuchtendem Zeichen in der Farbe der Welt, und Schmuck, der verrät, was dahinter wartet (Eiszapfen, Wasserfälle, glühende Lava-Adern, Kristalle, Laubkronen, ein Regenbogen, Riesenpilze). Vor dem Tor ist eine freie Bucht; steht das Kind davor, lichtet sich der Nebel im Gang dahinter, und es sieht schon ein Stück der Welt. Hinter das Tor kommt man nicht, auch nicht außen herum.
-- **Portal neben dem Tor:** Drei Felder breit mit Säulen und Krone im Thema der Welt, zuerst leer. Läuft das Kind hinein, leuchtet es auf, ein Wirbel dreht sich, Funken kreisen, und es bleibt an. Gleichzeitig erscheint sein Gegenstück im Kreis um das Bett, in Richtung seines Tors (vorher zeigen dort zwei kleine Sockel, wo es stehen wird). Von da an kann das Kind zwischen Bett und Tor hin- und herreisen, folgende Tiere reisen mit.
+- **Portal-Plattform neben dem Tor:** Eine flache, achteckige Plattform (3 × 3 Felder) im Material der Welt, mit einem Bild der Welt auf der Mitte und niedriger Zierde in den Ecken; man steigt von allen vier Seiten auf. Kommt das Kind nah heran, erwacht sie: Das Bild leuchtet, ein goldener Rahmen legt sich um die Mitte, Funken kreisen, und sie bleibt wach. Gleichzeitig erwacht ihr Gegenstück im Kreis um das Bett, in Richtung ihres Tors (vorher ein leerer grauer Sockel, der nicht verrät, wohin er führt). Wer auf die Mitte tritt, reist zum Gegenstück, folgende Tiere reisen mit. Nach der Ankunft liegt das Gold auf den Zugängen: erst runter, dann wieder rauf, und es geht zurück.
 - **Eigene Tiere:** Jede Welt bekommt ihre eigenen verlorenen Tiere, sobald man hinein kann. Die Vorschläge unten sind Ideen, gemeinsam mit dem Kind auszusuchen.
 - **Gleiche Regeln:** Klettern, Nebel, Folgen und Schlafen bleiben überall gleich. Neu ist nur, wie die Welt aussieht und klingt.
 - **Öffnen der Tore:** Wie die Tore aufgehen, hängt an der Geschichte (siehe Ideen: Tiere befreien). Bis dahin bleiben sie zu.
 
 ### Lichtung
 
-Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzelnen Bäumen, Blumenwiesen und Klettersteinen, ringsum Felsen als feste Grenze. In der Mitte das Bett, darüber später die vier Portale in einer Reihe. Zwölf Tiere: Hase, Igel, Schaf, Eichhörnchen, Ente, Kuh, Fuchs, Frosch, Biene, Schildkröte, Bär, Zicklein. Tag und Nacht, Schmetterlinge, nachts Glühwürmchen.
+Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzelnen Bäumen, Blumenwiesen und Klettersteinen, ringsum Felsen als feste Grenze. In der Mitte das Bett, im Kreis darum die Portal-Plattformen der acht Welten. Zwölf Tiere: Hase, Igel, Schaf, Eichhörnchen, Ente, Kuh, Fuchs, Frosch, Biene, Schildkröte, Bär, Zicklein. Tag und Nacht, Schmetterlinge, nachts Glühwürmchen.
 
 ### Eiswelt
 
 - **Aussehen:** Schneefelder, glitzernde Eisblöcke zum Klettern, zugefrorene Seen, verschneite Tannen, Iglus. Kühles, helles Licht, sanfter Schneefall (nicht bei reduzierter Bewegung).
 - **Besonderes:** Auf Eis rutscht die Figur nicht (das wäre für ein kleines Kind frustrierend), es knirscht nur beim Laufen.
 - **Tiere (Ideen):** Pinguin, Eisbär, Robbe, Schneehase, Schneeeule.
-- **Portal:** hellblau, Rahmen aus Eis.
+- **Portal-Plattform:** Eisscholle mit Schneekante, Eisspitzen in den Ecken; Bild: Schneeflocke.
 
 ### Sandwelt
 
 - **Aussehen:** Dünen in sanften Stufen, Kakteen, Palmen an einer kleinen Oase, Sandsteinfelsen, warmes Licht.
 - **Besonderes:** Fußspuren im Sand, die langsam verwehen (reine Zierde).
 - **Tiere (Ideen):** Kamel, Erdmännchen, Eidechse, Wüstenfuchs, Schildkröte aus der Oase.
-- **Portal:** goldgelb, Rahmen aus Sandstein.
+- **Portal-Plattform:** Sandsteinstufe, Mini-Pyramiden mit glühender Spitze; Bild: Stufenpyramide.
 
 ### Wasserwelt
 
 - **Aussehen:** Viele kleine Inseln und Strände, verbunden durch Stege, Brücken und Trittsteine; Seerosen, Boote am Ufer, ein Leuchtturm.
 - **Besonderes:** Wasser bleibt nicht begehbar, die Wege führen darüber. Wellen und Glitzern, leises Plätschern.
 - **Tiere (Ideen):** Fisch (springt aus dem Wasser), Krebs, Seestern, Möwe, Otter.
-- **Portal:** blau, Rahmen aus Wasserblöcken.
+- **Portal-Plattform:** Brunnenrand mit Wellensteinen, Muscheln in den Ecken; Bild: Wassertropfen.
 
 ### Lavaberge
 
 - **Aussehen:** Dunkle Felsen und Berge, dazwischen glühende Lavaflüsse, die warm leuchten, auch nachts. Höher als die anderen Welten, mit viel zum Klettern.
 - **Besonderes:** Ganz ungefährlich: Die Figur kommt nicht in die Lava, die Lava leuchtet nur. Kein Feuer, kein Rauch, der Angst macht.
 - **Tiere (Ideen):** Bergziege, Salamander, Murmeltier, Adler, Steinbock.
-- **Portal:** orange, Rahmen aus leuchtender Lava.
+- **Portal-Plattform:** Glutstein: kühler Basalt mit Glutrissen zur Mitte, runde Glutsteine; Bild: freundliche Flamme.
 
 ### Wald
 
 - **Aussehen:** Dichter, aber lichter Wald mit Eichen, Birken, Tannen und Herbstbäumen, Beerenbüsche, Farne, Pilze, kleine Teiche.
 - **Tiere (Ideen):** Reh, Wildschwein, Eule, Dachs, Specht.
-- **Portal:** grün, Säulen aus Holz, oben Laub.
+- **Portal-Plattform:** Baumstumpf mit Jahresringen, Moos und Farn in den Ecken; Bild: Blatt.
 
 ### Wolkenwelt
 
 - **Aussehen:** Weiße Wolkeninseln in verschiedenen Höhen, dazwischen nur Himmel. Am Tor ein Regenbogen.
 - **Besonderes:** Wenn man hineinkann, braucht es Wolkenbrücken zwischen den Inseln. Niemand fällt hinunter.
 - **Tiere (Ideen):** Wolkenschaf, Vögel, Schmetterlinge, ein kleiner Drache (freundlich).
-- **Portal:** goldgelb, Säulen aus Wolken.
+- **Portal-Plattform:** Wolkenkissen, Wolkenbällchen mit bunten Knöpfen; Bild: Regenbogen über einer Wolke.
 
 ### Pilzwald
 
 - **Aussehen:** Lila Moos, Riesenpilze mit roten, blauen und orangen Hüten, viele kleine Pilze.
 - **Tiere (Ideen):** Schnecke, Glühwürmchen, Igel, Maus.
-- **Portal:** lila, Säulen wie Pilzstiele, oben ein roter Hut.
+- **Portal-Plattform:** Pilzteller mit lila Moos, Mini-Pilze in den Ecken; Bild: Fliegenpilz.
 
 ### Höhlenwelt
 
 - **Aussehen:** Dunkle Steinblöcke, leuchtende Kristalle und Pilze als Lichtquellen, unterirdische Seen. Nie ganz dunkel: Es bleibt immer genug Licht, damit nichts unheimlich wirkt.
 - **Tiere (Ideen):** Fledermaus, Maulwurf, Glühwürmchen, Höhlenmolch.
-- **Portal:** lila, Rahmen aus dunklem Stein (das Thema `hoehle` gibt es schon).
+- **Portal-Plattform:** Kristallnest aus dunklem Stein, Kristallsäulen in den Ecken; Bild: Kristall-Raute (das Thema `hoehle` gibt es schon).
 
 ## Tiere
 
@@ -161,7 +161,7 @@ Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzel
 
 ## Klangsteine und Geschichten
 
-Das Kind kann noch nicht lesen, darum erzählen die Geschichten Klangsteine. Ein **Klangstein** ist ein kleiner Steinblock, über dem eine goldene Note schwebt (Gold heißt auf der ganzen Seite: hier kannst du etwas tun). Einer steht links vorn neben dem Bett, einer vor jedem großen Tor, gegenüber dem Portal vor dem anderen Turm.
+Das Kind kann noch nicht lesen, darum erzählen die Geschichten Klangsteine. Ein **Klangstein** ist ein kleiner Steinblock, über dem eine goldene Note schwebt (Gold heißt auf der ganzen Seite: hier kannst du etwas tun). Einer steht links vorn neben dem Bett, einer vor jedem großen Tor, gegenüber der Portal-Plattform vor dem anderen Turm.
 
 - **Hineinlaufen** spielt die Geschichte des Ortes, wie alles andere im Spiel ohne Leertaste. Noch einmal hineinlaufen hält sie an, ein anderer Stein löst den vorigen ab. Nichts spielt von selbst.
 - **Zuhören:** Solange die Figur stehen bleibt, sitzt sie am Stein, Noten steigen auf, und Tiere in der Nähe drehen sich zu ihr um und bleiben eine Weile stehen. Geht sie los, läuft die Geschichte weiter. Menü, Schlafen oder ein Wechsel des Tabs halten sie an.
@@ -303,10 +303,18 @@ Nur gesammelt, noch nicht ausgeplant.
 
 - **Welten hinter den Toren:** Alle acht sind oben unter „Die Welten“ beschrieben. Weitere Ideen: Blumenland, Herbstwald, Strand mit Gezeiten.
 - **Tiere befreien:** Später sollen die Tiere nicht nur entdeckt, sondern befreit werden. Daran hängt auch, wie sich die großen Tore öffnen (Vorschläge unten unter „Tore öffnen“). Die Geschichte dazu fehlt noch: Wovon werden die Tiere befreit, und warum? (Für ein kleines Kind freundlich, ohne Bösewicht, der Angst macht.)
-- **Portale:** Umgesetzt für die großen Tore (siehe Spec). Noch offen: Der Heimweg-Pfeil zeigt auf das Portal, wenn der Weg darüber kürzer ist. Neue Form siehe „Portale als Plattform“.
+- **Portale:** Als Plattformen umgesetzt (siehe „Portale als Plattform“ und Spec). Noch offen: Der Heimweg-Pfeil zeigt auf die Plattform, wenn der Weg darüber kürzer ist.
 - **Gemeinsame Welt:** Für ein höheres Alter: Man schickt anderen einen Link und spielt zu zweit in derselben Welt, z. B. Elternteil und Kind oder Kind und Freund. Braucht mehr als GitHub Pages (Verbindung zwischen zwei Browsern oder ein kleiner Dienst) und eine eigene Datenschutzprüfung.
 
-### Portale als Plattform (Notiz vom 17.11.2026)
+### Portale als Plattform (Notiz vom 17.11.2026, umgesetzt am 17.11.2026)
+
+**Umgesetzt** wie unten abgestimmt (Regeln und Tests: Spec, Regel 9a). Abweichungen und Entscheidungen bei der Umsetzung:
+
+- „Zwei Felder heran“ zählt vom Rand der Plattform (Abstand zur Mitte höchstens drei Felder, auch schräg).
+- Die Plattform am Tor steht eine Reihe weiter vor dem Tor als das alte Portal (Mitte drei Reihen vor der Torreihe), damit sie ringsum frei ist und man auch von der Torseite aufsteigen kann; Felsen des unregelmäßigen Felsrands weichen dafür. Ein Feld weiter steht kein Baum, dessen Krone sie verdeckte.
+- Die Ecken bleiben fest, auch beim schlafenden leeren Sockel am Bett. Damit man das sieht, trägt er in jeder Ecke einen grauen Eckstein, bei allen Welten gleich (verrät nichts).
+- Liegen zwei Gegenstücke nach dem Runden zu nah (selten, etwa 1 von 300 Welten), nimmt eines die nächste andere Rundung; so berühren sie sich nie.
+- Das Erwachen kommt in vier Helligkeitsstufen statt einer Welle von der Mitte nach außen; das Reisen nutzt den bisherigen Ton und die Funken (kein Schrumpfen der Figur). Das Nachtlicht der wachen Plattformen am Bett ist noch nicht umgesetzt.
 
 Die heutigen Portale (drei Felder breit, Säulen und Krone, man läuft von vorn hinein) wirken nicht schön. Besser:
 
@@ -320,7 +328,7 @@ Die heutigen Portale (drei Felder breit, Säulen und Krone, man läuft von vorn 
   - **Aufwachen** auch schräg: Abstand 2 Felder in jede Richtung, aber nur, wenn das Feld schon aufgedeckt ist (kein Leuchten im Nebel).
   - **Keine Sperrzeit** nach der Ankunft: Raus und wieder Rein genügt.
   - **Schlafende Gegenstücke** am Bett sind ein **leerer Sockel**, der nicht verrät, zu welcher Welt er gehört. Erst beim Erwachen bekommt er Material, Deko und Bild seiner Welt.
-- **Beispiele:** Voxel-Entwürfe für alle acht Welten (3×3-Achteck, Gold-Rahmen um die Mitte, Gold auf den Zugängen nach der Ankunft) stehen im Artefakt „Portal-Plattformen“ (https://claude.ai/artifact/46NLTpHryPctPEyfJwUX5r).
+- **Beispiele:** Voxel-Entwürfe für alle acht Welten (Vorlage der Umsetzung: `src/data/games/mitwachsen-portals.ts`) (3×3-Achteck, Gold-Rahmen um die Mitte, Gold auf den Zugängen nach der Ankunft) stehen im Artefakt „Portal-Plattformen“ (https://claude.ai/artifact/46NLTpHryPctPEyfJwUX5r).
 
 ### Tore je Welt verschieden (Notiz vom 17.11.2026)
 
