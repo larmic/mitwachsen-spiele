@@ -30,8 +30,9 @@ export const ABOUT = {
   ],
   // Bildunterschrift zum Bild der Lichtung (src/assets/games/mitwachsen.webp)
   shotAlt:
-    'Die Lichtung im Spiel: in der Mitte das Bett und die Figur, rundherum Hase, Igel, Schaf, Ente, Frosch und Biene, links ein Futtertrog, rechts ein Wassertrog, am Rand leuchtende Portale',
-  shotCaption: 'Die Lichtung mit dem Bett: Hier wohnen die Tiere, die dein Kind schon nach Hause gebracht hat.',
+    'Die Lichtung im Spiel: in der Mitte die Figur, dahinter Bett und Klangstein, rundherum Kuh, Zicklein, Igel, Schaf, Biene, Ente, Fuchs, Schildkröte und Frosch auf der Wiese, links ein Futtertrog, rechts ein Wassertrog, unten links eine leuchtende Portal-Plattform mit Pilzbild, oben links eine graue, noch schlafende Plattform',
+  shotCaption:
+    'Die Lichtung mit dem Bett: Hier wohnen die Tiere, die dein Kind schon nach Hause gebracht hat. Ringsum bringen Portal-Plattformen die Figur zu den großen Toren.',
   // Eckdaten zusätzlich zu denen aus src/content/games/mitwachsen.md
   facts: [
     ['Kosten', 'kostenlos, ohne Werbung'],

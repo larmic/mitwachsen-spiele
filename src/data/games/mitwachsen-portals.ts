@@ -122,20 +122,21 @@ export const PLATFORMS: Record<GateTheme, readonly (readonly string[])[]> = {
     [EMPTY, '.p.....P.', EMPTY, '...uWu...', '...WWW...', '...WWW...', EMPTY, '.P.....p.', EMPTY],
     NONE,
   ],
-  // Glutstein: kühler Basalt, Glutrisse über die Zugänge zur Mitte, runde Glutsteine; Bild: freundliche Flamme
+  // Glutstein: kühler Basalt, Glutrisse an den Zugängen, runde Glutsteine; Bild: freundliche Flamme. Um das Gold liegt
+  // nur dunkler Basalt (die Risse enden vorher), die Flamme hat dunkle Ecken: Gold und Glut sind sich sonst zu ähnlich
   lava: [
     [
       '..xxrxx..',
-      '.XXXrXXX.',
+      '.XXXXXXX.',
       'xXGGGGGXx',
       'xXGRRRGXx',
-      'rrGRRRGrr',
+      'rXGRRRGXr',
       'xXGRRRGXx',
       'xXGGGGGXx',
-      '.XXXrXXX.',
+      '.XXXXXXX.',
       '..xxrxx..',
     ],
-    [EMPTY, '.X.....X.', EMPTY, '...xrx...', '...rRr...', '...rRr...', EMPTY, '.X.....X.', EMPTY],
+    [EMPTY, '.X.....X.', EMPTY, '...xrx...', '...rRr...', '...xRx...', EMPTY, '.X.....X.', EMPTY],
     [EMPTY, '.r.....r.', EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, '.r.....r.', EMPTY],
   ],
   // Kristallnest: dunkle Schale, Kristallsäulen in den Ecken; Bild: Kristall-Raute

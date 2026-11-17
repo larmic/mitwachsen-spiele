@@ -105,7 +105,7 @@ Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzel
 - **Aussehen:** Dunkle Felsen und Berge, dazwischen glühende Lavaflüsse, die warm leuchten, auch nachts. Höher als die anderen Welten, mit viel zum Klettern.
 - **Besonderes:** Ganz ungefährlich: Die Figur kommt nicht in die Lava, die Lava leuchtet nur. Kein Feuer, kein Rauch, der Angst macht.
 - **Tiere (Ideen):** Bergziege, Salamander, Murmeltier, Adler, Steinbock.
-- **Portal-Plattform:** Glutstein: kühler Basalt mit Glutrissen zur Mitte, runde Glutsteine; Bild: freundliche Flamme.
+- **Portal-Plattform:** Glutstein: kühler Basalt mit Glutrissen an den Zugängen, runde Glutsteine; Bild: freundliche Flamme. Um das Gold liegt nur dunkler Basalt, sonst verschwimmt es mit der Glut.
 
 ### Wald
 

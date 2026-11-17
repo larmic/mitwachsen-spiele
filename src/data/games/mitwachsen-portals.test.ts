@@ -55,6 +55,31 @@ describe('Portal-Plattformen: Form', () => {
     });
   }
 
+  it('Gold hebt sich in jeder Welt vom Sockel daneben ab (bereit und nach der Ankunft)', () => {
+    const rgb = (c: string) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+    const dist = (a: string, b: string) => Math.hypot(...rgb(a).map((v, i) => v - rgb(b)[i]!));
+    // Paare (Gold, Nachbar im Sockel) je Welt und Zustand; die Mitte liegt unter dem Bild
+    const pairs = GATES.flatMap((g) =>
+      (['ready', 'arrived'] as const).flatMap((look) => {
+        const base = platformLook(g.id, 'gate', look).filter((v) => v.layer === 0);
+        const at = new Map(base.map((v) => [`${v.x},${v.z}`, v]));
+        return base
+          .filter((v) => v.gold)
+          .flatMap((v) => [
+            at.get(`${v.x + 1},${v.z}`),
+            at.get(`${v.x - 1},${v.z}`),
+            at.get(`${v.x},${v.z + 1}`),
+            at.get(`${v.x},${v.z - 1}`),
+          ])
+          .filter((n) => n && !n.gold && n.role !== 'core')
+          .map((n) => ({ n: n!, label: `${g.id} ${look} ${n!.x},${n!.z}` }));
+      }),
+    );
+    expect(pairs.length).toBeGreaterThan(100);
+    // Glut lag bei gut 50
+    for (const { n, label } of pairs) expect(dist(n.color, GOLD.top), label).toBeGreaterThanOrEqual(70);
+  });
+
   it('Rahmen-Ring fürs Lauflicht: 16 verschiedene Plätze, genau die des Gold-Rahmens', () => {
     const frame = platformVoxels('eis')
       .filter((v) => v.role === 'frame')
