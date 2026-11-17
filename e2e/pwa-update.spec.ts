@@ -7,6 +7,10 @@ import { join } from 'node:path';
 import { parseServiceWorker } from '../scripts/pwa.ts';
 import { CHUNK, VERSIONS } from './versions-dirs.ts';
 
+// Diese Tests warten echte Abläufe ab (Ritual, Installation einer Fassung, Neuladen mit 3D) und brauchen schon allein
+// auf einem Runner mit 2 CPUs gut 20 s; parallel zu anderen Tests reichen die üblichen 30 s nicht
+test.describe.configure({ timeout: 120_000 });
+
 /** Sammelt Fehler der Seite; am Ende des Tests muss die Liste leer sein */
 function watchErrors(page: Page) {
   const errors: string[] = [];
@@ -32,8 +36,9 @@ type GameEl = { state: { sleeping: boolean }; apply(cmd: { type: string }): void
 async function openGame(page: Page, firstTime = true) {
   await page.goto('/spielen/');
   if (firstTime) await page.getByRole('button', { name: /Verstanden/ }).click();
+  // Angemeldet wird erst nach dem Laden (samt 3D); auf langsamen Runnern dauert das
   await expect
-    .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null))
+    .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null), { timeout: 30_000 })
     .toMatch(/\/spielen\/sw\.js$/);
   const game = page.locator('larmic-mitwachsen');
   const sleeping = () => game.evaluate((el) => (el as unknown as GameEl).state.sleeping);
@@ -153,17 +158,18 @@ test('App-Update: weckt das Kind die Figur zwischen Bitte und Übernahme, wird e
   page,
   context,
 }) => {
-  // Das Kind tippt genau, nachdem die Seite um skipWaiting gebeten hat; die Übernahme dauert (ruhender Service Worker)
+  // Die Bitte um skipWaiting wird angehalten, bis der Test sie freigibt: So weckt das Kind die Figur sicher genau
+  // zwischen Bitte und Übernahme, auch wenn der Rechner langsam ist
   await page.addInitScript(() => {
     const post = Object.getOwnPropertyDescriptor(ServiceWorker.prototype, 'postMessage')!.value as (
       this: ServiceWorker,
       ...args: unknown[]
     ) => void;
+    const w = window as unknown as { skipAsked?: boolean; releaseSkip?: () => void };
     ServiceWorker.prototype.postMessage = function (this: ServiceWorker, ...args: unknown[]) {
       if ((args[0] as { type?: string } | null)?.type !== 'skip-waiting') return post.apply(this, args);
-      const el = document.querySelector('larmic-mitwachsen') as unknown as GameEl;
-      el.apply({ type: 'action' });
-      setTimeout(() => post.apply(this, args), 1000);
+      w.skipAsked = true;
+      w.releaseSkip = () => post.apply(this, args);
     } as ServiceWorker['postMessage'];
   });
   const [v1, v2] = [version('1'), version('2')];
@@ -177,7 +183,23 @@ test('App-Update: weckt das Kind die Figur zwischen Bitte und Übernahme, wird e
   await game.evaluate((el) => (el as unknown as GameEl).apply({ type: 'action' }));
   await expect.poll(sleeping).toBe(true);
   // Nach dem Ritual: Bitte, das Kind weckt die Figur, dann übernimmt Fassung 2 – aber die Seite lädt nicht neu
-  await expect.poll(sleeping, { timeout: 15_000 }).toBe(false);
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { skipAsked?: boolean }).skipAsked === true), {
+      timeout: 30_000,
+    })
+    .toBe(true);
+  // Kurz nach dem Einschlafen weckt Drücken noch nicht (SLEEP_LOCK zählt Spiel-Takte, die auf langsamen Rechnern
+  // länger dauern): drücken, bis die Figur wach ist
+  await expect
+    .poll(
+      async () => {
+        await page.keyboard.press('ArrowDown');
+        return sleeping();
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(false);
+  await page.evaluate(() => (window as unknown as { releaseSkip: () => void }).releaseSkip());
   await expect.poll(() => registration(page)).toEqual({ waiting: null, active: 'activated' });
   await page.waitForTimeout(3000);
   expect(loads()).toBe(0);
