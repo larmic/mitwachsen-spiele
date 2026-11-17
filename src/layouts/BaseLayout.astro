@@ -8,7 +8,7 @@ import '@fontsource/nunito/latin-600.css';
 import '@fontsource/nunito/latin-800.css';
 import '../styles/global.css';
 import '../styles/sections.css';
-import { SITE } from '../data/site';
+import { HOME_TITLE, SITE } from '../data/site';
 import { APP } from '../data/pwa';
 import { cubeDefs, textureCss } from '../lib/voxel/blocks';
 
@@ -18,7 +18,7 @@ interface Props {
   noindex?: boolean; // z. B. 404: nicht indexieren, kein canonical
 }
 const { title, description = SITE.description, noindex = false } = Astro.props;
-const fullTitle = title ? `${title} – ${SITE.title}` : 'Mitwachsen – ein Spiel, das mit dem Kind wächst';
+const fullTitle = title ? `${title} – ${SITE.title}` : HOME_TITLE;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 ---
 

@@ -9,7 +9,7 @@
 - [ ] Renovate-App für das Repo freischalten
 - [ ] Datenschutzerklärung prüfen lassen
 - [ ] Seite in der Search Console anmelden
-- [ ] Texte der Startseite schreiben: Platzhalter in `src/data/landing.ts` ersetzen (Form und Aufbau stehen)
+- [x] Texte der Startseite schreiben (`src/data/landing.ts`, erste Fassung 17.11.2026, gegenlesen)
 
 ## Später
 

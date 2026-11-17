@@ -1,8 +1,8 @@
 ---
 // Startseite für Eltern: Himmel mit schwebender Insel und „Spiel starten“, darunter auf Erde die Abschnitte
 // (was es ist, zusammen spielen, wächst mit, Bildschirmzeit, Versprechen). Ohne JavaScript vollständig lesbar.
-// Alle Texte stehen in src/data/landing.ts (dort als Platzhalter markiert), die Eckdaten in
-// src/content/games/mitwachsen.md.
+// Alle Texte stehen in src/data/landing.ts, die Eckdaten in src/content/games/mitwachsen.md, die strukturierten Daten
+// für Suchmaschinen in src/data/site.ts.
 import { getEntry } from 'astro:content';
 import { Image } from 'astro:assets';
 import BaseLayout from '../layouts/BaseLayout.astro';
@@ -12,6 +12,7 @@ import Clouds from '../components/Clouds.astro';
 import VoxelIcon from '../components/VoxelIcon.astro';
 import { ISLAND, sceneSvg, tower } from '../lib/voxel/blocks';
 import { CUBE_W } from '../lib/voxel/cube';
+import { homeLd } from '../data/site';
 import { ABOUT, CLOSING, HERO, PLAY_URL, PROMISES, SCREEN_TIME, STAGES, TOGETHER } from '../data/landing';
 import shot from '../assets/games/mitwachsen.webp';
 import '../styles/landing.css';
@@ -38,6 +39,12 @@ const maxTower = Math.max(...towers.map((t) => t.height));
 ---
 
 <BaseLayout description={g.data.teaser}>
+  <script
+    is:inline
+    slot="head"
+    type="application/ld+json"
+    set:html={JSON.stringify(homeLd(g.data.teaser)).replaceAll('<', '\\u003c')}
+  />
   <header class="sky landing-sky">
     <Clouds />
     <SiteHeader />

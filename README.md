@@ -48,8 +48,8 @@ src/
   integrations/       schreibt nach dem Build den Service Worker (dist/spielen/sw.js)
   data/pwa.ts         Name, Farben und Icons der App, Ort des Service Workers
   data/games/         Gegenden, Tiere, Figur, Geschichten
-  data/site.ts        Titel, Adresse, Kontakt
-  data/landing.ts     alle Texte der Startseite (noch Platzhalter)
+  data/site.ts        Titel, Adresse, strukturierte Daten für Suchmaschinen
+  data/landing.ts     alle Texte der Startseite
   styles/             tokens.css (Design-Tokens), global.css, sections.css, landing.css (Startseite)
 scripts/              Gates nach dem Build: Bundle-Gate, Seiten-Gate, App-Gate
 e2e/                  Smoke-Test und Barrierefreiheit (Playwright)

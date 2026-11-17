@@ -22,7 +22,7 @@ Vor jedem Commit `npm run format`, `npm run lint`, `npm run arch`, `npm run chec
 
 ## Aufbau
 
-- `src/pages/` – Seiten: `/` (Startseite für Eltern mit „Spiel starten“; Texte in `src/data/landing.ts`, noch Platzhalter, Eckdaten aus `src/content/games/mitwachsen.md`, Styles in `src/styles/landing.css`), `/spielen/` (das Spiel, `noindex`, nicht in der Sitemap), `/datenschutz/`, 404 (Impressum und Kontakt liegen auf larmic.de, der Footer verlinkt dorthin); dazu `favicon.*`, `[icon].png.ts` (apple-touch-icon und Icons der App), `og.png.ts`, `manifest.webmanifest.ts` (beim Build erzeugt)
+- `src/pages/` – Seiten: `/` (Startseite für Eltern mit „Spiel starten“; Texte in `src/data/landing.ts`, Titel und strukturierte Daten für Suchmaschinen in `src/data/site.ts`, Eckdaten aus `src/content/games/mitwachsen.md`, Styles in `src/styles/landing.css`), `/spielen/` (das Spiel, `noindex`, nicht in der Sitemap), `/datenschutz/`, 404 (Impressum und Kontakt liegen auf larmic.de, der Footer verlinkt dorthin); dazu `favicon.*`, `[icon].png.ts` (apple-touch-icon und Icons der App), `og.png.ts`, `manifest.webmanifest.ts` (beim Build erzeugt)
 - `src/layouts/BaseLayout.astro` – Kopfdaten, Schriften, Würfel-Symbole; `PlainPage.astro` – Himmel, Inhalt auf Papier, Footer
 - `src/content/` – Eckdaten des Spiels im Frontmatter von `src/content/games/mitwachsen.md` (Rumpf wird nicht gezeigt), Schema in `src/content.config.ts`; alle Texte der Startseite stehen in `src/data/landing.ts`
 - `src/components/` – `MitwachsenGame.astro` (Spielfläche), `MitwachsenParentInfo.astro` (Hinweis für Eltern), Kopf, Footer
