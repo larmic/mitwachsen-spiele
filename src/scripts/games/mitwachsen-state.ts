@@ -17,6 +17,7 @@ import {
 } from '../../data/games/mitwachsen';
 import type { StoryId } from '../../data/games/mitwachsen-stories';
 import { canStep, standHeight, wildAnimals, type World } from './mitwachsen-world';
+import { platformArea, platformsToWake, stepOn, withNeighbours } from './mitwachsen-portal';
 import { raining } from './mitwachsen-weather';
 
 export const SLEEP_LOCK = 30; // Takte nach dem Einschlafen, in denen Tasten nicht wecken (3 s)
@@ -51,7 +52,8 @@ export type State = {
   met: string[];
   garden: HomeAnimal[];
   openGates: GateId[];
-  portals: GateId[]; // aktivierte Portale (je Tor eines, mit Partner über dem Bett)
+  portals: GateId[]; // wache Portal-Plattformen (je Tor eine, mit Gegenstück am Bett)
+  arrived: readonly [number, number] | null; // Mittelfeld, auf dem die Figur angekommen ist: erst runter, dann wieder rauf (nicht gespeichert)
   picked: Record<string, number>; // Büsche ohne Beeren: "x,y" → Takt des Pflückens (nicht gespeichert)
   day: number; // Tage, die die Welt schon erlebt hat (jedes Schlafen zählt einen); Blumen wachsen damit
   dayStart: number; // Takt, an dem der heutige Tag begann (Aufwachen): Das Wetter zählt ab hier, jeder Tag beginnt mit Sonne
@@ -71,6 +73,9 @@ export type Progress = {
   heard: StoryId[];
 };
 
+export type Step = { state: State; events: GameEvent[] };
+type Explored = (x: number, y: number) => boolean;
+const EVERYWHERE: Explored = () => true;
 export type Cmd = { type: 'move'; dir: Dir } | { type: 'action' } | { type: 'tick' };
 export type GameEvent =
   | { type: 'step'; climb: number }
@@ -82,8 +87,9 @@ export type GameEvent =
   | { type: 'aside'; id: string; species: SpeciesId } // ein Tier der Wiese macht der Figur Platz
   | { type: 'home'; id: string; species: SpeciesId } // auf der Wiese angekommen
   | { type: 'gate'; id: GateId }
-  | { type: 'portal'; id: GateId } // Portal am Tor aktiviert
+  | { type: 'portal'; id: GateId } // Plattform am Tor (und ihr Gegenstück am Bett) erwacht
   | { type: 'teleport'; id: GateId; to: 'gate' | 'home' }
+  | { type: 'ready'; id: GateId } // nach der Ankunft von der Mitte gestiegen: Die Plattform ist wieder bereit
   | { type: 'pick'; x: number; y: number } // Beeren gepflückt
   | { type: 'regrow'; x: number; y: number } // neue Beeren am Busch
   | { type: 'feed'; ids: string[] } // Beeren in den Futtertrog: diese Tiere der Wiese freuen sich
@@ -105,19 +111,10 @@ const passageCache = new WeakMap<World, Set<string>>();
 function passages(world: World): Set<string> {
   let set = passageCache.get(world);
   if (!set) {
-    const portalSpots = [...world.portals.values()].flatMap((p) => [p.gate, p.gateExit, p.home, p.homeExit]);
-    const spots = [...[...world.gates.values()].flatMap((g) => g.cells), ...portalSpots];
-    set = new Set(
-      spots.flatMap(([x, y]) =>
-        [
-          [x, y],
-          [x + 1, y],
-          [x - 1, y],
-          [x, y + 1],
-          [x, y - 1],
-        ].map(([a, b]) => `${a},${b}`),
-      ),
-    );
+    set = new Set([
+      ...platformArea(world.portals),
+      ...withNeighbours([...world.gates.values()].flatMap((g) => g.cells)),
+    ]);
     passageCache.set(world, set);
   }
   return set;
@@ -235,6 +232,7 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     garden: [...garden],
     openGates: (saved.openGates ?? []).filter((id) => !GATES.find((g) => g.id === id)?.locked),
     portals: (saved.portals ?? []).filter((id) => world.portals.has(id)),
+    arrived: null,
     picked: {},
     basket: false,
     bucket: false,
@@ -286,7 +284,11 @@ export const regionAnimals = (region: RegionId): string[] =>
 
 // ---------- Ein Schritt ----------
 
-export function step(state: State, world: World, cmd: Cmd): { state: State; events: GameEvent[] } {
+/**
+ * Ein Befehl. `explored(x, y)` sagt, ob ein Feld schon aus dem Nebel ist (der Nebel gehört der Ansicht): Nur dort
+ * erwacht eine Portal-Plattform. Ohne Angabe gilt alles als erkundet.
+ */
+export function step(state: State, world: World, cmd: Cmd, explored: Explored = EVERYWHERE): Step {
   // Flache Kopie: Tiere werden beim Ändern ersetzt, nie verändert – alte Zustände bleiben gültig
   const s: State = {
     ...state,
@@ -302,8 +304,16 @@ export function step(state: State, world: World, cmd: Cmd): { state: State; even
   const events: GameEvent[] = [];
   if (cmd.type === 'tick') tick(s, world, events);
   else if (s.sleeping) wake(s, world, events);
-  else if (cmd.type === 'move') move(s, world, cmd.dir, events);
-  else action(s, world, events);
+  else if (cmd.type === 'move') {
+    const [fx, fy] = [s.player.x, s.player.y];
+    move(s, world, cmd.dir, events);
+    if (s.player.x !== fx || s.player.y !== fy) landed(s, world, events);
+  } else action(s, world, events);
+  // Portal-Plattformen in der Nähe erwachen (Regeln in mitwachsen-portal.ts)
+  for (const id of s.sleeping ? [] : platformsToWake(world.portals, s.portals, s.player.x, s.player.y, explored)) {
+    s.portals.push(id);
+    events.push({ type: 'portal', id });
+  }
   return { state: s, events };
 }
 
@@ -445,7 +455,6 @@ function move(s: State, world: World, dir: Dir, events: GameEvent[]) {
   const [dx, dy] = DIRS[dir];
   const tx = p.x + dx,
     ty = p.y + dy;
-  if (portal(s, world, tx, ty, events)) return;
   const animal = s.animals.find((a) => a.x === tx && a.y === ty);
   if (animal?.mode === 'wander') {
     // Hineinlaufen reicht: Das Tier singt, freut sich und folgt (die Aktionstaste braucht es dafür nicht)
@@ -522,36 +531,23 @@ function bringHome(s: State, world: World, events: GameEvent[]) {
 }
 
 /**
- * Portale: In ein inaktives Portal am Tor laufen aktiviert es (auch sein Partner über dem Bett erscheint).
- * In ein aktives Portal laufen bringt die Figur zum Partner; folgende Tiere kommen mit.
- * Ein noch nicht erschienenes Portal über dem Bett ist einfach Wiese. Liefert true, wenn ein Portal gehandelt hat.
+ * Die Figur hat ein neues Feld betreten: nach einer Ankunft wieder bereit, auf der Mitte einer wachen Plattform reisen
+ * (Regeln in mitwachsen-portal.ts). Folgende Tiere reisen mit und stellen sich um die Plattform, nie darauf.
  */
-function portal(s: State, world: World, x: number, y: number, events: GameEvent[]): boolean {
-  const here = world.cell(x, y).portal;
-  if (!here) return false;
-  const active = s.portals.includes(here.id);
-  if (!active) {
-    if (here.side === 'home') return false;
-    s.portals.push(here.id);
-    events.push({ type: 'portal', id: here.id });
-    return true;
-  }
-  const pair = world.portals.get(here.id)!;
-  const to = here.side === 'gate' ? 'home' : 'gate';
-  const exit = to === 'home' ? pair.homeExit : pair.gateExit;
-  const spot = freeNear(s, world, exit, (fx, fy) => !world.cell(fx, fy).portal);
-  if (!spot) return false;
-  s.player.x = spot[0];
-  s.player.y = spot[1];
-  s.player.dir = 's';
-  // Folgende Tiere reisen mit und stellen sich nah hinter die Figur
-  for (const id of s.followers) {
-    const a = s.animals.find((t) => t.id === id)!;
-    const place = freeNear(s, world, spot, (fx, fy) => !world.cell(fx, fy).portal, id);
+function landed(s: State, world: World, events: GameEvent[]) {
+  const { x, y } = s.player;
+  const r = stepOn(world.portals, (fx, fy) => world.cell(fx, fy).portal, s.portals, s.arrived, x, y);
+  s.arrived = r.arrived;
+  if (r.ready) events.push({ type: 'ready', id: r.ready });
+  if (!r.travel) return;
+  const { id, to, at } = r.travel;
+  Object.assign(s.player, { x: at[0], y: at[1], dir: 's' });
+  for (const f of s.followers) {
+    const a = s.animals.find((t) => t.id === f)!;
+    const place = freeNear(s, world, at, (fx, fy) => !world.cell(fx, fy).portal, f);
     if (place) [a.x, a.y] = place;
   }
-  events.push({ type: 'teleport', id: here.id, to });
-  return true;
+  events.push({ type: 'teleport', id, to });
 }
 
 function action(s: State, world: World, events: GameEvent[]) {
@@ -620,6 +616,7 @@ function sleep(s: State, world: World, events: GameEvent[]) {
     if (spot) [a.x, a.y] = spot;
   }
   s.followers = [];
+  s.arrived = null;
   s.player.x = HOME.bed[0];
   s.player.y = HOME.bed[1];
   s.player.dir = 's';

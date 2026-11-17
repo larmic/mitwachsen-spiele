@@ -1,13 +1,22 @@
-// Torhäuser und Portale der 3D-Ansicht: mächtige Tore im Felsring, je Welt anders geschmückt, und Portale mit
-// Säulen, Sturz und Krone. Liefert nur Geometrie in eigenen Koordinaten; die 3D-Ansicht stellt sie an ihren Platz.
+// Torhäuser und Portal-Plattformen der 3D-Ansicht: mächtige Tore im Felsring, je Welt anders geschmückt, und flache
+// Plattformen aus Voxeln. Liefert nur Geometrie in eigenen Koordinaten; die 3D-Ansicht stellt sie an ihren Platz.
 // Gehört zur 3D-Ansicht und wird nur mit ihr nachgeladen (Three.js).
 //
 // Koordinaten: x entlang des Tors (Mitte 0), y nach oben, z nach vorn (+z schaut zur Lichtung bzw. zum Bett).
-// Ein Torhaus ist 9 Felder breit (Tor 5, Türme je 2) und reicht 3 Felder tief in den Fels. Ein Portal ist 3 Felder
-// breit (Säule, Portal, Säule).
+// Ein Torhaus ist 9 Felder breit (Tor 5, Türme je 2) und reicht 3 Felder tief in den Fels. Eine Portal-Plattform ist
+// 3 × 3 Felder groß und flach.
 
-import { Color } from 'three';
 import { THEME_COLORS, type GateTheme } from '../../data/games/mitwachsen';
+import {
+  GOLD,
+  SUB,
+  emptySocketVoxels,
+  frameOffColor,
+  platformVoxels,
+  sleepingVoxels,
+  voxelSpan,
+  type PlatformVoxel,
+} from '../../data/games/mitwachsen-portals';
 import { Geo, type Tile } from './mitwachsen-geo';
 
 /** Teile, die mit verschiedenen Materialien gezeichnet werden */
@@ -315,56 +324,45 @@ function decorate(p: Parts, theme: GateTheme) {
 }
 
 /**
- * Portal: zwei Säulen und ein Sturz im Thema der Welt, oben eine Krone mit leuchtendem Stein. Ist es aktiv, dreht
- * sich innen ein Wirbel (eigenes Mesh in der 3D-Ansicht). `stubs`: noch nicht erschienenes Portal am Bett – nur zwei
- * kleine Sockel zeigen, wo es einmal stehen wird.
+ * Portal-Plattform: Voxel aus dem Raster (src/data/games/mitwachsen-portals.ts) als Quader, Mitte der Plattform im
+ * Ursprung, ein Voxel ist ein Drittel Feld. Leuchtende Voxel kommen in `bright`, die anderen in `solid`.
+ * `gold`: alle Voxel golden (leuchtend) mit dunkler Kante.
  */
-export function portalFrame(p: Parts, theme: GateTheme, stubs = false) {
-  const wall = WALL[theme];
-  const glow = THEME_COLORS[theme].portal;
-  const wallBlock = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, g = p.solid) =>
-    block(g, x0, y0, z0, x1, y1, z1, wall.tint, wall.tint, wall.tile, wall.top);
-  if (stubs) {
-    for (const x of [-1.35, 0.65]) {
-      wallBlock(x, 0, -0.35, x + 0.7, 0.5, 0.35);
-      block(p.solid, x + 0.2, 0.5, -0.15, x + 0.5, 0.75, 0.15, '#6b6f78'); // ruhender Stein
-    }
-    return;
+export function platformParts(p: Parts, voxels: readonly PlatformVoxel[], gold = false) {
+  for (const v of voxels) {
+    const [y0, y1] = voxelSpan(v);
+    const g = gold || v.glow ? p.bright : p.solid;
+    const size = 1 / SUB;
+    g.box(
+      v.x / SUB - 1.5,
+      y0,
+      v.z / SUB - 1.5,
+      size,
+      y1 - y0,
+      size,
+      gold ? GOLD.side : v.color,
+      gold ? GOLD.top : v.color,
+    );
   }
-  const pillar = theme === 'lava' ? p.lava : p.solid;
-  for (const x of [-1.45, 0.55]) {
-    wallBlock(x - 0.05, 0, -0.45, x + 0.95, 0.4, 0.45);
-    wallBlock(x + 0.1, 0.4, -0.35, x + 0.8, 3.3, 0.35, pillar);
-    wallBlock(x - 0.05, 3.3, -0.45, x + 0.95, 3.55, 0.45);
-  }
-  wallBlock(-1.6, 3.55, -0.4, 1.6, 4.05, 0.4);
-  wallBlock(-0.9, 4.05, -0.3, 0.9, 4.45, 0.3);
-  // Krone: leuchtender Stein in der Farbe der Welt, Schmuck an den Ecken
-  block(p.bright, -0.3, 4.45, -0.2, 0.3, 5.0, 0.2, glow);
-  block(p.bright, -0.15, 3.65, 0.4, 0.15, 3.95, 0.46, glow);
-  for (const x of [-1.6, 1.25]) block(p.bright, x, 4.05, -0.18, x + 0.35, 4.4, 0.18, glow);
-  if (theme === 'wald') block(p.leaves, -1.8, 3.9, -0.6, 1.8, 4.5, 0.6, '#3f9a3c', '#5ab651', 'leaves');
-  if (theme === 'eis') block(p.solid, -1.65, 4.05, -0.42, 1.65, 4.2, 0.42, '#ffffff');
-  if (theme === 'pilze') block(p.solid, -1.9, 4.05, -0.7, 1.9, 4.5, 0.7, '#c8323a', '#d9473a');
 }
 
-/** Wirbel im Portal: Ringe in Weiß, die Farbe kommt vom Material (Leinwand für eine Textur) */
-export function swirlCanvas(): HTMLCanvasElement {
-  const n = 64;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = n;
-  const ctx = canvas.getContext('2d')!;
-  for (let y = 0; y < n; y++)
-    for (let x = 0; x < n; x++) {
-      const dx = (x - n / 2 + 0.5) / (n / 2),
-        dy = (y - n / 2 + 0.5) / (n / 2);
-      const r = Math.hypot(dx, dy);
-      const a = Math.atan2(dy, dx);
-      const v = 0.5 + 0.5 * Math.sin(a * 3 + r * 14); // Spirale mit drei Armen
-      const alpha = Math.max(0, Math.min(1, (1.05 - r) * 3)) * (0.45 + 0.55 * v);
-      const c = new Color(1, 1, 1).lerp(new Color(0.75, 0.75, 0.75), 1 - v);
-      ctx.fillStyle = `rgba(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)},${alpha.toFixed(3)})`;
-      ctx.fillRect(x, y, 1, 1);
-    }
-  return canvas;
+/**
+ * Die Teile einer Plattform, die die 3D-Ansicht je nach Zustand zeigt: `asleep` (am Tor matt, am Bett der leere graue
+ * Sockel) allein; wach `body` und `picture` (das leuchtende Bild), dazu der Rahmen um die Mitte und die Zugänge, jeweils
+ * golden oder in ihrer eigenen Farbe. Keine zwei Teile haben einen Voxel gemeinsam, so flackert nichts.
+ */
+export function platformSets(theme: GateTheme, side: 'gate' | 'home') {
+  const lit = platformVoxels(theme);
+  const off = frameOffColor(theme);
+  const frame = lit.filter((v) => v.role === 'frame');
+  const access = lit.filter((v) => v.role === 'access');
+  return {
+    asleep: side === 'gate' ? sleepingVoxels(theme) : emptySocketVoxels(),
+    body: lit.filter((v) => v.role !== 'frame' && v.role !== 'access' && !(v.role === 'picture' && v.glow)),
+    picture: lit.filter((v) => v.role === 'picture' && v.glow),
+    frameGold: frame,
+    frameOff: frame.map((v) => ({ ...v, color: off, glow: false })),
+    accessGold: access,
+    accessOff: access,
+  };
 }

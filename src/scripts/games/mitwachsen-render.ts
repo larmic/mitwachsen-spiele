@@ -51,6 +51,7 @@ import type { Climate } from './mitwachsen-world';
 import type { State } from './mitwachsen-state';
 import { cycle, hash } from '../../lib/games/rng';
 import type { Cell, TreeKind, World } from './mitwachsen-world';
+import { drawPlatform } from './mitwachsen-platform-2d';
 
 /** Gleitende Position eines Wesens auf dem Bildschirm (in Feldern), dazu Hüpfer und Blickrichtung */
 export type Body = { x: number; y: number; z: number; hop: number };
@@ -782,28 +783,11 @@ export class Renderer {
         box(ctx, P, x + 0.3, y + 0.3, h + 6.6, 0.4, 0.4, 0.6, theme.portal);
         break;
       }
-      case 'portal': {
-        // Portal: Sturz über drei Felder und innen leuchtend, wenn aktiv; am Bett erst nach der Aktivierung
-        const id = c.portal!.id;
-        const active = state.portals.includes(id);
-        if (c.portal!.side === 'home' && !active) break;
-        const theme = THEME_COLORS[id];
-        const p = world.portals.get(id)!;
-        const [fx] = c.portal!.side === 'gate' ? p.gateFacing : p.homeFacing;
-        if (active) box(ctx, P, x + 0.1, y + 0.45, h + 0.1, 0.8, 0.1, 3.1, theme.portal);
-        if (fx === 0) box(ctx, P, x - 1, y + 0.3, h + 3.4, 3, 0.4, 0.6, theme.side, theme.top);
-        else box(ctx, P, x + 0.3, y - 1, h + 3.4, 0.4, 3, 0.6, theme.side, theme.top);
-        box(ctx, P, x + 0.35, y + 0.35, h + 4.0, 0.3, 0.3, 0.4, theme.portal);
+      case 'portal':
+      case 'portalrim':
+      case 'portalcorner':
+        drawPlatform(ctx, P, world, state, x, y, h, c.portal!);
         break;
-      }
-      case 'portalside': {
-        const { id, side } = c.part!;
-        const theme = THEME_COLORS[id];
-        if (side === 'home' && !state.portals.includes(id))
-          box(ctx, P, x + 0.2, y + 0.2, h, 0.6, 0.6, 0.5, theme.side, theme.top);
-        else box(ctx, P, x + 0.15, y + 0.15, h, 0.7, 0.7, 3.4, theme.side, theme.top);
-        break;
-      }
       case 'cactus':
         box(ctx, P, x + 0.37, y + 0.42, h, 0.26, 0.2, 1.35, '#3f8f3a', '#5aab4a');
         box(ctx, P, x + 0.13, y + 0.45, h + 0.55, 0.14, 0.14, 0.55, '#3f8f3a', '#5aab4a');

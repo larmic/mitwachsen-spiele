@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DIRS } from '../../lib/games/front';
 import { GATES, HOME, REGIONS, type GateId } from '../../data/games/mitwachsen';
+import { BED_STONE } from '../../data/games/mitwachsen-stories';
+import { platformCells, platformLift } from './mitwachsen-portal';
 import {
   GATE_HALF,
   HOUSE_DEPTH,
@@ -8,6 +10,7 @@ import {
   canStep,
   createWorld,
   gatePlaces,
+  portalPlaces,
   standHeight,
   wildAnimals,
   type Cell,
@@ -216,7 +219,7 @@ describe('Start auf der Lichtung', () => {
         for (let x = -HOME.meadow; x <= HOME.meadow; x++) {
           if (Math.hypot(x, y) > HOME.meadow) continue;
           const c = w.cell(HOME.bed[0] + x, HOME.bed[1] + y);
-          if (c.deco === 'bed' || c.deco === 'portal' || c.deco === 'portalside') continue;
+          if (c.deco === 'bed' || c.portal) continue;
           expect(c.garden, `${x},${y}`).toBe(true);
           if (c.solid) continue; // Tröge
           meadow++;
@@ -313,27 +316,84 @@ describe('Landschaft', () => {
   });
 });
 
-describe('Portale', () => {
-  for (const seed of [1, 42, 2026]) {
-    it(`Seed ${seed}: neben jedem Tor ein erreichbares Portal, sein Partner im Kreis um das Bett`, () => {
+describe('Portal-Plattformen', () => {
+  /** Die 16 Felder im Abstand 2 um eine Mitte */
+  const RING = Array.from({ length: 25 }, (_, i) => [(i % 5) - 2, Math.floor(i / 5) - 2] as const).filter(
+    ([dx, dy]) => Math.max(Math.abs(dx), Math.abs(dy)) === 2,
+  );
+  const cheb = (a: readonly number[], b: readonly number[]) =>
+    Math.max(Math.abs(a[0]! - b[0]!), Math.abs(a[1]! - b[1]!));
+  for (const seed of SEEDS) {
+    it(`Seed ${seed}: 3 × 3 Felder am Tor und am Bett, von allen vier Seiten erreichbar, ringsum frei`, () => {
       const w = createWorld(seed);
-      const cells = new Set(reachable(w, [], START).map(([x, y]) => `${x},${y}`));
+      const reach = new Set(reachable(w, [], START, 200000).map(([x, y]) => `${x},${y}`));
       for (const g of GATES) {
         const p = w.portals.get(g.id)!;
-        expect(w.cell(p.gate[0], p.gate[1]).portal).toEqual({ id: g.id, side: 'gate' });
-        expect(w.cell(p.home[0], p.home[1]).portal).toEqual({ id: g.id, side: 'home' });
-        expect(cells.has(`${p.gateExit[0]},${p.gateExit[1]}`), `${g.id} Ausgang am Tor`).toBe(true);
-        expect(cells.has(`${p.homeExit[0]},${p.homeExit[1]}`), `${g.id} Ausgang am Bett`).toBe(true);
-        expect(Math.hypot(p.home[0] - HOME.bed[0], p.home[1] - HOME.bed[1])).toBeLessThanOrEqual(HOME.portalRing + 1);
-        // gleich neben dem Tor (neben dem Turm, auf Höhe der Torreihe)
+        for (const [centre, side] of [
+          [p.gate, 'gate'],
+          [p.home, 'home'],
+        ] as const) {
+          const [cx, cy] = centre;
+          for (const { x, y, at } of platformCells(centre)) {
+            const c = w.cell(x, y);
+            expect(c.portal, `${g.id} ${side} ${x},${y}`).toEqual({ id: g.id, side, at });
+            expect(c.solid, `${g.id} ${side} ${at}`).toBe(at === 'corner'); // nur die Ecken mit Zierde sind fest
+            expect(c.h).toBe(w.cell(cx, cy).h); // flach
+            if (at !== 'corner') expect(reach.has(`${x},${y}`), `${g.id} ${side} ${at} erreichbar`).toBe(true);
+          }
+          // ringsum ein Feld frei, und jede Seitenmitte hat davor ein begehbares Feld: Man kommt von allen Seiten drauf
+          for (const [dx, dy] of RING) {
+            const c = w.cell(cx + dx, cy + dy);
+            expect(c.solid || c.ground === 'water' || !!c.portal, `${g.id} ${side} Ring ${dx},${dy}`).toBe(false);
+          }
+          for (const [dx, dy] of Object.values(DIRS))
+            expect(reach.has(`${cx + 2 * dx},${cy + 2 * dy}`), `${g.id} ${side} Zugang ${dx},${dy}`).toBe(true);
+          // ein Feld weiter steht kein Baum, dessen Krone die Plattform verdeckte
+          for (let d = -3; d <= 3; d++)
+            for (const [x, y] of [
+              [cx + d, cy - 3],
+              [cx + d, cy + 3],
+              [cx - 3, cy + d],
+              [cx + 3, cy + d],
+            ] as const)
+              expect(['tree', 'bush'], `${g.id} ${side} Baum ${x},${y}`).not.toContain(w.cell(x, y).deco);
+        }
+        // am Tor gleich neben dem Turm, im Ring um das Bett etwa neun Felder weit
         const { mid } = w.gates.get(g.id)!;
         expect(Math.hypot(p.gate[0] - mid[0], p.gate[1] - mid[1]), `${g.id} nah am Tor`).toBeLessThanOrEqual(7);
-        // Säulen links und rechts sind fest
-        const [fx, fy] = p.gateFacing;
-        for (const o of [-1, 1]) expect(w.cell(p.gate[0] + fy * o, p.gate[1] + fx * o).deco).toBe('portalside');
+        expect(Math.abs(Math.hypot(p.home[0] - HOME.bed[0], p.home[1] - HOME.bed[1]) - HOME.portalRing)).toBeLessThan(
+          1,
+        );
+        expect(cheb(p.gate, w.stones.get(g.id)!), `${g.id}: Klangstein nicht an der Plattform`).toBeGreaterThan(2);
       }
     });
   }
+
+  it('im Ring um das Bett: keine Plattform berührt eine andere, die Wiese, das Bett, Tröge, Unterstand oder Klangstein (viele Seeds)', () => {
+    const fixed: (readonly [number, number])[] = [HOME.bed, HOME.food, HOME.water, HOME.shelterStem, BED_STONE];
+    const { x0, y0, x1, y1 } = HOME.shelter;
+    for (let seed = 1; seed <= 3000; seed++) {
+      const homes = [...portalPlaces(seed).values()].map((p) => p.home);
+      for (const a of homes) {
+        for (const b of homes) if (a !== b) expect(cheb(a, b), `Seed ${seed}`).toBeGreaterThanOrEqual(4);
+        for (const { x, y } of platformCells(a)) {
+          const [dx, dy] = [x - HOME.bed[0], y - HOME.bed[1]];
+          expect(Math.hypot(dx, dy), `Seed ${seed}: nicht auf der Wiese`).toBeGreaterThan(HOME.meadow + 0.5);
+          expect(x >= x0 && x <= x1 && y >= y0 && y <= y1, `Seed ${seed}: Unterstand`).toBe(false);
+        }
+        // auch der freie Ring um die Plattform liegt nicht auf Bett, Trog, Pilzstiel oder Klangstein
+        for (const f of fixed) expect(cheb(a, f), `Seed ${seed}`).toBeGreaterThan(2);
+      }
+    }
+  });
+
+  it('auf der Plattform steht man etwas höher: auf dem Rand der Sockel, auf der Mitte das Bild', () => {
+    const w = createWorld(1);
+    const { gate } = w.portals.get('eis')!;
+    const lifts = platformCells(gate).map(({ x, y }) => platformLift(w.cell(x, y)));
+    expect(new Set(lifts)).toEqual(new Set([0.25, 0.4]));
+    expect(platformLift(w.cell(gate[0] + 3, gate[1]))).toBe(0);
+  });
 });
 
 describe('Klangsteine', () => {

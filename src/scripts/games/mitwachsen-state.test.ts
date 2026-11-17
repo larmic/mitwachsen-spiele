@@ -16,6 +16,7 @@ import {
 } from './mitwachsen-state';
 import { createWorld, standHeight, type Cell, type World } from './mitwachsen-world';
 import { BLOCK, raining } from './mitwachsen-weather';
+import { platformArea } from './mitwachsen-portal';
 
 /** Kleine Testwelt: überall flaches Gras des Zuhauses, einzelne Felder überschreibbar */
 function fakeWorld(cells: Record<string, Partial<Cell>> = {}): World {
@@ -636,11 +637,14 @@ describe('Randfälle aus der Prüfung', () => {
 });
 
 describe('Durchgänge bleiben frei', () => {
-  it('umherlaufende Tiere bleiben nie an Toren oder am Rosenbogen stehen', () => {
+  it('umherlaufende Tiere bleiben nie an Toren oder auf Portal-Plattformen und ihren Zugängen stehen', () => {
     const world = createWorld(5);
-    const passages = [...world.gates.values()]
-      .flatMap((g) => g.cells)
-      .flatMap(([x, y]) => [`${x},${y}`, `${x + 1},${y}`, `${x - 1},${y}`, `${x},${y + 1}`, `${x},${y - 1}`]);
+    const passages = [
+      ...platformArea(world.portals),
+      ...[...world.gates.values()]
+        .flatMap((g) => g.cells)
+        .flatMap(([x, y]) => [`${x},${y}`, `${x + 1},${y}`, `${x - 1},${y}`, `${x},${y + 1}`, `${x},${y - 1}`]),
+    ];
     // Alle Tore offen, Figur weit weg: Die Tiere laufen lange frei umher
     let s: State = {
       ...initialState(world),
@@ -656,67 +660,161 @@ describe('Durchgänge bleiben frei', () => {
   });
 });
 
-/** Richtung von einem Feld zum Nachbarfeld */
-const toward = (from: readonly [number, number], to: readonly [number, number]): Dir =>
-  to[0] > from[0] ? 'e' : to[0] < from[0] ? 'w' : to[1] > from[1] ? 's' : 'n';
-
-describe('Portale', () => {
+describe('Portal-Plattformen', () => {
   const world = createWorld(1);
-  const west = world.portals.get('lava')!;
-  /** Figur wach vor dem Portal am Westtor, Blick darauf */
-  function beforeGatePortal(extra: Animal[] = [], followers: string[] = []) {
-    const [ex, ey] = west.gateExit;
-    const dir: Dir =
-      west.gate[0] - ex === 1 ? 'e' : west.gate[0] - ex === -1 ? 'w' : west.gate[1] - ey === 1 ? 's' : 'n';
-    const s: State = {
-      ...initialState(world),
-      sleeping: false,
-      player: { x: ex, y: ey, dir },
-      animals: extra,
-      followers,
-    };
-    return { s, dir };
-  }
+  const lava = world.portals.get('lava')!;
+  const [gx, gy] = lava.gate;
+  const [hx, hy] = lava.home;
+  /** Figur wach an (x, y), Blick nach Osten */
+  const at = (x: number, y: number, extra: Partial<State> = {}): State => ({
+    ...initialState(world),
+    sleeping: false,
+    player: { x, y, dir: 'e' },
+    animals: [],
+    ...extra,
+  });
+  /** Von Westen her einen Schritt auf (x, y) */
+  const go = (s: State, x: number, y: number, explored?: (x: number, y: number) => boolean) => {
+    const r = step({ ...s, player: { ...s.player, x: x - 1, y } }, world, { type: 'move', dir: 'e' }, explored);
+    return { s: r.state, events: r.events };
+  };
+  /** Ein freies Feld der Lichtung, `dx`/`dy` Felder neben der Plattformmitte am Tor (auch das Feld links davon frei) */
+  const near = (dx: number, dy: number): [number, number] => [gx + dx, gy + dy];
 
-  it('aktiviert das Portal am Tor beim Hineinlaufen, ohne gleich zu reisen', () => {
-    const { s, dir } = beforeGatePortal();
-    const r = run(s, world, dir);
-    expect(r.events).toEqual([{ type: 'portal', id: 'lava' }]);
-    expect(r.s.portals).toEqual(['lava']);
-    expect([r.s.player.x, r.s.player.y]).toEqual([...west.gateExit]);
+  it('erwacht, sobald die Figur zwei Felder heran ist – auch schräg; das Gegenstück am Bett erwacht mit', () => {
+    // drei Felder von der Mitte = zwei Felder vom Rand der Plattform, auch schräg an der Ecke
+    for (const [dx, dy] of [
+      [3, 3],
+      [-3, 2],
+      [0, -3],
+      [-1, 1],
+    ] as const) {
+      const r = step(at(...near(dx, dy)), world, TICK);
+      expect(r.events, `${dx},${dy}`).toContainEqual({ type: 'portal', id: 'lava' });
+      expect(r.state.portals).toEqual(['lava']);
+    }
   });
 
-  it('bringt die Figur durch das aktive Portal zum Bett und zurück; folgende Tiere reisen mit', () => {
-    const { s, dir } = beforeGatePortal(
-      [animal('lichtung:hase', west.gateExit[0], west.gateExit[1] + 1, { mode: 'follow' })],
-      ['lichtung:hase'],
-    );
-    let r = run({ ...s, portals: ['lava'] }, world, dir);
-    expect(r.events).toEqual([{ type: 'teleport', id: 'lava', to: 'home' }]);
-    expect([r.s.player.x, r.s.player.y]).toEqual([...west.homeExit]);
-    const hase = r.s.animals.find((a) => a.id === 'lichtung:hase')!;
-    expect(Math.max(Math.abs(hase.x - r.s.player.x), Math.abs(hase.y - r.s.player.y))).toBeLessThanOrEqual(2);
-    // zurück: vom Ausgang am Bett ins Portal
-    const back = toward(west.homeExit, west.home);
-    r = run({ ...r.s, player: { ...r.s.player, dir: back } }, world, back);
-    expect(r.events).toEqual([{ type: 'teleport', id: 'lava', to: 'gate' }]);
-    expect([r.s.player.x, r.s.player.y]).toEqual([...west.gateExit]);
+  it('weiter weg schläft sie weiter', () => {
+    for (const [dx, dy] of [
+      [4, 3],
+      [-4, 0],
+      [0, 4],
+    ] as const)
+      expect(step(at(...near(dx, dy)), world, TICK).state.portals).toEqual([]);
   });
 
-  it('ein noch nicht erschienenes Portal am Bett ist einfach Wiese', () => {
-    const [hx, hy] = west.home;
-    const [ex, ey] = west.homeExit;
-    const dir = toward(west.homeExit, west.home);
-    const s: State = { ...initialState(world), sleeping: false, player: { x: ex, y: ey, dir }, animals: [] };
-    const r = run(s, world, dir);
+  it('beim Herangehen erwacht sie, und die Figur geht ganz normal weiter', () => {
+    // von der Lichtung her auf die Plattform zu (dort ist der Platz vor dem Tor frei)
+    const { out } = world.gates.get('lava')!;
+    const [x4, y4] = [gx - out[0] * 4, gy - out[1] * 4];
+    const dir: Dir = out[0] > 0 ? 'e' : out[0] < 0 ? 'w' : out[1] > 0 ? 's' : 'n';
+    let r = run(at(x4 - out[0], y4 - out[1]), world, dir);
+    expect(r.s.portals).toEqual([]);
+    r = run(r.s, world, dir);
+    expect(r.events).toEqual([
+      { type: 'step', climb: 0 },
+      { type: 'portal', id: 'lava' },
+    ]);
+    expect([r.s.player.x, r.s.player.y]).toEqual([gx - out[0] * 3, gy - out[1] * 3]);
+  });
+
+  it('im Nebel erwacht sie nicht; sobald das Feld erkundet ist, im nächsten Takt', () => {
+    const r = go(at(0, 0), ...near(3, 0), () => false);
+    expect(r.s.portals).toEqual([]);
+    const t = step(r.s, world, TICK, () => true);
+    expect(t.events).toContainEqual({ type: 'portal', id: 'lava' });
+    expect(t.state.portals).toEqual(['lava']);
+  });
+
+  it('das Gegenstück am Bett weckt niemand: schlafend ist es ein Sockel, der nichts auslöst', () => {
+    let s = at(hx - 3, hy);
+    for (let x = hx - 2; x <= hx; x++) {
+      const r = go(s, x, hy);
+      expect(types(r.events)).toEqual(['step']);
+      s = r.s;
+    }
+    expect([s.player.x, s.player.y, s.portals]).toEqual([hx, hy, []]);
+  });
+
+  it('der Rand einer wachen Plattform ist nur Boden; gereist wird erst auf der Mitte', () => {
+    let r = go(at(0, 0, { portals: ['lava'] }), gx - 2, gy);
+    r = go(r.s, gx - 1, gy); // Rand (Seitenmitte im Westen)
     expect(types(r.events)).toEqual(['step']);
-    expect([r.s.player.x, r.s.player.y]).toEqual([hx, hy]);
+    r = go(r.s, gx, gy); // Mitte
+    expect(r.events).toEqual([
+      { type: 'step', climb: 0 },
+      { type: 'teleport', id: 'lava', to: 'home' },
+    ]);
+    expect([r.s.player.x, r.s.player.y, r.s.player.dir]).toEqual([hx, hy, 's']);
+    expect(r.s.arrived).toEqual([hx, hy]);
   });
 
-  it('aktive Portale kommen mit dem Spielstand wieder; Unbekanntes fällt weg', () => {
+  it('die Ecken sind fest, man steigt nur über die Seitenmitten auf', () => {
+    const s = at(gx - 2, gy - 1, { portals: ['lava'] });
+    const r = step(s, world, { type: 'move', dir: 'e' });
+    expect(types(r.events)).toEqual(['bump']);
+  });
+
+  it('nach der Ankunft erst runter, dann wieder rauf: dann geht es zurück, ohne Sperrzeit', () => {
+    let r = go(at(gx - 1, gy, { portals: ['lava'] }), gx, gy);
+    expect([r.s.player.x, r.s.player.y]).toEqual([hx, hy]);
+    // auf der Mitte angekommen: Ein Schritt auf das Mittelfeld selbst ist unmöglich, Weiterlaufen bringt auf den Rand
+    r = go(r.s, hx + 1, hy);
+    expect(r.events).toEqual([
+      { type: 'step', climb: 0 },
+      { type: 'ready', id: 'lava' },
+    ]);
+    expect(r.s.arrived).toBeNull();
+    // gleich wieder zurück auf die Mitte (im selben Takt): reist zurück ans Tor
+    const back = step({ ...r.s, player: { ...r.s.player, dir: 'w' } }, world, { type: 'move', dir: 'w' });
+    expect(back.events).toEqual([
+      { type: 'step', climb: 0 },
+      { type: 'teleport', id: 'lava', to: 'gate' },
+    ]);
+    expect([back.state.player.x, back.state.player.y]).toEqual([gx, gy]);
+    expect(back.state.arrived).toEqual([gx, gy]);
+  });
+
+  it('wer auf der Mitte steht und nicht angekommen ist (z. B. Spielstand), reist erst beim nächsten Betreten', () => {
+    const s = at(gx, gy, { portals: ['lava'] });
+    const r = step(s, world, TICK);
+    expect(types(r.events)).not.toContain('teleport');
+  });
+
+  it('folgende Tiere reisen mit und stehen um die Plattform, nie darauf', () => {
+    const followers = ['lichtung:hase', 'lichtung:igel', 'lichtung:schaf'];
+    const animals = followers.map((id, i) => animal(id, gx - 2 - i, gy, { mode: 'follow' }));
+    const r = go(at(gx - 1, gy, { portals: ['lava'], animals, followers }), gx, gy);
+    expect(types(r.events)).toContain('teleport');
+    for (const a of r.s.animals) {
+      expect(world.cell(a.x, a.y).portal, a.id).toBeUndefined();
+      expect(Math.max(Math.abs(a.x - hx), Math.abs(a.y - hy)), a.id).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('Platztausch mit einem folgenden Tier auf die Mitte ist auch ein Betreten', () => {
+    const hase = animal('lichtung:hase', gx, gy, { mode: 'follow' });
+    const r = step(at(gx - 1, gy, { portals: ['lava'], animals: [hase], followers: ['lichtung:hase'] }), world, {
+      type: 'move',
+      dir: 'e',
+    });
+    expect(r.events).toContainEqual({ type: 'teleport', id: 'lava', to: 'home' });
+  });
+
+  it('Schlafen vergisst die Ankunft', () => {
+    const r = go(at(gx - 1, gy, { portals: ['lava'] }), gx, gy);
+    const s = { ...r.s, wokeAt: -100, player: { x: HOME.bed[0] + 1, y: HOME.bed[1], dir: 'w' as const } };
+    const slept = step(s, world, { type: 'move', dir: 'w' }).state;
+    expect([slept.sleeping, slept.arrived]).toEqual([true, null]);
+  });
+
+  it('wache Plattformen kommen mit dem Spielstand wieder (Format wie bisher); Unbekanntes fällt weg', () => {
     const s = initialState(world, { portals: ['lava', 'westtor' as never] });
     expect(s.portals).toEqual(['lava']);
+    expect(s.arrived).toBeNull();
     expect(progressOf(s).portals).toEqual(['lava']);
+    expect(progressOf(s)).not.toHaveProperty('arrived');
   });
 });
 

@@ -19,6 +19,7 @@ import {
   type SpeciesId,
 } from '../../data/games/mitwachsen';
 import { BED_STONE, type StoryId } from '../../data/games/mitwachsen-stories';
+import { PLATFORM_HALF, platformCells, ringSpots, type PlatformSpot, type Portal } from './mitwachsen-portal';
 
 export type Ground =
   | 'grass'
@@ -54,8 +55,9 @@ export type Deco =
   | 'mushroom'
   | 'biggate'
   | 'gatetower' // Turm eines großen Tors (fest; das Torhaus zeichnet die Ansicht)
-  | 'portal'
-  | 'portalside' // Säule eines Portals (fest)
+  | 'portal' // Mittelfeld einer Portal-Plattform: Wer es betritt, reist (wenn die Plattform wach ist)
+  | 'portalrim' // Seitenmitte einer Portal-Plattform: begehbarer Rand, löst nichts aus
+  | 'portalcorner' // Eckfeld einer Portal-Plattform mit niedriger Zierde (fest)
   | 'cactus'
   | 'crystal'
   | 'stalagmite'
@@ -67,15 +69,7 @@ export type Deco =
   | 'klangstein'; // Stein mit schwebender Note: Hineinlaufen spielt die Geschichte des Ortes
 export type TreeKind =
   'oak' | 'birch' | 'autumn' | 'red' | 'blossom' | 'winter' | 'pine' | 'snowpine' | 'palm' | 'dead';
-/** Portal je Tor: Feld am Tor und am Bett, je mit dem Feld davor (dort kommt man heraus) und der Blickrichtung */
-export type Portal = {
-  gate: Point;
-  gateExit: Point;
-  gateFacing: Point; // Richtung, in die das Portal am Tor schaut (zur Lichtung)
-  home: Point;
-  homeExit: Point;
-  homeFacing: Point; // zum Bett
-};
+export type { Portal };
 /** Ein großes Tor: fünf Felder in einer Reihe, nach außen in eine Achsenrichtung, dahinter die Welt `id` */
 export type GatePlace = {
   id: GateId;
@@ -98,9 +92,9 @@ export type Cell = {
   roof?: true; // unter dem Unterstand auf der Wiese
   tree?: TreeKind; // Baumart bei deco 'tree'
   tufts?: number; // Grasbüschel auf dem Feld (nur Zierde, begehbar)
-  portal?: { id: GateId; side: 'gate' | 'home' }; // Portal (am Tor oder am Bett)
+  portal?: PlatformSpot; // Feld einer Portal-Plattform (am Tor oder am Bett)
   biome?: GateId; // Welt hinter einem Tor
-  part?: { id: GateId; side?: 'gate' | 'home' }; // Turm eines Tors oder Säule eines Portals: gehört zu dieser Welt
+  part?: { id: GateId }; // Turm eines Tors: gehört zu dieser Welt
   shade?: number; // Farbfleck im Boden: −1 dunkler … +1 heller (große, weiche Flecken)
   tint?: string; // Farbe, mit der Gras und Blätter auf der Lichtung getönt sind (Stimmung der Richtung)
   story?: StoryId; // Klangstein dieser Geschichte
@@ -162,7 +156,9 @@ export const GATE_HALF = 2; // Tor: Mitte ± 2 Felder
 export const TOWER = 2; // Türme links und rechts, je zwei Felder breit
 export const HOUSE_DEPTH = 2; // so viele Reihen hinter der Torreihe umschließt das Torhaus ganz
 const BAY_HALF = GATE_HALF + TOWER + 1; // Bucht vor dem Torhaus: so breit (Mitte ± 5), bis zur Lichtung frei
-const PORTAL_SIDE = GATE_HALF + TOWER + 2; // das Portal steht gleich neben dem Turm (Mitte ± 6), auf Höhe des Tors
+const PORTAL_SIDE = GATE_HALF + TOWER + 2; // die Plattform steht gleich neben dem Turm (Mitte ± 6)
+// Mittelfeld der Plattform drei Reihen vor der Torreihe: Sie reicht bis eine Reihe vor den Fels, ringsum bleibt ein Feld frei
+const PORTAL_ROW = 3;
 
 const sign = (v: number) => (v < 0 ? -1 : 1);
 /** Achse, die einer Richtung am nächsten kommt */
@@ -172,7 +168,7 @@ const axis = (dx: number, dy: number): Point => (Math.abs(dx) >= Math.abs(dy) ? 
 type Layout = GatePlace & {
   depth: number; // t der Torreihe
   at: (u: number, t: number) => Point;
-  side: number; // Portal links (−1) oder rechts (+1) vom Tor
+  side: number; // Portal-Plattform links (−1) oder rechts (+1) vom Tor
 };
 
 /**
@@ -208,27 +204,19 @@ function layouts(seed: number): Layout[] {
   });
 }
 
-/** Portale: neben dem Tor auf dem Torplatz, zur Lichtung schauend; ihr Partner im Kreis um das Bett, in Torrichtung */
+/** Portal-Plattformen: neben dem Tor auf dem Torplatz; ihr Gegenstück im Kreis um das Bett, in Richtung des Tors */
 function portalsOf(places: readonly Layout[]): Map<GateId, Portal> {
-  const out = new Map<GateId, Portal>();
-  for (const p of places) {
-    const u = p.side * PORTAL_SIDE;
-    const r = HOME.portalRing;
-    const home: Point = [
-      HOME.bed[0] + Math.round(Math.cos(p.angle) * r),
-      HOME.bed[1] + Math.round(Math.sin(p.angle) * r),
-    ];
-    const homeFacing = axis(HOME.bed[0] - home[0], HOME.bed[1] - home[1]);
-    out.set(p.id, {
-      gate: p.at(u, p.depth - 2),
-      gateExit: p.at(u, p.depth - 3),
-      gateFacing: [-p.out[0], -p.out[1]],
-      home,
-      homeExit: [home[0] + homeFacing[0], home[1] + homeFacing[1]],
-      homeFacing,
-    });
-  }
-  return out;
+  const homes = ringSpots(
+    places.map((p) => p.angle),
+    HOME.portalRing,
+    HOME.bed,
+  );
+  return new Map(
+    places.map((p, i): [GateId, Portal] => [
+      p.id,
+      { gate: p.at(p.side * PORTAL_SIDE, p.depth - PORTAL_ROW), home: homes[i]! },
+    ]),
+  );
 }
 
 /** Klangsteine: am Bett und vor jedem Tor gegenüber dem Portal, vor dem anderen Turm (der Gang zum Tor bleibt frei) */
@@ -327,19 +315,7 @@ function buildStart(
     }
   }
 
-  // Portale: drei Felder breit (Säule, Portal, Säule), Platz ringsum flach und frei
-  for (const [id, p] of portalsOf(places))
-    for (const [[px, py], [fx, fy], side] of [
-      [p.gate, p.gateFacing, 'gate'],
-      [p.home, p.homeFacing, 'home'],
-    ] as const) {
-      for (let dy = -2; dy <= 2; dy++)
-        for (let dx = -2; dx <= 2; dx++)
-          if (map.get(key(px + dx, py + dy))?.region === 'lichtung') set(px + dx, py + dy, grass('lichtung'));
-      set(px, py, { ...grass('lichtung'), deco: 'portal', portal: { id, side } });
-      for (const o of [-1, 1])
-        set(px + fy * o, py + fx * o, { ...grass('lichtung'), deco: 'portalside', solid: true, part: { id, side } });
-    }
+  placePlatforms(map, portalsOf(places));
 
   // Wiese ums Bett: eben und frei, mit Futter und Wasser; am Rand ein paar Blumen
   const r = HOME.meadow;
@@ -349,7 +325,7 @@ function buildStart(
       if (d > r + 0.5) continue;
       const [x, y] = [HOME.bed[0] + dx, HOME.bed[1] + dy];
       const c = map.get(key(x, y));
-      if (!c || c.deco === 'bed' || c.deco === 'portal' || c.deco === 'portalside') continue;
+      if (!c || c.deco === 'bed' || c.portal) continue;
       const edgeFlower = d > r - 0.5 && hash(seed, x, y, 15) % 3 === 0;
       set(x, y, {
         ...grass('lichtung'),
@@ -393,6 +369,36 @@ function buildStart(
     if (c.region === 'lichtung' && !c.solid && c.ground !== 'water' && !reached.has(k)) map.set(k, rock(3));
   const spots = reach.filter(([x, y]) => map.get(key(x, y))!.region === 'lichtung' && !map.get(key(x, y))!.garden);
   return { map, spawns: findSpawns(seed, spots), spots };
+}
+
+/** Platz um eine Plattform: nah flach und frei, ein Feld weiter (`outer`) nur ohne Baum und Busch (Kronen verdeckten sie) */
+function clearNear(map: Map<string, Cell>, k: string, outer: boolean) {
+  const c = map.get(k);
+  if (outer) {
+    if (c?.deco === 'tree' || c?.deco === 'bush') map.set(k, { ...c, deco: null, solid: false });
+  } else if (c?.region === 'lichtung' || c?.deco === 'rock') map.set(k, grass('lichtung'));
+}
+
+/**
+ * Portal-Plattformen einbauen: 3 × 3 Felder, ringsum ein Feld flach und frei, ein Feld weiter kein Baum. Mitte und
+ * Seitenmitten sind begehbar, die Eckfelder mit ihrer Zierde fest. Auch Felsen des unregelmäßigen Felsrands weichen,
+ * sonst käme man am Tor nicht von allen Seiten auf die Plattform.
+ */
+function placePlatforms(map: Map<string, Cell>, portals: ReadonlyMap<GateId, Portal>) {
+  for (const [id, p] of portals)
+    for (const [centre, side] of [
+      [p.gate, 'gate'],
+      [p.home, 'home'],
+    ] as const) {
+      const ring = PLATFORM_HALF + 1;
+      for (let dy = -ring - 1; dy <= ring + 1; dy++)
+        for (let dx = -ring - 1; dx <= ring + 1; dx++)
+          clearNear(map, key(centre[0] + dx, centre[1] + dy), Math.max(Math.abs(dx), Math.abs(dy)) > ring);
+      for (const { x, y, at } of platformCells(centre)) {
+        const deco = at === 'centre' ? 'portal' : at === 'edge' ? 'portalrim' : 'portalcorner';
+        map.set(key(x, y), { ...grass('lichtung'), deco, solid: at === 'corner', portal: { id, side, at } });
+      }
+    }
 }
 
 /**
@@ -687,6 +693,8 @@ function dress(seed: number, x: number, y: number, c: Cell): Cell {
   return out;
 }
 
+/** Die Portal-Plattformen einer Welt; schnell, ohne die Welt zu bauen */
+export const portalPlaces = (seed: number) => portalsOf(layouts(seed));
 /** Die großen Tore einer Welt; schnell, ohne die Welt zu bauen (Lage und Reihenfolge würfelt der Seed) */
 export const gatePlaces = (seed: number) => gatesOf(layouts(seed));
 const gatesOf = (places: readonly Layout[]) =>

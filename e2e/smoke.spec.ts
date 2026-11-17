@@ -81,6 +81,53 @@ test('Spiel: Hinweis für Eltern beim ersten Mal, eine Pfeiltaste weckt die Figu
   expect(errors).toEqual([]);
 });
 
+test('Spiel: Portal-Plattform erwacht beim Herangehen, die Mitte bringt zum Bett, runter und wieder rauf zurück', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  await page.goto('/spielen/');
+  await page.getByRole('button', { name: /Verstanden/ }).click();
+  const game = page.locator('larmic-mitwachsen');
+  await page.keyboard.press('ArrowDown');
+  await expect
+    .poll(() => game.evaluate((el) => (el as unknown as { state: { sleeping: boolean } }).state.sleeping))
+    .toBe(false);
+  // Über die Felder der Komponente (wie die Regeln sie sehen): Figur auf den freien Ring vor die Plattform am
+  // Tor stellen (dort erwacht sie im nächsten Takt), dann Schritt für Schritt wie mit den Pfeiltasten
+  type Game = {
+    world: {
+      portals: Map<string, { gate: [number, number]; home: [number, number] }>;
+      gates: Map<string, { out: [number, number] }>;
+    };
+    state: { player: { x: number; y: number; dir: string }; portals: string[]; arrived: [number, number] | null };
+    apply(cmd: { type: 'move'; dir: string } | { type: 'tick' }): void;
+    lift(): void; // Nebel um die Figur lichten
+  };
+  const r = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const [id, p] = [...el.world.portals][0]!;
+    const out = el.world.gates.get(id)!.out;
+    const dir = (v: readonly number[]) => (v[0]! > 0 ? 'e' : v[0]! < 0 ? 'w' : v[1]! > 0 ? 's' : 'n');
+    const [gx, gy] = p.gate;
+    el.state = { ...el.state, player: { x: gx - out[0] * 2, y: gy - out[1] * 2, dir: 's' }, portals: [] };
+    const walk = (n: number) => {
+      for (let i = 0; i < n; i++) el.apply({ type: 'move', dir: dir(out) });
+    };
+    el.lift(); // wie nach jedem Schritt: Um die Figur lichtet sich der Nebel
+    el.apply({ type: 'tick' }); // die Figur ist nah: Die Plattform erwacht
+    const woke = el.state.portals.includes(id);
+    walk(2); // über den Rand auf die Mitte: Reise zum Bett
+    const home = [el.state.player.x, el.state.player.y].join() === p.home.join();
+    const arrived = el.state.arrived?.join() === p.home.join();
+    // erst runter (zurück in Richtung Tor), dann wieder rauf: zurück zum Tor
+    el.apply({ type: 'move', dir: dir(out) });
+    el.apply({ type: 'move', dir: dir([-out[0], -out[1]]) });
+    return { woke, home, arrived, back: [el.state.player.x, el.state.player.y].join() === p.gate.join() };
+  });
+  expect(r).toEqual({ woke: true, home: true, arrived: true, back: true });
+  expect(errors).toEqual([]);
+});
+
 test.describe('ohne JavaScript', () => {
   test.use({ javaScriptEnabled: false });
   test('Inhalte bleiben lesbar, das Spiel erklärt sich Eltern', async ({ page }) => {

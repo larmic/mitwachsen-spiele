@@ -7,7 +7,7 @@
 import { chunkOf } from '../../lib/games/chunks';
 import { projection, type Dir } from '../../lib/games/front';
 import type { World3D as World3DType } from './mitwachsen-3d';
-import { GAME_COLORS, GATES, HOME, LOOK, SPECIES, THEME_COLORS, TIRED_TALK } from '../../data/games/mitwachsen';
+import { GAME_COLORS, HOME, LOOK, SPECIES, THEME_COLORS, TIRED_TALK } from '../../data/games/mitwachsen';
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
 import { Sfx } from './sfx';
 import { NOTE_COLORS, StoryPlayer } from './mitwachsen-story';
@@ -30,6 +30,7 @@ import { drawMap } from './mitwachsen-map';
 import { Fog, REVEAL, START_REVEAL } from './mitwachsen-fog';
 import { initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
 import { createWorld, standHeight, type World } from './mitwachsen-world';
+import { platformLift } from './mitwachsen-portal';
 import { weatherLook, windAt } from './mitwachsen-weather';
 import { idlePose, type Pose } from './mitwachsen-tired';
 import { advance, evening, freshDay, loadTired, saveTired, type Tired, type TiredEvent } from './mitwachsen-tired';
@@ -253,7 +254,7 @@ class LarmicMitwachsen extends HTMLElement {
   private apply(cmd: Cmd) {
     if (cmd.type !== 'tick') this.lastInput = performance.now(); // jemand spielt
     if (cmd.type === 'move' && performance.now() < this.sitUntil) return; // die müde Figur sitzt kurz
-    const { state, events } = step(this.state, this.world, cmd);
+    const { state, events } = step(this.state, this.world, cmd, (x, y) => this.fog.has(x, y));
     this.state = state;
     this.lift();
     if (events.length) this.react(events);
@@ -521,15 +522,14 @@ class LarmicMitwachsen extends HTMLElement {
         case 'regrow':
           this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]);
           break;
-        case 'portal':
-          this.sfx.gate();
-          this.burst('player', [THEME_COLORS[GATES.find((g) => g.id === e.id)!.theme].portal, '#ffffff'], 24);
+        case 'portal': // Plattform erwacht bzw. gereist
+        case 'teleport':
+          this.sfx[e.type === 'portal' ? 'gate' : 'portal']();
+          this.burst('player', [THEME_COLORS[e.id].portal, '#ffffff'], e.type === 'portal' ? 24 : 18);
           persist = true;
           break;
-        case 'teleport':
-          this.sfx.portal();
-          this.burst('player', [THEME_COLORS[GATES.find((g) => g.id === e.id)!.theme].portal, '#ffffff'], 18);
-          persist = true;
+        case 'ready':
+          this.sfx.pling();
           break;
         case 'gate':
           this.sfx.gate();
@@ -630,7 +630,8 @@ class LarmicMitwachsen extends HTMLElement {
     for (const a of this.state.animals) targets.set(a.id, a);
     for (const id of this.bodies.keys()) if (!targets.has(id)) this.bodies.delete(id);
     for (const [id, t] of targets) {
-      const ground = standHeight(this.world, this.state.openGates, t.x, t.y) ?? this.world.cell(t.x, t.y).h;
+      const c = this.world.cell(t.x, t.y); // auf einer Portal-Plattform etwas höher (Sockel bzw. Mittelfeld)
+      const ground = (standHeight(this.world, this.state.openGates, t.x, t.y) ?? c.h) + platformLift(c);
       const sits =
         id === 'player' && (now < this.sitUntil || this.pose !== 'stand' || (this.listening && !!this.story.playing)); // müde, lesend, zuhörend
       const z = sits ? ground - 0.35 : ground; // sitzt im Gras

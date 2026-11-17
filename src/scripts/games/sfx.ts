@@ -90,6 +90,10 @@ export class Sfx {
   portal() {
     [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => this.note(f, 0.12, 'sine', 0.08, 1.02, i * 0.05));
   }
+  /** Von der Mitte gestiegen: Das Gold springt zurück, die Plattform ist wieder bereit (ein kurzes, helles Pling) */
+  pling() {
+    this.note(783.99, 0.16, 'sine', 0.08, 1.01);
+  }
   /** Beeren pflücken: zweimal ein kleines, helles Ploppen */
   pick() {
     this.note(880, 0.07, 'sine', 0.09, 1.3);

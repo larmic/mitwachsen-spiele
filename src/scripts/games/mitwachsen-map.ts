@@ -22,6 +22,7 @@ const COLORS = {
   player: '#ffffff',
   home: '#f3ead6',
   roof: '#c0453a',
+  socket: '#a8adb3', // schlafende Portal-Plattform
 };
 
 /** Böden der Welten hinter den Toren */
@@ -38,7 +39,7 @@ const WORLD_GROUND: Partial<Record<Cell['ground'], string>> = {
 
 function colorOf(c: Cell): string {
   if (c.gate) return THEME_COLORS[c.gate].side;
-  if (c.deco === 'gatetower' || c.deco === 'portalside') return THEME_COLORS[c.part!.id].side;
+  if (c.deco === 'gatetower') return THEME_COLORS[c.part!.id].side;
   if (c.deco === 'gate' || c.deco === 'trough' || c.deco === 'watertrough') return COLORS.gate;
   if (WORLD_GROUND[c.ground]) return WORLD_GROUND[c.ground]!;
   if (c.ground === 'water') return COLORS.water;
@@ -79,14 +80,13 @@ export function drawMap(
       ctx.fillRect(Math.floor(ox + x * cell), Math.floor(oy + y * cell), Math.ceil(cell), Math.ceil(cell));
     }
 
-  // Portale: am Tor, sobald erkundet; über dem Bett, sobald aktiv
+  // Portal-Plattformen, sobald erkundet: wach farbig, schlafend grau (verrät nicht, wohin sie führt)
   for (const g of GATES) {
     const p = world.portals.get(g.id);
     if (!p) continue;
-    const color = THEME_COLORS[g.theme].portal;
-    const spots = [explored(p.gate[0], p.gate[1]) ? p.gate : null, state.portals.includes(g.id) ? p.home : null];
-    for (const spot of spots) {
-      if (!spot) continue;
+    const color = state.portals.includes(g.id) ? THEME_COLORS[g.theme].portal : COLORS.socket;
+    for (const spot of [p.gate, p.home]) {
+      if (!explored(spot[0], spot[1])) continue;
       const px = ox + (spot[0] + 0.5) * cell,
         py = oy + (spot[1] + 0.5) * cell;
       const r = Math.max(3, cell * 1.1);

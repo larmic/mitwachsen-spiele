@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BufferGeometry } from 'three';
 import { GATES } from '../../data/games/mitwachsen';
-import { gatehouse, parts, portalFrame, type Parts } from './mitwachsen-gatehouse';
+import { gatehouse, parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
 
 type Face = { axis: number; dir: number; at: number; min: [number, number]; max: [number, number]; part: string };
 
@@ -43,18 +43,28 @@ function fighting(p: Parts): string[] {
   return found;
 }
 
-describe('Torhäuser und Portale flackern nicht', () => {
+describe('Torhäuser und Portal-Plattformen flackern nicht', () => {
   for (const g of GATES) {
     it(`${g.id}: keine zwei Flächen liegen deckungsgleich in einer Ebene`, () => {
       const p = parts();
       gatehouse(p, g.id);
       expect(fighting(p)).toEqual([]);
     });
-    it(`${g.id}: Portal und Sockel ebenso`, () => {
-      for (const stubs of [false, true]) {
-        const p = parts();
-        portalFrame(p, g.id, stubs);
-        expect(fighting(p)).toEqual([]);
+    it(`${g.id}: Portal-Plattform in jedem Zustand ebenso (am Tor und am Bett)`, () => {
+      for (const side of ['gate', 'home'] as const) {
+        const sets = platformSets(g.id, side);
+        const asleep = parts();
+        platformParts(asleep, sets.asleep);
+        expect(fighting(asleep), `${side} schlafend`).toEqual([]);
+        // bereit: Gold um die Mitte; angekommen: Gold auf den Zugängen
+        for (const ready of [true, false]) {
+          const p = parts();
+          platformParts(p, sets.body);
+          platformParts(p, sets.picture);
+          platformParts(p, ready ? sets.frameGold : sets.frameOff, ready);
+          platformParts(p, ready ? sets.accessOff : sets.accessGold, !ready);
+          expect(fighting(p), side).toEqual([]);
+        }
       }
     });
   }

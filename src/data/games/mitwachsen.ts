@@ -115,8 +115,11 @@ export const HOME = {
     [-1, 1],
   ] as readonly Point[], // freie Plätze am Bett zum Aufwachen
   clear: 2, // so weit um das Bett bleibt es flach und frei
-  /** Partner-Portale stehen im Kreis um das Bett, jedes in Richtung seines Tors; erscheinen mit der Aktivierung */
-  portalRing: 8,
+  /**
+   * Gegenstücke der Portal-Plattformen stehen im Kreis um das Bett, jedes in Richtung seines Tors; schlafend sind sie
+   * leere graue Sockel. Radius 9: Die Plattformen (3 × 3) berühren einander nicht und ragen nicht in die Wiese.
+   */
+  portalRing: 9,
   /**
    * Zuhause der gefundenen Tiere: eine offene Wiese rund um das Bett (ohne Zaun), mit Futter und Wasser.
    * Folgende Tiere, die sie betreten, bleiben dort und verteilen sich.

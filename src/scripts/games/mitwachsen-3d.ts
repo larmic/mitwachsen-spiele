@@ -7,13 +7,10 @@
 // Die Welt wird in Stücken zu einem Mesh gebaut: Boden, Zierde und Wasser, alles mit einer Textur-Kachel.
 
 import {
-  BoxGeometry,
   BufferGeometry,
-  CanvasTexture,
   DataTexture,
   LinearFilter,
   MeshBasicMaterial,
-  PlaneGeometry,
   RedFormat,
   UnsignedByteType,
   Vector2,
@@ -28,7 +25,6 @@ import {
   PCFShadowMap,
   PerspectiveCamera,
   Scene as ThreeScene,
-  SRGBColorSpace,
   Vector3,
   WebGLRenderer,
 } from 'three';
@@ -48,13 +44,12 @@ import {
   BUCKET_PARTS,
   BOOK_PARTS,
   SLEEPY_EYES,
-  type GateId,
-  type GateTheme,
   type Look,
 } from '../../data/games/mitwachsen';
 import { Geo, atlas, snapToShadowTexel, type Tile, type V3 } from './mitwachsen-geo';
 import { grown } from './mitwachsen-growth';
-import { gatehouse, parts, portalFrame, swirlCanvas, type Parts } from './mitwachsen-gatehouse';
+import { gatehouse, parts, type Parts } from './mitwachsen-gatehouse';
+import { Platforms3D } from './mitwachsen-platform-3d';
 import { StoneNotes, stoneInto } from './mitwachsen-story-3d';
 import type { Scene } from './mitwachsen-render';
 import type { State } from './mitwachsen-state';
@@ -120,7 +115,6 @@ const CLOUD_SKY = new Color('#a9b4bf'); // Himmel bei Wolken und Regen
 const HEMI_SKY = '#cfe9ff'; // Himmelslicht von oben
 
 type Chunk = { meshes: Mesh[] };
-
 export class World3D {
   private renderer: WebGLRenderer;
   private scene = new ThreeScene();
@@ -156,12 +150,7 @@ export class World3D {
   private gateGroup = new Group(); // Torhäuser
   private gateSolid!: MeshLambertMaterial; // Mauerwerk der Torhäuser und Portale: vor der Figur durchsichtig
   private bright!: MeshBasicMaterial; // leuchtet aus sich selbst: Kristalle, Zeichen, Wasserfälle
-  private swirl!: CanvasTexture; // Wirbel in aktiven Portalen
-  private portalGroup = new Group();
-  private portalParts = new Map<
-    GateId,
-    { gateInner: Mesh; home: Group; homeInner: Mesh; stubs: Group; sparks: Mesh[]; cell: readonly [number, number] }
-  >();
+  private platforms!: Platforms3D; // Portal-Plattformen
   private chunks = new Map<string, Chunk>();
   private stale = new Set<string>(); // Stücke, die neu gebaut werden müssen; bis dahin bleibt das alte stehen
   private picked: Record<string, number> = {}; // Büsche ohne Beeren (aus den Regeln)
@@ -195,15 +184,18 @@ export class World3D {
     this.foliage = new MeshLambertMaterial({ vertexColors: true, side: DoubleSide });
     this.gateSolid = new MeshLambertMaterial({ map: tex, vertexColors: true });
     this.bright = new MeshBasicMaterial({ map: tex, vertexColors: true });
-    this.swirl = new CanvasTexture(swirlCanvas());
-    this.swirl.center.set(0.5, 0.5);
-    this.swirl.colorSpace = SRGBColorSpace;
     this.fogTex.magFilter = LinearFilter;
     this.fogTex.minFilter = LinearFilter;
     for (const m of [this.solid, this.water, this.lava, this.bright]) this.withFog(m, false);
     this.withFog(this.foliage, false, true);
     this.withFog(this.canopy, true);
     this.withFog(this.gateSolid, true);
+    this.platforms = new Platforms3D(this.gateSolid, this.bright, () => {
+      const m = new MeshBasicMaterial({ map: tex, vertexColors: true });
+      this.withFog(m, false);
+      return m;
+    });
+    this.scene.add(this.platforms.group);
     this.scene.background = SKY.clone();
     this.scene.fog = new Fog(SKY.clone(), 26, 58);
     this.sun.castShadow = true;
@@ -217,16 +209,7 @@ export class World3D {
     sc.far = 60;
     this.sun.shadow.bias = -0.0008;
     this.sun.shadow.normalBias = 0.03; // gegen Streifen auf Wänden, die die Sonne schräg trifft (Shadow Acne)
-    this.scene.add(
-      this.sun,
-      this.sun.target,
-      this.hemi,
-      this.signs,
-      this.sleeper,
-      this.gateGroup,
-      this.portalGroup,
-      this.notes.group,
-    );
+    this.scene.add(this.sun, this.sun.target, this.hemi, this.signs, this.sleeper, this.gateGroup, this.notes.group);
   }
 
   /**
@@ -401,7 +384,7 @@ export class World3D {
     this.syncBodies(state, sc);
     this.syncSigns(state);
     this.syncSleeper(state);
-    this.syncPortals(state, sc);
+    this.platforms.sync(state, sc);
     this.notes.update(state.heard, sc.now, sc.reduced);
     this.renderer.render(this.scene, this.camera);
   }
@@ -423,7 +406,7 @@ export class World3D {
     this.world = world;
     this.fogDirty = true;
     this.buildGates(world);
-    this.buildPortals(world);
+    this.platforms.build(world);
     this.notes.build(world);
     for (const c of this.chunks.values())
       for (const m of c.meshes) {
@@ -462,7 +445,7 @@ export class World3D {
 
   private clear(group: Group) {
     group.traverse((o) => {
-      if (o instanceof Mesh && o.geometry !== this.sparkGeo) (o.geometry as BufferGeometry).dispose();
+      if (o instanceof Mesh) (o.geometry as BufferGeometry).dispose();
     });
     group.clear();
   }
@@ -477,85 +460,6 @@ export class World3D {
       const group = this.place(new Group(), mx, my, world.cell(mx, my).h, [-g.out[0], -g.out[1]]);
       group.add(...this.meshes(p));
       this.gateGroup.add(group);
-    }
-  }
-
-  private sparkGeo = new BoxGeometry(0.1, 0.1, 0.1);
-
-  /**
-   * Portale: Säulen, Sturz und Krone im Thema des Tors; innen dreht sich ein Wirbel, sobald es aktiv ist, und
-   * Funken kreisen. Das Portal am Tor steht immer, sein Partner am Bett erscheint mit der Aktivierung (vorher zeigen
-   * zwei kleine Sockel, wo es stehen wird).
-   */
-  private buildPortals(world: World) {
-    this.clear(this.portalGroup);
-    this.portalParts.clear();
-    const inner = (theme: GateTheme) => {
-      const m = new Mesh(
-        new PlaneGeometry(1.05, 3.05),
-        new MeshBasicMaterial({
-          map: this.swirl,
-          color: THEME_COLORS[theme].portal,
-          transparent: true,
-          opacity: 0.9,
-          depthWrite: false,
-          side: DoubleSide,
-        }),
-      );
-      m.position.set(0, 1.85, 0);
-      return m;
-    };
-    for (const g of GATES) {
-      const p = world.portals.get(g.id);
-      if (!p) continue;
-      const [gx, gy] = p.gate,
-        [hx, hy] = p.home;
-      const atGate = this.place(new Group(), gx, gy, world.cell(gx, gy).h, p.gateFacing);
-      const frame = parts();
-      portalFrame(frame, g.theme);
-      const gateInner = inner(g.theme);
-      atGate.add(...this.meshes(frame), gateInner);
-      const home = this.place(new Group(), hx, hy, world.cell(hx, hy).h, p.homeFacing);
-      const homeFrame = parts();
-      portalFrame(homeFrame, g.theme);
-      const homeInner = inner(g.theme);
-      home.add(...this.meshes(homeFrame), homeInner);
-      const stubs = this.place(new Group(), hx, hy, world.cell(hx, hy).h, p.homeFacing);
-      const stubParts = parts();
-      portalFrame(stubParts, g.theme, true);
-      stubs.add(...this.meshes(stubParts));
-      // Funken: kreisen um beide Portale, solange es aktiv ist
-      const sparks: Mesh[] = [];
-      for (const host of [atGate, home])
-        for (let i = 0; i < 6; i++) {
-          const spark = new Mesh(
-            this.sparkGeo,
-            new MeshBasicMaterial({ color: i % 2 ? '#ffffff' : THEME_COLORS[g.theme].portal }),
-          );
-          spark.userData.phase = i / 6;
-          host.add(spark);
-          sparks.push(spark);
-        }
-      this.portalGroup.add(atGate, home, stubs);
-      this.portalParts.set(g.id, { gateInner, home, homeInner, stubs, sparks, cell: p.gate });
-    }
-  }
-
-  private syncPortals(state: State, sc: Scene) {
-    const t = sc.now / 1000;
-    this.swirl.rotation = sc.reduced ? 0 : -t * 1.6;
-    const glow = sc.reduced ? 0.9 : 0.8 + 0.15 * Math.sin(t * 3);
-    for (const [id, part] of this.portalParts) {
-      const active = state.portals.includes(id);
-      part.gateInner.visible = active && this.explored(part.cell[0], part.cell[1]);
-      part.home.visible = active;
-      part.stubs.visible = !active;
-      for (const m of [part.gateInner, part.homeInner]) (m.material as MeshBasicMaterial).opacity = glow;
-      for (const spark of part.sparks) {
-        spark.visible = active && !sc.reduced;
-        const a = (spark.userData.phase as number) * Math.PI * 2 + t * 1.3;
-        spark.position.set(Math.cos(a) * 0.8, 1.85 + Math.sin(a * 2 + t) * 1.3, Math.sin(a) * 0.35);
-      }
     }
   }
 
