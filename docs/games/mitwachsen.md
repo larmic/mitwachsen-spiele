@@ -313,7 +313,10 @@ Die heutigen Portale (drei Felder breit, Säulen und Krone, man läuft von vorn 
 - **Eine flache Plattform**, die man **von allen Seiten** betreten kann, z. B. ein runder oder achteckiger Sockel im Material der Welt, mit leuchtendem Zeichen in der Mitte. Keine Vorder- und Rückseite, kein Rahmen, durch den man genau hindurch muss.
 - **Aktivierung durch Nähertreten:** Kommt die Figur nah heran (z. B. ein, zwei Felder), erwacht die Plattform: Leuchten, Funken, Ton. Man muss sie dafür nicht betreten.
 - **Danach auch zu Hause aktiv:** Mit der Aktivierung erscheint (oder erwacht) das Gegenstück im Startgebiet am Bett, wie heute. Von da an kann man hin- und herwechseln, folgende Tiere reisen mit.
-- **Offen:** Reisen beim Betreten der Mitte oder schon beim Betreten der Plattform? Nach der Ankunft darf die Figur nicht gleich zurückreisen (z. B. am Rand ankommen oder erst wieder losgehen müssen). Wie stehen die acht Gegenstücke am Bett – heute ein Ring mit Radius 8?
+- **Abgestimmt (17.11.2026):**
+  - Gereist wird erst, wenn die Figur die **Mitte** betritt. Der Rand der Plattform ist nur Sockel.
+  - **Zurückreisen** geht nur durch Raus und wieder Rein: Wer auf der Mitte ankommt, reist nicht sofort zurück, sondern muss die Mitte erst verlassen und dann wieder betreten.
+  - Die **Gegenstücke am Bett** stehen dort, wo heute die Portale stehen (Ring um das Bett).
 
 ### Tore je Welt verschieden (Notiz vom 17.11.2026)
 
