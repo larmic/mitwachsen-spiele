@@ -302,9 +302,37 @@ Gespielt wird direkt auf der Seite: Sobald eine Stufe spielbar ist, spielt der V
 Nur gesammelt, noch nicht ausgeplant.
 
 - **Welten hinter den Toren:** Alle acht sind oben unter „Die Welten“ beschrieben. Weitere Ideen: Blumenland, Herbstwald, Strand mit Gezeiten.
-- **Tiere befreien:** Später sollen die Tiere nicht nur entdeckt, sondern befreit werden. Daran hängt auch, wie sich die großen Tore öffnen. Die Geschichte dazu fehlt noch: Wovon werden die Tiere befreit, und warum? (Für ein kleines Kind freundlich, ohne Bösewicht, der Angst macht.)
-- **Portale:** Umgesetzt für die großen Tore (siehe Spec). Noch offen: Der Heimweg-Pfeil zeigt auf das Portal, wenn der Weg darüber kürzer ist.
+- **Tiere befreien:** Später sollen die Tiere nicht nur entdeckt, sondern befreit werden. Daran hängt auch, wie sich die großen Tore öffnen (Vorschläge unten unter „Tore öffnen“). Die Geschichte dazu fehlt noch: Wovon werden die Tiere befreit, und warum? (Für ein kleines Kind freundlich, ohne Bösewicht, der Angst macht.)
+- **Portale:** Umgesetzt für die großen Tore (siehe Spec). Noch offen: Der Heimweg-Pfeil zeigt auf das Portal, wenn der Weg darüber kürzer ist. Neue Form siehe „Portale als Plattform“.
 - **Gemeinsame Welt:** Für ein höheres Alter: Man schickt anderen einen Link und spielt zu zweit in derselben Welt, z. B. Elternteil und Kind oder Kind und Freund. Braucht mehr als GitHub Pages (Verbindung zwischen zwei Browsern oder ein kleiner Dienst) und eine eigene Datenschutzprüfung.
+
+### Portale als Plattform (Notiz vom 17.11.2026)
+
+Die heutigen Portale (drei Felder breit, Säulen und Krone, man läuft von vorn hinein) wirken nicht schön. Besser:
+
+- **Eine flache Plattform**, die man **von allen Seiten** betreten kann, z. B. ein runder oder achteckiger Sockel im Material der Welt, mit leuchtendem Zeichen in der Mitte. Keine Vorder- und Rückseite, kein Rahmen, durch den man genau hindurch muss.
+- **Aktivierung durch Nähertreten:** Kommt die Figur nah heran (z. B. ein, zwei Felder), erwacht die Plattform: Leuchten, Funken, Ton. Man muss sie dafür nicht betreten.
+- **Danach auch zu Hause aktiv:** Mit der Aktivierung erscheint (oder erwacht) das Gegenstück im Startgebiet am Bett, wie heute. Von da an kann man hin- und herwechseln, folgende Tiere reisen mit.
+- **Offen:** Reisen beim Betreten der Mitte oder schon beim Betreten der Plattform? Nach der Ankunft darf die Figur nicht gleich zurückreisen (z. B. am Rand ankommen oder erst wieder losgehen müssen). Wie stehen die acht Gegenstücke am Bett – heute ein Ring mit Radius 8?
+
+### Tore je Welt verschieden (Notiz vom 17.11.2026)
+
+Die Eingänge zu den Welten wirken alle gleich (gleiches Torhaus, nur Schmuck und Farbe anders). Jede Welt soll einen ganz eigenen Eingang bekommen, an dem man schon von Weitem erkennt, wohin er führt:
+
+- **Höhle:** ein Bergeingang, dunkle Öffnung im Fels, mit Kristallen am Rand.
+- **Eis:** ein Durchgang zwischen Gletschern bzw. ein Bogen aus Eis.
+- **Pilzwald:** ein Tor, das zwischen zwei großen Pilzen steht.
+- Vorschläge für die übrigen (noch nicht abgestimmt): **Sand** ein Bogen aus Sandstein zwischen Dünen, an einer Oase; **Wasser** ein Steg, der aufs Wasser führt; **Lava** ein Felspass zwischen glühenden Bergen; **Wald** ein Durchgang zwischen zwei riesigen Bäumen, deren Kronen sich oben berühren; **Wolken** eine Wolkentreppe mit Regenbogen.
+
+### Tore öffnen: Man sieht, was zu tun ist (Notiz vom 17.11.2026)
+
+Das Kind kann nicht lesen, also muss am Tor selbst sichtbar sein, was fehlt. Jedes Tor bekommt eine eigene kleine Aufgabe, die mit dem arbeitet, was das Kind schon kann (Hineinlaufen, Tiere einsammeln, Dinge tragen). Der Klangstein am Tor kann zusätzlich einen Hinweis erzählen.
+
+- **Eis:** Ein Pinguin ist aus der Eiswelt entkommen und läuft irgendwo auf der Lichtung herum. Man sammelt ihn wie die anderen Tiere ein, bringt ihn aber zum großen Tor statt zur Wiese; dann geht das Tor auf. (Passt zur Tor-Geschichte, in der der Pinguin schon vorkommt.)
+- **Höhle:** Ein großer Stein liegt im Eingang. Man schiebt ihn weg, indem man hineinläuft.
+- **Wasser:** Die Welt ist nur mit einem Boot zu betreten. Das Boot liegt irgendwo im Startgebiet; hat die Figur es einmal gefunden, legt sie es jedes Mal vor sich ins Wasser, wenn sie am Ufer ankommt, und fährt los. (Dann sind auch die Teiche der Lichtung befahrbar.)
+- Vorschläge für die übrigen (noch nicht abgestimmt): **Sand** dem Kamel Wasser bringen (Eimer gibt es schon, passt zur Tor-Geschichte); **Pilzwald** Glühwürmchen zum Tor bringen, damit es leuchtet; **Wald** ein verirrtes Tier (z. B. Eichhörnchen) zurückbringen oder Beeren in einen Korb am Tor legen; **Lava** ein Murmeltier oder eine Bergziege nach Hause bringen; **Wolken** eine Wolkenbrücke aus „gesammelten“ Wolken.
+- **Gemeinsam für alle:** Was zu tun ist, zeigt das Tor mit Bildern (Umriss des fehlenden Tiers oder Gegenstands, Gold für „hier kannst du etwas tun“). Nichts geht kaputt, nichts muss in einer Zeit geschafft werden. Welches Tor in welcher Altersstufe aufgeht, ist noch offen.
 
 ## Offen
 
