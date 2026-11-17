@@ -316,7 +316,11 @@ Die heutigen Portale (drei Felder breit, Säulen und Krone, man läuft von vorn 
 - **Abgestimmt (17.11.2026):**
   - Gereist wird erst, wenn die Figur die **Mitte** betritt. Der Rand der Plattform ist nur Sockel.
   - **Zurückreisen** geht nur durch Raus und wieder Rein: Wer auf der Mitte ankommt, reist nicht sofort zurück, sondern muss die Mitte erst verlassen und dann wieder betreten.
-  - Die **Gegenstücke am Bett** stehen dort, wo heute die Portale stehen (Ring um das Bett).
+  - Die **Gegenstücke am Bett** stehen dort, wo heute die Portale stehen (Ring um das Bett). Der Ring wächst dafür von Radius 8 auf **Radius 9**, damit sich die Plattformen nicht berühren.
+  - **Aufwachen** auch schräg: Abstand 2 Felder in jede Richtung, aber nur, wenn das Feld schon aufgedeckt ist (kein Leuchten im Nebel).
+  - **Keine Sperrzeit** nach der Ankunft: Raus und wieder Rein genügt.
+  - **Schlafende Gegenstücke** am Bett sind ein **leerer Sockel**, der nicht verrät, zu welcher Welt er gehört. Erst beim Erwachen bekommt er Material, Deko und Bild seiner Welt.
+- **Beispiele:** Voxel-Entwürfe für alle acht Welten (3×3-Achteck, Gold-Rahmen um die Mitte, Gold auf den Zugängen nach der Ankunft) stehen im Artefakt „Portal-Plattformen“ (https://claude.ai/artifact/46NLTpHryPctPEyfJwUX5r).
 
 ### Tore je Welt verschieden (Notiz vom 17.11.2026)
 
