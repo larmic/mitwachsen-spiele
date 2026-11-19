@@ -750,10 +750,14 @@ describe('Portal-Plattformen', () => {
     expect(r.s.arrived).toEqual([hx, hy]);
   });
 
-  it('die Ecken sind fest, man steigt nur über die Seitenmitten auf', () => {
+  it('auch die Ecken sind begehbar: Man steigt von überall auf, und auf dem Rand passiert nichts', () => {
     const s = at(gx - 2, gy - 1, { portals: ['lava'] });
     const r = step(s, world, { type: 'move', dir: 'e' });
-    expect(types(r.events)).toEqual(['bump']);
+    expect(r.events).toEqual([{ type: 'step', climb: 0 }]);
+    expect([r.state.player.x, r.state.player.y]).toEqual([gx - 1, gy - 1]);
+    // über die Ecke hinüber auf die Seitenmitte: noch keine Reise
+    const r2 = step({ ...r.state, player: { ...r.state.player, dir: 's' } }, world, { type: 'move', dir: 's' });
+    expect(types(r2.events)).not.toContain('teleport');
   });
 
   it('nach der Ankunft erst runter, dann wieder rauf: dann geht es zurück, ohne Sperrzeit', () => {

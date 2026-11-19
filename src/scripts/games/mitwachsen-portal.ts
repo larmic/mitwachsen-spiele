@@ -8,7 +8,7 @@ import { CENTRE_TOP, SOCKET_TOP } from '../../data/games/mitwachsen-portals';
 
 /** Portal je Tor: Mittelfelder der Plattform am Tor und ihres Gegenstücks am Bett (dort kommt man an) */
 export type Portal = { gate: Point; home: Point };
-/** Teil einer Plattform: Mittelfeld, Seitenmitte (Zugang, begehbarer Rand) oder Eckfeld (mit Zierde, fest) */
+/** Teil einer Plattform: Mittelfeld, Seitenmitte oder Eckfeld (beide begehbarer Rand; in den Ecken steht Zierde) */
 export type PlatformPart = 'centre' | 'edge' | 'corner';
 /** Was auf einem Feld einer Plattform liegt */
 export type PlatformSpot = { id: GateId; side: 'gate' | 'home'; at: PlatformPart };

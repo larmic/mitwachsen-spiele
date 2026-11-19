@@ -785,7 +785,6 @@ export class Renderer {
       }
       case 'portal':
       case 'portalrim':
-      case 'portalcorner':
         drawPlatform(ctx, P, world, state, x, y, h, c.portal!);
         break;
       case 'cactus':

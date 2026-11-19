@@ -56,8 +56,7 @@ export type Deco =
   | 'biggate'
   | 'gatetower' // Turm eines großen Tors (fest; das Torhaus zeichnet die Ansicht)
   | 'portal' // Mittelfeld einer Portal-Plattform: Wer es betritt, reist (wenn die Plattform wach ist)
-  | 'portalrim' // Seitenmitte einer Portal-Plattform: begehbarer Rand, löst nichts aus
-  | 'portalcorner' // Eckfeld einer Portal-Plattform mit niedriger Zierde (fest)
+  | 'portalrim' // Rand einer Portal-Plattform (Seitenmitten und Ecken): begehbar, löst nichts aus
   | 'cactus'
   | 'crystal'
   | 'stalagmite'
@@ -380,8 +379,8 @@ function clearNear(map: Map<string, Cell>, k: string, outer: boolean) {
 }
 
 /**
- * Portal-Plattformen einbauen: 3 × 3 Felder, ringsum ein Feld flach und frei, ein Feld weiter kein Baum. Mitte und
- * Seitenmitten sind begehbar, die Eckfelder mit ihrer Zierde fest. Auch Felsen des unregelmäßigen Felsrands weichen,
+ * Portal-Plattformen einbauen: 3 × 3 Felder, alle begehbar, ringsum ein Feld flach und frei, ein Feld weiter kein
+ * Baum. Die Zierde in den Ecken ist nur Bild und hält niemanden auf. Auch Felsen des unregelmäßigen Felsrands weichen,
  * sonst käme man am Tor nicht von allen Seiten auf die Plattform.
  */
 function placePlatforms(map: Map<string, Cell>, portals: ReadonlyMap<GateId, Portal>) {
@@ -395,8 +394,8 @@ function placePlatforms(map: Map<string, Cell>, portals: ReadonlyMap<GateId, Por
         for (let dx = -ring - 1; dx <= ring + 1; dx++)
           clearNear(map, key(centre[0] + dx, centre[1] + dy), Math.max(Math.abs(dx), Math.abs(dy)) > ring);
       for (const { x, y, at } of platformCells(centre)) {
-        const deco = at === 'centre' ? 'portal' : at === 'edge' ? 'portalrim' : 'portalcorner';
-        map.set(key(x, y), { ...grass('lichtung'), deco, solid: at === 'corner', portal: { id, side, at } });
+        const deco = at === 'centre' ? 'portal' : 'portalrim';
+        map.set(key(x, y), { ...grass('lichtung'), deco, portal: { id, side, at } });
       }
     }
 }

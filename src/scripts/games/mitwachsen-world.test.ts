@@ -337,9 +337,9 @@ describe('Portal-Plattformen', () => {
           for (const { x, y, at } of platformCells(centre)) {
             const c = w.cell(x, y);
             expect(c.portal, `${g.id} ${side} ${x},${y}`).toEqual({ id: g.id, side, at });
-            expect(c.solid, `${g.id} ${side} ${at}`).toBe(at === 'corner'); // nur die Ecken mit Zierde sind fest
+            expect(c.solid, `${g.id} ${side} ${at}`).toBeFalsy(); // alle neun Felder begehbar, auch die Ecken
             expect(c.h).toBe(w.cell(cx, cy).h); // flach
-            if (at !== 'corner') expect(reach.has(`${x},${y}`), `${g.id} ${side} ${at} erreichbar`).toBe(true);
+            expect(reach.has(`${x},${y}`), `${g.id} ${side} ${at} erreichbar`).toBe(true);
           }
           // ringsum ein Feld frei, und jede Seitenmitte hat davor ein begehbares Feld: Man kommt von allen Seiten drauf
           for (const [dx, dy] of RING) {
@@ -391,7 +391,7 @@ describe('Portal-Plattformen', () => {
     const w = createWorld(1);
     const { gate } = w.portals.get('eis')!;
     const lifts = platformCells(gate).map(({ x, y }) => platformLift(w.cell(x, y)));
-    expect(new Set(lifts)).toEqual(new Set([0.25, 0.4]));
+    expect(new Set(lifts)).toEqual(new Set([0.25, 0.375]));
     expect(platformLift(w.cell(gate[0] + 3, gate[1]))).toBe(0);
   });
 });

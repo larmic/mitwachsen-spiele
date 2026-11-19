@@ -70,7 +70,7 @@ Die Lichtung ist das Zuhause mit dem Bett. Hinter jedem der acht großen Tore li
 
 - **Die Welt wächst beim Laufen:** Alles entsteht aus dem Seed, Stück für Stück, wenn die Figur dorthin kommt. Derselbe Seed ergibt immer dieselbe Welt, ein anderer eine andere: Die Tore stehen in jeder Welt woanders und in anderer Reihenfolge. In Richtung jedes Tors liegt seine Welt, endlos.
 - **Mächtiges Torhaus:** Neun Felder breit, hohe Türme, eine geschlossene Doppeltür mit leuchtendem Zeichen in der Farbe der Welt, und Schmuck, der verrät, was dahinter wartet (Eiszapfen, Wasserfälle, glühende Lava-Adern, Kristalle, Laubkronen, ein Regenbogen, Riesenpilze). Vor dem Tor ist eine freie Bucht; steht das Kind davor, lichtet sich der Nebel im Gang dahinter, und es sieht schon ein Stück der Welt. Hinter das Tor kommt man nicht, auch nicht außen herum.
-- **Portal-Plattform neben dem Tor:** Eine flache, achteckige Plattform (3 × 3 Felder) im Material der Welt, mit einem Bild der Welt auf der Mitte und niedriger Zierde in den Ecken; man steigt von allen vier Seiten auf. Kommt das Kind nah heran, erwacht sie: Das Bild leuchtet, ein goldener Rahmen legt sich um die Mitte, Funken kreisen, und sie bleibt wach. Gleichzeitig erwacht ihr Gegenstück im Kreis um das Bett, in Richtung ihres Tors (vorher ein leerer grauer Sockel, der nicht verrät, wohin er führt). Wer auf die Mitte tritt, reist zum Gegenstück, folgende Tiere reisen mit. Nach der Ankunft liegt das Gold auf den Zugängen: erst runter, dann wieder rauf, und es geht zurück.
+- **Portal-Plattform neben dem Tor:** Eine flache Platte mit runden Ecken (3 × 3 Felder, alle begehbar) im Material der Welt, mit einem Bild der Welt auf der Mitte und kleiner Zierde in den Ecken; man steigt von überall auf. Kommt das Kind nah heran, erwacht sie: Das Bild leuchtet, ein goldener Rahmen legt sich um die Mitte, Funken kreisen, und sie bleibt wach. Gleichzeitig erwacht ihr Gegenstück im Kreis um das Bett, in Richtung ihres Tors (vorher ein leerer grauer Sockel, der nicht verrät, wohin er führt). Wer auf die Mitte tritt, reist zum Gegenstück, folgende Tiere reisen mit. Nach der Ankunft zeigen goldene Pfeile nach außen: erst runter, dann wieder rauf, und es geht zurück.
 - **Eigene Tiere:** Jede Welt bekommt ihre eigenen verlorenen Tiere, sobald man hinein kann. Die Vorschläge unten sind Ideen, gemeinsam mit dem Kind auszusuchen.
 - **Gleiche Regeln:** Klettern, Nebel, Folgen und Schlafen bleiben überall gleich. Neu ist nur, wie die Welt aussieht und klingt.
 - **Öffnen der Tore:** Wie die Tore aufgehen, hängt an der Geschichte (siehe Ideen: Tiere befreien). Bis dahin bleiben sie zu.
@@ -105,7 +105,7 @@ Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzel
 - **Aussehen:** Dunkle Felsen und Berge, dazwischen glühende Lavaflüsse, die warm leuchten, auch nachts. Höher als die anderen Welten, mit viel zum Klettern.
 - **Besonderes:** Ganz ungefährlich: Die Figur kommt nicht in die Lava, die Lava leuchtet nur. Kein Feuer, kein Rauch, der Angst macht.
 - **Tiere (Ideen):** Bergziege, Salamander, Murmeltier, Adler, Steinbock.
-- **Portal-Plattform:** Glutstein: kühler Basalt mit Glutrissen an den Zugängen, runde Glutsteine; Bild: freundliche Flamme. Um das Gold liegt nur dunkler Basalt, sonst verschwimmt es mit der Glut.
+- **Portal-Plattform:** Glutstein: kühler Basalt mit Glutrissen vom Rand zur Mitte, runde Glutsteine; Bild: freundliche Flamme. Um das Gold liegt nur dunkler Basalt, sonst verschwimmt es mit der Glut.
 
 ### Wald
 
@@ -328,7 +328,9 @@ Die heutigen Portale (drei Felder breit, Säulen und Krone, man läuft von vorn 
   - **Aufwachen** auch schräg: Abstand 2 Felder in jede Richtung, aber nur, wenn das Feld schon aufgedeckt ist (kein Leuchten im Nebel).
   - **Keine Sperrzeit** nach der Ankunft: Raus und wieder Rein genügt.
   - **Schlafende Gegenstücke** am Bett sind ein **leerer Sockel**, der nicht verrät, zu welcher Welt er gehört. Erst beim Erwachen bekommt er Material, Deko und Bild seiner Welt.
-- **Beispiele:** Voxel-Entwürfe für alle acht Welten (Vorlage der Umsetzung: `src/data/games/mitwachsen-portals.ts`) (3×3-Achteck, Gold-Rahmen um die Mitte, Gold auf den Zugängen nach der Ankunft) stehen im Artefakt „Portal-Plattformen“ (https://claude.ai/artifact/46NLTpHryPctPEyfJwUX5r).
+- **Beispiele:** Voxel-Entwürfe für alle acht Welten (Vorlage der Umsetzung: `src/data/games/mitwachsen-portals.ts`) stehen im Artefakt „Portal-Plattformen“ (https://claude.ai/artifact/46NLTpHryPctPEyfJwUX5r), dort auch zum Ausprobieren.
+- **Runde 2 (19.11.2026, umgesetzt):** Die festen Ecken waren für Kinder schwer: Die Figur blieb hängen, ohne dass man sah, warum. Jetzt sind alle neun Felder begehbar, die Zierde steht nur klein in der äußersten Spitze. Feineres Raster: 1 Voxel = 1/8 Feld (vorher 1/3), so groß wie ein Pixel der Bodentexturen. Nach der Ankunft goldene Pfeile in den Seitenfeldern; Gold immer mit dunkler Kante.
+- **Auflösung im ganzen Spiel:** Vorschlag Stufe B: Alles Gebaute, mit dem das Kind etwas tut, auf 1/8 Feld; das Gelände bleibt aus ganzen Blöcken. Für die Plattformen umgesetzt (19.11.2026). Offen, ob Torhäuser, Bett, Tröge und Klangstein folgen. Stufe C (auch das Gelände fein) wäre viel mehr Flächen und unruhig für 3-Jährige.
 
 ### Tore je Welt verschieden (Notiz vom 17.11.2026)
 

@@ -7,17 +7,8 @@
 // 3 × 3 Felder groß und flach.
 
 import { THEME_COLORS, type GateTheme } from '../../data/games/mitwachsen';
-import {
-  GOLD,
-  SUB,
-  emptySocketVoxels,
-  frameOffColor,
-  platformVoxels,
-  sleepingVoxels,
-  voxelSpan,
-  type PlatformVoxel,
-} from '../../data/games/mitwachsen-portals';
-import { Geo, type Tile } from './mitwachsen-geo';
+import { GOLD, SUB, platformLook, voxelSpan, type PlatformVoxel } from '../../data/games/mitwachsen-portals';
+import { Geo, col, type Tile, type V3 } from './mitwachsen-geo';
 
 /** Teile, die mit verschiedenen Materialien gezeichnet werden */
 export type Parts = {
@@ -323,46 +314,55 @@ function decorate(p: Parts, theme: GateTheme) {
   }
 }
 
+/** Voxel einer Plattform, Gold-Voxel mit `gold: true` */
+export type GoldVoxel = PlatformVoxel & { gold?: true };
+const at = (v: Pick<PlatformVoxel, 'x' | 'z' | 'layer'>) => `${v.x},${v.z},${v.layer}`;
+
 /**
- * Portal-Plattform: Voxel aus dem Raster (src/data/games/mitwachsen-portals.ts) als Quader, Mitte der Plattform im
- * Ursprung, ein Voxel ist ein Drittel Feld. Leuchtende Voxel kommen in `bright`, die anderen in `solid`.
- * `gold`: alle Voxel golden (leuchtend) mit dunkler Kante.
+ * Portal-Plattform: Voxel aus dem Raster (src/data/games/mitwachsen-portals.ts) als Würfel, Mitte der Plattform im
+ * Ursprung, ein Voxel ist 1/8 Feld. Nur Flächen, an denen kein Voxel von `around` anliegt, kommen ins Mesh (alles,
+ * was zugleich zu sehen ist; sonst lägen Hunderte verdeckte Flächen darin). Leuchtende und goldene Voxel kommen in
+ * `bright`, die anderen in `solid`; Gold hat eine dunkle Seite.
  */
-export function platformParts(p: Parts, voxels: readonly PlatformVoxel[], gold = false) {
+export function platformParts(p: Parts, voxels: readonly GoldVoxel[], around: readonly PlatformVoxel[] = voxels) {
+  const taken = new Set(around.map(at));
+  const free = (x: number, z: number, layer: number) => !taken.has(`${x},${z},${layer}`);
+  const s = 1 / SUB;
   for (const v of voxels) {
     const [y0, y1] = voxelSpan(v);
-    const g = gold || v.glow ? p.bright : p.solid;
-    const size = 1 / SUB;
-    g.box(
-      v.x / SUB - 1.5,
-      y0,
-      v.z / SUB - 1.5,
-      size,
-      y1 - y0,
-      size,
-      gold ? GOLD.side : v.color,
-      gold ? GOLD.top : v.color,
-    );
+    const [x0, z0] = [v.x * s - 1.5, v.z * s - 1.5];
+    const [x1, z1] = [x0 + s, z0 + s];
+    const g = v.gold || v.glow ? p.bright : p.solid;
+    const top = col(v.gold ? GOLD.top : v.color),
+      side = col(v.gold ? GOLD.side : v.color);
+    const face = (a: V3, b: V3, c: V3, d: V3, n: V3, color = side) => g.quad(a, b, c, d, n, 'white', color);
+    if (free(v.x, v.z, v.layer + 1)) face([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], [0, 1, 0], top);
+    if (free(v.x, v.z + 1, v.layer)) face([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1]);
+    if (free(v.x, v.z - 1, v.layer)) face([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1]);
+    if (free(v.x + 1, v.z, v.layer)) face([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0]);
+    if (free(v.x - 1, v.z, v.layer)) face([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0]);
   }
 }
 
 /**
  * Die Teile einer Plattform, die die 3D-Ansicht je nach Zustand zeigt: `asleep` (am Tor matt, am Bett der leere graue
- * Sockel) allein; wach `body` und `picture` (das leuchtende Bild), dazu der Rahmen um die Mitte und die Zugänge, jeweils
- * golden oder in ihrer eigenen Farbe. Keine zwei Teile haben einen Voxel gemeinsam, so flackert nichts.
+ * Sockel) allein; wach `body` und `picture` (das leuchtende Bild), dazu der Rahmen um die Mitte und die Pfeile in den
+ * Seitenfeldern, jeweils golden oder in ihrer eigenen Farbe. `awake` sind alle Plätze der wachen Plattform (für das
+ * Weglassen verdeckter Flächen). Keine zwei Teile haben einen Voxel gemeinsam, so flackert nichts.
  */
 export function platformSets(theme: GateTheme, side: 'gate' | 'home') {
-  const lit = platformVoxels(theme);
-  const off = frameOffColor(theme);
-  const frame = lit.filter((v) => v.role === 'frame');
-  const access = lit.filter((v) => v.role === 'access');
+  const lit = platformLook(theme, side, 'ready');
+  const arrived = platformLook(theme, side, 'arrived');
+  const isFrame = (v: PlatformVoxel) => v.role === 'frame';
+  const isAccess = (v: PlatformVoxel) => v.role === 'access' || v.role === 'accessEdge';
   return {
-    asleep: side === 'gate' ? sleepingVoxels(theme) : emptySocketVoxels(),
-    body: lit.filter((v) => v.role !== 'frame' && v.role !== 'access' && !(v.role === 'picture' && v.glow)),
+    asleep: platformLook(theme, side, 'asleep'),
+    awake: lit,
+    body: lit.filter((v) => !isFrame(v) && !isAccess(v) && !(v.role === 'picture' && v.glow)),
     picture: lit.filter((v) => v.role === 'picture' && v.glow),
-    frameGold: frame,
-    frameOff: frame.map((v) => ({ ...v, color: off, glow: false })),
-    accessGold: access,
-    accessOff: access,
+    frameGold: lit.filter(isFrame),
+    frameOff: arrived.filter(isFrame),
+    accessGold: arrived.filter(isAccess),
+    accessOff: lit.filter(isAccess),
   };
 }

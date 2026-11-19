@@ -1,15 +1,19 @@
-// Portal-Plattformen von Mitwachsen: Form, Farben und Bild je Welt als Voxel-Raster.
-// Eine flache, achteckige Plattform aus 3 × 3 Feldern, die man von allen vier Seiten betritt. Im Raster ist sie
-// 9 × 9 Voxel groß (ein Voxel ist ein Drittel Feld). Lage 0 ist der Sockel mit dem Gold-Rahmen um das Mittelfeld,
-// darüber liegen das Bild der Welt auf dem Mittelfeld und niedrige Zierde auf den vier Eckfeldern.
-// Die Seitenmitten bleiben frei: Dort steigt man auf. Entwurf: Artefakt „Portal-Plattformen“ (docs/games/mitwachsen.md).
+// Portal-Plattformen von Mitwachsen: Form, Farben und Bild je Welt als Voxel.
+// Eine flache Platte mit runden Ecken aus 3 × 3 Feldern, ganz begehbar, von allen Seiten zu betreten. Ein Voxel ist
+// 1/8 Feld groß und 1/8 Feld hoch, so groß wie ein Pixel der Bodentexturen. Der Sockel ist zwei Lagen hoch (0,25),
+// sein äußerster Ring nur eine (eine kleine Schwelle). Auf dem Mittelfeld liegt eine Lage höher das Bild der Welt
+// (8 × 8 Pixel), eng darum der Gold-Rahmen mit dunkler Kante. Die Zierde steht klein in der äußersten Spitze der
+// Ecken, höchstens drei Lagen hoch, und hält niemanden auf. Nach der Ankunft zeigen goldene Pfeile in den vier
+// Seitenfeldern nach außen. Entwurf: Artefakt „Portal-Plattformen“ (docs/games/mitwachsen.md).
 // Spezifikation: docs/specs/mitwachsen.md
 
 import type { GateTheme } from './mitwachsen';
 
 /** Voxel je Feld und Raster der Plattform */
-export const SUB = 3;
+export const SUB = 8;
 export const GRID = SUB * 3;
+/** Höhe einer Lage (in Feldern) */
+export const LAYER = 1 / SUB;
 
 /** Farben der Zeichen in den Rastern */
 const PALETTE: Record<string, string> = {
@@ -62,6 +66,7 @@ const PALETTE: Record<string, string> = {
   F: '#e08cff',
   U: '#4f7fd9',
   o: '#e0a03a',
+  w: '#b07d4c', // helle Jahresringe
 };
 /** Gold der Plattform (Aktionsfarbe): oben Gold, an den Seiten die dunkle Kante, hell im Lauflicht */
 export const GOLD = { top: '#f0a531', side: '#b46a0c', light: '#ffd47e' } as const;
@@ -69,197 +74,300 @@ export const GOLD = { top: '#f0a531', side: '#b46a0c', light: '#ffd47e' } as con
 /** Diese Zeichen leuchten aus sich selbst, sobald die Plattform wach ist */
 const GLOW = new Set('GWejyuvrRhmnkLF123456');
 
-const EMPTY = '.........';
-const NONE = [EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY];
-
-/** Je Welt drei Lagen zu 9 Zeilen (Norden oben); `.` ist leer */
-export const PLATFORMS: Record<GateTheme, readonly (readonly string[])[]> = {
-  // Eisscholle: Schneekante, klares Eis, Eisspitzen in den Ecken; Bild: Schneeflocke
-  eis: [
-    [
-      '..sssss..',
-      '.siiiiis.',
-      'siGGGGGis',
-      'siGeeeGis',
-      'siGeeeGis',
-      'siGeeeGis',
-      'siGGGGGis',
-      '.siiiiis.',
-      '..sssss..',
-    ],
-    [EMPTY, '.j.....j.', EMPTY, '...WeW...', '...eWe...', '...WeW...', EMPTY, '.j.....j.', EMPTY],
-    [EMPTY, '.j.....j.', EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, '.j.....j.', EMPTY],
-  ],
-  // Sandsteinstufe: Mini-Pyramiden mit glühender Spitze; Bild: Stufenpyramide mit blauen Ecken
-  sand: [
-    [
-      '..AAAAA..',
-      '.AaaaaaA.',
-      'AaGGGGGaA',
-      'AaGyyyGaA',
-      'AaGyyyGaA',
-      'AaGyyyGaA',
-      'AaGGGGGaA',
-      '.AaaaaaA.',
-      '..AAAAA..',
-    ],
-    [EMPTY, '.a.....a.', EMPTY, '...bWb...', '...yyy...', '...yyy...', EMPTY, '.a.....a.', EMPTY],
-    [EMPTY, '.y.....y.', EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, '.y.....y.', EMPTY],
-  ],
-  // Brunnenrand: Wellensteine, Muscheln über Kreuz; Bild: Wassertropfen
-  wasser: [
-    [
-      '..qqqqq..',
-      '.qvvvvvq.',
-      'qvGGGGGvq',
-      'qvGuuuGvq',
-      'qvGuuuGvq',
-      'qvGuuuGvq',
-      'qvGGGGGvq',
-      '.qvvvvvq.',
-      '..qqqqq..',
-    ],
-    [EMPTY, '.p.....P.', EMPTY, '...uWu...', '...WWW...', '...WWW...', EMPTY, '.P.....p.', EMPTY],
-    NONE,
-  ],
-  // Glutstein: kühler Basalt, Glutrisse an den Zugängen, runde Glutsteine; Bild: freundliche Flamme. Um das Gold liegt
-  // nur dunkler Basalt (die Risse enden vorher), die Flamme hat dunkle Ecken: Gold und Glut sind sich sonst zu ähnlich
-  lava: [
-    [
-      '..xxrxx..',
-      '.XXXXXXX.',
-      'xXGGGGGXx',
-      'xXGRRRGXx',
-      'rXGRRRGXr',
-      'xXGRRRGXx',
-      'xXGGGGGXx',
-      '.XXXXXXX.',
-      '..xxrxx..',
-    ],
-    [EMPTY, '.X.....X.', EMPTY, '...xrx...', '...rRr...', '...xRx...', EMPTY, '.X.....X.', EMPTY],
-    [EMPTY, '.r.....r.', EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, '.r.....r.', EMPTY],
-  ],
-  // Kristallnest: dunkle Schale, Kristallsäulen in den Ecken; Bild: Kristall-Raute
-  hoehle: [
-    [
-      '..ccccc..',
-      '.cCCCCCc.',
-      'cCGGGGGCc',
-      'cCGhhhGCc',
-      'cCGhhhGCc',
-      'cCGhhhGCc',
-      'cCGGGGGCc',
-      '.cCCCCCc.',
-      '..ccccc..',
-    ],
-    [EMPTY, '.m.....n.', EMPTY, '...chc...', '...hnh...', '...chc...', EMPTY, '.k.....m.', EMPTY],
-    [EMPTY, '.m.....n.', EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, '.k.....m.', EMPTY],
-  ],
-  // Baumstumpf: Rinde außen, Jahresringe innen, Moos und Farn in den Ecken; Bild: Blatt
-  wald: [
-    [
-      '..TTTTT..',
-      '.TtttttT.',
-      'TtGGGGGtT',
-      'TtGLLLGtT',
-      'TtGLLLGtT',
-      'TtGLLLGtT',
-      'TtGGGGGtT',
-      '.TtttttT.',
-      '..TTTTT..',
-    ],
-    [EMPTY, '.z.....z.', EMPTY, '...tLz...', '...LzL...', '...zLt...', EMPTY, '.z.....z.', EMPTY],
-    [EMPTY, '.Z.....Z.', EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, '.Z.....Z.', EMPTY],
-  ],
-  // Wolkenkissen: Wolkenbällchen mit bunten Knöpfen; Bild: Regenbogen über einer Wolke
-  wolken: [
-    [
-      '..DDDDD..',
-      '.DdddddD.',
-      'DdGGGGGdD',
-      'DdGWWWGdD',
-      'DdGWWWGdD',
-      'DdGWWWGdD',
-      'DdGGGGGdD',
-      '.DdddddD.',
-      '..DDDDD..',
-    ],
-    [EMPTY, '.d.....d.', EMPTY, '...234...', '...1W5...', '...WWW...', EMPTY, '.d.....d.', EMPTY],
-    [EMPTY, '.1.....3.', EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, '.5.....6.', EMPTY],
-  ],
-  // Pilzteller: lila Moos, Mini-Pilze in den Ecken; Bild: Fliegenpilz
-  pilze: [
-    [
-      '..MMMMM..',
-      '.MSSSSSM.',
-      'MSGGGGGSM',
-      'MSGFFFGSM',
-      'MSGFFFGSM',
-      'MSGFFFGSM',
-      'MSGGGGGSM',
-      '.MSSSSSM.',
-      '..MMMMM..',
-    ],
-    [EMPTY, '.N.....N.', EMPTY, '...BWB...', '...HBH...', '...FMF...', EMPTY, '.N.....N.', EMPTY],
-    [EMPTY, '.B.....U.', EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, '.o.....B.', EMPTY],
-  ],
+/**
+ * Aussehen einer Welt: Material des Rands (`edge`) und der Fläche (`surf`), gestreute helle Körner (`speck`), das Bild
+ * auf dem Mittelfeld (8 × 8, Norden oben) und die Zierde einer Ecke als [nach innen x, nach innen z, Lage über dem
+ * Sockel, Zeichen]; `*` nimmt je Ecke eine eigene Farbe aus `corners` (Nordwest, Nordost, Südwest, Südost)
+ */
+type Look = {
+  edge: string;
+  surf: string;
+  speck?: string;
+  picture: readonly string[];
+  deco: readonly (readonly [number, number, number, string])[];
+  corners?: readonly [string, string, string, string];
 };
 
+export const LOOKS: Record<GateTheme, Look> = {
+  // Eisscholle: Schneekante, klares Eis mit Glitzer, Eisspitzen; Bild: Schneeflocke
+  eis: {
+    edge: 's',
+    surf: 'i',
+    speck: 'j',
+    picture: ['eeeWWeee', 'eWeWWeWe', 'eeWWWWee', 'WWWeeWWW', 'WWWeeWWW', 'eeWWWWee', 'eWeWWeWe', 'eeeWWeee'],
+    deco: [
+      [0, 0, 0, 'j'],
+      [0, 0, 1, 'j'],
+      [0, 0, 2, 'W'],
+      [1, 0, 0, 'e'],
+      [0, 1, 0, 'e'],
+    ],
+  },
+  // Sandsteinstufe: Mini-Pyramide mit glühender Spitze; Bild: Stufenpyramide mit blauen Ecken
+  sand: {
+    edge: 'A',
+    surf: 'a',
+    speck: 'A',
+    picture: ['yyyyyyyy', 'yyyWWyyy', 'yyybbyyy', 'yybAAbyy', 'yyAAAAyy', 'ybAAAAby', 'yAAAAAAy', 'yyyyyyyy'],
+    deco: [
+      [0, 0, 0, 'A'],
+      [1, 0, 0, 'A'],
+      [0, 1, 0, 'A'],
+      [1, 1, 0, 'A'],
+      [0, 0, 1, 'a'],
+      [0, 0, 2, 'y'],
+    ],
+  },
+  // Brunnenrand: Wellensteine, Muscheln; Bild: Wassertropfen
+  wasser: {
+    edge: 'q',
+    surf: 'v',
+    speck: 'W',
+    picture: ['uuuWWuuu', 'uuuWWuuu', 'uuWWWWuu', 'uWWWWWWu', 'uWqWWWWu', 'uWWqWWWu', 'uuWWWWuu', 'uuuuuuuu'],
+    deco: [
+      [0, 0, 0, 'p'],
+      [1, 0, 0, 'p'],
+      [0, 1, 0, 'p'],
+      [1, 1, 0, 'P'],
+    ],
+  },
+  // Glutstein: kühler Basalt, Glutrisse vom Rand zur Mitte, die vor dem Gold enden; runde Glutsteine; Bild: Flamme
+  lava: {
+    edge: 'x',
+    surf: 'X',
+    picture: ['xxxrxxxx', 'xxrrxxxx', 'xxrrrxrx', 'xrrRrrrx', 'xrRRRrrx', 'xrRRRRrx', 'xxrRRrxx', 'xxxxxxxx'],
+    deco: [
+      [0, 0, 0, 'x'],
+      [1, 0, 0, 'x'],
+      [0, 1, 0, 'x'],
+      [1, 1, 0, 'x'],
+      [0, 0, 1, 'r'],
+      [1, 0, 1, 'r'],
+      [0, 1, 1, 'r'],
+      [0, 0, 2, 'R'],
+    ],
+  },
+  // Kristallnest: dunkle Schale, Kristalle in drei Farben; Bild: Kristall
+  hoehle: {
+    edge: 'c',
+    surf: 'C',
+    speck: 'n',
+    picture: ['cccnhccc', 'ccnhhhcc', 'cnhhhmhc', 'cnhhmhhc', 'cnhhhmhc', 'ccnhhhcc', 'cccnhccc', 'cccccccc'],
+    deco: [
+      [0, 0, 0, '*'],
+      [0, 0, 1, '*'],
+      [0, 0, 2, '*'],
+      [1, 0, 0, '*'],
+      [1, 1, 0, 'n'],
+    ],
+    corners: ['h', 'n', 'k', 'm'],
+  },
+  // Baumstumpf: Rinde außen, Jahresringe innen, Moos und Farn; Bild: Blatt
+  wald: {
+    edge: 'T',
+    surf: 't',
+    picture: ['tttttLLL', 'tttLLLLL', 'ttLLLLzL', 'tLLLLzLL', 'tLLLzLLt', 'tLLzLLtt', 'tLzLLttt', 'zztttttt'],
+    deco: [
+      [0, 0, 0, 'z'],
+      [1, 0, 0, 'Z'],
+      [0, 1, 0, 'Z'],
+      [1, 1, 0, 'z'],
+      [0, 0, 1, 'L'],
+      [1, 0, 1, 'z'],
+    ],
+  },
+  // Wolkenkissen: Wolkenbällchen mit bunten Knöpfen; Bild: Regenbogen über einer Wolke
+  wolken: {
+    edge: 'D',
+    surf: 'd',
+    picture: ['qq1111qq', 'q122221q', '12333321', '23444432', '345qq543', '45WWWW54', '5WWWWWW5', 'qWWWWWWq'],
+    deco: [
+      [0, 0, 0, 'd'],
+      [1, 0, 0, 'd'],
+      [0, 1, 0, 'd'],
+      [1, 1, 0, 'd'],
+      [0, 0, 1, 'd'],
+      [0, 1, 1, 'd'],
+      [1, 0, 1, '*'],
+    ],
+    corners: ['1', '3', '5', '6'],
+  },
+  // Pilzteller: heller Rand, Ring aus lila Moos; Mini-Pilze; Bild: Fliegenpilz
+  pilze: {
+    edge: 'M',
+    surf: 'N',
+    speck: 'S',
+    picture: ['FFBBBBFF', 'FBWBBWBF', 'BBBBBBBB', 'BWBBBWBB', 'FFFNNFFF', 'FFFNNFFF', 'FFNNNNFF', 'FFFFFFFF'],
+    deco: [
+      [0, 0, 0, 'N'],
+      [0, 0, 1, '*'],
+      [1, 0, 1, '*'],
+      [0, 1, 1, '*'],
+      [1, 1, 1, '*'],
+    ],
+    corners: ['B', 'U', 'o', 'B'],
+  },
+};
+
+/** Goldener Pfeil nach der Ankunft in einem Seitenfeld (8 × 8, zeigt nach unten = nach außen); `o` dunkle Kante */
+const ARROW = ['........', '........', '.o....o.', 'oGo..oGo', 'oGGooGGo', '.oGGGGo.', '..oGGo..', '...oo...'];
+
 /**
- * Rolle eines Voxels: `socket` Sockel, `frame` Gold-Rahmen um die Mitte, `access` äußere Voxel der vier Zugänge
- * (nach der Ankunft golden), `core` Sockel unter dem Bild, `picture` Bild der Welt auf dem Mittelfeld, `deco` Zierde
- * auf den Eckfeldern
+ * Rolle eines Voxels: `socket` Sockel, `frame` Gold-Rahmen um die Mitte, `access` goldener Pfeil in einem Seitenfeld
+ * (nach der Ankunft), `accessEdge` seine dunkle Kante, `core` Sockel unter dem Bild, `picture` Bild der Welt auf dem
+ * Mittelfeld, `deco` Zierde in den Ecken
  */
-export type VoxelRole = 'socket' | 'frame' | 'access' | 'core' | 'picture' | 'deco';
-/** Ein Voxel: Spalte x (Westen → Osten) und Zeile z (Norden → Süden) im 9 × 9-Raster, Lage, Farbe, leuchtet es? */
+export type VoxelRole = 'socket' | 'frame' | 'access' | 'accessEdge' | 'core' | 'picture' | 'deco';
+/** Ein Voxel: Spalte x (Westen → Osten) und Zeile z (Norden → Süden) im Raster, Lage, Farbe, leuchtet es? */
 export type PlatformVoxel = { x: number; z: number; layer: number; color: string; glow: boolean; role: VoxelRole };
 
-/** Höhe der Lagen über dem Boden (in Feldern): Sockel, Bild bzw. Zierde unten, Zierde oben */
-export const SOCKET_TOP = 0.25; // Rand der Plattform: Hier steht die Figur
-export const CENTRE_TOP = 0.4; // Mittelfeld mit dem Bild
-const DECO_LAYER = 0.3;
+/** Höhe über dem Boden (in Feldern): Sockel, auf dem die Figur steht, und Mittelfeld mit dem Bild */
+export const SOCKET_TOP = 2 * LAYER;
+export const CENTRE_TOP = 3 * LAYER;
 
 /** Unter- und Oberkante eines Voxels */
-export function voxelSpan(v: Pick<PlatformVoxel, 'layer' | 'role'>): [number, number] {
-  if (v.layer === 0) return [0, SOCKET_TOP];
-  if (v.role === 'picture') return [SOCKET_TOP, CENTRE_TOP];
-  const y0 = SOCKET_TOP + (v.layer - 1) * DECO_LAYER;
-  return [y0, y0 + DECO_LAYER];
-}
+export const voxelSpan = (v: Pick<PlatformVoxel, 'layer'>): [number, number] => [
+  v.layer * LAYER,
+  (v.layer + 1) * LAYER,
+];
 
 const inCentre = (x: number, z: number) => x >= SUB && x < 2 * SUB && z >= SUB && z < 2 * SUB;
-const inFrame = (x: number, z: number) =>
-  x >= SUB - 1 && x <= 2 * SUB && z >= SUB - 1 && z <= 2 * SUB && !inCentre(x, z);
-/** Äußere Voxel der Seitenmitten: dort, wo man auf die Plattform steigt */
-const isAccess = (x: number, z: number) =>
-  ((z === 0 || z === GRID - 1) && x >= SUB && x < 2 * SUB) || ((x === 0 || x === GRID - 1) && z >= SUB && z < 2 * SUB);
+const inBox = (x: number, z: number, d: number) => x >= SUB - d && x < 2 * SUB + d && z >= SUB - d && z < 2 * SUB + d;
+const inFrame = (x: number, z: number) => inBox(x, z, 1) && !inCentre(x, z);
+const inFrameEdge = (x: number, z: number) => inBox(x, z, 2) && !inBox(x, z, 1);
 
-function roleOf(x: number, z: number, layer: number): VoxelRole {
-  if (layer > 0) return inCentre(x, z) ? 'picture' : 'deco';
-  if (inCentre(x, z)) return 'core';
-  if (inFrame(x, z)) return 'frame';
-  return isAccess(x, z) ? 'access' : 'socket';
+/** Platte mit runden Ecken (Radius 0,6 Feld): Abstand der Voxelmitte zur Kante nach innen (in Feldern), < 0 außen */
+const ROUND = 0.6;
+export function inset(x: number, z: number): number {
+  const u = (x + 0.5) / SUB,
+    v = (z + 0.5) / SUB;
+  const corner = (u < ROUND || u > 3 - ROUND) && (v < ROUND || v > 3 - ROUND);
+  if (!corner) return Math.min(u, v, 3 - u, 3 - v);
+  const cu = Math.min(Math.max(u, ROUND), 3 - ROUND),
+    cv = Math.min(Math.max(v, ROUND), 3 - ROUND);
+  return ROUND - Math.hypot(u - cu, v - cv);
+}
+const BAND = 0.22; // Breite des Rands im Material `edge`
+
+/** Kleiner, fester Zufall je Voxel (für die gestreuten Körner) */
+function grain(x: number, z: number, salt: number): number {
+  let h = (x * 374761393 + z * 668265263 + salt * 1442695041) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-/** Alle Voxel der Plattform einer Welt, wach (Farben wie im Entwurf) */
+/** Zeichen der Oberfläche an einem Voxel des Sockels */
+function surface(theme: GateTheme, x: number, z: number, d: number): string {
+  const look = LOOKS[theme];
+  const u = (x + 0.5) / SUB,
+    v = (z + 0.5) / SUB;
+  switch (theme) {
+    case 'lava': {
+      if (d < BAND) return 'x';
+      // Glutrisse auf den Achsen, zwei Voxel breit; sie enden ein Stück vor dem Gold
+      const axis = Math.abs(u - 1.5) < 1 / SUB || Math.abs(v - 1.5) < 1 / SUB;
+      return axis && !inBox(x, z, 4) ? 'r' : 'X';
+    }
+    case 'wald':
+      if (d < 0.17) return 'T';
+      return Math.floor(Math.hypot(u - 1.5, v - 1.5) / 0.19) % 2 ? 'w' : 't';
+    case 'pilze':
+      if (d < BAND) return 'M';
+      if (d < 0.42) return 'S';
+      return 'N';
+    default:
+      if (d < BAND) return look.edge;
+      return look.speck && grain(x, z, theme.length) < 0.06 ? look.speck : look.surf;
+  }
+}
+
+/** Seitenfeld, in dem ein Voxel liegt, und seine Lage im Pfeil-Muster (Zeile zeigt nach außen) */
+function arrowAt(x: number, z: number): string {
+  const fx = Math.floor(x / SUB),
+    fz = Math.floor(z / SUB),
+    a = x % SUB,
+    b = z % SUB;
+  const r = SUB - 1;
+  const [col, row] =
+    fx === 1 && fz === 2
+      ? [a, b]
+      : fx === 1 && fz === 0
+        ? [a, r - b]
+        : fx === 2 && fz === 1
+          ? [b, a]
+          : fx === 0 && fz === 1
+            ? [b, r - a]
+            : [-1, -1];
+  return ARROW[row]?.[col] ?? '.';
+}
+
+const color = (ch: string) => PALETTE[ch] ?? PALETTE.Q!;
+const voxel = (x: number, z: number, layer: number, ch: string, role: VoxelRole): PlatformVoxel => ({
+  x,
+  z,
+  layer,
+  color: color(ch),
+  glow: GLOW.has(ch),
+  role,
+});
+
+/** Farbe abdunkeln (Faktor 0 … 1) */
+export function darken(c: string, f: number): string {
+  const n = parseInt(c.slice(1), 16);
+  const ch = (shift: number) => Math.round(((n >> shift) & 255) * f);
+  return `#${((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, '0')}`;
+}
+const EDGE_DARK = 0.62; // dunkle Kante neben dem Gold
+
+/**
+ * Alle Voxel der Plattform einer Welt, wach, in ihrem Material: Rahmen und Pfeile haben hier noch ihre Sockelfarbe;
+ * Gold legt erst `platformLook` darauf. Die dunkle Kante außen um den Rahmen gehört fest zum Sockel.
+ */
 export function platformVoxels(theme: GateTheme): PlatformVoxel[] {
+  const look = LOOKS[theme];
   const out: PlatformVoxel[] = [];
-  PLATFORMS[theme].forEach((rows, layer) =>
-    rows.forEach((row, z) => {
-      for (let x = 0; x < GRID; x++) {
-        const ch = row[x] ?? '.';
-        const color = PALETTE[ch];
-        if (!color) continue;
-        out.push({ x, z, layer, color, glow: GLOW.has(ch), role: roleOf(x, z, layer) });
+  for (let z = 0; z < GRID; z++)
+    for (let x = 0; x < GRID; x++) {
+      const d = inset(x, z);
+      if (d < 0) continue;
+      const top = d < LAYER ? 1 : 2; // äußerster Ring eine Lage tiefer: eine kleine Schwelle
+      const ch = surface(theme, x, z, d);
+      const arrow = arrowAt(x, z);
+      const role: VoxelRole = inCentre(x, z)
+        ? 'core'
+        : inFrame(x, z)
+          ? 'frame'
+          : arrow === 'G'
+            ? 'access'
+            : arrow === 'o'
+              ? 'accessEdge'
+              : 'socket';
+      for (let layer = 0; layer < top; layer++) {
+        const v = voxel(x, z, layer, ch, role);
+        if (inFrameEdge(x, z)) out.push({ ...v, color: darken(v.color, EDGE_DARK), glow: false });
+        else out.push(v);
       }
-    }),
-  );
+      if (inCentre(x, z)) {
+        const p = look.picture[z - SUB]?.[x - SUB] ?? '.';
+        out.push(voxel(x, z, 2, p, 'picture'));
+      }
+    }
+  // Zierde: klein in der äußersten Spitze jeder Ecke, gespiegelt nach innen
+  const tip = 2;
+  (
+    [
+      [1, 1],
+      [-1, 1],
+      [1, -1],
+      [-1, -1],
+    ] as const
+  ).forEach(([sx, sz], i) => {
+    const bx = sx > 0 ? tip : GRID - 1 - tip,
+      bz = sz > 0 ? tip : GRID - 1 - tip;
+    for (const [dx, dz, dl, ch] of look.deco)
+      out.push(voxel(bx + dx * sx, bz + dz * sz, 2 + dl, ch === '*' ? (look.corners?.[i] ?? 'W') : ch, 'deco'));
+  });
   return out;
-}
-
-/** Farbe des Sockels um das Mittelfeld: So sieht der Rahmen aus, wenn kein Gold darauf liegt */
-export function frameOffColor(theme: GateTheme): string {
-  return PALETTE[PLATFORMS[theme][0]?.[1]?.[4] ?? 'Q'] ?? PALETTE.Q!;
 }
 
 const GREY = { edge: PALETTE.Q!, inner: PALETTE.V!, engraved: PALETTE.K! };
@@ -273,49 +381,30 @@ export function dim(color: string): string {
 }
 
 /**
- * Schlafende Plattform in ihrer Welt: alles matt, das Bild nur eingeritzt, kein Gold (der Rahmen hat die
- * Sockelfarbe), die Zierde in den Ecken steht da, leuchtet aber nicht
+ * Schlafende Plattform in ihrer Welt: alles matt, das Bild nur grau eingeritzt (sein Grund matt), kein Gold, die
+ * Zierde steht da, leuchtet aber nicht
  */
 export function sleepingVoxels(theme: GateTheme): PlatformVoxel[] {
-  const off = frameOffColor(theme);
+  const ground = color(LOOKS[theme].picture[0]![0]!);
   return platformVoxels(theme).map((v) => ({
     ...v,
     glow: false,
-    color:
-      v.role === 'picture' || v.role === 'core'
-        ? GREY.engraved
-        : v.role === 'frame'
-          ? off
-          : v.glow
-            ? dim(v.color)
-            : v.color,
+    color: v.role === 'picture' ? (v.color === ground ? dim(v.color) : GREY.engraved) : v.glow ? dim(v.color) : v.color,
   }));
 }
 
 /**
  * Schlafendes Gegenstück am Bett: ein leerer grauer Sockel aus Lichtungsstein, für alle Welten gleich. Kein Bild,
- * keine Zierde der Welt; nur die erhöhte Mitte und je ein niedriger Eckstein zeigen, wo man steht und wo nicht.
- * So verrät er nicht, zu welcher Welt er gehört.
+ * keine Zierde; nur die erhöhte Mitte zeigt, wo man reist. So verrät er nicht, zu welcher Welt er gehört.
  */
 export function emptySocketVoxels(): PlatformVoxel[] {
-  const base = PLATFORMS.eis[0]!; // die Form ist bei allen Welten gleich
-  const has = (x: number, z: number) => (base[z]?.[x] ?? '.') !== '.';
-  const out: PlatformVoxel[] = [];
-  for (let z = 0; z < GRID; z++)
-    for (let x = 0; x < GRID; x++) {
-      if (!has(x, z)) continue;
-      const edge = !has(x - 1, z) || !has(x + 1, z) || !has(x, z - 1) || !has(x, z + 1);
-      out.push({ x, z, layer: 0, color: edge ? GREY.edge : GREY.inner, glow: false, role: roleOf(x, z, 0) });
-      if (inCentre(x, z)) out.push({ x, z, layer: 1, color: GREY.edge, glow: false, role: 'picture' });
-    }
-  for (const [x, z] of [
-    [1, 1],
-    [GRID - 2, 1],
-    [1, GRID - 2],
-    [GRID - 2, GRID - 2],
-  ] as const)
-    out.push({ x, z, layer: 1, color: GREY.edge, glow: false, role: 'deco' });
-  return out;
+  return platformVoxels('eis')
+    .filter((v) => v.role !== 'deco')
+    .map((v) => ({
+      ...v,
+      glow: false,
+      color: v.role === 'picture' || inset(v.x, v.z) < BAND ? GREY.edge : GREY.inner,
+    }));
 }
 
 /** Die Plätze des Gold-Rahmens im Kreis (für das Lauflicht), im Uhrzeigersinn ab Nordwesten */
@@ -332,7 +421,8 @@ export const FRAME_RING: readonly (readonly [number, number])[] = (() => {
 
 /**
  * Wie eine Plattform gerade aussieht: schlafend (am Tor matt, am Bett leerer Sockel), wach und bereit (Gold-Rahmen um
- * die Mitte) oder wach nach der Ankunft (Gold auf den Zugängen). Gold-Voxel haben `gold: true`.
+ * die Mitte) oder wach nach der Ankunft (goldene Pfeile mit dunkler Kante in den Seitenfeldern). Gold-Voxel haben
+ * `gold: true`.
  */
 export type PlatformLook = 'asleep' | 'ready' | 'arrived';
 export function platformLook(
@@ -341,13 +431,12 @@ export function platformLook(
   look: PlatformLook,
 ): (PlatformVoxel & { gold?: true })[] {
   if (look === 'asleep') return side === 'gate' ? sleepingVoxels(theme) : emptySocketVoxels();
-  const off = frameOffColor(theme);
-  const goldRole = look === 'ready' ? 'frame' : 'access';
+  const gold = look === 'ready' ? 'frame' : 'access';
   return platformVoxels(theme).map((v) =>
-    v.role === goldRole
+    v.role === gold
       ? { ...v, color: GOLD.top, glow: true, gold: true }
-      : v.role === 'frame'
-        ? { ...v, color: off, glow: false }
+      : look === 'arrived' && v.role === 'accessEdge'
+        ? { ...v, color: darken(v.color, EDGE_DARK), glow: false }
         : v,
   );
 }

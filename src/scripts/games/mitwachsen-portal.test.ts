@@ -46,7 +46,7 @@ describe('Portal-Plattformen: Form und Lage', () => {
   it('auf dem Sockel steht man höher, auf der Mitte noch etwas mehr; daneben nicht', () => {
     expect(platformLift({})).toBe(0);
     expect(platformLift({ portal: { at: 'edge' } })).toBe(0.25);
-    expect(platformLift({ portal: { at: 'centre' } })).toBe(0.4);
+    expect(platformLift({ portal: { at: 'centre' } })).toBe(0.375);
   });
 
   it('im Kreis: wird es beim Runden eng, nimmt eine Plattform die nächste andere Rundung', () => {

@@ -1,6 +1,6 @@
 // Portal-Plattformen in der 2D-Ansicht (Ersatz ohne WebGL): je Feld die Voxel, die darauf liegen, als kleine Quader.
-// Dieselben Zustände wie in 3D (schlafend, bereit mit Gold-Rahmen, nach der Ankunft Gold auf den Zugängen), ohne
-// Bewegung.
+// Dieselben Zustände wie in 3D (schlafend, bereit mit Gold-Rahmen, nach der Ankunft goldene Pfeile), ohne Bewegung.
+// Von jeder Säule nur der oberste Voxel, darunter sieht man von schräg oben ohnehin nichts.
 
 import { box, type Projection } from '../../lib/games/front';
 import { GOLD, SUB, platformLook, voxelSpan } from '../../data/games/mitwachsen-portals';
@@ -27,12 +27,15 @@ export function drawPlatform(
   const fx = (x - cx + PLATFORM_HALF) * SUB,
     fz = (y - cy + PLATFORM_HALF) * SUB;
   const s = 1 / SUB;
-  const mine = platformLook(id, side, look)
+  const all = platformLook(id, side, look);
+  const taken = new Set(all.map((v) => `${v.x},${v.z},${v.layer}`));
+  const mine = all
     .filter((v) => v.x >= fx && v.x < fx + SUB && v.z >= fz && v.z < fz + SUB)
+    .filter((v) => !taken.has(`${v.x},${v.z},${v.layer + 1}`))
     .sort((a, b) => a.z - b.z || a.layer - b.layer); // von hinten nach vorn, von unten nach oben
   for (const v of mine) {
-    const [y0, y1] = voxelSpan(v);
+    const y1 = voxelSpan(v)[1];
     const side = v.gold ? GOLD.side : v.color;
-    box(ctx, P, x + (v.x - fx) * s, y + (v.z - fz) * s, h + y0, s, s, y1 - y0, side, v.color);
+    box(ctx, P, x + (v.x - fx) * s, y + (v.z - fz) * s, h, s, s, y1, side, v.color); // die ganze Säule als ein Quader
   }
 }

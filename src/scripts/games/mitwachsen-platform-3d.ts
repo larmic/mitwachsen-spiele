@@ -1,19 +1,20 @@
 // Portal-Plattformen in der 3D-Ansicht: am Tor und ihr Gegenstück am Bett, flach aus Voxeln im Material der Welt.
 // Jede Plattform hat ihre Zustände als eigene Teile, die je nach Spiel sichtbar werden: schlafend (am Tor matt, am
-// Bett ein leerer grauer Sockel), wach mit leuchtendem Bild, Gold-Rahmen um die Mitte (bereit: hier drauf) oder Gold
-// auf den Zugängen (nach der Ankunft: erst runter). Keine zwei Teile teilen einen Voxel, so flackert nichts.
+// Bett ein leerer grauer Sockel), wach mit leuchtendem Bild, Gold-Rahmen um die Mitte (bereit: hier drauf) oder goldene
+// Pfeile in den Seitenfeldern (nach der Ankunft: erst runter). Keine zwei Teile teilen einen Voxel, so flackert nichts.
 // Wird nur mit der 3D-Ansicht nachgeladen (Three.js).
 
 import { BoxGeometry, Group, type BufferGeometry, Mesh, MeshBasicMaterial, type Material } from 'three';
 import { GATES, THEME_COLORS, type GateId } from '../../data/games/mitwachsen';
 import { FRAME_RING, GOLD, SOCKET_TOP, SUB, type PlatformVoxel } from '../../data/games/mitwachsen-portals';
-import { parts, platformParts, platformSets } from './mitwachsen-gatehouse';
+import { parts, platformParts, platformSets, type GoldVoxel } from './mitwachsen-gatehouse';
 import { PLATFORM_HALF, PORTAL_WAKE } from './mitwachsen-portal';
 import type { Scene } from './mitwachsen-render';
 import type { State } from './mitwachsen-state';
 import type { World } from './mitwachsen-world';
 
 const RUNNER_H = 0.3; // die hellen Voxel des Lauflichts: etwas größer als die Gold-Voxel, die sie umschließen
+const RUNNER = 4; // so viele helle Voxel wandern hintereinander um die Mitte
 const WAVE_MS = 150; // Erwachen: eine Stufe des Lichts
 
 type Platform3D = {
@@ -25,8 +26,8 @@ type Platform3D = {
   picture: Group; // leuchtendes Bild auf dem Mittelfeld
   frame: Group; // Gold-Rahmen um die Mitte: hier drauf
   frameOff: Group; // derselbe Rahmen in Sockelfarbe
-  access: Group; // Gold auf den Zugängen nach der Ankunft: erst runter
-  accessOff: Group; // dieselben Zugänge in ihrer Farbe
+  access: Group; // goldene Pfeile in den Seitenfeldern nach der Ankunft: erst runter
+  accessOff: Group; // dieselben Voxel in ihrer Farbe
   runner: Mesh[]; // Lauflicht im Gold-Rahmen
   sparks: Mesh[];
   pictureMat: MeshBasicMaterial;
@@ -39,7 +40,7 @@ export class Platforms3D {
   private awakeSeen: Set<GateId> | null = null; // wache Plattformen beim letzten Bild (null: neue Welt, noch keins)
   private wokeAt = new Map<GateId, number>(); // gerade erwacht: Das Licht kommt in Stufen
   private sparkGeo = new BoxGeometry(0.1, 0.1, 0.1);
-  private runnerGeo = new BoxGeometry(1 / SUB + 0.06, RUNNER_H, 1 / SUB + 0.06);
+  private runnerGeo = new BoxGeometry(1 / SUB + 0.03, RUNNER_H, 1 / SUB + 0.03);
   private runnerMat = new MeshBasicMaterial({ color: GOLD.light });
 
   /**
@@ -52,10 +53,13 @@ export class Platforms3D {
     private readonly glow: () => MeshBasicMaterial,
   ) {}
 
-  /** Gruppe aus Voxeln: leuchtende mit `bright` (eigenes Material, z. B. zum Pulsieren), andere mit `solid` */
-  private voxels(voxels: readonly PlatformVoxel[], gold = false, bright = this.bright): Group {
+  /**
+   * Gruppe aus Voxeln: leuchtende und goldene mit `bright` (eigenes Material, z. B. zum Pulsieren), andere mit
+   * `solid`; `around`: alle Voxel, die zugleich zu sehen sind (verdeckte Flächen fallen weg)
+   */
+  private voxels(voxels: readonly GoldVoxel[], around: readonly PlatformVoxel[], bright = this.bright): Group {
     const p = parts();
-    platformParts(p, voxels, gold);
+    platformParts(p, voxels, around);
     const group = new Group();
     for (const [g, mat] of [
       [p.solid, this.solid],
@@ -114,14 +118,14 @@ export class Platforms3D {
       id,
       side,
       centre,
-      asleep: this.voxels(sets.asleep),
-      body: this.voxels(sets.body),
-      picture: this.voxels(sets.picture, false, pictureMat),
-      frame: this.voxels(sets.frameGold, true),
-      frameOff: this.voxels(sets.frameOff),
-      access: this.voxels(sets.accessGold, true, accessMat),
-      accessOff: this.voxels(sets.accessOff),
-      runner: [0, 1].map(() => new Mesh(this.runnerGeo, this.runnerMat)),
+      asleep: this.voxels(sets.asleep, sets.asleep),
+      body: this.voxels(sets.body, sets.awake),
+      picture: this.voxels(sets.picture, sets.awake, pictureMat),
+      frame: this.voxels(sets.frameGold, sets.awake),
+      frameOff: this.voxels(sets.frameOff, sets.awake),
+      access: this.voxels(sets.accessGold, sets.awake, accessMat),
+      accessOff: this.voxels(sets.accessOff, sets.awake),
+      runner: Array.from({ length: RUNNER }, () => new Mesh(this.runnerGeo, this.runnerMat)),
       sparks,
       pictureMat,
       accessMat,
@@ -172,11 +176,11 @@ export class Platforms3D {
 
   /** Lauflicht im Gold-Rahmen und Funken über der Mitte (nur, wenn `lively`) */
   private sparkle(p: Platform3D, lively: boolean, t: number) {
-    // Lauflicht: zwei helle Voxel wandern in acht Stufen um die Mitte
-    const at = Math.floor(t * 6) % (FRAME_RING.length / 2);
+    // Lauflicht: vier helle Voxel wandern in Stufen um die Mitte
+    const at = Math.floor(t * 6) % (FRAME_RING.length / RUNNER);
     p.runner.forEach((m, i) => {
       m.visible = lively;
-      const [vx, vz] = FRAME_RING[at * 2 + i] ?? [0, 0];
+      const [vx, vz] = FRAME_RING[at * RUNNER + i] ?? [0, 0];
       m.position.set((vx + 0.5) / SUB - 1.5, SOCKET_TOP - RUNNER_H / 2 + 0.03, (vz + 0.5) / SUB - 1.5);
     });
     for (const spark of p.sparks) {
