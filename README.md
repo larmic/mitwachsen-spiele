@@ -103,6 +103,8 @@ Die Pipeline `.github/workflows/deploy.yml` läuft bei jedem Pull Request (auch 
 
 So laufen die Install-Skripte neuer Paketversionen nie mit einem Schreib-Token.
 
+Für den Notfall gibt es `.github/workflows/fast-deploy.yml` (Schnell-Deploy): Er startet nur von Hand über die GitHub-Oberfläche (Actions → „Schnell-Deploy ohne Guard-Gates“ → Run workflow, Branch `main`), baut `main` und veröffentlicht sofort, ohne Guard-Gates und ohne Browser-Tests. Die Rechte sind dieselben wie oben; auch hier laufen die Install-Skripte ohne Schreib-Token.
+
 In den GitHub-Pages-Einstellungen ist die Quelle „GitHub Actions“. Die Domain `www.mitwachsen-spiele.de` steht dort ebenfalls (Custom domain), eine `CNAME`-Datei braucht es dafür nicht, und Jekyll läuft bei diesem Weg nicht, also auch kein `.nojekyll`. Alle Actions sind auf Commit-SHAs gepinnt.
 
 Es gibt vorerst nur diese eine Stufe. Eine Teststufe ist für später geplant.
