@@ -331,7 +331,7 @@ class LarmicMitwachsen extends HTMLElement {
           return;
         }
         e.preventDefault();
-        if (e.repeat) return; // gehaltene Pfeile laufen über den eigenen Takt (poll im Bild), nicht über das System
+        if (e.repeat) return this.pace.repeat(dir); // gehalten: Takt im Bild (poll); hält auch ein falsches keyup aus
         this.sfx.unlock();
         const go = this.pace.press(dir, performance.now());
         if (go) this.apply({ type: 'move', dir: go });

@@ -122,6 +122,30 @@ describe('Ruhiger Takt der Eingabe', () => {
     expect(steps(bed, 100, 2000)).toEqual([]);
   });
 
+  it('ein falsches Loslassen kurz nach dem Druck (Chrome auf dem Mac): Die Wiederholungen halten den Pfeil, die Figur läuft weiter', () => {
+    // So aufgezeichnet: keydown 4942, keyup 4963 (Taste weiter gehalten), keydown repeat ab 5276, keyup 7027
+    const pace = new InputPace();
+    expect(pace.press('s', 4942)).toBe('s');
+    pace.release('s');
+    pace.repeat('s');
+    const times = steps(pace, 5276, 7027 - 5276);
+    expect(times[0]).toBeLessThanOrEqual(4942 + HOLD_MS + 16 + 5276 - 4942); // spätestens mit der ersten Wiederholung
+    expect(times.length).toBeGreaterThanOrEqual(5); // läuft durch bis zum echten Loslassen
+    pace.release('s');
+    expect(steps(pace, 7027, 1000)).toEqual([]);
+  });
+
+  it('nach clear (Bett, Fokus weg) bringen Wiederholungen den Pfeil nicht zurück, erst ein neuer Druck', () => {
+    const pace = new InputPace();
+    pace.press('s', 0);
+    pace.clear();
+    pace.repeat('s');
+    expect(steps(pace, 0, 2000)).toEqual([]);
+    expect(pace.press('s', 2000)).toBe('s');
+    pace.repeat('s');
+    expect(steps(pace, 2000, 1000).length).toBeGreaterThan(0);
+  });
+
   it('Aktionen zählen höchstens im eigenen Takt', () => {
     const pace = new InputPace();
     expect(pace.action(0)).toBe(true);

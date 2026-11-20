@@ -69,11 +69,13 @@ export class InputPace {
   private lastStep = -Infinity;
   private since = -Infinity; // wann der zuletzt gedrückte Pfeil gedrückt wurde
   private lastAction = -Infinity;
+  private fresh = false; // nach clear: Wiederholungen zählen erst nach einem neuen Druck wieder
 
   /** Pfeil gedrückt (keine Wiederholungen des Systems): liefert den Schritt, falls er sofort dran ist */
   press(dir: Dir, now: number): Dir | null {
     this.down = [...this.down.filter((d) => d !== dir), dir];
     this.since = now;
+    this.fresh = false;
     if (now - this.lastStep >= STEP_MS) {
       this.lastStep = now;
       this.pending = null;
@@ -85,6 +87,15 @@ export class InputPace {
 
   release(dir: Dir) {
     this.down = this.down.filter((d) => d !== dir);
+  }
+
+  /**
+   * Wiederholung des Systems: Der Pfeil ist noch gedrückt. Chrome auf dem Mac meldet manchmal kurz nach dem Druck ein
+   * Loslassen, obwohl die Taste weiter gehalten wird; dann nimmt die Wiederholung sie wieder auf (die Wartezeit zählt
+   * ab dem Druck). Nach `clear` (Bett, Fokus weg, Menü) nicht: Da braucht es einen neuen Druck.
+   */
+  repeat(dir: Dir) {
+    if (!this.fresh && !this.down.includes(dir)) this.down = [...this.down, dir];
   }
 
   /** In jedem Bild aufrufen: liefert den nächsten Schritt im Takt (gemerkter Tipp, sonst gehaltener Pfeil) */
@@ -122,5 +133,6 @@ export class InputPace {
   clear() {
     this.down = [];
     this.pending = null;
+    this.fresh = true;
   }
 }
