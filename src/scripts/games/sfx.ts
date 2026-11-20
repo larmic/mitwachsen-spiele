@@ -64,10 +64,10 @@ export class Sfx {
     osc.stop(t + len + 0.03);
   }
 
-  /** Ton eines Tiers */
-  play(tone: Tone) {
+  /** Ton eines Tiers, auf Wunsch etwas später (`delay` in Sekunden) */
+  play(tone: Tone, delay = 0) {
     tone.notes.forEach((f, i) =>
-      this.note(f, tone.len, tone.wave, tone.gain ?? 0.15, tone.slide, i * (tone.len + tone.gap)),
+      this.note(f, tone.len, tone.wave, tone.gain ?? 0.15, tone.slide, delay + i * (tone.len + tone.gap)),
     );
   }
 
@@ -84,8 +84,8 @@ export class Sfx {
   friend() {
     [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.note(f, 0.16, 'triangle', 0.1, 1, 0.25 + i * 0.08));
   }
-  home() {
-    [783.99, 1046.5].forEach((f, i) => this.note(f, 0.18, 'sine', 0.1, 1, i * 0.1));
+  home(delay = 0) {
+    [783.99, 1046.5].forEach((f, i) => this.note(f, 0.18, 'sine', 0.1, 1, delay + i * 0.1));
   }
   gate() {
     [392, 523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.note(f, 0.22, 'triangle', 0.1, 1, 0.3 + i * 0.11));

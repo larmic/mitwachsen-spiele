@@ -743,6 +743,43 @@ describe('Wiese ums Bett', () => {
     }
   });
 
+  it('kommt die Figur nah an die Wiese, ziehen alle folgenden Tiere zugleich ein, auch die hinteren, und laufen selbst hin', () => {
+    const w = meadowWorld(); // Wiese bis x = 0
+    const ids = ['lichtung:hase', 'lichtung:igel', 'lichtung:fuchs', 'lichtung:schaf', 'lichtung:kuh'];
+    let s = awake(
+      w,
+      5,
+      0,
+      ids.map((id, i) => animal(id, 6 + i, 0, { mode: 'follow' })),
+    );
+    s = { ...s, followers: ids, player: { ...s.player, dir: 'w' } };
+    let r = run(s, w, 'w'); // Figur auf x = 4: noch 4 Felder bis zur Wiese
+    expect(types(r.events)).not.toContain('home');
+    r = run(r.s, w, 'w'); // x = 3: noch 3 Felder
+    expect(types(r.events)).not.toContain('home');
+    r = run(r.s, w, 'w'); // x = 2: nah genug (`NEAR_MEADOW`), alle zugleich
+    expect(r.events.filter((e) => e.type === 'home').map((e) => e.type === 'home' && e.id)).toEqual(ids);
+    expect(r.s.followers).toEqual([]);
+    expect(r.s.garden.map((p) => p.id)).toEqual(ids);
+    expect(r.s.animals.every((a) => !w.cell(a.x, a.y).garden)).toBe(true); // noch stehen alle draußen
+    s = { ...r.s, player: { ...r.s.player, x: 3, y: 4 } }; // Figur geht zur Seite
+    for (let i = 0; i < 300; i++) s = run(s, w, TICK).s;
+    for (const a of s.animals) expect(w.cell(a.x, a.y).garden, a.id).toBe(true);
+  });
+
+  it('nah an der Wiese bleiben Tiere einer anderen Gegend in der Kette', () => {
+    const w = meadowWorld();
+    const ids = ['lichtung:hase', 'eis:pinguin'];
+    let s = awake(w, 3, 0, [
+      animal(ids[0]!, 4, 0, { mode: 'follow' }),
+      animal(ids[1]!, 5, 0, { mode: 'follow', realm: 'eis', home: { kind: 'region', region: 'eis' } }),
+    ]);
+    s = { ...s, followers: ids, player: { ...s.player, dir: 'w' } };
+    const r = run(s, w, 'w');
+    expect(r.events.filter((e) => e.type === 'home').map((e) => e.type === 'home' && e.id)).toEqual(['lichtung:hase']);
+    expect(r.s.followers).toEqual(['eis:pinguin']);
+  });
+
   it('jedes Tier bekommt einen eigenen Platz auf der Wiese', () => {
     const w = meadowWorld();
     const ids = ['lichtung:hase', 'lichtung:igel', 'lichtung:fuchs'];
@@ -1000,12 +1037,26 @@ describe('Spielstand', () => {
   });
 });
 
+/**
+ * Tiere der Wiese verlassen sie nie: Wer eingezogen ist, als die Figur nah an der Wiese war, steht noch kurz draußen
+ * und läuft hin; ist es einmal auf der Wiese (`settled`), bleibt es dort.
+ */
+function stayOnMeadow(world: World, s: State, settled: Set<string>) {
+  for (const a of s.animals) {
+    if (a.mode !== 'home') continue;
+    const on = world.cell(a.x, a.y).garden === true;
+    if (settled.has(a.id)) expect(on, a.id).toBe(true);
+    else if (on) settled.add(a.id);
+  }
+}
+
 describe('Invarianten bei wildem Drücken', () => {
   const DIRS: Dir[] = ['n', 's', 'e', 'w'];
   for (const seed of [1, 2, 3]) {
     it(`Seed ${seed}: Figur steht immer begehbar, nie zwei auf einem Feld, Tiere der Wiese bleiben drauf, alles wiederholbar`, () => {
       const world = createWorld(seed);
       const play = () => {
+        const settled = new Set<string>();
         let s = initialState(world, {}, seed);
         let r = seed * 7919;
         for (let i = 0; i < 4000; i++) {
@@ -1017,7 +1068,7 @@ describe('Invarianten bei wildem Drücken', () => {
           const spots = s.animals.map((a) => `${a.x},${a.y}`);
           if (!s.sleeping) spots.push(`${s.player.x},${s.player.y}`);
           expect(new Set(spots).size).toBe(spots.length);
-          for (const a of s.animals) if (a.mode === 'home') expect(world.cell(a.x, a.y).garden).toBe(true);
+          stayOnMeadow(world, s, settled);
           expect(new Set(s.followers).size).toBe(s.followers.length);
         }
         return s;
@@ -1032,6 +1083,7 @@ describe('Invarianten bei wildem Drücken', () => {
       const world = createWorld(seed);
       const [bx, by] = world.homes.eis.bed;
       const play = () => {
+        const settled = new Set<string>();
         let s: State = { ...initialState(world, { openGates: ['eis'] }, seed), player: { x: bx, y: by, dir: 's' } };
         let r = seed * 104729;
         for (let i = 0; i < 4000; i++) {
@@ -1048,7 +1100,7 @@ describe('Invarianten bei wildem Drücken', () => {
           const spots = s.animals.map((a) => `${a.x},${a.y}`);
           if (!s.sleeping) spots.push(`${s.player.x},${s.player.y}`);
           expect(new Set(spots).size).toBe(spots.length);
-          for (const a of s.animals) if (a.mode === 'home') expect(world.cell(a.x, a.y).garden).toBe(true);
+          stayOnMeadow(world, s, settled);
           expect(new Set(s.followers).size).toBe(s.followers.length);
         }
         return s;
@@ -1598,6 +1650,7 @@ describe('Invarianten bei wildem Drücken durchs offene Eistor', () => {
       const bay: [number, number] = [gate.mid[0] - gate.out[0] * 6, gate.mid[1] - gate.out[1] * 6];
       const snow = crossings(world)[0]!.seats.get('eis')!.at(-1)!; // im Kessel, nah an der Mündung, weit vom Bett
       const play = () => {
+        const settled = new Set<string>();
         const s0 = initialState(world, {}, seed);
         // Kette: vier Tiere der Lichtung und vier Eis-Tiere, dicht hinter der Figur in der Bucht
         const herd = [
@@ -1641,8 +1694,8 @@ describe('Invarianten bei wildem Drücken durchs offene Eistor', () => {
           if (!s.sleeping) spots.push(`${s.player.x},${s.player.y}`);
           expect(new Set(spots).size).toBe(spots.length);
           expect(new Set(s.followers).size).toBe(s.followers.length);
+          stayOnMeadow(world, s, settled);
           for (const a of s.animals) {
-            if (a.mode === 'home') expect(world.cell(a.x, a.y).garden).toBe(true);
             if (a.realm === 'eis' && a.mode !== 'follow') expect(world.realm(a.x, a.y), a.id).toBe('eis');
             if (a.mode !== 'wait') continue;
             // Wartende: auf der eigenen Seite, nie im Durchgang (jedes auf eigenem Feld, siehe oben)

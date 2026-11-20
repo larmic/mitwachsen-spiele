@@ -24,6 +24,7 @@ import { landed, wakePortals, type PortalEvent } from './mitwachsen-travel';
 import type { PortalId } from '../../data/games/mitwachsen-portals';
 import { sheltering } from './mitwachsen-weather';
 import { PENGUIN, atHome, meadowSpots, shelterPlaces, slipPast, windOk, type Home } from './mitwachsen-meadow';
+import { comesHome, homeward, ownSpot, walkHome } from './mitwachsen-arrive';
 import { dirTo, freeNear, occupied } from './mitwachsen-free';
 import { crossBorder, type BorderEvent, type Mode } from './mitwachsen-border';
 import { lost, type GuideEvent, type GuideRules } from './mitwachsen-guide';
@@ -310,6 +311,8 @@ function tick(s: State, world: World, events: GameEvent[]) {
       a.dir = pick(ALL_DIRS, random(s));
       continue;
     }
+    // Ein Tier der Wiese, das noch draußen steht (eingezogen, als die Figur nah an der Wiese war), findet selbst hin
+    if (walkHome(s, world, a, goal)) continue;
     // Außerhalb des Zuhauses (nach einem Platztausch) zieht es heim, sonst läuft es zufällig
     const away = !atHome(world, a.home, a.x, a.y);
     // zielstrebig heim (außerhalb des Zuhauses) oder zum eigenen Platz auf der Wiese, sonst zufällig
@@ -318,7 +321,7 @@ function tick(s: State, world: World, events: GameEvent[]) {
         ? [...ALL_DIRS].sort((p, q) => dist(a, p, goal) - dist(a, q, goal))
         : [pick(ALL_DIRS, random(s))];
     // Im Iglu schlüpft ein Tier an den schon Sitzenden vorbei zu seinem Platz, sonst blieben die hinteren Plätze zu
-    if (spot && order[0] && slipPast(s, world, a, order[0], places)) continue;
+    if (spot && slipPast(s, world, a, order[0], places)) continue;
     for (const d of order) {
       const [dx, dy] = DIRS[d];
       const tx = a.x + dx,
@@ -348,7 +351,8 @@ function meetAnimal(s: State, world: World, animal: Animal, dir: Dir, events: Ga
     events.push({ type: 'aside', id: animal.id, species: animal.species });
     return false; // die Figur geht auf das frei gewordene Feld
   }
-  if (climbable && (animal.mode === 'follow' || atHome(world, animal.home, p.x, p.y))) {
+  // Tauschen: ein folgendes Tier, eines auf dem Weg zur Wiese oder eines, das auf dem Feld der Figur zu Hause ist
+  if (climbable && (animal.mode === 'follow' || homeward(world, animal) || atHome(world, animal.home, p.x, p.y))) {
     const [dx, dy] = DIRS[dir];
     [animal.x, animal.y] = [p.x, p.y];
     animal.dir = dirTo(-dx, -dy);
@@ -432,32 +436,22 @@ function move(s: State, world: World, dir: Dir, events: GameEvent[]) {
 }
 
 /**
- * Wer als folgendes Tier die Wiese ums Bett seiner Gegend betritt, ist zu Hause: Es löst sich aus der Kette, singt,
- * bekommt einen eigenen Platz auf der Wiese (dorthin läuft es von selbst) und bleibt für immer dort. Auf der Wiese
- * einer anderen Gegend zieht es nicht ein.
+ * Zu Hause: Kommt die Figur nah an die Wiese ums Bett einer Gegend, lösen sich alle folgenden Tiere dieser Gegend
+ * zugleich aus der Kette, auch die hinteren; ebenso ein folgendes Tier, das selbst die Wiese seiner Gegend betritt
+ * (`comesHome`). Jedes singt, bekommt einen eigenen Platz auf der Wiese, läuft von selbst dorthin und bleibt für immer
+ * dort. Auf der Wiese einer anderen Gegend zieht es nicht ein.
  */
 function bringHome(s: State, world: World, events: GameEvent[]) {
   for (const id of [...s.followers]) {
     const a = s.animals.find((x) => x.id === id)!;
-    if (!world.cell(a.x, a.y).garden || world.realm(a.x, a.y) !== a.realm) continue;
+    if (!comesHome(world, a, s.player)) continue;
     a.mode = 'home';
     a.home = { kind: 'garden' };
     a.rest = 2;
     s.followers = s.followers.filter((f) => f !== id);
     if (!s.garden.some((x) => x.id === id)) s.garden.push({ id, species: a.species });
     if (id === PENGUIN) s.calm = s.day; // heute bleibt es windstill
-    // Eigener Platz: ein Platz der Wiese, den noch kein anderes Tier als Platz hat
-    const spots = meadowSpots(world, a.realm);
-    const taken = new Set(
-      s.animals.filter((o) => o.mode === 'home' && o !== a).map((o) => `${o.spawn[0]},${o.spawn[1]}`),
-    );
-    const start = Math.floor(random(s) * spots.length);
-    for (let k = 0; k < spots.length; k++) {
-      const spot = cycle(spots, start + k);
-      if (taken.has(`${spot[0]},${spot[1]}`)) continue;
-      a.spawn = spot;
-      break;
-    }
+    ownSpot(world, s.animals, a, random(s)); // ein Platz der Wiese, den noch kein anderes Tier hat
     events.push({ type: 'home', id, species: a.species });
   }
 }

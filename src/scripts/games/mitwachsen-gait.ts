@@ -7,6 +7,7 @@ import { FISH_EATERS } from '../../data/games/mitwachsen-eis';
 
 const SING_MS = 320; // so lange dauert der Hüpfer beim Singen
 const SNAP_MS = 180; // so lange dauert der Schnapp-Hüpfer eines Fischfressers
+export const HOME_STAGGER = 250; // ziehen mehrere Tiere zugleich ein, ruft und hüpft jedes so viele ms nach dem vorigen
 export const SNAP_DELAY = 300; // ms nach dem Hüpfer beim Füttern mit Fisch: Dann schnappen die Fischfresser zu
 
 /** Schnappt dieses Wesen nach Fisch (ein Fischfresser der Eis-Welt)? */
@@ -24,12 +25,12 @@ const STRIDE: Record<Gait | 'schritt', (m: number) => number> = {
 
 /**
  * Höhe des Hüpfers eines Wesens (Kennung `id`, die Figur heißt 'player'): Gangart seiner Art über den Schritt
- * (`moving`, 0 … 1), dazu der Hüpfer beim Singen (`sung` ms her) und der kurze Schnapp-Hüpfer nach Fisch (`snapped` ms
+ * (`moving`, 0 … 1), dazu der Hüpfer beim Singen (`sung` ms her; vor dem Zeitpunkt nichts) und der kurze Schnapp-Hüpfer nach Fisch (`snapped` ms
  * her; vor dem Zeitpunkt nichts).
  */
 export function hopOf(id: string, moving: number, sung: number, snapped = Infinity): number {
   const species = speciesOf(id);
   const stride = STRIDE[(species && SPECIES[species].gait) || 'schritt'];
   const snap = snapped >= 0 && snapped < SNAP_MS ? Math.sin((snapped / SNAP_MS) * Math.PI) * 0.16 : 0;
-  return stride(moving) + (sung < SING_MS ? Math.sin((sung / SING_MS) * Math.PI) * 0.3 : 0) + snap;
+  return stride(moving) + (sung >= 0 && sung < SING_MS ? Math.sin((sung / SING_MS) * Math.PI) * 0.3 : 0) + snap;
 }

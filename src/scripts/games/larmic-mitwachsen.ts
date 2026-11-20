@@ -34,7 +34,7 @@ import type { ChoreEvent } from './mitwachsen-chores';
 import { createWorld, standHeight, type World } from './mitwachsen-world';
 import { pending, type GuideRules } from './mitwachsen-guide';
 import { platformLift, portalColor } from './mitwachsen-portal';
-import { SNAP_DELAY, hopOf, snaps } from './mitwachsen-gait';
+import { HOME_STAGGER, SNAP_DELAY, hopOf, snaps } from './mitwachsen-gait';
 import { windAt } from './mitwachsen-weather';
 import { Air, postures, stepSound } from './mitwachsen-air';
 import { idlePose, type Pose } from './mitwachsen-tired';
@@ -453,6 +453,7 @@ class LarmicMitwachsen extends HTMLElement {
   private react(events: GameEvent[]) {
     const now = performance.now();
     let persist = false;
+    let homes = 0; // Tiere, die in diesem Zug einziehen
     // Begegnung (Tier gefunden oder getroffen, Beeren, Fische, Füttern, Portal): Die Figur bleibt stehen, bis der Pfeil
     // neu gedrückt wird. Sonst liefe sie mit gehaltenem Pfeil gleich weiter und tauschte den Platz mit dem neuen Tier.
     if (events.some((e) => ENCOUNTERS.has(e.type))) this.pace.clear();
@@ -496,11 +497,9 @@ class LarmicMitwachsen extends HTMLElement {
           this.hops.set('player', now);
           break;
         case 'home':
-          // Zu Hause angekommen: Das Tier ruft seinen eigenen Ton, dazu ein heller Klang und ein Herz
-          this.sfx.play(SPECIES[e.species].tone);
-          this.sfx.home();
-          this.hops.set(e.id, now);
-          this.float('heart', e.id, GAME_COLORS.heart, now + 150);
+          // Zu Hause angekommen: Das Tier ruft seinen eigenen Ton, dazu ein heller Klang und ein Herz. Ziehen mehrere
+          // zugleich ein, rufen sie kurz nacheinander, damit man jedes hört
+          this.cheer(e, now, HOME_STAGGER * homes++);
           this.burst(e.id, SPARKS[realmOfAnimal(e.id)], 14); // in der Eis-Welt eine Funkenwolke in Eisblau
           persist = true;
           break;
@@ -546,14 +545,16 @@ class LarmicMitwachsen extends HTMLElement {
    * Ein Tier ruft kurz mit seinem Ton und hüpft: Ein Tier der Wiese hüpft zur Seite (die Figur geht weiter, ohne
    * anzuhalten). An der Weltgrenze setzt sich ein Tier mit Herz auf seinen Warteplatz bzw. hüpft vor Freude und reiht
    * sich wieder ein. Der verlaufene Pinguin taucht in einer kleinen Schneewolke auf und piept; bei der Figur angekommen,
-   * zeigt er ein Herz. Geht das Eistor auf, rutscht er durch den Gang, dreht sich um, hüpft und zeigt ein Herz.
+   * zeigt er ein Herz. Geht das Eistor auf, rutscht er durch den Gang, dreht sich um, hüpft und zeigt ein Herz. Zu
+   * Hause angekommen klingt dazu ein heller Klang; `later` ms später, wenn mehrere zugleich einziehen.
    */
-  private cheer(e: GameEvent & { id: string; species: keyof typeof SPECIES }, now: number) {
+  private cheer(e: GameEvent & { id: string; species: keyof typeof SPECIES }, now: number, later = 0) {
     if (e.type === 'guide') this.burst(e.id, SPARKS.snow, 14, { x: e.x, y: e.y, z: this.world.cell(e.x, e.y).h });
-    this.sfx.play(SPECIES[e.species].tone);
-    this.hops.set(e.id, now);
+    this.sfx.play(SPECIES[e.species].tone, later / 1000);
+    if (e.type === 'home') this.sfx.home(later / 1000);
+    this.hops.set(e.id, now + later);
     if (e.type === 'guide' || e.type === 'peep' || e.type === 'aside') return;
-    this.float('heart', e.id, GAME_COLORS.heart, now + 150);
+    this.float('heart', e.id, GAME_COLORS.heart, now + later + 150);
     if (e.type !== 'arrive') this.hops.set(`seat:${e.id}`, now); // gleitet zum Warteplatz, in die Kette, durch den Gang
   }
 

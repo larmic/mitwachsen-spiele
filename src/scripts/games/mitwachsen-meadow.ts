@@ -24,7 +24,7 @@ export const windOk = (s: { garden: readonly { id: string }[]; day: number; calm
 
 /** Felder an Durchgängen (Tore, Rosenbogen): Dort bleibt kein Tier stehen, sonst versperrt es den Weg */
 const passageCache = new WeakMap<World, Set<string>>();
-function passages(world: World): Set<string> {
+export function passages(world: World): Set<string> {
   let set = passageCache.get(world);
   if (!set) {
     set = new Set([
@@ -111,16 +111,17 @@ type Walker = { id: string; x: number; y: number; dir: Dir; realm: RegionId };
 
 /**
  * Pustewind (Unterstand mit `huddle`, das Iglu): Sitzt auf dem nächsten Feld zum eigenen Platz schon ein Tier auf
- * seinem Platz, tauschen beide; das andere rückt gleich wieder an seinen Platz. Liefert true, wenn getauscht wurde.
+ * seinem Platz, tauschen beide; das andere rückt gleich wieder an seinen Platz. Liefert true, wenn getauscht wurde
+ * (ohne Richtung `d` nie).
  */
 export function slipPast(
   s: { openGates: readonly GateId[]; animals: Walker[] },
   world: World,
   a: Walker,
-  d: Dir,
+  d: Dir | undefined,
   places: Map<string, [number, number]>,
 ): boolean {
-  if (!world.homes[a.realm].huddle) return false;
+  if (!d || !world.homes[a.realm].huddle) return false;
   const [tx, ty] = [a.x + DIRS[d][0], a.y + DIRS[d][1]];
   const other = s.animals.find((o) => o.x === tx && o.y === ty);
   const its = other && places.get(other.id);
