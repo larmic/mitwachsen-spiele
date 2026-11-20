@@ -238,7 +238,7 @@ class LarmicMitwachsen extends HTMLElement {
     this.lastInput = performance.now(); // nach Menü, Hinweis oder Tab-Wechsel: frisch, die Figur steht
     if (this.timer === undefined && !this.paused() && document.visibilityState === 'visible')
       this.timer = window.setInterval(() => this.apply({ type: 'tick' }), TICK_MS);
-    if (!this.raf) this.raf = requestAnimationFrame((t) => this.frame(t));
+    if (!this.raf) this.raf = requestAnimationFrame(() => this.frame(performance.now()));
   }
 
   private stop() {
@@ -684,7 +684,9 @@ class LarmicMitwachsen extends HTMLElement {
   }
 
   private frame(t: number) {
-    this.raf = requestAnimationFrame((n) => this.frame(n));
+    // Eine Uhr für alles: Tasten, Ereignisse und Bild laufen über performance.now(). Die Bildzeit von rAF kann auf dem
+    // Mac weit davon abweichen (z. B. nach dem Ruhezustand); dann lief ein gehaltener Pfeil nie weiter.
+    this.raf = requestAnimationFrame(() => this.frame(performance.now()));
     const dt = Math.min(0.05, (t - (this.lastFrame || t)) / 1000);
     this.lastFrame = t;
     if (!this.size.w) this.measure();
