@@ -47,6 +47,14 @@ export const ENCOUNTERS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['typ
   'hop',
 ]);
 
+/**
+ * Hält dieser Zug die Figur an (Begegnung)? Nicht, wenn nur das führende Tier singt: Der Pinguin, der zum Tor führt,
+ * hüpft dabei voraus oder tauscht den Platz, er blockiert nie (docs/specs/mitwachsen.md, „Der Pinguin holt dich ab“).
+ */
+export function stops(events: readonly GameEvent[], leader?: string): boolean {
+  return events.some((e) => ENCOUNTERS.has(e.type) && !(e.type === 'sing' && e.id === leader));
+}
+
 export class InputPace {
   private down: Dir[] = []; // gehaltene Pfeile, zuletzt gedrückter hinten
   private pending: Dir | null = null;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Dir } from '../../lib/games/front';
-import { ACTION_MS, ENCOUNTERS, HOLD_MS, InputPace, STEP_MS } from './input-pace';
+import { ACTION_MS, ENCOUNTERS, HOLD_MS, InputPace, STEP_MS, stops } from './input-pace';
 
 /** Simuliert `ms` Millisekunden mit einem Bild alle 16 ms und zählt die Schritte */
 function steps(pace: InputPace, from: number, ms: number, taps: number[] = [], dir: Dir = 'e') {
@@ -95,6 +95,14 @@ describe('Ruhiger Takt der Eingabe', () => {
     // Laufen, Anstoßen, Platz machen, Heimkommen und Nachwachsen halten nicht an
     for (const type of ['step', 'bump', 'swap', 'aside', 'home', 'regrow', 'ready'] as const)
       expect(ENCOUNTERS.has(type), type).toBe(false);
+  });
+
+  it('der führende Pinguin hält nicht an, wenn die Figur in ihn läuft; jedes andere Tier schon', () => {
+    const sing = (id: string) => ({ type: 'sing', id, species: 'pinguin', first: false }) as const;
+    expect(stops([{ type: 'step', climb: 0 }, sing('eis:pinguin')], 'eis:pinguin')).toBe(false);
+    expect(stops([sing('eis:pinguin')])).toBe(true); // führt nicht (wohnt schon im Kessel): Begegnung wie jedes Tier
+    expect(stops([sing('eis:robbe')], 'eis:pinguin')).toBe(true);
+    expect(stops([sing('eis:pinguin'), { type: 'portal', id: 'eiskessel' }], 'eis:pinguin')).toBe(true);
   });
 
   it('Aktionen zählen höchstens im eigenen Takt', () => {

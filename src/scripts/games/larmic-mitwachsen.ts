@@ -26,7 +26,7 @@ import {
   type SavedWorld,
   type Store,
 } from './mitwachsen-save';
-import { ENCOUNTERS, FREE_KEYS, InputPace, KEYS, STEP_MS } from './input-pace';
+import { FREE_KEYS, InputPace, KEYS, STEP_MS, stops } from './input-pace';
 import { drawMap } from './mitwachsen-map';
 import { Fog, REVEAL, START_REVEAL } from './mitwachsen-fog';
 import { initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
@@ -455,7 +455,7 @@ class LarmicMitwachsen extends HTMLElement {
     let homes = 0; // Tiere, die in diesem Zug einziehen
     // Begegnung (Tier gefunden oder getroffen, Beeren, Fische, Füttern, Portal): Die Figur bleibt stehen, bis der Pfeil
     // neu gedrückt wird. Sonst liefe sie mit gehaltenem Pfeil gleich weiter und tauschte den Platz mit dem neuen Tier.
-    if (events.some((e) => ENCOUNTERS.has(e.type))) this.pace.clear();
+    if (stops(events, this.state.animals.find((a) => a.mode === 'lead')?.id)) this.pace.clear();
     for (const e of events) {
       switch (e.type) {
         case 'step':
