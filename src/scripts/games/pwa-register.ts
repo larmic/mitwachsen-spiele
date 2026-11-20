@@ -4,9 +4,10 @@
 // weil manche Browser dort nachfragen würden.
 //
 // Neue Versionen: Eine installierte App wird meist nur angehalten und beim Tipp aufs Symbol fortgesetzt, ohne neu zu
-// laden – eine wartende Version käme so wochenlang nicht an. Darum übernimmt die Seite sie selbst, aber nur an zwei
-// sicheren Stellen (Entscheidungen rein und getestet in pwa-update.ts): nach dem Gute-Nacht-Ritual im Bett und beim
-// Zurückkommen nach langer Pause, wenn das Spiel dann schläft oder noch nicht begonnen hat. Dann fragt sie nach einer
+// laden – eine wartende Version käme so wochenlang nicht an. Darum übernimmt die Seite sie selbst, aber nur an drei
+// sicheren Stellen (Entscheidungen rein und getestet in pwa-update.ts): nach dem Gute-Nacht-Ritual im Bett, beim
+// Zurückkommen nach langer Pause und nach einem Neuladen von Hand, wenn das Spiel dann schläft oder noch nicht begonnen
+// hat. Dann fragt sie nach einer
 // neuen Version, bittet eine wartende um skipWaiting und lädt einmal neu, sobald diese die Seite übernimmt – aber nur,
 // wenn der Moment dann noch sicher ist (das Kind kann die Figur dazwischen wecken); sonst erst beim nächsten Auslöser
 // in einem sicheren Moment. Das Spiel kommt danach im selben Zustand zurück (Nacht, Figur im Bett). Mitten im Spiel
@@ -18,6 +19,7 @@ import {
   SLEEP_EVENT,
   longPause,
   registrationOptions,
+  reloaded,
   safeMoment,
   shouldApply,
   shouldReload,
@@ -115,6 +117,9 @@ function watchUpdates(reg: ServiceWorkerRegistration) {
       hiddenAt = 0;
     }
   });
+  // 3. Neu geladen (Cmd+R, Strg+R, F5): sonst behielte die offene Seite die alte Version
+  const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+  if (reloaded(navigation?.type)) trigger();
 }
 
 export function registerServiceWorker() {

@@ -6,6 +6,7 @@ import {
   RITUAL_MS,
   longPause,
   registrationOptions,
+  reloaded,
   safeMoment,
   shouldApply,
   shouldReload,
@@ -50,6 +51,13 @@ describe('App-Update: sicherer Moment', () => {
     expect(safeMoment({ ...asleep, persistent: false })).toBe(false);
     expect(safeMoment({ ...asleep, fullscreen: true })).toBe(false);
     expect(safeMoment({ ...asleep, visible: false })).toBe(false);
+  });
+});
+
+describe('App-Update: neu geladen', () => {
+  it('zählt nur ein Neuladen (Cmd+R, Strg+R, F5), kein normales Öffnen, Zurück oder Vorspulen', () => {
+    expect(reloaded('reload')).toBe(true);
+    for (const type of ['navigate', 'back_forward', 'prerender', undefined]) expect(reloaded(type)).toBe(false);
   });
 });
 

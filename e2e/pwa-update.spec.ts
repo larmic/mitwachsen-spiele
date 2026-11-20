@@ -237,6 +237,26 @@ test('App-Update: zurück nach langer Pause, das Spiel schläft noch – die neu
   expect(errors).toEqual([]);
 });
 
+test('App-Update: neu laden von Hand (Cmd+R, Strg+R, F5) bringt die wartende Fassung, das Spiel schläft', async ({
+  page,
+  context,
+}) => {
+  const v2 = version('2');
+  const errors = watchErrors(page);
+  const { sleeping, loads } = await openGame(page);
+  await page.keyboard.press('ArrowDown'); // gespielt …
+  await expect.poll(sleeping).toBe(false);
+  await goLive(context);
+  await askForUpdate(page);
+  await expect.poll(() => registration(page)).toEqual({ waiting: 'installed', active: 'activated' });
+  await page.reload(); // … dann von Hand neu geladen: Die Seite übernimmt die wartende Fassung und lädt einmal neu
+  await expect.poll(loads, { timeout: 30_000 }).toBe(2);
+  await expect.poll(() => registration(page)).toEqual({ waiting: null, active: 'activated' });
+  await expect.poll(() => cacheNames(page)).toEqual([v2.cache]);
+  expect(await sleeping()).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('App-Update: mitten im Spiel wird nie neu geladen, die neue Fassung wartet', async ({ page, context }) => {
   const errors = watchErrors(page);
   const { sleeping, loads } = await openGame(page);

@@ -1,10 +1,12 @@
 // Neue Version der App an sicheren Stellen übernehmen – rein, ohne DOM und ohne Uhr, damit testbar.
 // Installierte Apps (iPad, Android) werden meist nur angehalten, nicht beendet: Ein Tipp aufs Symbol setzt sie fort,
 // ohne neu zu laden. Der Browser prüft dann weder auf eine neue Version, noch wird eine wartende aktiv. Darum übernimmt
-// das Spiel eine wartende Version selbst, aber nur an zwei sicheren Stellen:
+// das Spiel eine wartende Version selbst, aber nur an drei sicheren Stellen:
 // 1. Gute Nacht: Die Figur ist ins Bett gegangen, das Schlaflied ist verklungen, der Spielstand gespeichert.
 // 2. Zurück nach langer Pause (Seite lange verborgen), wenn das Spiel dann schläft oder noch nicht begonnen hat
 //    (Hinweis für Eltern beim allerersten Öffnen).
+// 3. Neu geladen (Cmd+R, Strg+R, F5): Eltern wollen die neue Fassung; ein normales Neuladen hält die alte, solange die
+//    Seite offen ist. Nach dem Laden schläft das Spiel ohnehin, der Moment ist sicher.
 // Nach einem Auslöser bleibt ein kurzes Fenster offen, damit eine Version, die erst jetzt geladen wird, noch zählt.
 // Mitten im Spiel wird nie neu geladen. Spezifikation: docs/specs/mitwachsen.md („App“).
 
@@ -36,6 +38,9 @@ export function safeMoment(m: Moment): boolean {
   if (m.infoOpen) return m.firstInfo;
   return m.sleeping && m.sleepingFor >= RITUAL_MS;
 }
+
+/** Wurde die Seite neu geladen? (Art der Navigation, `PerformanceNavigationTiming.type`) */
+export const reloaded = (navigation: string | undefined): boolean => navigation === 'reload';
 
 /** War die Seite lange genug verborgen? (`hiddenAt` 0: war sie nicht) */
 export const longPause = (hiddenAt: number, now: number): boolean => hiddenAt > 0 && now - hiddenAt >= LONG_PAUSE;
