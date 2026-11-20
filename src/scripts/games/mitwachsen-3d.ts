@@ -56,6 +56,7 @@ import type { Scene } from './mitwachsen-render';
 import type { State } from './mitwachsen-state';
 import type { Cell, TreeKind, World } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
+import { turnHead } from './mitwachsen-air';
 
 export const PITCH = (55 * Math.PI) / 180; // Neigung der Kamera: 90° wäre senkrecht von oben
 /** Beeren am Busch: [x, Höhe, z] im Feld; oben auf der Kuppe und an der Vorderseite (zur Kamera) */
@@ -936,7 +937,7 @@ export class World3D {
         this.bodies.set(id, m);
       }
       m.geometry = geo;
-      m.scale.setScalar(scale);
+      m.scale.setScalar(scale * (b.puff ?? 1)); // Haltung im Iglu: aufgeplustert oder eingerollt
       m.position.set(b.x + 0.5, b.z + b.hop, b.y + 0.5);
       m.rotation.y = YAW[dir];
     };
@@ -945,9 +946,9 @@ export class World3D {
       const book = sc.pose !== 'stand';
       const doze = sc.pose === 'doze';
       const turning = sc.pose === 'read' && !sc.reduced && sc.now % 5000 < 450; // alle paar Sekunden umblättern
-      const key = `player${state.basket ? '-basket' : ''}${state.bucket ? '-bucket' : ''}${state.fish ? '-fish' : ''}${book ? '-book' : ''}${turning ? '-turn' : ''}${doze ? '-doze' : ''}`;
+      const key = `player${state.basket ? '-basket' : ''}${state.bucket ? '-bucket' : ''}${state.fish ? '-fish' : ''}${book ? '-book' : ''}${turning ? '-turn' : ''}${doze ? '-doze' : ''}${sc.glance ? '-glance' : ''}`;
       const parts = [
-        ...figureParts(this.look),
+        ...(sc.glance ? turnHead(figureParts(this.look)) : figureParts(this.look)), // Kopf kurz in die Böe gedreht
         ...(state.basket ? BASKET_PARTS : []),
         ...(state.bucket ? BUCKET_PARTS : []),
         ...(state.fish ? FISH_PARTS : []),

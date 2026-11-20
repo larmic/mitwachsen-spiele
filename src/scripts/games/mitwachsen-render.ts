@@ -55,9 +55,11 @@ import { cycle, hash } from '../../lib/games/rng';
 import type { Cell, TreeKind, World } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
 import { drawPlatform } from './mitwachsen-platform-2d';
+import { moodLife } from './mitwachsen-sky';
+import { turnHead } from './mitwachsen-air';
 
 /** Gleitende Position eines Wesens auf dem Bildschirm (in Feldern), dazu Hüpfer und Blickrichtung */
-export type Body = { x: number; y: number; z: number; hop: number };
+export type Body = { x: number; y: number; z: number; hop: number; puff?: number }; // puff: Haltung im Iglu (Größe)
 export type Float = { kind: 'note' | 'heart' | 'zzz'; x: number; y: number; z: number; age: number; color: string };
 export type Particle = { x: number; y: number; vx: number; vy: number; life: number; color: string; size: number };
 
@@ -70,7 +72,9 @@ export type Scene = {
   gates: Map<GateId, number>; // Öffnung 0…1 je Tor
   night: number; // 0 Tag … 1 Nacht
   evening: number; // 0 Tag … 1 goldener Abend (die Figur wird müde)
-  weather: WeatherLook; // Wolken, Regen, Regenbogen (je 0 … 1)
+  weather: WeatherLook; // Wolken, Regen, Regenbogen, Schnee, Pustewind, Böe, Glitzerluft (je 0 … 1)
+  aurora: number; // nachts im Schneebett: Polarlicht (0 … 1)
+  glance: boolean; // die Figur dreht bei einer Böe kurz den Kopf zur Seite
   pose: Pose; // was die wache Figur tut, wenn niemand spielt (lesen, einnicken)
   mood: Climate; // Stimmung dort, wo die Figur steht (Richtung des nächsten Tors, Stärke)
   wind: number; // 0 still … 1 windig (Gras wiegt sich, Blätter fliegen)
@@ -101,7 +105,7 @@ const FLAT_GROUND: Partial<Record<Cell['ground'], readonly [string, string]>> = 
  * Buch, wenn niemand spielt
  */
 const figure = (state: State, sc: Scene) => [
-  ...figureParts(sc.look),
+  ...(sc.glance ? turnHead(figureParts(sc.look)) : figureParts(sc.look)),
   ...(state.basket ? BASKET_PARTS : []),
   ...(state.bucket ? BUCKET_PARTS : []),
   ...(state.fish ? FISH_PARTS : []),
@@ -137,6 +141,7 @@ function sprite(ctx: CanvasRenderingContext2D, grid: string[], color: string, cx
 export class Renderer {
   /** Eis-Quader des Bilds (Iglu, Eisschale, Trog): jeder kommt in der Reihe seiner Vorderkante dran */
   private later: IceBox[] = [];
+  private ice: typeof import('./mitwachsen-ice-sky') | Promise<unknown> | null = null;
   private blocks: Record<'grass' | 'dirt' | 'stone' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
 
   constructor(private readonly ctx: CanvasRenderingContext2D) {
@@ -189,8 +194,9 @@ export class Renderer {
         const a = byId.get(id);
         if (!a || !sc.explored(Math.round(b.x), Math.round(b.y))) continue; // Tiere im Nebel bleiben verborgen
         const sp = SPECIES[a.species];
-        this.shadow(P, b.x + 0.5, b.y + 0.5, b.z, 0.26 * sp.scale);
-        drawModel(ctx, P, sp.parts, b.x + 0.5, b.y + 0.5, b.z + b.hop, a.dir, sp.scale);
+        const scale = sp.scale * (b.puff ?? 1);
+        this.shadow(P, b.x + 0.5, b.y + 0.5, b.z, 0.26 * scale);
+        drawModel(ctx, P, sp.parts, b.x + 0.5, b.y + 0.5, b.z + b.hop, a.dir, scale);
       }
     }
 
@@ -217,6 +223,8 @@ export class Renderer {
     const followers = new Set(state.followers);
     if (sc.evening > 0) this.eveningGlow(sc);
     this.weather(sc);
+    const ice = this.iceSky(world, state); // Wetter der Eis-Welt, nur im Kessel geladen
+    ice?.iceWeather(ctx, world, sc, P);
     for (const a of state.animals) {
       const b = sc.bodies.get(a.id);
       if (!b || !sc.explored(Math.round(b.x), Math.round(b.y))) continue; // im Nebel nichts verraten
@@ -237,10 +245,19 @@ export class Renderer {
       }
     }
     this.effects(P, sc);
-    this.moodLife(sc);
+    moodLife(ctx, sc);
     if (sc.night > 0) this.nightSky(sc);
+    if (sc.aurora > 0) ice?.aurora(ctx, sc);
     this.life(sc);
     this.album(state, sc, world.realm(state.player.x, state.player.y));
+  }
+
+  /** Wetter der Eis-Welt (mitwachsen-ice-sky.ts): erst nachgeladen, wenn die Figur im Kessel ist; bis dahin nichts */
+  private iceSky(world: World, state: State) {
+    // Scheitert das Laden, bleibt es beim Versprechen: dann eben ohne Eis-Wetter
+    if (!this.ice && world.realm(state.player.x, state.player.y) === 'eis')
+      this.ice = import('./mitwachsen-ice-sky').then((m) => (this.ice = m)).catch(() => undefined);
+    return this.ice instanceof Promise ? null : this.ice;
   }
 
   /**
@@ -591,85 +608,6 @@ export class Renderer {
   }
 
   /** Leben in der Luft: tagsüber Schmetterlinge und Pollen, nachts Glühwürmchen (nicht bei reduzierter Bewegung) */
-  /**
-   * Leben der Richtungen, je näher am Tor, desto mehr: Herbstblätter (Wald), Federwölkchen und Wolkenschatten
-   * (Wolken), glimmende Funken (Lava), schwebende Sporen (Pilze), Glühwürmchen auch am Tag (Höhle).
-   * Nichts davon bei reduzierter Bewegung.
-   */
-  private moodLife(sc: Scene) {
-    if (sc.reduced || sc.mood.strength <= 0) return;
-    const { ctx } = this;
-    const t = sc.now / 1000;
-    const s = sc.mood.strength * 0.5; // nur eine Ahnung der Welt hinter dem Tor
-    const W = sc.width,
-      H = sc.height,
-      z = sc.zoom;
-    const wrap = (v: number, m: number) => ((v % m) + m) % m;
-    switch (sc.mood.id) {
-      case 'wald': {
-        const colors = ['#e8823a', '#c8452e', '#f2b13a', '#a0522d'];
-        const n = Math.round(30 * s);
-        for (let i = 0; i < n; i++) {
-          const fall = 18 + (hash(11, i) % 20);
-          const y = wrap((hash(12, i) % 1000) * H * 0.001 + t * fall * z, H + 40) - 20;
-          const x =
-            wrap((hash(13, i) % 1000) * W * 0.001 + t * (30 + sc.wind * 60) * z, W + 40) -
-            20 +
-            Math.sin(t * 2 + i) * 10 * z;
-          const flip = Math.sin(t * 4 + i) > 0;
-          ctx.fillStyle = cycle(colors, i);
-          ctx.fillRect(Math.round(x), Math.round(y), (flip ? 8 : 5) * z, (flip ? 5 : 8) * z);
-        }
-        break;
-      }
-      case 'wolken': {
-        // ziehende Wolkenschatten auf dem Boden, darüber weiße Federwölkchen
-        ctx.fillStyle = `rgba(40,52,72,${(0.1 * s).toFixed(3)})`;
-        for (let i = 0; i < 3; i++) {
-          const x = wrap(i * W * 0.45 + t * 22 * z, W + 400) - 200;
-          const y = (0.25 + i * 0.27) * H;
-          for (let k = -2; k <= 2; k++)
-            ctx.fillRect(x + k * 30 * z, y - (3 - Math.abs(k)) * 14 * z, 60 * z, (3 - Math.abs(k)) * 28 * z);
-        }
-        ctx.fillStyle = `rgba(255,255,255,${(0.8 * s).toFixed(3)})`;
-        for (let i = 0; i < Math.round(18 * s); i++) {
-          const x = wrap((hash(14, i) % 1000) * W * 0.001 + t * (60 + (i % 5) * 15) * z, W + 60) - 30;
-          const y = (hash(15, i) % 1000) * H * 0.001 + Math.sin(t + i) * 8 * z;
-          ctx.fillRect(Math.round(x), Math.round(y), 10 * z, 2 * z);
-        }
-        break;
-      }
-      case 'lava':
-        for (let i = 0; i < Math.round(22 * s); i++) {
-          const life = wrap(t * 0.4 + (hash(16, i) % 100) / 100, 1);
-          const x = (hash(17, i) % 1000) * W * 0.001 + Math.sin(t * 1.5 + i) * 6 * z;
-          const y = H * (1 - life) - 10;
-          ctx.fillStyle = `rgba(255,${150 + (i % 4) * 20},60,${((1 - life) * 0.9).toFixed(2)})`;
-          ctx.fillRect(Math.round(x), Math.round(y), 4 * z, 4 * z);
-        }
-        break;
-      case 'pilze':
-        for (let i = 0; i < Math.round(28 * s); i++) {
-          const y = wrap((hash(18, i) % 1000) * H * 0.001 - t * (8 + (i % 4) * 3) * z, H + 20) - 10;
-          const x = (hash(19, i) % 1000) * W * 0.001 + Math.sin(t * 0.8 + i * 1.7) * 14 * z;
-          ctx.fillStyle = i % 3 ? 'rgba(220,180,255,.75)' : 'rgba(255,255,255,.7)';
-          ctx.fillRect(Math.round(x), Math.round(y), 3 * z, 3 * z);
-        }
-        break;
-      case 'hoehle':
-        for (let i = 0; i < Math.round(14 * s); i++) {
-          const x = ((Math.sin(t * 0.19 + i * 1.9) + 1) / 2) * W;
-          const y = (((Math.sin(t * 0.16 + i * 2.7) + 1) / 2) * 0.7 + 0.2) * H;
-          const glow = 0.3 + 0.7 * Math.max(0, Math.sin(t * 2.2 + i * 1.3));
-          ctx.fillStyle = `rgba(255,236,120,${(glow * s).toFixed(2)})`;
-          ctx.fillRect(x, y, 3 * z, 3 * z);
-          ctx.fillStyle = `rgba(255,236,120,${(glow * 0.25 * s).toFixed(2)})`;
-          ctx.fillRect(x - 3 * z, y - 3 * z, 9 * z, 9 * z);
-        }
-        break;
-    }
-  }
-
   private life(sc: Scene) {
     if (sc.reduced) return;
     const { ctx } = this;

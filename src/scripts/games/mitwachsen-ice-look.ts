@@ -29,10 +29,15 @@ export function finTwitch(now: number, x: number, y: number): number {
   return t < TWITCH_MS ? Math.sin((t / TWITCH_MS) * Math.PI) : 0;
 }
 
-const IGLOO_H = 2.8; // Höhe der Kuppel
+export const IGLOO_H = 2.8; // Höhe der Kuppel
 const LAYERS = 7; // Reihen aus Schneeblöcken
 const ARCH = 1.7; // bis zu dieser Höhe ist das Iglu vorn offen (weiter Bogen): Man sieht die Tiere darin
 const WALL = 0.45; // Dicke der Wand
+/**
+ * Sims vorn über dem Bogen, auf der zweitobersten Reihe: Mitte des Platzes vor der obersten Reihe (vor der Rückwand
+ * gemessen) und Höhe über dem Boden. Dort sitzt beim Polarlicht die Schneeeule (in 3D unter der Kopfzeile gut zu sehen).
+ */
+export const IGLOO_LEDGE = { ahead: 3.08, z: (IGLOO_H * (LAYERS - 1)) / LAYERS } as const;
 const STRIP = 0.5; // Tiefe eines Schneeblocks: Jede Reihe besteht aus Streifen, so wird die Kuppel rund
 
 /**

@@ -5,7 +5,7 @@
 
 import { chunkOf } from '../../lib/games/chunks';
 import { DIRS, type Dir } from '../../lib/games/front';
-import { cycle, hash, nextRandom, pick } from '../../lib/games/rng';
+import { cycle, nextRandom, pick } from '../../lib/games/rng';
 import {
   GATES,
   REGIONS,
@@ -18,9 +18,10 @@ import {
 import type { StoryId } from '../../data/games/mitwachsen-stories';
 import { canStep, standHeight, wildAnimals, type World } from './mitwachsen-world';
 import { chore, regrow, type ChoreEvent } from './mitwachsen-chores';
-import { homeAt, perRealm, startRealm } from './mitwachsen-home';
-import { platformArea, platformsToWake, stepOn, withNeighbours } from './mitwachsen-portal';
-import { raining } from './mitwachsen-weather';
+import { homeAt, startRealm } from './mitwachsen-home';
+import { platformsToWake, stepOn } from './mitwachsen-portal';
+import { sheltering } from './mitwachsen-weather';
+import { PENGUIN, atHome, meadowSpots, shelterPlaces, windOk, type Home } from './mitwachsen-meadow';
 
 export const SLEEP_LOCK = 30; // Takte nach dem Einschlafen, in denen Tasten nicht wecken (3 s)
 export const WAKE_GRACE = 15; // Takte nach dem Aufwachen, in denen das Bett nur ein Hindernis ist (1,5 s)
@@ -28,7 +29,7 @@ export { REGROW } from './mitwachsen-chores';
 export const WILD_RADIUS = 1; // Stücke um die Figur, in denen Tiere der Landschaft unterwegs sind
 export const WILD_KEEP = 2; // ab diesem Abstand verschwinden sie wieder (und tauchen später an ihrem Platz auf)
 
-export type Home = { kind: 'region'; region: RegionId } | { kind: 'wild'; cx: number; cy: number } | { kind: 'garden' };
+export type { Home } from './mitwachsen-meadow';
 export type Animal = {
   id: string;
   species: SpeciesId;
@@ -64,6 +65,7 @@ export type State = {
   bucket: boolean; // Eimer mit Wasser in der Hand (nach dem Schöpfen, bis zum Wassertrog)
   fish: boolean; // Netz mit Fischen in der linken Hand (nach dem Fangen an der Fischkiste, bis zur Eisschale)
   heard: StoryId[]; // Geschichten, deren Klangstein schon einmal erklungen ist
+  calm: number; // Tag, an dem der Pinguin auf die Schneewiese gezogen ist: an ihm weht kein Pustewind (nicht gespeichert)
 };
 
 /** Was gespeichert wird */
@@ -106,29 +108,6 @@ const cheb = (ax: number, ay: number, bx: number, by: number) => Math.max(Math.a
 
 /** Darf ein Tier auf diesem Feld umherlaufen? (Folgende Tiere gehen überall hin, wo die Figur war) */
 
-/** Felder an Durchgängen (Tore, Rosenbogen): Dort bleibt kein Tier stehen, sonst versperrt es den Weg */
-const passageCache = new WeakMap<World, Set<string>>();
-function passages(world: World): Set<string> {
-  let set = passageCache.get(world);
-  if (!set) {
-    set = new Set([
-      ...platformArea(world.portals),
-      ...withNeighbours([...world.gates.values()].flatMap((g) => g.cells)),
-    ]);
-    passageCache.set(world, set);
-  }
-  return set;
-}
-
-function atHome(world: World, home: Home, x: number, y: number): boolean {
-  const c = world.cell(x, y);
-  if (home.kind === 'garden') return c.garden === true && !passages(world).has(`${x},${y}`);
-  if (c.garden || passages(world).has(`${x},${y}`)) return false;
-  if (home.kind === 'region') return c.region === home.region;
-  const [cx, cy] = chunkOf(x, y);
-  return c.region === 'wild' && cx === home.cx && cy === home.cy;
-}
-
 const occupied = (s: State, x: number, y: number, except?: string) =>
   (!s.sleeping && s.player.x === x && s.player.y === y) ||
   s.animals.some((a) => a.id !== except && a.x === x && a.y === y);
@@ -148,35 +127,7 @@ function random(s: State): number {
   return v;
 }
 
-/**
- * Plätze bei Regen: erst die Felder unter dem Unterstand der Gegend, vorn zuerst (dort sieht man die Tiere unter dem
- * Dach), dann die nächsten Felder ihrer Wiese.
- */
-const shelterSpots = perRealm((world: World, realm): [number, number][] => {
-  const { x0, y0, x1, y1 } = world.homes[realm].shelter;
-  const [cx, cy] = [(x0 + x1) / 2, (y0 + y1) / 2];
-  const near = (p: [number, number]) =>
-    world.cell(p[0], p[1]).roof ? (y1 - p[1]) * 10 + Math.abs(p[0] - cx) : 1000 + Math.hypot(p[0] - cx, p[1] - cy);
-  return [...meadowSpots(world, realm)].sort((a, b) => near(a) - near(b));
-});
-
 // ---------- Aufbau ----------
-
-/** Freie Plätze auf der Wiese ums Bett einer Gegend, gut verteilt (benachbarte Plätze stehen in der Liste weit auseinander) */
-const meadowSpots = perRealm((world: World, realm): [number, number][] => {
-  const { bed, meadow } = world.homes[realm];
-  const out: [number, number][] = [];
-  const r = meadow + 1;
-  for (let y = bed[1] - r; y <= bed[1] + r; y++)
-    for (let x = bed[0] - r; x <= bed[0] + r; x++)
-      if (
-        world.realm(x, y) === realm &&
-        atHome(world, { kind: 'garden' }, x, y) &&
-        standHeight(world, [], x, y) !== null
-      )
-        out.push([x, y]);
-  return out.sort((a, b) => hash(7, a[0], a[1]) - hash(7, b[0], b[1]));
-});
 
 export function initialState(world: World, saved: Partial<Progress> = {}, rngSeed = 1): State {
   const garden = saved.garden ?? [];
@@ -242,6 +193,7 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     day: saved.day ?? 0,
     dayStart: 0,
     heard: (saved.heard ?? []).filter((id) => world.stones.has(id)),
+    calm: -1,
   };
   scatter(s, world); // jeder Besuch: Die Tiere wohnen woanders
   syncWild(s, world);
@@ -333,20 +285,20 @@ function tick(s: State, world: World, events: GameEvent[]) {
   regrow(s, events); // Beeren und Fische wachsen nach, auch nachts
   if (s.sleeping) return; // nachts ist es still
   syncWild(s, world);
-  // Regnet es, gehen die Tiere der Wiese unter den Unterstand ihrer Gegend: jedes an einen eigenen Platz darunter oder
-  // dicht daneben
-  const wet = raining(world.seed, s.day, s.tick - s.dayStart);
-  const homes = new Map<RegionId, Animal[]>(); // Tiere der Wiese je Gegend
-  if (wet) for (const a of s.animals) if (a.mode === 'home') homes.set(a.realm, [...(homes.get(a.realm) ?? []), a]);
+  // Regnet es auf der Lichtung bzw. weht in der Eis-Welt der Pustewind, gehen die Tiere der Wiese dieser Gegend unter
+  // ihren Unterstand: jedes an einen eigenen Platz darunter oder dicht daneben (Riesenpilz bzw. Iglu)
+  const t = s.tick - s.dayStart;
+  const places = shelterPlaces(world, s.animals, (realm) => sheltering(world.seed, s.day, t, realm, windOk(s)));
   for (const a of s.animals) {
     if (a.mode === 'follow') continue;
-    const goal =
-      wet && a.mode === 'home' ? cycle(shelterSpots(world, a.realm), homes.get(a.realm)!.indexOf(a)) : a.spawn;
+    const spot = places.get(a.id);
+    const wet = spot !== undefined;
+    const goal = spot ?? a.spawn;
     const gap = Math.abs(a.x - goal[0]) + Math.abs(a.y - goal[1]);
-    // Gerade heimgekommen oder Regen: Es läuft zu seinem Platz auf der Wiese bzw. unter dem Dach
+    // Gerade heimgekommen oder Regen bzw. Wind: Es läuft zu seinem Platz auf der Wiese bzw. unter dem Dach
     const arriving = a.mode === 'home' && gap > (wet ? 0 : 2);
-    if (wet && a.mode === 'home' && !arriving) {
-      a.rest = Math.max(a.rest, 5); // bleibt im Trockenen
+    if (wet && !arriving) {
+      a.rest = Math.max(a.rest, 5); // bleibt im Trockenen bzw. Windstillen
       continue;
     }
     // Steht die Figur daneben, bleibt das Tier stehen und schaut sie an
@@ -368,6 +320,8 @@ function tick(s: State, world: World, events: GameEvent[]) {
       away || arriving
         ? [...ALL_DIRS].sort((p, q) => dist(a, p, goal) - dist(a, q, goal))
         : [pick(ALL_DIRS, random(s))];
+    // Im Iglu schlüpft ein Tier an den schon Sitzenden vorbei zu seinem Platz, sonst blieben die hinteren Plätze zu
+    if (spot && order[0] && slipPast(s, world, a, order[0], places)) continue;
     for (const d of order) {
       const [dx, dy] = DIRS[d];
       const tx = a.x + dx,
@@ -379,6 +333,22 @@ function tick(s: State, world: World, events: GameEvent[]) {
       }
     }
   }
+}
+
+/**
+ * Pustewind (Unterstand mit `huddle`, das Iglu): Sitzt auf dem nächsten Feld zum eigenen Platz schon ein Tier auf
+ * seinem Platz, tauschen beide; das andere rückt gleich wieder an seinen Platz. Liefert true, wenn getauscht wurde.
+ */
+function slipPast(s: State, world: World, a: Animal, d: Dir, places: Map<string, [number, number]>): boolean {
+  if (!world.homes[a.realm].huddle) return false;
+  const [tx, ty] = [a.x + DIRS[d][0], a.y + DIRS[d][1]];
+  const other = s.animals.find((o) => o.x === tx && o.y === ty);
+  const its = other && places.get(other.id);
+  if (!other || its?.[0] !== tx || its[1] !== ty) return false;
+  if (!canStep(world, s.openGates, a.x, a.y, tx, ty) || !canStep(world, s.openGates, tx, ty, a.x, a.y)) return false;
+  [other.x, other.y, a.x, a.y] = [a.x, a.y, tx, ty];
+  a.dir = d;
+  return true;
 }
 
 /**
@@ -493,6 +463,7 @@ function bringHome(s: State, world: World, events: GameEvent[]) {
     a.rest = 2;
     s.followers = s.followers.filter((f) => f !== id);
     if (!s.garden.some((x) => x.id === id)) s.garden.push({ id, species: a.species });
+    if (id === PENGUIN) s.calm = s.day; // heute bleibt es windstill
     // Eigener Platz: ein Platz der Wiese, den noch kein anderes Tier als Platz hat
     const spots = meadowSpots(world, a.realm);
     const taken = new Set(

@@ -128,7 +128,7 @@ test('Spiel: Portal-Plattform erwacht beim Herangehen, die Mitte bringt zum Bett
   expect(errors).toEqual([]);
 });
 
-test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offen), alle zehn Eis-Tiere, ohne Fehler', async ({
+test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offen), alle zehn Eis-Tiere, Pustewind, ohne Fehler', async ({
   page,
 }) => {
   const errors = watchErrors(page);
@@ -152,6 +152,13 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
     bodies: Map<string, unknown>;
     fog: { has(x: number, y: number): boolean };
     r3d: { bodies: Map<string, unknown> } | null; // in 3D: Modelle in der Szene nach Kennung
+  };
+  /** Was der Wind-Teil zusätzlich braucht: Felder, Takt, Wetter dort, wo die Figur ist, und das nachgeladene Eis-Wetter */
+  type WindGame = {
+    world: { cell(x: number, y: number): { garden?: boolean; solid: boolean; roof?: boolean } };
+    state: { dayStart: number; tick: number };
+    air: { frame(world: unknown, state: unknown, quiet: boolean, reduced: boolean): { weather: { wind: number } } };
+    renderer: { ice: { iceWeather?: unknown } | null };
   };
   /** Einige Bilder abwarten */
   const frames = (n: number) =>
@@ -199,7 +206,42 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
       );
     }, shown),
   ).toBe(true);
-  // ein paar Schritte durch den Kessel, dann ins Schneebett (der Schläfer liegt jetzt dort)
+  // Pustewind: Die Eis-Tiere wohnen auf der Schneewiese (mit dem Pinguin), ein Abschnitt mit Wind läuft – die Tiere
+  // gehen ins Iglu, Flocken, Wirbel, Fahnen und Wimpel werden gezeichnet (das Eis-Wetter ist nachgeladen), ohne Fehler
+  const windy = await game.evaluate((node) => {
+    const el = node as unknown as Game & WindGame;
+    const [bx, by] = el.world.homes.eis.bed;
+    const free: [number, number][] = [];
+    for (let y = by - 6; y <= by + 6; y++)
+      for (let x = bx - 6; x <= bx + 6; x++) {
+        const c = el.world.cell(x, y);
+        if (c.garden && !c.solid && !c.roof && (x !== el.state.player.x || y !== el.state.player.y)) free.push([x, y]);
+      }
+    const ice = el.state.animals.filter((a) => a.realm === 'eis');
+    const animals = el.state.animals.map((a) => {
+      const i = ice.indexOf(a);
+      const at = free[i * 3];
+      return i < 0 || !at ? a : { ...a, x: at[0], y: at[1], spawn: at, mode: 'home', home: { kind: 'garden' } };
+    });
+    const garden = ice.map((a) => ({ id: a.id, species: a.species }));
+    const met = ice.map((a) => a.id);
+    let b = 1;
+    const at = (k: number) => ({ ...el.state, animals, garden, met, tick: el.state.dayStart + k * 3000 + 400 });
+    while (b < 80 && el.air.frame(el.world, at(b), true, false).weather.wind < 1) b++;
+    el.state = at(b);
+    for (let i = 0; i < 300; i++) el.apply({ type: 'tick' });
+    return b < 80;
+  });
+  expect(windy).toBe(true);
+  await frames(60);
+  expect(
+    await game.evaluate((node) => {
+      const el = node as unknown as Game & WindGame;
+      const sheltered = el.state.animals.filter((a) => a.realm === 'eis' && el.world.cell(a.x, a.y).roof).length;
+      return { sheltered: sheltered > 5, loaded: typeof el.renderer.ice?.iceWeather === 'function' };
+    }),
+  ).toEqual({ sheltered: true, loaded: true });
+  // ein paar Schritte durch den Kessel, dann ins Schneebett (der Schläfer liegt jetzt dort, darüber das Polarlicht)
   await game.evaluate((node) => {
     const el = node as unknown as Game;
     for (const dir of ['s', 's', 'e', 'n', 'n', 'w']) el.apply({ type: 'move', dir });

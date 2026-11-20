@@ -27,6 +27,10 @@ export type HomePlan = {
   water: Point; // Wassertrog
   shelter: Rect; // Unterstand: Bei Regen gehen die Tiere der Wiese hierher
   shelterStem: Point; // fester Teil des Unterstands: Pilzstiel in der Mitte, beim Iglu die Mitte der Rückwand
+  /** Pustewind (Eis-Welt): Wer im Iglu keinen Platz findet, steht dicht an dieser windgeschützten Stelle daneben */
+  lee?: Point;
+  /** Im Unterstand stehen die Tiere einer Art beieinander (Pinguine kuscheln, Moschusochsen stehen dicht) */
+  huddle?: boolean;
 };
 
 /** Plätze zum Aufwachen: rechts, vorn und links neben dem Bett */
@@ -59,5 +63,7 @@ export const HOMES: Record<RegionId, HomePlan> = {
     water: [4, 3], // Wassertrog aus Eisblöcken
     shelter: { x0: -3, y0: -5, x1: 3, y1: -3 }, // im Iglu, vorn ein weiter Bogen
     shelterStem: [0, -6], // feste Rückwand des Iglus (x −3 … 3), ihre Mitte zeichnet die Kuppel
+    lee: [4, -4], // der Pustewind weht nach rechts (+x): rechts neben dem Iglu ist es windstill
+    huddle: true,
   },
 };

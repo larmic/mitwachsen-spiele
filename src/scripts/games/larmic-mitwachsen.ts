@@ -25,7 +25,7 @@ import {
   type SavedWorld,
   type Store,
 } from './mitwachsen-save';
-import { ENCOUNTERS, InputPace, STEP_MS } from './input-pace';
+import { ENCOUNTERS, FREE_KEYS, InputPace, KEYS, STEP_MS } from './input-pace';
 import { drawMap } from './mitwachsen-map';
 import { Fog, REVEAL, START_REVEAL } from './mitwachsen-fog';
 import { initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
@@ -34,7 +34,8 @@ import { createWorld, standHeight, type World } from './mitwachsen-world';
 import { platformLift } from './mitwachsen-portal';
 import { SNAP_DELAY, hopOf, snaps } from './mitwachsen-gait';
 import { FISH_SPARKS } from '../../data/games/mitwachsen-eis';
-import { weatherLook, windAt } from './mitwachsen-weather';
+import { windAt } from './mitwachsen-weather';
+import { Air, postures, stepSound } from './mitwachsen-air';
 import { idlePose, type Pose } from './mitwachsen-tired';
 import { advance, evening, freshDay, loadTired, saveTired, type Tired, type TiredEvent } from './mitwachsen-tired';
 import { SLEEP_EVENT, type GameMoment } from './pwa-update';
@@ -45,19 +46,6 @@ const SAVE_EVERY_MS = 10_000; // Position regelmäßig sichern
 const SIT_MS = 2500; // so lange setzt sich die müde Figur hin (Laufen geht in der Zeit nicht)
 const INFO_KEY = 'larmic.games.mitwachsen.info'; // Hinweis für Eltern schon gesehen
 const SPEED = (1000 / STEP_MS) * 1.1; // Felder pro Sekunde beim Gleiten: etwas schneller als der Takt, also weich
-const KEYS: Record<string, Dir> = { ArrowUp: 'n', ArrowDown: 's', ArrowLeft: 'w', ArrowRight: 'e' };
-const FREE_KEYS = new Set([
-  'Tab',
-  'Escape',
-  'Shift',
-  'Control',
-  'Alt',
-  'AltGraph',
-  'Meta',
-  'OS',
-  'CapsLock',
-  'ContextMenu',
-]);
 
 /** Funken der Handgriffe: an Busch, Fischkiste und Wasser, dann an Futtertrog, Eisschale und Wassertrog */
 const SPARKS = {
@@ -90,6 +78,7 @@ class LarmicMitwachsen extends HTMLElement {
   private pose: Pose = 'stand';
   private sfx = new Sfx();
   private story = new StoryPlayer(this.sfx); // Klangsteine
+  private air = new Air(this.sfx); // Wetter, wo die Figur ist: Rauschen und Windspiel des Pustewinds
   private listening = false; // die Figur sitzt am Klangstein und hört zu, bis sie losgeht
   private globals: AbortController | null = null;
   private timer: number | undefined;
@@ -472,8 +461,8 @@ class LarmicMitwachsen extends HTMLElement {
     for (const e of events) {
       switch (e.type) {
         case 'step':
-        case 'swap':
-          this.sfx.step(e.type === 'step' ? e.climb : 0);
+        case 'swap': // im Kessel knirscht es auf Schnee und Eis
+          this.sfx[stepSound(this.world, this.state.player.x, this.state.player.y)](e.type === 'step' ? e.climb : 0);
           this.listening = false;
           break;
         case 'story':
@@ -622,30 +611,34 @@ class LarmicMitwachsen extends HTMLElement {
     targets.set('player', this.state.player);
     for (const a of this.state.animals) targets.set(a.id, a);
     for (const id of this.bodies.keys()) if (!targets.has(id)) this.bodies.delete(id);
+    const poses = postures(this.world, this.state); // Pustewind: zusammenrücken, aufplustern; Eule auf dem Iglu
     for (const [id, t] of targets) {
+      const pose = poses.get(id);
       const c = this.world.cell(t.x, t.y); // auf einer Portal-Plattform etwas höher (Sockel bzw. Mittelfeld)
       const ground = (standHeight(this.world, this.state.openGates, t.x, t.y) ?? c.h) + platformLift(c);
       const sits =
         id === 'player' && (now < this.sitUntil || this.pose !== 'stand' || (this.listening && !!this.story.playing)); // müde, lesend, zuhörend
-      const z = sits ? ground - 0.35 : ground; // sitzt im Gras
+      const z = pose?.z ?? (sits ? ground - 0.35 : ground); // sitzt im Gras
+      const [tx, ty] = [t.x + (pose?.dx ?? 0), t.y + (pose?.dy ?? 0)];
       let b = this.bodies.get(id);
-      if (!b || snap || Math.abs(b.x - t.x) + Math.abs(b.y - t.y) > 2.5) b = { x: t.x, y: t.y, z, hop: 0 };
-      const dx = t.x - b.x,
-        dy = t.y - b.y,
+      if (!b || snap || Math.abs(b.x - tx) + Math.abs(b.y - ty) > 2.5) b = { x: tx, y: ty, z, hop: 0 };
+      const dx = tx - b.x,
+        dy = ty - b.y,
         d = Math.hypot(dx, dy);
       const stepLen = SPEED * dt;
       if (d <= stepLen) {
-        b.x = t.x;
-        b.y = t.y;
+        b.x = tx;
+        b.y = ty;
       } else {
         b.x += (dx / d) * stepLen;
         b.y += (dy / d) * stepLen;
       }
       b.z += (z - b.z) * Math.min(1, dt * 14);
-      const moving = Math.min(1, Math.hypot(t.x - b.x, t.y - b.y));
+      const moving = Math.min(1, Math.hypot(tx - b.x, ty - b.y));
       const sung = now - (this.hops.get(id) ?? -1e9);
       const snapped = now - (this.hops.get(`snap:${id}`) ?? -1e9); // Schnapp-Hüpfer der Fischfresser beim Füttern
       b.hop = snap ? 0 : hopOf(id, moving, sung, snapped); // je Gangart der Art (watscheln, robben, hüpfen …)
+      b.puff = pose?.puff ?? 1;
       this.bodies.set(id, b);
     }
   }
@@ -740,7 +733,7 @@ class LarmicMitwachsen extends HTMLElement {
 
     const { dpr, w, h, zoom } = this.size;
     const mood = this.world.climate(Math.round(player.x), Math.round(player.y));
-    const weather = weatherLook(this.world.seed, this.state.day, this.state.tick - this.state.dayStart);
+    const { weather, glance, aurora } = this.air.frame(this.world, this.state, this.paused(), this.reduced.matches);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ctx.imageSmoothingEnabled = false;
     const scene: Scene = {
@@ -753,6 +746,8 @@ class LarmicMitwachsen extends HTMLElement {
       night,
       evening: this.state.sleeping ? 0 : evening(this.tired),
       weather,
+      aurora: aurora * night,
+      glance,
       pose: this.pose,
       mood,
       lit3d: !!this.r3d,

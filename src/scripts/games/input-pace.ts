@@ -12,6 +12,21 @@ export const STEP_MS = 260; // gut 4 Schritte pro Sekunde
 export const HOLD_MS = 450; // so lange halten, bis die Figur weiterläuft (erster Spieltest am Tablet)
 export const ACTION_MS = 350; // Leertaste: höchstens knapp 3 Aktionen pro Sekunde
 
+/** Pfeiltasten und ihre Richtung; Tasten, die das Spiel nicht nimmt (der Browser und Hilfsmittel brauchen sie) */
+export const KEYS: Record<string, Dir> = { ArrowUp: 'n', ArrowDown: 's', ArrowLeft: 'w', ArrowRight: 'e' };
+export const FREE_KEYS = new Set([
+  'Tab',
+  'Escape',
+  'Shift',
+  'Control',
+  'Alt',
+  'AltGraph',
+  'Meta',
+  'OS',
+  'CapsLock',
+  'ContextMenu',
+]);
+
 /**
  * Begegnungen: Tier gefunden oder angestoßen, Beeren gepflückt, Fische gefangen, Futter oder Wasser gebracht, Wasser
  * geschöpft, Plattform erwacht, gereist, Klangstein. Danach bleibt die Figur stehen, bis der Pfeil neu gedrückt wird

@@ -2,15 +2,18 @@
 // Kurz, warm und leise. Höchstens MAX_VOICES Töne gleichzeitig, damit Dauerdrücken nicht laut wird.
 // Der Browser erlaubt Ton erst nach einer Geste: `unlock()` aus einem Tasten- oder Klick-Handler aufrufen.
 
+import { pick } from '../../lib/games/rng';
 import type { Tone } from '../../data/games/mitwachsen';
 import type { Melody } from '../../data/games/mitwachsen-stories';
 
 const MAX_VOICES = 6;
+const ICICLES = [1567.98, 1760, 2093, 2349.32, 2637.02]; // Windspiel aus Eiszapfen: G6 A6 C7 D7 E7 (Pentatonik)
 
 export class Sfx {
   private ctx: AudioContext | null = null;
   private out: GainNode | null = null;
   private voices = 0;
+  private wind: GainNode | null = null; // Rauschen des Pustewinds, läuft, solange es weht
   muted = false;
 
   /** Im Handler einer Nutzergeste aufrufen: legt den AudioContext an bzw. weckt ihn */
@@ -37,6 +40,7 @@ export class Sfx {
   close() {
     void this.ctx?.close();
     this.ctx = null;
+    this.wind = null;
   }
 
   private note(freq: number, len: number, wave: OscillatorType, gain: number, slide = 1, delay = 0, dest?: AudioNode) {
@@ -143,7 +147,68 @@ export class Sfx {
       setTimeout(() => bus.disconnect(), 400);
     };
   }
+  /** Schritt auf Schnee und Eis: ein kurzes, weiches Knirschen (gefiltertes Rauschen), dazu leise der Schritt */
+  crunch(climb = 0) {
+    const ctx = this.ctx;
+    if (this.muted || !ctx || !this.out || ctx.state === 'closed' || this.voices >= MAX_VOICES) return;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = noise(ctx, 0.09);
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 1800 + Math.random() * 600;
+    band.Q.value = 1.2;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.09, t + 0.01);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    src.connect(band).connect(env).connect(this.out);
+    this.voices++;
+    src.onended = () => this.voices--;
+    src.start(t);
+    this.note(climb > 0 ? 260 : climb < 0 ? 160 : 190, 0.04, 'sine', 0.03);
+  }
+  /**
+   * Rauschen des Pustewinds („fuuu“): weiches, tief gefiltertes Rauschen, das Wind und Böe folgt (`level` 0 … 1, 0 =
+   * still). Leiser als die Spieltöne (höchstens 0,04), es heult und pfeift nie.
+   */
+  windLoop(level: number) {
+    const ctx = this.ctx;
+    if (!ctx || !this.out || ctx.state === 'closed') return;
+    if (!this.wind && (level <= 0 || this.muted)) return;
+    if (!this.wind) {
+      const src = ctx.createBufferSource();
+      src.buffer = noise(ctx, 2);
+      src.loop = true;
+      const low = ctx.createBiquadFilter();
+      low.type = 'lowpass';
+      low.frequency.value = 500;
+      this.wind = ctx.createGain();
+      this.wind.gain.value = 0;
+      src.connect(low).connect(this.wind).connect(this.out);
+      src.start();
+    }
+    const gain = this.muted ? 0 : Math.max(0, Math.min(1, level)) * 0.04;
+    this.wind.gain.setTargetAtTime(gain, ctx.currentTime, 0.4);
+  }
+  /** Windspiel aus Eiszapfen am Iglu an der Spitze einer Böe: zwei bis drei helle, fröhliche Töne */
+  chime(soft = false) {
+    const n = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < n; i++) this.note(pick(ICICLES, Math.random()), 0.3, 'sine', soft ? 0.025 : 0.05, 1, i * 0.16);
+  }
+  /** Die Figur lacht in der Böe leise: zwei kurze, helle „hi“ */
+  giggle(soft = false) {
+    [659.25, 587.33].forEach((f, i) => this.note(f, 0.07, 'triangle', soft ? 0.02 : 0.04, 0.85, i * 0.11));
+  }
   lullaby() {
     [783.99, 659.25, 587.33, 523.25, 392].forEach((f, i) => this.note(f, 0.42, 'sine', 0.08, 1, i * 0.38));
   }
+}
+
+/** Weißes Rauschen der Länge `seconds` (für Knirschen und Wind) */
+function noise(ctx: AudioContext, seconds: number): AudioBuffer {
+  const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * seconds), ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  return buf;
 }

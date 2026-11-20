@@ -15,9 +15,10 @@ import {
   type GameEvent,
   type State,
 } from './mitwachsen-state';
+import { windOk } from './mitwachsen-meadow';
 import { createWorld, standHeight, type Cell, type World } from './mitwachsen-world';
 import { startRealm, type Homestead } from './mitwachsen-home';
-import { BLOCK, raining } from './mitwachsen-weather';
+import { BLOCK, raining, windy } from './mitwachsen-weather';
 import { platformArea } from './mitwachsen-portal';
 
 /** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich; Zuhause der Eis-Welt (im Kessel von Seed 1) */
@@ -446,6 +447,106 @@ describe('Unterstand bei Regen', () => {
     for (const a of home())
       expect(Math.abs(a.x - a.spawn[0]) + Math.abs(a.y - a.spawn[1]), a.id).toBeLessThanOrEqual(4);
     for (const a of home()) expect(world.cell(a.x, a.y).garden).toBe(true);
+  });
+});
+
+describe('Iglu bei Pustewind (Eis-Welt)', () => {
+  const world = createWorld(1);
+  const igloo = world.homes.eis.shelter;
+  const lee = world.homes.eis.lee!;
+  /** alle Tiere der Lichtung und der Eis-Welt wohnen auf ihrer Wiese (ohne den Pinguin: noch kein Pustewind) */
+  const everyone = (penguin = true) =>
+    REGIONS.flatMap((r) => regionAnimals(r.id))
+      .filter((id) => penguin || id !== 'eis:pinguin')
+      .map((id) => ({ id, species: id.split(':')[1] as 'hase' }));
+  /** erster Abschnitt des Tages, in dem es in der Eis-Welt windet (bzw. nicht) und auf der Lichtung regnet (bzw. nicht) */
+  const block = (wind: boolean, rain: boolean) => {
+    let b = 1;
+    while (windy(world.seed, 0, b * BLOCK) !== wind || raining(world.seed, 0, b * BLOCK) !== rain) b++;
+    return b;
+  };
+  const start = (b: number, garden = everyone()): State => ({
+    ...initialState(world, { garden }),
+    sleeping: false,
+    tick: b * BLOCK,
+  });
+  const ticks = (s: State, n: number) => {
+    for (let i = 0; i < n; i++) s = run(s, world, TICK).s;
+    return s;
+  };
+  const resting = (s: State, realm: RegionId) => s.animals.filter((a) => a.mode === 'home' && a.realm === realm);
+  const inIgloo = (a: Animal) => world.cell(a.x, a.y).roof === true && world.realm(a.x, a.y) === 'eis';
+  const nearSpawn = (a: Animal) => Math.abs(a.x - a.spawn[0]) + Math.abs(a.y - a.spawn[1]) <= 4;
+
+  it('weht der Pustewind, gehen die Tiere der Schneewiese ins Iglu, vorn zuerst, die übrigen dicht an die windgeschützte Seite; danach zurück', () => {
+    let s = ticks(start(block(true, false)), 600);
+    const ice = resting(s, 'eis');
+    expect(ice).toHaveLength(30);
+    const inside = ice.filter(inIgloo);
+    expect(inside).toHaveLength((igloo.x1 - igloo.x0 + 1) * (igloo.y1 - igloo.y0 + 1)); // das Iglu ist voll
+    for (const a of ice.filter((a) => !inIgloo(a))) {
+      expect(a.x, a.id).toBeGreaterThanOrEqual(igloo.x1); // rechts daneben: windgeschützt
+      expect(Math.hypot(a.x - lee[0], a.y - lee[1]), a.id).toBeLessThanOrEqual(3);
+    }
+    // Pinguine kuscheln vorn in der Mitte, die drei Moschusochsen stehen dicht beieinander
+    const of = (species: string) => ice.filter((a) => a.species === species);
+    for (const p of of('pinguin')) expect([inIgloo(p), p.y], p.id).toEqual([true, igloo.y1]);
+    for (const group of [of('pinguin'), of('moschusochse')]) {
+      expect(group).toHaveLength(3);
+      for (const a of group)
+        for (const b of group) expect(Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)), a.id).toBeLessThanOrEqual(2);
+    }
+    // Hört der Wind auf, gehen alle zurück an ihre Plätze auf der Schneewiese
+    s = ticks({ ...s, tick: block(false, false) * BLOCK }, 900);
+    for (const a of resting(s, 'eis')) {
+      expect(nearSpawn(a), a.id).toBe(true);
+      expect(world.cell(a.x, a.y).garden).toBe(true);
+    }
+  });
+
+  it('jede Wiese folgt nur dem Wetter ihrer Gegend: Tiere der Lichtung bleiben bei Eis-Wind draußen und umgekehrt', () => {
+    const windOnly = ticks(start(block(true, false)), 400);
+    for (const a of resting(windOnly, 'lichtung')) expect(nearSpawn(a), a.id).toBe(true);
+    expect(resting(windOnly, 'eis').filter(inIgloo).length).toBeGreaterThan(15);
+    const rainOnly = ticks(start(block(false, true)), 400);
+    for (const a of resting(rainOnly, 'eis'))
+      expect([nearSpawn(a), inIgloo(a) && !nearSpawn(a)], a.id).toEqual([true, false]);
+    expect(resting(rainOnly, 'lichtung').filter((a) => world.cell(a.x, a.y).roof).length).toBeGreaterThan(10);
+  });
+
+  it('bevor der Pinguin zu Hause ist, weht kein Pustewind: Die Tiere der Schneewiese bleiben draußen', () => {
+    const s = ticks(start(block(true, false), everyone(false)), 400);
+    const ice = resting(s, 'eis');
+    expect(ice).toHaveLength(29);
+    for (const a of ice) expect(nearSpawn(a), a.id).toBe(true);
+  });
+
+  it('zieht der Pinguin mitten im Pustewind-Abschnitt ein, bleibt es heute windstill; erst nach dem Schlafen weht es', () => {
+    const [x, y] = world.homes.eis.wake[0]!;
+    const base = start(block(true, false), everyone(false));
+    const free = (dx: number, dy: number) => {
+      const c = world.cell(x + dx, y + dy);
+      return c.garden === true && !c.solid && !base.animals.some((a) => a.x === x + dx && a.y === y + dy);
+    };
+    const [dir, dx, dy] = (
+      [
+        ['e', 1, 0],
+        ['w', -1, 0],
+        ['s', 0, 1],
+        ['n', 0, -1],
+      ] as const
+    ).find(([, dx, dy]) => free(dx, dy) && free(-dx, -dy))!;
+    const animals = base.animals.map((a) =>
+      a.id === 'eis:pinguin' ? { ...a, mode: 'follow' as const, x: x - dx, y: y - dy } : a,
+    );
+    const s0: State = { ...base, animals, followers: ['eis:pinguin'], player: { x, y, dir } };
+    const moved = run(s0, world, dir);
+    expect(moved.events).toContainEqual({ type: 'home', id: 'eis:pinguin', species: 'pinguin' });
+    expect(windOk(moved.s)).toBe(false); // heute nicht: kein Sprung von Sonne auf vollen Wind
+    const s = ticks(moved.s, 400);
+    for (const a of resting(s, 'eis')) expect(nearSpawn(a), a.id).toBe(true); // keiner sucht das Iglu auf
+    expect(windOk({ ...s, day: s.day + 1 })).toBe(true); // nach dem Schlafen darf der Pustewind wehen
+    expect(windOk(initialState(world, { garden: everyone(), day: s.day }))).toBe(true); // im Spielstand: gleich
   });
 });
 

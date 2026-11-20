@@ -6,7 +6,7 @@ import { REGIONS, type GateId, type Point, type Rect, type Region, type RegionId
 import { HOMES, type HomePlan } from '../../data/games/mitwachsen-homes';
 
 /** Zuhause einer Gegend in Feldern: Bett, Plätze zum Aufwachen, Wiese, Tröge und Unterstand (`HOMES`, ans Bett gelegt) */
-export type Homestead = Omit<HomePlan, 'wake' | 'food' | 'water' | 'shelter' | 'shelterStem'> & {
+export type Homestead = Omit<HomePlan, 'wake' | 'food' | 'water' | 'shelter' | 'shelterStem' | 'lee'> & {
   realm: RegionId;
   bed: Point;
   wake: readonly Point[];
@@ -14,6 +14,7 @@ export type Homestead = Omit<HomePlan, 'wake' | 'food' | 'water' | 'shelter' | '
   water: Point;
   shelter: Rect;
   shelterStem: Point;
+  lee?: Point;
 };
 
 /** Was eine Welt über ihre Gegenden weiß (Teil von `World`) */
@@ -38,6 +39,7 @@ export function placeHome(realm: RegionId, bed: Point): Homestead {
     water: at(plan.water),
     shelter: { x0: bed[0] + x0, y0: bed[1] + y0, x1: bed[0] + x1, y1: bed[1] + y1 },
     shelterStem: at(plan.shelterStem),
+    ...(plan.lee && { lee: at(plan.lee) }),
   };
 }
 
