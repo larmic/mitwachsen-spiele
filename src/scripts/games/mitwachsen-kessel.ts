@@ -1,17 +1,20 @@
 // Gletscherkessel hinter dem Eistor (Gegend 'eis') – rein und deterministisch: Derselbe Seed ergibt denselben Kessel.
 // Er liegt fest am Ende des Gangs hinter dem Eistor, ganz hinter dem Felsring der Lichtung, im selben Koordinatenraum.
 // Ringsum feste Eisklippen, der Gang ist der einzige Zugang. In der Mitte das Schneebett mit Schneewiese, Eisschale,
-// Wassertrog aus Eis, Iglu und Klangstein, seitlich das Eisloch, drei Fischkisten, ein Moosfleck, vom Tor bis ans Bett
-// die Rutschspur.
+// Wassertrog aus Eis, Iglu und Klangstein, seitlich das Eisloch, drei Fischkisten, ein Moosfleck, die beiden
+// Plattformen des Eis-Portals (hinter der Mündung und im Kreis um das Bett), vom Tor bis ans Bett die Rutschspur.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt“, Kessel)
 
 import { fromKey } from '../../lib/games/chunks';
 import { hash, valueNoise } from '../../lib/games/rng';
 import type { Point } from '../../data/games/mitwachsen';
 import { KESSEL } from '../../data/games/mitwachsen-eis';
+import { HOMES } from '../../data/games/mitwachsen-homes';
+import { ICE_PORTAL } from '../../data/games/mitwachsen-portals';
 import { ICE_STONE } from '../../data/games/mitwachsen-stories';
 import type { Cell } from './mitwachsen-cell';
 import { placeHome } from './mitwachsen-home';
+import { PLATFORM_HALF, platformCells, ringSpots, type Portal, type PortalId } from './mitwachsen-portal';
 
 /** Gang hinter einem Tor, in Koordinaten u (entlang des Tors) und t (nach außen) */
 export type Gang = {
@@ -25,8 +28,17 @@ export type Gang = {
 /** Lage des Kessels: Mitte (dort steht das Schneebett) und alle Felder samt Klippen */
 export type KesselPlace = { bed: Point; centre: number; cells: readonly Point[] };
 
-/** Der gebaute Kessel: Bett, Felder der Eis-Welt (Kessel und Gang ab der Mitte), Wohnplätze ihrer Tiere, Klangstein */
-export type Kessel = { bed: Point; realm: ReadonlySet<string>; spots: readonly Point[]; stone: Point };
+/**
+ * Der gebaute Kessel: Bett, Felder der Eis-Welt (Kessel und Gang ab der Mitte), Wohnplätze ihrer Tiere, Klangstein und
+ * das Eis-Portal (als Eintrag für `world.portals`)
+ */
+export type Kessel = {
+  bed: Point;
+  realm: ReadonlySet<string>;
+  spots: readonly Point[];
+  stone: Point;
+  portal: [PortalId, Portal];
+};
 
 const key = (x: number, y: number) => `${x},${y}`;
 const { rx, ry } = KESSEL.shape;
@@ -100,6 +112,7 @@ export function buildKessel(
     }
   home(gang, place, set);
   forage(gang, place, map);
+  const portal = platforms(gang, place, map);
   const slide = slidePath(gang, place.bed, map);
   for (const [x, y] of slide) {
     const c = map.get(key(x, y))!; // die Spur läuft nur über gebaute Felder
@@ -111,7 +124,7 @@ export function buildKessel(
   for (let t = gang.depth + 1 + Math.floor((inner - gang.depth - 1) / 2); t < centre; t++)
     for (let u = -gang.half - gang.wall; u <= gang.half + gang.wall; u++) realm.add(key(...gang.at(u, t)));
   const stone: Point = [place.bed[0] + ICE_STONE[0], place.bed[1] + ICE_STONE[1]];
-  return { bed: place.bed, realm, spots: spotsOf(place, map), stone };
+  return { bed: place.bed, realm, spots: spotsOf(place, map), stone, portal: [ICE_PORTAL, portal] };
 }
 
 /** Eisklippe in Terrassen: innen 3, dann 4, außen 5, hier und da ein Block höher */
@@ -173,6 +186,34 @@ function forage(gang: Gang, { centre }: KesselPlace, map: Map<string, Cell>) {
   }
 }
 
+/**
+ * Die beiden Plattformen des Eis-Portals (3 × 3, flach, ringsum zwei Felder ebener Schnee): gleich hinter der
+ * Gangmündung und im Kreis um das Schneebett (`HOMES.eis.portalRing`) in Richtung des Tors. Es erwacht, sobald die
+ * Figur am Schneebett ankommt (`bed`).
+ */
+function platforms(gang: Gang, { bed, centre }: KesselPlace, map: Map<string, Cell>): Portal {
+  const [mx, my] = gang.at(0, gang.depth);
+  const [home] = ringSpots([Math.atan2(my - bed[1], mx - bed[0])], HOMES.eis.portalRing, bed);
+  const portal: Portal = { gate: gang.at(KESSEL.portal[0], centre + KESSEL.portal[1]), home: home!, bed };
+  for (const side of ['gate', 'home'] as const) {
+    const [cx, cy] = portal[side];
+    const ring = PLATFORM_HALF + 1;
+    for (let dy = -ring; dy <= ring; dy++)
+      for (let dx = -ring; dx <= ring; dx++)
+        if (plain(map.get(key(cx + dx, cy + dy)))) map.set(key(cx + dx, cy + dy), snow(1));
+    for (const { x, y, at } of platformCells([cx, cy]))
+      map.set(key(x, y), {
+        ...snow(1),
+        deco: at === 'centre' ? 'portal' : 'portalrim',
+        portal: { id: ICE_PORTAL, side, at },
+      });
+  }
+  return portal;
+}
+
+/** Schneeboden des Kessels ohne Bau darauf: Nur ihn ebnen die Plattformen, Wiese, Kisten und Klippen bleiben */
+const plain = (c: Cell | undefined) => c?.region === 'eis' && !c.deco && !c.garden && !c.solid;
+
 const stand = (map: ReadonlyMap<string, Cell>, x: number, y: number) => {
   const c = map.get(key(x, y));
   return !!c && !c.solid && !c.gate && c.ground !== 'water';
@@ -200,7 +241,7 @@ function slidePath(gang: Gang, bed: Point, map: ReadonlyMap<string, Cell>): Poin
     const next = NEIGHBOURS.map(([dx, dy]): Point => [x + dx, y + dy]).sort((a, b) => toBed(...a) - toBed(...b));
     for (const [nx, ny] of next) {
       const k = key(nx, ny);
-      if (from.has(k) || !stand(map, nx, ny)) continue;
+      if (from.has(k) || !stand(map, nx, ny) || map.get(k)!.portal) continue; // die Spur weicht den Plattformen aus
       from.set(k, key(x, y));
       queue.push([nx, ny]);
     }
@@ -209,8 +250,8 @@ function slidePath(gang: Gang, bed: Point, map: ReadonlyMap<string, Cell>): Poin
 }
 
 /**
- * Wohnplätze der Eis-Tiere: vom Schneebett aus erreichbare Felder des Kessels außerhalb der Schneewiese, nicht in der
- * Mündung (zwei Felder Abstand zum Gang, so versperrt kein Tier den Weg hinein)
+ * Wohnplätze der Eis-Tiere: vom Schneebett aus erreichbare Felder des Kessels außerhalb der Schneewiese und der
+ * Portal-Plattformen, nicht in der Mündung (zwei Felder Abstand zum Gang, so versperrt kein Tier den Weg hinein)
  */
 function spotsOf({ bed }: KesselPlace, map: ReadonlyMap<string, Cell>): Point[] {
   const out: Point[] = [];
@@ -226,7 +267,7 @@ function spotsOf({ bed }: KesselPlace, map: ReadonlyMap<string, Cell>): Point[] 
   while (queue.length) {
     const [x, y] = queue.shift()!;
     const c = map.get(key(x, y))!; // nur Felder, auf denen man steht, kommen in die Liste
-    if (c.region === 'eis' && !c.garden && !mouth(x, y)) out.push([x, y]);
+    if (c.region === 'eis' && !c.garden && !c.portal && !mouth(x, y)) out.push([x, y]);
     for (const [dx, dy] of NEIGHBOURS) {
       const k = key(x + dx, y + dy);
       const n = map.get(k);

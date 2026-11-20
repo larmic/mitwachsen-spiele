@@ -1,4 +1,4 @@
-// Portal-Plattformen von Mitwachsen: Form, Farben und Bild je Welt als Voxel.
+// Portal-Plattformen von Mitwachsen: welche Portale es gibt, Form, Farben und Bild je Welt als Voxel.
 // Eine flache Platte mit runden Ecken aus 3 × 3 Feldern, ganz begehbar, von allen Seiten zu betreten. Ein Voxel ist
 // 1/8 Feld groß und 1/8 Feld hoch, so groß wie ein Pixel der Bodentexturen. Der Sockel ist zwei Lagen hoch (0,25),
 // sein äußerster Ring nur eine (eine kleine Schwelle). Auf dem Mittelfeld liegt eine Lage höher das Bild der Welt
@@ -7,7 +7,22 @@
 // Seitenfeldern nach außen. Entwurf: Artefakt „Portal-Plattformen“ (docs/games/mitwachsen.md).
 // Spezifikation: docs/specs/mitwachsen.md
 
-import type { GateTheme } from './mitwachsen';
+import { GATES, type GateId, type GateTheme, type RegionId } from './mitwachsen';
+
+/** Portale: je großes Tor eines (heißt wie das Tor) und das Eis-Portal im Gletscherkessel */
+export type PortalId = GateId | 'eiskessel';
+export const ICE_PORTAL = 'eiskessel' satisfies PortalId;
+/**
+ * Je Portal: Thema (Bild und Farben der Plattform, Funken) und Gegend, in der seine beiden Plattformen stehen.
+ * Ein Portal verbindet immer nur Tor und Bett derselben Gegend: Die Portale der Tore stehen auf der Lichtung (neben dem
+ * Tor und im Kreis um ihr Bett), das Eis-Portal im Kessel (hinter der Gangmündung und im Kreis um das Schneebett).
+ */
+export const PORTALS = Object.fromEntries([
+  ...GATES.map((g) => [g.id, { theme: g.theme, realm: g.region }] as const),
+  [ICE_PORTAL, { theme: 'eis', realm: 'eis' }],
+]) as Readonly<Record<PortalId, { theme: GateTheme; realm: RegionId }>>;
+/** Alle Portal-Kennungen (Spielstände behalten nur diese) */
+export const PORTAL_IDS = Object.keys(PORTALS) as readonly PortalId[];
 
 /** Voxel je Feld und Raster der Plattform */
 export const SUB = 8;

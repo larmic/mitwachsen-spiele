@@ -1202,6 +1202,20 @@ describe('Portal-Plattformen', () => {
     }
   });
 
+  it('ein Gast reist mit: Der Pinguin, der auf der Lichtung folgt, kommt durch das Portal der Lichtung mit', () => {
+    const pinguin = animal('eis:pinguin', gx - 2, gy, {
+      species: 'pinguin',
+      mode: 'follow',
+      realm: 'eis',
+      home: { kind: 'region', region: 'eis' },
+    });
+    const r = go(at(gx - 1, gy, { portals: ['lava'], animals: [pinguin], followers: ['eis:pinguin'] }), gx, gy);
+    expect(r.events).toContainEqual({ type: 'teleport', id: 'lava', to: 'home' });
+    const p = r.s.animals[0]!;
+    expect([r.s.followers, p.mode]).toEqual([['eis:pinguin'], 'follow']);
+    expect(Math.max(Math.abs(p.x - hx), Math.abs(p.y - hy))).toBeLessThanOrEqual(3);
+  });
+
   it('Platztausch mit einem folgenden Tier auf die Mitte ist auch ein Betreten', () => {
     const hase = animal('lichtung:hase', gx, gy, { mode: 'follow' });
     const r = step(at(gx - 1, gy, { portals: ['lava'], animals: [hase], followers: ['lichtung:hase'] }), world, {
@@ -1224,6 +1238,96 @@ describe('Portal-Plattformen', () => {
     expect(s.arrived).toBeNull();
     expect(progressOf(s).portals).toEqual(['lava']);
     expect(progressOf(s)).not.toHaveProperty('arrived');
+  });
+});
+
+describe('Eis-Portal (Eis-Welt)', () => {
+  const world = createWorld(1);
+  const ice = world.portals.get('eiskessel')!;
+  const [gx, gy] = ice.gate;
+  const [hx, hy] = ice.home;
+  const bed = world.homes.eis.bed;
+  /** Figur wach an (x, y) im Gletscherkessel, Eistor offen, Blick nach Osten */
+  const at = (x: number, y: number, extra: Partial<State> = {}): State => ({
+    ...initialState(world),
+    sleeping: false,
+    player: { x, y, dir: 'e' },
+    animals: [],
+    openGates: ['eis'],
+    ...extra,
+  });
+  const cheb = (a: readonly number[], b: readonly number[]) =>
+    Math.max(Math.abs(a[0]! - b[0]!), Math.abs(a[1]! - b[1]!));
+
+  it('beide Plattformen stehen in der Eis-Welt, am Bett gehört es zum Schneebett', () => {
+    expect([world.realm(gx, gy), world.realm(hx, hy)]).toEqual(['eis', 'eis']);
+    expect(ice.bed).toEqual(bed);
+  });
+
+  it('Eis-Portal schläft bis zur ersten Ankunft am Schneebett, dann erwachen beide', () => {
+    // an der Plattform hinter der Mündung und an ihrem Gegenstück erwacht nichts, drei Felder vor dem Bett auch nicht
+    for (const p of [ice.gate, [gx + 3, gy], [gx, gy + 2], ice.home, [bed[0] + 3, bed[1]]] as const)
+      expect(step(at(p[0], p[1]), world, TICK).state.portals, p.join(',')).toEqual([]);
+    // zwei Felder vor dem Schneebett (auch schräg): Es ist angekommen, beide Plattformen erwachen
+    for (const [dx, dy] of [
+      [2, 0],
+      [-2, 2],
+      [0, 1],
+    ] as const) {
+      const r = step(at(bed[0] + dx, bed[1] + dy), world, TICK);
+      expect(r.events, `${dx},${dy}`).toContainEqual({ type: 'portal', id: 'eiskessel' });
+      expect(r.state.portals).toEqual(['eiskessel']);
+      expect(step(r.state, world, TICK).events.map((e) => e.type)).not.toContain('portal'); // nur einmal
+    }
+    // im Schlaf nicht, im Nebel nicht
+    expect(step(at(bed[0] + 1, bed[1], { sleeping: true }), world, TICK).state.portals).toEqual([]);
+    expect(step(at(bed[0] + 1, bed[1]), world, TICK, () => false).state.portals).toEqual([]);
+    // mit dem Laufen dorthin: der Schritt, der zwei Felder heran ist, weckt es
+    const walk = run(
+      at(bed[0] + 4, bed[1] + 1, { player: { x: bed[0] + 4, y: bed[1] + 1, dir: 'w' } }),
+      world,
+      'w',
+      'w',
+    );
+    expect(walk.events).toEqual([
+      { type: 'step', climb: 0 },
+      { type: 'step', climb: 0 },
+      { type: 'portal', id: 'eiskessel' },
+    ]);
+  });
+
+  it('Reisen nur innerhalb der Eis-Welt, folgende Tiere derselben Welt reisen mit', () => {
+    const pinguin = animal('eis:pinguin', gx - 2, gy, {
+      species: 'pinguin',
+      mode: 'follow',
+      realm: 'eis',
+      home: { kind: 'region', region: 'eis' },
+    });
+    const robbe = animal('eis:robbe', gx - 3, gy, {
+      species: 'robbe',
+      mode: 'follow',
+      realm: 'eis',
+      home: { kind: 'region', region: 'eis' },
+    });
+    const s = at(gx - 1, gy, {
+      portals: ['eiskessel'],
+      animals: [pinguin, robbe],
+      followers: ['eis:pinguin', 'eis:robbe'],
+    });
+    const r = run(s, world, 'e'); // auf die Mitte hinter der Mündung
+    expect(r.events).toContainEqual({ type: 'teleport', id: 'eiskessel', to: 'home' });
+    expect([r.s.player.x, r.s.player.y]).toEqual([hx, hy]); // im Kreis um das Schneebett, nicht auf der Lichtung
+    expect(r.s.followers).toEqual(['eis:pinguin', 'eis:robbe']);
+    for (const p of r.s.animals) {
+      expect(world.cell(p.x, p.y).portal, p.id).toBeUndefined();
+      expect(cheb([p.x, p.y], [hx, hy]), p.id).toBeLessThanOrEqual(3);
+      expect(world.realm(p.x, p.y), p.id).toBe('eis');
+    }
+    // erst runter, dann wieder rauf: zurück hinter die Mündung, nie auf die Lichtung
+    const off = run(r.s, world, 'e');
+    const back = run({ ...off.s, player: { ...off.s.player, dir: 'w' } }, world, 'w');
+    expect(back.events).toContainEqual({ type: 'teleport', id: 'eiskessel', to: 'gate' });
+    expect([back.s.player.x, back.s.player.y]).toEqual([gx, gy]);
   });
 });
 

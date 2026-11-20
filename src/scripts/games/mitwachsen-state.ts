@@ -20,7 +20,8 @@ import type { StoryId } from '../../data/games/mitwachsen-stories';
 import { canStep, standHeight, wildAnimals, type World } from './mitwachsen-world';
 import { chore, regrow, type ChoreEvent } from './mitwachsen-chores';
 import { homeAt, startRealm } from './mitwachsen-home';
-import { platformsToWake, stepOn } from './mitwachsen-portal';
+import { landed, wakePortals, type PortalEvent } from './mitwachsen-travel';
+import type { PortalId } from '../../data/games/mitwachsen-portals';
 import { sheltering } from './mitwachsen-weather';
 import { PENGUIN, atHome, meadowSpots, shelterPlaces, windOk, type Home } from './mitwachsen-meadow';
 import { dirTo, freeNear, occupied } from './mitwachsen-free';
@@ -59,7 +60,7 @@ export type State = {
   met: string[];
   garden: HomeAnimal[];
   openGates: GateId[];
-  portals: GateId[]; // wache Portal-Plattformen (je Tor eine, mit Gegenstück am Bett)
+  portals: PortalId[]; // wache Portal-Plattformen (je Portal eine, mit Gegenstück am Bett)
   arrived: readonly [number, number] | null; // Mittelfeld, auf dem die Figur angekommen ist: erst runter, dann wieder rauf (nicht gespeichert)
   picked: Record<string, number>; // Büsche ohne Beeren und leere Fischkisten: "x,y" → Takt des Leerens (nicht gespeichert)
   day: number; // Tage, die die Welt schon erlebt hat (jedes Schlafen zählt einen); Blumen wachsen damit
@@ -76,7 +77,7 @@ export type Progress = {
   met: string[];
   garden: HomeAnimal[];
   openGates: GateId[];
-  portals: GateId[];
+  portals: PortalId[];
   position: [number, number];
   day: number;
   heard: StoryId[];
@@ -96,9 +97,7 @@ export type GameEvent =
   | { type: 'aside'; id: string; species: SpeciesId } // ein Tier der Wiese macht der Figur Platz
   | { type: 'home'; id: string; species: SpeciesId } // auf der Wiese angekommen
   | { type: 'gate'; id: GateId }
-  | { type: 'portal'; id: GateId } // Plattform am Tor (und ihr Gegenstück am Bett) erwacht
-  | { type: 'teleport'; id: GateId; to: 'gate' | 'home' }
-  | { type: 'ready'; id: GateId } // nach der Ankunft von der Mitte gestiegen: Die Plattform ist wieder bereit
+  | PortalEvent // Plattformen erwachen, reisen, wieder bereit (mitwachsen-travel.ts)
   | ChoreEvent // Handgriffe: pflücken, fangen, nachwachsen, füttern, schöpfen, tränken (mitwachsen-chores.ts)
   | BorderEvent // Weltgrenze am Tor: warten, wieder einreihen, Gegend wechseln (mitwachsen-border.ts)
   | { type: 'call' }
@@ -272,11 +271,7 @@ export function step(state: State, world: World, cmd: Cmd, explored: Explored = 
       crossBorder(s, world, from, events);
     }
   } else action(s, world, events);
-  // Portal-Plattformen in der Nähe erwachen (Regeln in mitwachsen-portal.ts)
-  for (const id of s.sleeping ? [] : platformsToWake(world.portals, s.portals, s.player.x, s.player.y, explored)) {
-    s.portals.push(id);
-    events.push({ type: 'portal', id });
-  }
+  wakePortals(s, world, explored, events); // Portal-Plattformen in der Nähe erwachen (mitwachsen-travel.ts)
   return { state: s, events };
 }
 
@@ -478,26 +473,6 @@ function bringHome(s: State, world: World, events: GameEvent[]) {
     }
     events.push({ type: 'home', id, species: a.species });
   }
-}
-
-/**
- * Die Figur hat ein neues Feld betreten: nach einer Ankunft wieder bereit, auf der Mitte einer wachen Plattform reisen
- * (Regeln in mitwachsen-portal.ts). Folgende Tiere reisen mit und stellen sich um die Plattform, nie darauf.
- */
-function landed(s: State, world: World, events: GameEvent[]) {
-  const { x, y } = s.player;
-  const r = stepOn(world.portals, (fx, fy) => world.cell(fx, fy).portal, s.portals, s.arrived, x, y);
-  s.arrived = r.arrived;
-  if (r.ready) events.push({ type: 'ready', id: r.ready });
-  if (!r.travel) return;
-  const { id, to, at } = r.travel;
-  Object.assign(s.player, { x: at[0], y: at[1], dir: 's' });
-  for (const f of s.followers) {
-    const a = s.animals.find((t) => t.id === f)!;
-    const place = freeNear(s, world, at, (fx, fy) => !world.cell(fx, fy).portal, f);
-    if (place) [a.x, a.y] = place;
-  }
-  events.push({ type: 'teleport', id, to });
 }
 
 function action(s: State, world: World, events: GameEvent[]) {

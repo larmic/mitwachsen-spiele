@@ -7,7 +7,7 @@
 import { chunkOf } from '../../lib/games/chunks';
 import { projection, type Dir } from '../../lib/games/front';
 import type { World3D as World3DType } from './mitwachsen-3d';
-import { GAME_COLORS, LOOK, SPECIES, THEME_COLORS, TIRED_TALK } from '../../data/games/mitwachsen';
+import { GAME_COLORS, LOOK, SPECIES, TIRED_TALK } from '../../data/games/mitwachsen';
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
 import { sparks } from './mitwachsen-glyphs';
 import { Sfx } from './sfx';
@@ -32,7 +32,7 @@ import { Fog, REVEAL, START_REVEAL } from './mitwachsen-fog';
 import { initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
 import type { ChoreEvent } from './mitwachsen-chores';
 import { createWorld, standHeight, type World } from './mitwachsen-world';
-import { platformLift } from './mitwachsen-portal';
+import { platformLift, portalColor } from './mitwachsen-portal';
 import { SNAP_DELAY, hopOf, snaps } from './mitwachsen-gait';
 import { FISH_SPARKS } from '../../data/games/mitwachsen-eis';
 import { windAt } from './mitwachsen-weather';
@@ -513,10 +513,10 @@ class LarmicMitwachsen extends HTMLElement {
           this.burst(e.id, ['#ffd47e', '#ffffff', '#6cc46f'], 14);
           persist = true;
           break;
-        case 'portal': // Plattform erwacht bzw. gereist
+        case 'portal': // Plattform erwacht bzw. gereist (Funken in der Farbe ihres Portals)
         case 'teleport':
           this.sfx[e.type === 'portal' ? 'gate' : 'portal']();
-          this.burst('player', [THEME_COLORS[e.id].portal, '#ffffff'], e.type === 'portal' ? 24 : 18);
+          this.burst('player', [portalColor(e.id), '#ffffff'], e.type === 'portal' ? 24 : 18);
           persist = true;
           break;
         case 'ready':

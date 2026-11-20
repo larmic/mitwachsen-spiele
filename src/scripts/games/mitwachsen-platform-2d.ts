@@ -3,7 +3,7 @@
 // Von jeder Säule nur der oberste Voxel, darunter sieht man von schräg oben ohnehin nichts.
 
 import { box, type Projection } from '../../lib/games/front';
-import { GOLD, SUB, platformLook, voxelSpan } from '../../data/games/mitwachsen-portals';
+import { GOLD, PORTALS, SUB, platformLook, voxelSpan } from '../../data/games/mitwachsen-portals';
 import { PLATFORM_HALF, type PlatformSpot } from './mitwachsen-portal';
 import type { State } from './mitwachsen-state';
 import type { World } from './mitwachsen-world';
@@ -27,7 +27,7 @@ export function drawPlatform(
   const fx = (x - cx + PLATFORM_HALF) * SUB,
     fz = (y - cy + PLATFORM_HALF) * SUB;
   const s = 1 / SUB;
-  const all = platformLook(id, side, look);
+  const all = platformLook(PORTALS[id].theme, side, look);
   const taken = new Set(all.map((v) => `${v.x},${v.z},${v.layer}`));
   const mine = all
     .filter((v) => v.x >= fx && v.x < fx + SUB && v.z >= fz && v.z < fz + SUB)

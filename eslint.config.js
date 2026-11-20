@@ -75,7 +75,7 @@ export default defineConfig(
     files: ['src/scripts/games/mitwachsen-state.ts'],
     rules: {
       complexity: ['error', 25],
-      'max-lines': ['error', { max: 510, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['error', { max: 491, skipBlankLines: true, skipComments: true }],
     },
   },
   {

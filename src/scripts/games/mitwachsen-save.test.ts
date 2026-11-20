@@ -168,6 +168,46 @@ describe('Format und Umzug (migrate)', () => {
   });
 });
 
+describe('Eis-Portal im Spielstand', () => {
+  it('Eis-Portal kommt mit dem Spielstand wieder (Format v4 wie bisher, Unbekanntes fällt weg)', () => {
+    const store = memoryStore();
+    const w = { ...newWorld('a', 1, 'X'), portals: ['lava', 'eiskessel'] as ('lava' | 'eiskessel')[] };
+    saveWorld(store, w);
+    expect(loadWorld(store, 'a')!.portals).toEqual(['lava', 'eiskessel']);
+    expect(migrate({ ...w, portals: ['eiskessel', 'westtor', 'kessel', 3, 'pilze'] })!.portals).toEqual([
+      'eiskessel',
+      'pilze',
+    ]);
+    expect(progressFrom(loadWorld(store, 'a')!).portals).toEqual(['lava', 'eiskessel']);
+  });
+
+  it('alter v4-Stand (vor dem Eis-Portal gespeichert) lädt unverändert', () => {
+    // so, wie ihn die Spielseite bisher geschrieben hat: Portale nur an Toren
+    const old = {
+      v: 4,
+      game: 'mitwachsen',
+      age: 3,
+      id: 'k7',
+      seed: 2026,
+      worldName: 'Bobos Insel',
+      figureName: 'Bobo',
+      openGates: [],
+      metAnimals: ['lichtung:hase', 'lichtung:igel'],
+      homeAnimals: [{ id: 'lichtung:hase', species: 'hase' }],
+      portals: ['lava', 'pilze', 'eis'],
+      position: [12, -3],
+      visits: 7,
+      day: 4,
+      explored: { '0,0': 'AAAA' },
+      heard: ['bett', 'eis'],
+    };
+    const store = memoryStore();
+    store.setItem(worldKey('k7'), JSON.stringify(old));
+    expect(loadWorld(store, 'k7')).toEqual(old);
+    expect(migrate(old)).toEqual(old);
+  });
+});
+
 describe('Namen und Welt-Code', () => {
   it('säubert Namen und nimmt sonst den Ersatz', () => {
     expect(cleanName('  Bobo  ', 'X')).toBe('Bobo');

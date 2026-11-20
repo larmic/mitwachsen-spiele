@@ -21,7 +21,7 @@ import { BED_STONE, type StoryId } from '../../data/games/mitwachsen-stories';
 import type { Cell, Ground, TreeKind } from './mitwachsen-cell';
 import { LICHTUNG_HOME, realmsOf, type Realms } from './mitwachsen-home';
 import { buildKessel, placeKessel, type Gang, type Kessel } from './mitwachsen-kessel';
-import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from './mitwachsen-portal';
+import { PLATFORM_HALF, platformCells, ringSpots, type Portal, type PortalId } from './mitwachsen-portal';
 import { findSpawns } from './mitwachsen-spawns';
 
 export type { Cell, Deco, Ground, TreeKind } from './mitwachsen-cell';
@@ -43,8 +43,11 @@ export type World = Realms & {
   readonly spawns: ReadonlyMap<string, Point>; // je Tier-Kennung
   /** Alle vom Bett aus erreichbaren Felder einer Gegend außerhalb der Wiese: hier dürfen ihre Tiere wohnen */
   spotsOf(realm: RegionId): readonly Point[];
-  /** Portale: je Tor eines daneben und eines im Kreis um das Bett, mit dem Feld, auf dem man herauskommt */
-  readonly portals: ReadonlyMap<GateId, Portal>;
+  /**
+   * Portale: je Tor eines daneben und eines im Kreis um das Bett, mit dem Feld, auf dem man herauskommt; dazu das
+   * Eis-Portal im Gletscherkessel (hinter der Gangmündung und im Kreis um das Schneebett)
+   */
+  readonly portals: ReadonlyMap<PortalId, Portal>;
   /** Die großen Tore: Lage und Reihenfolge würfelt der Seed */
   readonly gates: ReadonlyMap<GateId, GatePlace>;
   /** Klangsteine: einer am Bett, einer vor jedem großen Tor, einer am Schneebett im Gletscherkessel */
@@ -613,7 +616,7 @@ function dress(seed: number, x: number, y: number, c: Cell): Cell {
 export const kesselPlace = (seed: number) => placeKessel(seed, gangOf(layouts(seed)), outside);
 /** Liegt ein Feld ganz hinter dem Felsring der Lichtung (Landschaft, Gänge ins Freie, Kessel)? */
 export const beyondRing = outside;
-/** Die Portal-Plattformen einer Welt; schnell, ohne die Welt zu bauen */
+/** Die Portal-Plattformen der Lichtung (an den Toren); schnell, ohne die Welt zu bauen */
 export const portalPlaces = (seed: number) => portalsOf(layouts(seed));
 /** Die großen Tore einer Welt; schnell, ohne die Welt zu bauen (Lage und Reihenfolge würfelt der Seed) */
 export const gatePlaces = (seed: number) => gatesOf(layouts(seed));
@@ -645,7 +648,7 @@ export function createWorld(seed: number): World {
     gates: gatesOf(places),
     spawns,
     spotsOf: (realm) => ({ lichtung: spots, eis: kessel.spots })[realm],
-    portals: portalsOf(places),
+    portals: new Map([...portalsOf(places), kessel.portal]),
     stones: new Map<StoryId, Point>([...stonesOf(places), ['eis-offen', kessel.stone]]),
     // In der Eis-Welt überall kühles Licht (wie ganz nah am Eistor)
     climate: (x, y) => (kessel.realm.has(key(x, y)) ? { id: 'eis', strength: 1 } : climateOf(seed, places, x, y)),

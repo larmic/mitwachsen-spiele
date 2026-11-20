@@ -29,6 +29,11 @@ export const KESSEL = {
   ],
   /** Moosfleck: grünes Moos und Flechten unter dem Schnee (nur Kulisse, begehbar) */
   moss: { across: -14, out: 3, r: 1.8 },
+  /**
+   * Mitte der Plattform des Eis-Portals [quer, vom Tor weg]: gleich hinter der Gangmündung neben der Rutschspur, auf
+   * der anderen Seite als die Fischkiste am Tor. Ihr Gegenstück steht im Kreis um das Schneebett in Richtung des Tors.
+   */
+  portal: [5, -14],
 } as const;
 
 /** Farben im Kessel (Spielgrafik): Seite und Oberseite */

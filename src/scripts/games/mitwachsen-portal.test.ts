@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { GateId, Point } from '../../data/games/mitwachsen';
+import type { Point } from '../../data/games/mitwachsen';
+import { PORTALS, PORTAL_IDS, type PortalId } from '../../data/games/mitwachsen-portals';
 import {
+  BED_ARRIVAL,
   PLATFORM_HALF,
   PORTAL_WAKE,
   RING_GAP,
@@ -8,6 +10,7 @@ import {
   platformCells,
   platformLift,
   platformsToWake,
+  portalColor,
   ringSpots,
   stepOn,
   type PlatformSpot,
@@ -15,7 +18,7 @@ import {
 } from './mitwachsen-portal';
 
 const cheb = (a: Point, b: Point) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
-const portals = new Map<GateId, Portal>([
+const portals = new Map<PortalId, Portal>([
   ['eis', { gate: [50, 0], home: [9, 0] }],
   ['lava', { gate: [-50, 0], home: [-9, 0] }],
 ]);
@@ -80,6 +83,38 @@ describe('Portal-Plattformen: Erwachen', () => {
 
   it('das Gegenstück am Bett weckt nichts', () => {
     expect(platformsToWake(portals, [], 9, 0, all)).toEqual([]);
+  });
+});
+
+describe('Eis-Portal (Gletscherkessel)', () => {
+  const all = () => true;
+  // Plattform hinter der Gangmündung, Gegenstück im Kreis um das Schneebett bei (0, 100)
+  const ice = new Map<PortalId, Portal>([['eiskessel', { gate: [0, 82], home: [0, 91], bed: [0, 100] }]]);
+
+  it('schläft bis zur ersten Ankunft am Schneebett, dann erwachen beide (nicht durch Nähe zur Plattform)', () => {
+    for (const [x, y] of [
+      [0, 82], // auf der Plattform hinter der Mündung
+      [3, 82],
+      [0, 91], // auf dem Gegenstück
+      [0, 100 - BED_ARRIVAL - 1], // drei Felder vor dem Bett
+    ] as const)
+      expect(platformsToWake(ice, [], x, y, all), `${x},${y}`).toEqual([]);
+    for (const [x, y] of [
+      [0, 100 - BED_ARRIVAL],
+      [BED_ARRIVAL, 100 + BED_ARRIVAL], // auch schräg
+      [1, 100],
+    ] as const)
+      expect(platformsToWake(ice, [], x, y, all), `${x},${y}`).toEqual(['eiskessel']);
+    expect(platformsToWake(ice, [], 1, 100, (x, y) => !(x === 0 && y === 100))).toEqual([]); // Bett noch im Nebel
+    expect(platformsToWake(ice, ['eiskessel'], 1, 100, all)).toEqual([]); // schon wach
+  });
+
+  it('Thema Eis (Eisscholle, Schneeflocke) und Gegend Eis-Welt; die Portale der Tore stehen auf der Lichtung', () => {
+    expect(PORTALS.eiskessel).toEqual({ theme: 'eis', realm: 'eis' });
+    expect(portalColor('eiskessel')).toBe(portalColor('eis'));
+    expect(PORTAL_IDS).toHaveLength(9);
+    for (const id of PORTAL_IDS.filter((p) => p !== 'eiskessel'))
+      expect(PORTALS[id], id).toEqual({ theme: id, realm: 'lichtung' });
   });
 });
 

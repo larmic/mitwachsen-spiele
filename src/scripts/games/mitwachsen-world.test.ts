@@ -280,6 +280,66 @@ describe('Zuhause je Gegend', () => {
   }
 });
 
+const keyOf = ([x, y]: readonly [number, number]) => `${x},${y}`;
+const chebOf = (a: readonly number[], b: readonly number[]) =>
+  Math.max(Math.abs(a[0]! - b[0]!), Math.abs(a[1]! - b[1]!));
+
+/** Feld (dx, dy) um eine Plattform: frei und nicht im Gang; im äußeren Ring auch eben und keine Plattform */
+function ringFree(w: World, gang: ReadonlySet<string>, [cx, cy]: readonly [number, number], dx: number, dy: number) {
+  const c = w.cell(cx + dx, cy + dy);
+  const free = !c.solid && c.ground !== 'water' && !c.garden && !gang.has(`${cx + dx},${cy + dy}`);
+  return free && (Math.max(Math.abs(dx), Math.abs(dy)) < 2 || (!c.portal && c.h === 1));
+}
+
+/** Was an einer Plattform des Eis-Portals nicht stimmt: Felder, Ring ringsum, Zugänge (leer, wenn alles passt) */
+function icePlatformFaults(w: World, side: 'gate' | 'home', reach: ReadonlySet<string>): string[] {
+  const wrong: string[] = [];
+  const centre = w.portals.get('eiskessel')![side];
+  const crossing = crossings(w)[0]!;
+  for (const { x, y, at } of platformCells(centre)) {
+    const c = w.cell(x, y);
+    if (JSON.stringify(c.portal) !== JSON.stringify({ id: 'eiskessel', side, at }))
+      wrong.push(`${side} ${x},${y} Feld`);
+    if (c.solid || c.h !== w.cell(...centre).h || c.slide || c.garden) wrong.push(`${side} ${x},${y} flach und frei`);
+    if (w.realm(x, y) !== 'eis' || c.region !== 'eis' || !reach.has(`${x},${y}`))
+      wrong.push(`${side} ${x},${y} Kessel`);
+  }
+  // ringsum zwei Felder ebener Schnee, frei, nicht im Gang; von allen vier Seiten erreichbar
+  for (let dy = -2; dy <= 2; dy++)
+    for (let dx = -2; dx <= 2; dx++)
+      if (!ringFree(w, crossing.cells, centre, dx, dy)) wrong.push(`${side} Ring ${dx},${dy}`);
+  for (const [dx, dy] of Object.values(DIRS))
+    if (!reach.has(`${centre[0] + 2 * dx},${centre[1] + 2 * dy}`)) wrong.push(`${side} Zugang ${dx},${dy}`);
+  return wrong;
+}
+
+/** Was am Eis-Portal einer Welt nicht stimmt: beide Plattformen, ihre Lage, Warteplätze (leer, wenn alles passt) */
+function icePortalFaults(w: World): string[] {
+  const home = w.homes.eis;
+  const gate = w.gates.get('eis')!;
+  const p = w.portals.get('eiskessel')!;
+  const crossing = crossings(w)[0]!;
+  const reach = new Set(reachable(w, [], home.wake[0]!, 200000).map(keyOf)); // vom Schneebett aus, Tor zu
+  const wrong = [...icePlatformFaults(w, 'gate', reach), ...icePlatformFaults(w, 'home', reach)];
+  if (keyOf(p.bed!) !== keyOf(home.bed)) wrong.push('erwacht nicht am Schneebett');
+  // kein Warteplatz auf einer der Plattformen oder an ihren Zugängen (Durchgänge wie an den Toren)
+  const area = new Set(platformArea(new Map([['eiskessel', p]])));
+  for (const seat of crossing.seats.get('eis')!) if (area.has(keyOf(seat))) wrong.push(`Warteplatz ${keyOf(seat)}`);
+  // gleich hinter der Gangmündung (wenige Felder vom ersten Feld der Kesselseite)
+  const mouth = [...crossing.entries].filter(([, r]) => r === 'eis').map(([k]) => k.split(',').map(Number));
+  if (Math.min(...mouth.map((m) => chebOf(m, p.gate))) > 7) wrong.push('nicht hinter der Mündung');
+  // im Kreis um das Schneebett, in Richtung des Tors; berührt weder Wiese, Iglu, Tröge noch Klangstein
+  const [vx, vy] = [p.home[0] - home.bed[0], p.home[1] - home.bed[1]];
+  if (Math.abs(Math.hypot(vx, vy) - home.portalRing) >= 1) wrong.push('nicht im Ring um das Schneebett');
+  if (vx * -gate.out[0] + vy * -gate.out[1] <= 0.95 * Math.hypot(vx, vy)) wrong.push('nicht in Richtung des Tors');
+  for (const f of [home.bed, home.food, home.water, home.shelterStem, w.stones.get('eis-offen')!])
+    if (chebOf(p.home, f) <= 2) wrong.push(`an ${keyOf(f)}`);
+  const { x0, y0, x1, y1 } = home.shelter;
+  for (const { x, y } of platformCells(p.home))
+    if (x >= x0 - 1 && x <= x1 + 1 && y >= y0 - 2 && y <= y1 + 1) wrong.push(`Iglu ${x},${y}`);
+  return wrong;
+}
+
 describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
   const span = GATE_HALF + TOWER;
   /** Felder eines Torhauses und seines Gangs: Reihe für Reihe nach außen, bis eine ganz hinter dem Felsring liegt */
@@ -339,6 +399,11 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
       );
       expect(cut, `Seed ${seed}`).toEqual([]);
     }
+  });
+
+  it('Eis-Portal: Plattform hinter der Mündung und im Ring um das Schneebett: 3 × 3, erreichbar, ringsum frei (24 Seeds)', () => {
+    for (const seed of [1, 42, 2026, 7, ...Array.from({ length: 20 }, (_, i) => 201 + i)])
+      expect(icePortalFaults(createWorld(seed)), `Seed ${seed}`).toEqual([]);
   });
 
   for (const seed of [1, 42, 2026, 7]) {

@@ -6,6 +6,7 @@
 import { GATES, REGIONS, SPECIES, animalId, type GateId, type SpeciesId } from '../../data/games/mitwachsen';
 import type { HomeAnimal, Progress } from './mitwachsen-state';
 import { STORIES, type StoryId } from '../../data/games/mitwachsen-stories';
+import { PORTAL_IDS, type PortalId } from '../../data/games/mitwachsen-portals';
 
 export const PREFIX = 'larmic.games.';
 export const INDEX_KEY = `${PREFIX}index`;
@@ -28,7 +29,7 @@ export type SavedWorld = {
   openGates: GateId[];
   metAnimals: string[];
   homeAnimals: HomeAnimal[];
-  portals: GateId[]; // aktivierte Portale
+  portals: PortalId[]; // wache Portal-Plattformen (je Tor eines und das Eis-Portal)
   position: [number, number];
   visits: number;
   day: number; // Tage der Welt (jedes Schlafen einer), Blumen und Pilze wachsen damit
@@ -131,6 +132,7 @@ export function migrate(input: unknown): SavedWorld | null {
   if (raw.v !== VERSION || raw.game !== 'mitwachsen') return null;
   if (typeof raw.id !== 'string' || typeof raw.seed !== 'number' || !Number.isFinite(raw.seed)) return null;
   const gates = new Set<string>(GATES.map((g) => g.id));
+  const portals = new Set<string>(PORTAL_IDS); // alle Portale, auch das Eis-Portal (nicht nur die der Tore)
   const garden = Array.isArray(raw.homeAnimals)
     ? raw.homeAnimals.filter(
         (p): p is HomeAnimal =>
@@ -152,7 +154,7 @@ export function migrate(input: unknown): SavedWorld | null {
     position: pos ? (raw.position as [number, number]) : [0, 0],
     visits: typeof raw.visits === 'number' && raw.visits >= 0 ? Math.floor(raw.visits) : 0,
     day: typeof raw.day === 'number' && raw.day >= 0 && Number.isFinite(raw.day) ? Math.floor(raw.day) : 0,
-    portals: strings(raw.portals).filter((g): g is GateId => gates.has(g)),
+    portals: strings(raw.portals).filter((p): p is PortalId => portals.has(p)),
     heard: [...new Set(strings(raw.heard))].filter((id): id is StoryId => Object.hasOwn(STORIES, id)).sort(),
     explored: isRecord(raw.explored)
       ? Object.fromEntries(Object.entries(raw.explored).filter(([, v]) => typeof v === 'string') as [string, string][])

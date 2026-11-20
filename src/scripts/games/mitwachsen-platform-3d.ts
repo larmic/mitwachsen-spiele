@@ -5,10 +5,17 @@
 // Wird nur mit der 3D-Ansicht nachgeladen (Three.js).
 
 import { BoxGeometry, Group, type BufferGeometry, Mesh, MeshBasicMaterial, type Material } from 'three';
-import { GATES, THEME_COLORS, type GateId } from '../../data/games/mitwachsen';
-import { FRAME_RING, GOLD, SOCKET_TOP, SUB, type PlatformVoxel } from '../../data/games/mitwachsen-portals';
+import {
+  FRAME_RING,
+  GOLD,
+  PORTALS,
+  SOCKET_TOP,
+  SUB,
+  type PlatformVoxel,
+  type PortalId,
+} from '../../data/games/mitwachsen-portals';
 import { parts, platformParts, platformSets, type GoldVoxel } from './mitwachsen-gatehouse';
-import { PLATFORM_HALF, PORTAL_WAKE } from './mitwachsen-portal';
+import { PLATFORM_HALF, PORTAL_WAKE, portalColor } from './mitwachsen-portal';
 import type { Scene } from './mitwachsen-render';
 import type { State } from './mitwachsen-state';
 import type { World } from './mitwachsen-world';
@@ -18,7 +25,7 @@ const RUNNER = 4; // so viele helle Voxel wandern hintereinander um die Mitte
 const WAVE_MS = 150; // Erwachen: eine Stufe des Lichts
 
 type Platform3D = {
-  id: GateId;
+  id: PortalId;
   side: 'gate' | 'home';
   centre: readonly [number, number];
   asleep: Group; // am Tor matt, am Bett ein leerer grauer Sockel
@@ -37,8 +44,8 @@ type Platform3D = {
 export class Platforms3D {
   readonly group = new Group();
   private platforms: Platform3D[] = [];
-  private awakeSeen: Set<GateId> | null = null; // wache Plattformen beim letzten Bild (null: neue Welt, noch keins)
-  private wokeAt = new Map<GateId, number>(); // gerade erwacht: Das Licht kommt in Stufen
+  private awakeSeen: Set<PortalId> | null = null; // wache Plattformen beim letzten Bild (null: neue Welt, noch keins)
+  private wokeAt = new Map<PortalId, number>(); // gerade erwacht: Das Licht kommt in Stufen
   private sparkGeo = new BoxGeometry(0.1, 0.1, 0.1);
   private runnerGeo = new BoxGeometry(1 / SUB + 0.03, RUNNER_H, 1 / SUB + 0.03);
   private runnerMat = new MeshBasicMaterial({ color: GOLD.light });
@@ -88,29 +95,24 @@ export class Platforms3D {
     this.platforms = [];
     this.awakeSeen = null;
     this.wokeAt.clear();
-    for (const g of GATES) {
-      const pair = world.portals.get(g.id);
-      if (!pair) continue;
+    for (const [id, pair] of world.portals)
+      // die Portale der Tore und das Eis-Portal im Gletscherkessel
       for (const [centre, side] of [
         [pair.gate, 'gate'],
         [pair.home, 'home'],
       ] as const)
-        this.platforms.push(this.platform(world, g.id, centre, side));
-    }
+        this.platforms.push(this.platform(world, id, centre, side));
   }
 
-  private platform(world: World, id: GateId, centre: readonly [number, number], side: 'gate' | 'home') {
+  private platform(world: World, id: PortalId, centre: readonly [number, number], side: 'gate' | 'home') {
     const [cx, cy] = centre;
     const host = new Group();
     host.position.set(cx + 0.5, world.cell(cx, cy).h, cy + 0.5);
-    const sets = platformSets(id, side);
+    const sets = platformSets(PORTALS[id].theme, side);
     const pictureMat = this.glow();
     const accessMat = this.glow();
     const sparks = Array.from({ length: 6 }, (_, i) => {
-      const spark = new Mesh(
-        this.sparkGeo,
-        new MeshBasicMaterial({ color: i % 2 ? '#ffffff' : THEME_COLORS[id].portal }),
-      );
+      const spark = new Mesh(this.sparkGeo, new MeshBasicMaterial({ color: i % 2 ? '#ffffff' : portalColor(id) }));
       spark.userData.phase = i / 6;
       return spark;
     });
@@ -169,7 +171,7 @@ export class Platforms3D {
   }
 
   /** Erwachen: Das Licht kommt in vier Stufen (0 bis 4; bei reduzierter Bewegung und nach dem Laden sofort ganz) */
-  private wave(id: GateId, sc: Scene): number {
+  private wave(id: PortalId, sc: Scene): number {
     const since = this.wokeAt.get(id);
     return sc.reduced || since === undefined ? 4 : Math.min(4, Math.floor((sc.now - since) / WAVE_MS));
   }
