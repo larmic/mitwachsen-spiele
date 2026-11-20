@@ -208,7 +208,7 @@ export class Renderer {
     if (sc.evening > 0) this.eveningGlow(sc);
     this.weather(sc);
     const ice = this.iceSky(world, state); // Wetter der Eis-Welt und Bild der Weltgrenze, erst nachgeladen
-    ice?.iceWeather(ctx, world, sc, P);
+    if (world.spotsOf('eis').length) ice?.iceWeather(ctx, world, sc, P); // ohne Paket der Eis-Welt kein Iglu, kein Wetter
     for (const a of state.animals) {
       const b = sc.bodies.get(a.id);
       if (!b || !sc.explored(Math.round(b.x), Math.round(b.y))) continue; // im Nebel nichts verraten

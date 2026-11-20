@@ -16,12 +16,12 @@ import {
   type RegionId,
   type SpeciesId,
 } from '../../data/games/mitwachsen';
-import { told, type StoryId } from '../../data/games/mitwachsen-stories';
+import { STORIES, told, type StoryId } from '../../data/games/mitwachsen-stories';
 import { canStep, standHeight, wildAnimals, type World } from './mitwachsen-world';
 import { chore, regrow, type ChoreEvent } from './mitwachsen-chores';
 import { homeAt, startRealm } from './mitwachsen-home';
 import { landed, wakePortals, type PortalEvent } from './mitwachsen-travel';
-import type { PortalId } from '../../data/games/mitwachsen-portals';
+import { PORTAL_IDS, type PortalId } from '../../data/games/mitwachsen-portals';
 import { sheltering } from './mitwachsen-weather';
 import { PENGUIN, atHome, meadowSpots, shelterPlaces, slipPast, windOk, type Home } from './mitwachsen-meadow';
 import { comesHome, homeward, ownSpot, walkHome } from './mitwachsen-arrive';
@@ -73,7 +73,8 @@ export type State = {
   heard: StoryId[]; // Geschichten, deren Klangstein schon einmal erklungen ist
   calm: number; // Tag, an dem der Pinguin auf die Schneewiese gezogen ist: an ihm weht kein Pustewind (nicht gespeichert)
   guideDue: number; // verlaufener Pinguin: Takt, ab dem er auftaucht bzw. aufgetaucht ist (nicht gespeichert, mitwachsen-guide.ts)
-  ritual: number; // Takt, an dem das Eistor mit dem Pinguin aufging (-1: noch nicht; nicht gespeichert, mitwachsen-ritual.ts)
+  ritual: number; // Takt, an dem das Eistor mit dem Pinguin aufging (-1: noch nicht; nicht gespeichert, worlds/eis/mitwachsen-ritual.ts)
+  held?: readonly [number, number]; // gespeicherte Position, solange ein Welt-Paket fehlt: bleibt im Spielstand (Abschnitt „Welt-Pakete“)
 };
 
 /** Was gespeichert wird */
@@ -159,6 +160,8 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
   const placed = new Map<RegionId, number>(); // je Gegend: so viele Tiere stehen schon auf ihrer Wiese
   for (const p of garden) {
     const realm = realmOfAnimal(p.id);
+    // Ohne das Paket ihrer Welt hat die Gegend keine Wiese: Das Tier bleibt im Spielstand, steht aber nirgends
+    if (!meadowSpots(world, realm).length) continue;
     const i = placed.get(realm) ?? 0;
     placed.set(realm, i + 1);
     animals.push(settle(p.id, p.species, cycle(meadowSpots(world, realm), i), 'home', { kind: 'garden' }, realm));
@@ -176,7 +179,8 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     met: [...(saved.met ?? [])].sort(),
     garden: [...garden],
     openGates: open,
-    portals: (saved.portals ?? []).filter((id) => world.portals.has(id)),
+    // Erwachte Portale und gehörte Steine bleiben, auch wenn die Welt sie gerade nicht kennt (Welt-Paket fehlt)
+    portals: (saved.portals ?? []).filter((id) => PORTAL_IDS.includes(id)),
     arrived: null,
     picked: {},
     basket: false,
@@ -184,11 +188,13 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     fish: false,
     day: saved.day ?? 0,
     dayStart: 0,
-    heard: (saved.heard ?? []).filter((id) => world.stones.has(id)),
+    heard: (saved.heard ?? []).filter((id) => Object.hasOwn(STORIES, id)),
     calm: -1,
     guideDue: -1,
     ritual: -1,
   };
+  // Fehlt das Paket einer Welt hinter einem Tor, wüsste die Welt nicht, ob die Figur dort war: Position behalten
+  if (saved.position && REGIONS.some((r) => r.behind && !world.spotsOf(r.id).length)) s.held = [...saved.position];
   scatter(s, world); // jeder Besuch: Die Tiere wohnen woanders
   syncWild(s, world);
   return s;
@@ -230,7 +236,7 @@ export const progressOf = (s: State): Progress => ({
   garden: [...s.garden],
   openGates: [...s.openGates],
   portals: [...s.portals],
-  position: [s.player.x, s.player.y],
+  position: s.held ? [...s.held] : [s.player.x, s.player.y],
   day: s.day,
   heard: [...s.heard],
 });
@@ -244,7 +250,8 @@ export const regionAnimals = (region: RegionId): string[] =>
 /**
  * Ein Befehl. `explored(x, y)` sagt, ob ein Feld schon aus dem Nebel ist (der Nebel gehört der Ansicht): Nur dort
  * erwacht eine Portal-Plattform. Ohne Angabe gilt alles als erkundet. `guide` sind die Regeln des verlaufenen Pinguins
- * (mitwachsen-lead.ts), die die Ansicht erst nachlädt, wenn er fällig ist; ohne sie taucht er nicht auf.
+ * (worlds/eis/mitwachsen-lead.ts, aus dem Welt-Paket), die die Ansicht erst hereinreicht, wenn er fällig ist; ohne sie
+ * taucht er nicht auf.
  */
 export function step(state: State, world: World, cmd: Cmd, explored: Explored = EVERYWHERE, guide?: GuideRules): Step {
   // Flache Kopie: Tiere werden beim Ändern ersetzt, nie verändert – alte Zustände bleiben gültig
@@ -263,7 +270,7 @@ export function step(state: State, world: World, cmd: Cmd, explored: Explored = 
   if (cmd.type === 'tick') tick(s, world, events);
   else if (s.sleeping) wake(s, world, events);
   else if (cmd.type === 'move' && !guide?.hold(s, events)) {
-    // Ein Schritt (während das Eistor aufgeht, hüpft die Figur stattdessen nur: `hold` in mitwachsen-ritual.ts)
+    // Ein Schritt (während das Eistor aufgeht, hüpft die Figur stattdessen nur: `hold` in worlds/eis/mitwachsen-ritual.ts)
     const from: Point = [s.player.x, s.player.y];
     move(s, world, cmd.dir, events);
     guide?.meetGuide(s, world, events); // in den führenden Pinguin gelaufen: Er hüpft voraus oder tauscht den Platz

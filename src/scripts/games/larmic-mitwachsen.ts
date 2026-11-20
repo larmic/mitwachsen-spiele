@@ -33,6 +33,8 @@ import { initialState, progressOf, step, type Cmd, type GameEvent, type State } 
 import type { ChoreEvent } from './mitwachsen-chores';
 import { createWorld, standHeight, type World } from './mitwachsen-world';
 import { pending, type GuideRules } from './mitwachsen-guide';
+import { loadPacks, type LoadedPack } from './mitwachsen-packs';
+import { worldItem } from './mitwachsen-world-list';
 import { platformLift, portalColor } from './mitwachsen-portal';
 import { HOME_STAGGER, SNAP_DELAY, hopOf, snaps } from './mitwachsen-gait';
 import { windAt } from './mitwachsen-weather';
@@ -86,7 +88,9 @@ class LarmicMitwachsen extends HTMLElement {
   private gates = new Map<string, number>(); // Zeitpunkt, an dem ein Tor aufging (0 = schon offen)
   private floats: (Float & { born: number; who?: string })[] = [];
   private particles: Particle[] = [];
-  private nightSince = 0; // seit wann die Figur schläft (performance.now): für die Überblendung und App-Updates
+  // seit wann die Figur schläft (performance.now): für die Überblendung und App-Updates. Solange die Welt-Pakete laden,
+  // gibt es noch keine Figur: wie eine Welt, die schlafend öffnet (unendlich lange), sonst wartete ein App-Update
+  private nightSince = -Infinity;
   private dayAt = 0;
   private resize: ResizeObserver | null = null;
   private readonly reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -98,8 +102,8 @@ class LarmicMitwachsen extends HTMLElement {
   private touchUi!: HTMLElement;
   private r3d: World3DType | null = null; // 3D-Ansicht, solange sie zeichnen kann
   private gl3d: World3DType | null = null; // die geladene 3D-Ansicht, auch wenn ihr Kontext gerade fehlt
-  private guide?: GuideRules; // Regeln des verlaufenen Pinguins: erst nachgeladen, wenn er fällig ist
-  private guiding?: Promise<unknown>; // sie werden geladen (scheitert das Laden, bleibt es ohne ihn)
+  private guide?: GuideRules; // Regeln des verlaufenen Pinguins (aus dem Paket der Eis-Welt), sobald er fällig ist
+  private packs: readonly LoadedPack[] = []; // geladene Welt-Pakete (worlds/): heute nur die Eis-Welt
 
   connectedCallback() {
     this.canvas = this.querySelector('canvas.mw-canvas')!;
@@ -114,6 +118,13 @@ class LarmicMitwachsen extends HTMLElement {
     this.store = browserStore().store;
     this.sfx.muted = this.store.getItem('larmic.games.muted') === '1';
     this.tired = loadTired(this.store, Date.now());
+    void loadPacks().then((packs) => this.begin(packs));
+  }
+
+  /** Mit den geladenen Welt-Paketen die Welt öffnen und das Spiel starten */
+  private begin(packs: readonly LoadedPack[]) {
+    if (!this.isConnected || this.globals) return; // inzwischen weg (oder schon gestartet)
+    this.packs = packs;
     this.openWorld(loadIndex(this.store).current);
     this.listen();
     this.resize = new ResizeObserver(() => this.measure());
@@ -191,7 +202,7 @@ class LarmicMitwachsen extends HTMLElement {
       newWorld(id ?? randomId(), randomSeed(), entry?.worldName ?? 'Meine Welt', entry?.figureName ?? DEFAULT_FIGURE);
     this.saved = { ...this.saved, visits: this.saved.visits + 1 };
     saveWorld(this.store, this.saved);
-    this.world = createWorld(this.saved.seed);
+    this.world = createWorld(this.saved.seed, this.packs);
     this.seenAt = '';
     this.state = initialState(this.world, progressFrom(this.saved), this.saved.seed ^ this.saved.visits);
     // Nebel: Am Anfang ist nur ein kleines Stück um das Bett zu sehen (die Figur liegt darin)
@@ -219,7 +230,8 @@ class LarmicMitwachsen extends HTMLElement {
   /** Für Updates der App (pwa-register.ts): Was im Spiel gerade los ist; entschieden wird in pwa-update.ts */
   updateMoment(): GameMoment {
     return {
-      sleeping: this.state.sleeping,
+      // Solange die Welt-Pakete laden, gibt es noch keinen Zustand und nichts zu verlieren
+      sleeping: (this.state as State | undefined)?.sleeping ?? true,
       sleepingFor: performance.now() - this.nightSince, // eine Welt öffnet schlafend: dann unendlich
       menuOpen: this.menu.open,
       infoOpen: this.info.open,
@@ -253,8 +265,8 @@ class LarmicMitwachsen extends HTMLElement {
     if (cmd.type === 'move' && performance.now() < this.sitUntil) return; // die müde Figur sitzt kurz
     const { state, events } = step(this.state, this.world, cmd, (x, y) => this.fog.has(x, y), this.guide);
     this.state = state;
-    // Ist die Leiste der Lichtung voll, kommen die Regeln des Pinguins nach (sie gelten, bis er im Kessel wohnt)
-    if (!this.guiding && pending(state)) this.guiding = import('./mitwachsen-lead').then((m) => (this.guide = m), noop);
+    // Ist die Leiste der Lichtung voll, gelten die Regeln des Pinguins aus dem Paket der Eis-Welt (bis er im Kessel wohnt)
+    if (!this.guide && pending(state)) this.guide = this.packs.find((p) => p.id === 'eis')?.lead;
     this.lift();
     if (events.length) this.react(events);
     if (cmd.type === 'tick') this.ageTired();
@@ -818,29 +830,7 @@ class LarmicMitwachsen extends HTMLElement {
 
   private renderMenu() {
     const list = this.menu.querySelector('.mw-worlds')!;
-    list.replaceChildren(
-      ...loadIndex(this.store).worlds.map((w) => {
-        const li = document.createElement('li');
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'mw-world';
-        b.dataset.world = w.id;
-        if (w.id === this.saved.id) b.setAttribute('aria-current', 'true');
-        const name = document.createElement('strong');
-        name.textContent = w.worldName;
-        const fig = document.createElement('span');
-        fig.textContent = w.figureName;
-        b.append(name, fig);
-        const del = document.createElement('button');
-        del.type = 'button';
-        del.className = 'mw-link mw-delete';
-        del.dataset.delete = w.id;
-        del.textContent = 'Löschen';
-        del.setAttribute('aria-label', `Welt „${w.worldName}“ löschen`);
-        li.append(b, del);
-        return li;
-      }),
-    );
+    list.replaceChildren(...loadIndex(this.store).worlds.map((w) => worldItem(w, w.id === this.saved.id)));
     (this.menu.querySelector('#mw-world-name') as HTMLInputElement).value = this.saved.worldName;
     (this.menu.querySelector('#mw-figure-name') as HTMLInputElement).value = this.saved.figureName;
     this.menu.querySelector('.mw-code')!.textContent = worldCode(this.saved.seed);

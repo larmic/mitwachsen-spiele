@@ -67,6 +67,14 @@ test('Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotz
   // Auch das nachträglich geladene Three.js kommt ohne Netz aus dem Speicher
   if (webgl) await expect(game).toHaveClass(/three/);
   expect(fromSw).toContain('/spielen/');
+  // Auch das Welt-Paket der Eis-Welt kommt ohne Netz aus dem Speicher: Der Kessel steht samt Eis-Portal
+  expect(
+    fromSw.some((p) => /\/welt-eis\.[\w-]+\.js$/.test(p)),
+    fromSw.join(', '),
+  ).toBe(true);
+  const portals = () =>
+    game.evaluate((el) => [...(el as unknown as { world: { portals: Map<string, unknown> } }).world.portals.keys()]);
+  expect(await portals()).toContain('eiskessel');
   const sleeping = () => game.evaluate((el) => (el as unknown as { state: { sleeping: boolean } }).state.sleeping);
   await page.keyboard.press('ArrowDown');
   await expect.poll(sleeping).toBe(false);

@@ -29,10 +29,11 @@ import {
   pending,
   wanted,
 } from './mitwachsen-guide';
-import * as rules from './mitwachsen-lead';
-import { toGate } from './mitwachsen-lead';
-import { BREATH, HOP_AGAIN, SLIDE_PACE, mouth, toMeadow } from './mitwachsen-ritual';
+import * as rules from './worlds/eis/mitwachsen-lead';
+import { toGate } from './worlds/eis/mitwachsen-lead';
+import { BREATH, HOP_AGAIN, SLIDE_PACE, mouth, toMeadow } from './worlds/eis/mitwachsen-ritual';
 import { canStep, createWorld, standHeight, type World } from './mitwachsen-world';
+import { PACKS, worldOf } from './test-worlds';
 
 const TICK: Cmd = { type: 'tick' };
 const key = ([x, y]: Point) => `${x},${y}`;
@@ -91,7 +92,7 @@ function leading(world: World, at: Point, penguin: Point, extra: Animal[] = []):
 }
 
 describe('Der Pinguin holt dich ab: Auftauchen', () => {
-  const world = createWorld(1);
+  const world = worldOf(1);
 
   it('das Eistor hat seinen Schlüssel; solange es zu ist, wohnt der Pinguin nicht im Kessel', () => {
     expect(GATES.find((g) => g.id === 'eis')!.opens).toEqual({ key: 'pinguin' });
@@ -134,7 +135,7 @@ describe('Der Pinguin holt dich ab: Auftauchen', () => {
 
   for (const seed of [1, 2, 3]) {
     it(`Seed ${seed}: alter Stand mit allen Tieren zu Hause: beim nächsten Aufwachen 4 bis 6 Felder neben der Figur, auf freiem Feld`, () => {
-      const world = createWorld(seed);
+      const world = createWorld(seed, PACKS);
       let s = initialState(world, { garden: everyone() });
       s = run(s, world, ...ticks(50)).s; // im Schlaf: noch nicht
       expect(guideOf(s)).toBeUndefined();
@@ -153,7 +154,7 @@ describe('Der Pinguin holt dich ab: Auftauchen', () => {
 
   for (const seed of [1, 2, 3]) {
     it(`Seed ${seed}: er watschelt selbst zur Figur, hüpft und zeigt ein Herz (arrive), erst dann führt er`, () => {
-      const world = createWorld(seed);
+      const world = createWorld(seed, PACKS);
       let r = run(initialState(world, { garden: everyone() }), world, 'n'); // aufwachen: Er taucht auf
       let g = guideOf(r.s)!;
       let t = 0;
@@ -223,7 +224,7 @@ describe('Der Pinguin holt dich ab: Auftauchen', () => {
 });
 
 describe('Der Pinguin holt dich ab: Führen', () => {
-  const world = createWorld(1);
+  const world = worldOf(1);
 
   it('führt 2 bis 3 Felder voraus und wartet, bis die Figur höchstens 2 Felder entfernt ist', () => {
     const p = onPath(world, 40);
@@ -397,7 +398,7 @@ describe('Der Pinguin holt dich ab: Führen', () => {
 describe('Invarianten bei wildem Drücken mit führendem Pinguin', () => {
   for (const seed of [1, 2]) {
     it(`Seed ${seed}: höchstens ein Pinguin, immer führend, nie zwei auf einem Feld, Figur begehbar, wiederholbar`, () => {
-      const world = createWorld(seed);
+      const world = createWorld(seed, PACKS);
       const dirs: Dir[] = ['n', 'e', 's', 'w'];
       const play = () => {
         let s = initialState(world, { garden: everyone() }, seed);
@@ -463,7 +464,7 @@ function walk(s: State, world: World, goal: (x: number, y: number) => boolean, p
 const types = (events: GameEvent[]) => events.map((e) => e.type);
 
 describe('Das Eistor geht mit dem Pinguin auf', () => {
-  const world = createWorld(1);
+  const world = worldOf(1);
   const door = world.gates.get('eis')!;
   const front: Point = [door.mid[0] - door.out[0], door.mid[1] - door.out[1]]; // direkt vor der Mitte der Tür
   const row2: Point = [door.mid[0] - 2 * door.out[0], door.mid[1] - 2 * door.out[1]];
@@ -644,7 +645,7 @@ describe('Das Eistor geht mit dem Pinguin auf', () => {
 describe('Invarianten bei wildem Drücken bis durchs offene Eistor', () => {
   for (const seed of [1, 2]) {
     it(`Seed ${seed}: führen, Tor öffnen, in den Kessel, einziehen: nie zwei auf einem Feld, Figur begehbar, wiederholbar`, () => {
-      const world = createWorld(seed);
+      const world = createWorld(seed, PACKS);
       const door = world.gates.get('eis')!;
       const inBay = new Set(bay(door).map(key));
       const dirs: Dir[] = ['n', 'e', 's', 'w'];

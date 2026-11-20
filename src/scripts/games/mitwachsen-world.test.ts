@@ -22,6 +22,7 @@ import {
 } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
 import { APRON } from './mitwachsen-apron';
+import { EIS_PACK, PACKS, worldOf } from './test-worlds';
 
 /** Alle Felder, die von `start` aus zu Fuß erreichbar sind (bis `limit` Felder) */
 function reachable(world: World, open: GateId[], start: readonly [number, number], limit = 30000) {
@@ -40,7 +41,7 @@ function reachable(world: World, open: GateId[], start: readonly [number, number
 }
 const lichtung = REGIONS[0];
 /** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich */
-const LICHTUNG = createWorld(1).homes.lichtung;
+const LICHTUNG = worldOf(1).homes.lichtung;
 const START = LICHTUNG.wake[0]!;
 const SEEDS = [1, 42, 2026, 7, 99, 123456, 15838, 23757, 55433, 95028];
 /** Die acht Nachbarfelder und das Feld selbst */
@@ -48,9 +49,9 @@ const RING_1 = [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => [dx, dy] as con
 
 describe('Welt aus dem Seed', () => {
   it('entsteht aus demselben Seed immer gleich, aus einem anderen anders', () => {
-    const a = createWorld(1234),
-      b = createWorld(1234),
-      c = createWorld(99);
+    const a = createWorld(1234, PACKS),
+      b = createWorld(1234, PACKS),
+      c = createWorld(99, PACKS);
     let differs = 0;
     for (let y = -60; y < 60; y += 3)
       for (let x = -60; x < 60; x += 3) {
@@ -63,7 +64,7 @@ describe('Welt aus dem Seed', () => {
 
 describe('Start auf der Lichtung', () => {
   for (const seed of SEEDS) {
-    const w = createWorld(seed);
+    const w = createWorld(seed, PACKS);
 
     it(`Seed ${seed}: In der Mitte steht nur das Bett, ringsum ist es frei`, () => {
       expect(w.cell(LICHTUNG.bed[0], LICHTUNG.bed[1]).deco).toBe('bed');
@@ -203,7 +204,7 @@ describe('Start auf der Lichtung', () => {
     const mids = (gates: World['gates']) => GATES.map((g) => gates.get(g.id)!.mid.join(',')).join(' ');
     expect(mids(gatePlaces(5))).not.toBe(mids(gatePlaces(6)));
     expect(mids(gatePlaces(5))).toBe(mids(gatePlaces(5)));
-    expect(mids(createWorld(5).gates)).toBe(mids(gatePlaces(5))); // die gebaute Welt hat dieselben Tore
+    expect(mids(worldOf(5).gates)).toBe(mids(gatePlaces(5))); // die gebaute Welt hat dieselben Tore
   });
 
   it('Die fünf Felder jedes großen Tores liegen in einer geraden Reihe, Tore weit auseinander (viele Seeds)', () => {
@@ -223,7 +224,7 @@ describe('Start auf der Lichtung', () => {
 
   for (const seed of [3, 42]) {
     it(`Seed ${seed}: Ums Bett liegt die Wiese, eben und frei, mit Futter- und Wassertrog`, () => {
-      const w = createWorld(seed);
+      const w = createWorld(seed, PACKS);
       const reach = new Set(reachable(w, [], START).map(([x, y]) => `${x},${y}`));
       let meadow = 0;
       for (let y = -LICHTUNG.meadow; y <= LICHTUNG.meadow; y++)
@@ -249,7 +250,7 @@ describe('Start auf der Lichtung', () => {
 describe('Zuhause je Gegend', () => {
   for (const seed of [1, 42]) {
     it(`Seed ${seed}: jede Gegend hat ein Zuhause: Bett, Wiese, Tröge und Unterstand liegen in ihr, wie HOMES sie legt`, () => {
-      const w = createWorld(seed);
+      const w = createWorld(seed, PACKS);
       expect(w.homes.lichtung.bed).toEqual([0, 0]); // das Bett der Lichtung steht in ihrer Mitte
       for (const r of REGIONS) {
         const home = w.homes[r.id];
@@ -362,7 +363,7 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
     // Ein `expect` je Seed statt je Feld: sonst dauert der Lauf mit Abdeckung in der Pipeline zu lange
     const key = (x: number, y: number) => x * 4096 + y;
     for (let seed = 1; seed <= 500; seed++) {
-      const { cells, bed } = kesselPlace(seed);
+      const { cells, bed } = kesselPlace(seed, EIS_PACK);
       const kessel = new Set(cells.map(([x, y]) => key(x, y)));
       expect(kessel.has(key(...bed)), `Seed ${seed}`).toBe(true);
       const wrong: string[] = cells.filter(([x, y]) => !beyondRing(x, y)).map(([x, y]) => `${x},${y} vor dem Felsring`);
@@ -379,8 +380,8 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
   it('Jedes begehbare Kesselfeld ist vom Schneebett aus erreichbar (20 weitere Seeds)', () => {
     // eine Welt zu bauen kostet etwa 0,1 s: darum nur 20 Seeds, über den Felsring prüfen die 500 oben
     for (let seed = 101; seed <= 120; seed++) {
-      const w = createWorld(seed);
-      const { cells } = kesselPlace(seed);
+      const w = createWorld(seed, PACKS);
+      const { cells } = kesselPlace(seed, EIS_PACK);
       const inKessel = new Set(cells.map(([x, y]) => `${x},${y}`));
       // Suche nur über Felder des Kessels: der Boden hängt in sich zusammen, ohne Umweg über den Gang
       const start = w.homes.eis.wake[0]!;
@@ -404,18 +405,18 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
 
   it('Eis-Portal: Plattform hinter der Mündung und im Ring um das Schneebett: 3 × 3, erreichbar, ringsum frei (24 Seeds)', () => {
     for (const seed of [1, 42, 2026, 7, ...Array.from({ length: 20 }, (_, i) => 201 + i)])
-      expect(icePortalFaults(createWorld(seed)), `Seed ${seed}`).toEqual([]);
+      expect(icePortalFaults(createWorld(seed, PACKS)), `Seed ${seed}`).toEqual([]);
   });
 
   for (const seed of [1, 42, 2026, 7]) {
-    const w = createWorld(seed);
+    const w = createWorld(seed, PACKS);
     const home = w.homes.eis;
     const gate = w.gates.get('eis')!;
     const LIMIT = 200000;
     const fromLichtung = (open: GateId[]) => reachable(w, open, START, LIMIT);
     const fromSnowBed = (open: GateId[]) => reachable(w, open, home.wake[0]!, LIMIT);
     /** Felder des Kessels (Klippen, Boden, Mündung) */
-    const kessel = kesselPlace(seed).cells;
+    const kessel = kesselPlace(seed, EIS_PACK).cells;
     const floor = kessel.filter(([x, y]) => w.cell(x, y).region === 'eis' && standHeight(w, [], x, y) !== null);
 
     it(`Seed ${seed}: Bei geschlossenem Tor kommt man weder hinein noch heraus, bei offenem ist jedes Kesselfeld erreichbar`, () => {
@@ -654,7 +655,7 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
 
 describe('Stimmung der Richtungen', () => {
   for (const seed of [4, 77]) {
-    const w = createWorld(seed);
+    const w = createWorld(seed, PACKS);
     const { rx, ry } = lichtung.shape;
     // Felder der Lichtung, gruppiert nach der Welt, in deren Richtung sie liegen (nur starke Stimmung)
     const strong = new Map<string, Cell[]>();
@@ -699,7 +700,7 @@ describe('Stimmung der Richtungen', () => {
 
 describe('Landschaft', () => {
   it('ist meist sanft: Nachbarfelder unterscheiden sich selten um mehr als eine Ebene', () => {
-    const w = createWorld(11);
+    const w = worldOf(11);
     let steep = 0,
       total = 0;
     for (let y = 130; y < 190; y++)
@@ -714,8 +715,8 @@ describe('Landschaft', () => {
   });
 
   it('hat Tiere, immer dieselben an derselben Stelle, auf Feldern der Landschaft', () => {
-    const w = createWorld(8),
-      again = createWorld(8);
+    const w = createWorld(8, PACKS),
+      again = createWorld(8, PACKS);
     const all = [];
     for (let cy = 8; cy < 14; cy++)
       // weit draußen, hinter dem Felsring
@@ -742,7 +743,7 @@ describe('Portal-Plattformen', () => {
     Math.max(Math.abs(a[0]! - b[0]!), Math.abs(a[1]! - b[1]!));
   for (const seed of SEEDS) {
     it(`Seed ${seed}: 3 × 3 Felder am Tor und am Bett, von allen vier Seiten erreichbar, ringsum frei`, () => {
-      const w = createWorld(seed);
+      const w = createWorld(seed, PACKS);
       const reach = new Set(reachable(w, [], START, 200000).map(([x, y]) => `${x},${y}`));
       for (const g of GATES) {
         const p = w.portals.get(g.id)!;
@@ -811,7 +812,7 @@ describe('Portal-Plattformen', () => {
   });
 
   it('auf der Plattform steht man etwas höher: auf dem Rand der Sockel, auf der Mitte das Bild', () => {
-    const w = createWorld(1);
+    const w = worldOf(1);
     const { gate } = w.portals.get('eis')!;
     const lifts = platformCells(gate).map(({ x, y }) => platformLift(w.cell(x, y)));
     expect(new Set(lifts)).toEqual(new Set([0.25, 0.375]));
@@ -821,7 +822,7 @@ describe('Portal-Plattformen', () => {
 
 describe('Klangsteine', () => {
   for (const seed of [1, 42, 2026]) {
-    const w = createWorld(seed);
+    const w = createWorld(seed, PACKS);
     it(`Seed ${seed}: einer am Bett, einer vor jedem Tor, einer am Schneebett; fest, erreichbar, der Weg zum Tor bleibt frei`, () => {
       expect([...w.stones.keys()].sort()).toEqual(['bett', ...GATES.map((g) => g.id), 'eis-offen'].sort());
       // die der Lichtung bei geschlossenen Toren; der am Schneebett liegt im Gletscherkessel: erreichbar, sobald das Eistor offen ist
@@ -858,7 +859,7 @@ describe('Torhaus und Felsring', () => {
   );
 
   it('hinter den Türmen ragt kein Fels ins Torhaus (seine Wände lägen in den Turmwänden und flackerten)', () => {
-    for (const w of [1, 42, 2026].map(createWorld))
+    for (const w of [1, 42, 2026].map(worldOf))
       for (const g of w.gates.values()) {
         const along = [g.out[1], -g.out[0]] as const; // quer zum Tor
         const at = (u: number, t: number) =>
@@ -869,7 +870,7 @@ describe('Torhaus und Felsring', () => {
 
   it('vor jedem Zugang liegt ein Vorfeld im Boden seiner Welt, nach vorn schmaler; begehbar bleibt alles wie zuvor', () => {
     const U = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6];
-    for (const w of [1, 42, 2026].map(createWorld))
+    for (const w of [1, 42, 2026].map(worldOf))
       for (const g of w.gates.values()) {
         const along = [g.out[1], -g.out[0]] as const;
         const xy = (u: number, t: number) =>
@@ -885,5 +886,59 @@ describe('Torhaus und Felsring', () => {
           expect(standHeight(w, [], ...at), `${w.seed} ${g.id} ${at.join()}`).not.toBeNull();
         }
       }
+  });
+});
+
+describe('Welt-Pakete', () => {
+  for (const seed of [1, 42]) {
+    const full = worldOf(seed);
+    const bare = createWorld(seed, []);
+
+    it(`Seed ${seed}: Die Lichtung ist mit und ohne Paket der Eis-Welt Feld für Feld gleich, ihre Tiere wohnen gleich`, () => {
+      const [RX, RY] = [Math.ceil(lichtung.shape.rx * 1.3), Math.ceil(lichtung.shape.ry * 1.3)]; // samt Felsring
+      const differ: string[] = [];
+      for (let y = -RY; y <= RY; y++)
+        for (let x = -RX; x <= RX; x++) {
+          const a = full.cell(x, y);
+          if (a.region !== 'lichtung' && !a.gate && !(a.region === 'border' && !a.biome)) continue;
+          if (JSON.stringify(a) !== JSON.stringify(bare.cell(x, y))) differ.push(`${x},${y}`);
+        }
+      expect(differ).toEqual([]);
+      const lichtungIds = [...full.spawns.keys()].filter((id) => id.startsWith('lichtung:'));
+      expect(lichtungIds.length).toBeGreaterThan(0);
+      for (const id of lichtungIds) expect(bare.spawns.get(id), id).toEqual(full.spawns.get(id));
+      expect(bare.spotsOf('lichtung')).toEqual(full.spotsOf('lichtung'));
+      expect([...bare.gates.keys()]).toEqual([...full.gates.keys()]);
+    });
+
+    it(`Seed ${seed}: Ohne Paket endet der Gang des Eistors an einer Eisklippe: keine Eis-Welt, kein Eis-Portal, kein Loch`, () => {
+      expect(bare.spotsOf('eis')).toEqual([]);
+      expect([...bare.spawns.keys()].some((id) => id.startsWith('eis:'))).toBe(false);
+      expect(bare.portals.has('eiskessel')).toBe(false);
+      expect(bare.stones.has('eis-offen')).toBe(false);
+      // Bei offenem Eistor kommt man durch den Gang, aber nicht weiter: hinter dem Felsring nur sein Boden
+      const gate = bare.gates.get('eis')!;
+      const along = [gate.out[1], -gate.out[0]] as const;
+      const seen = reachable(bare, ['eis'], START, 60000);
+      expect(seen.length).toBeLessThan(60000);
+      expect(seen.some(([x, y]) => bare.realm(x, y) === 'eis')).toBe(false);
+      const beyond = seen.filter(([x, y]) => beyondRing(x, y));
+      expect(beyond.length).toBeGreaterThan(0); // der Gang führt bis hinter den Felsring
+      for (const [x, y] of beyond) {
+        const u = (x - gate.mid[0]) * along[0] + (y - gate.mid[1]) * along[1];
+        expect(Math.abs(u), `${x},${y}`).toBeLessThanOrEqual(GATE_HALF);
+      }
+      const end = Math.max(
+        ...beyond.map(([x, y]) => (x - gate.mid[0]) * gate.out[0] + (y - gate.mid[1]) * gate.out[1]),
+      );
+      const [cx, cy] = [gate.mid[0] + gate.out[0] * (end + 1), gate.mid[1] + gate.out[1] * (end + 1)];
+      expect(bare.cell(cx, cy)).toMatchObject({ ground: 'ice', solid: true, region: 'border' }); // Eisklippe
+      // Das Bett der Eis-Welt liegt in der Klippe: Jede Gegend hat ein Zuhause, aber niemand kommt hin
+      expect(standHeight(bare, ['eis'], ...bare.homes.eis.bed)).toBeNull();
+    });
+  }
+
+  it('die Lage des Kessels kommt aus dem Paket, wie beim Bauen', () => {
+    expect(kesselPlace(1, EIS_PACK).bed).toEqual(worldOf(1).homes.eis.bed);
   });
 });

@@ -3,7 +3,7 @@
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md
 
 import { eyes, type Part } from '../../lib/games/front';
-import { ICE_ANIMALS, ICE_SPECIES, KESSEL, type IceSpeciesId } from './mitwachsen-eis';
+import { ICE_SPECIES, type IceSpeciesId } from './mitwachsen-eis';
 import type { SpeciesOf } from './mitwachsen-species';
 
 export type RegionId = 'lichtung' | 'eis';
@@ -31,12 +31,15 @@ export type Region = {
   id: RegionId;
   name: string;
   /**
-   * Ellipse um ihre Mitte, deren Rand leicht unregelmäßig ist; darum liegen Felsen. Die Lichtung liegt um (0, 0); eine
-   * Gegend hinter einem Tor liegt dort, wo die Welt sie hinlegt, mit `rx` quer zum Tor und `ry` vom Tor weg.
+   * Ellipse um ihre Mitte, deren Rand leicht unregelmäßig ist; darum liegen Felsen. Die Lichtung liegt um (0, 0). Eine
+   * Gegend hinter einem Tor hat keine: Form und Lage kennt nur ihr Welt-Paket (src/scripts/games/worlds/).
    */
-  shape: { rx: number; ry: number };
-  /** Tiere mit ungefährem Wohnort; die Welt sucht das nächste Feld, das vom Bett aus erreichbar ist */
-  animals: readonly { species: SpeciesId; at: Point }[];
+  shape?: { rx: number; ry: number };
+  /**
+   * Tiere, in der Reihenfolge der Leiste, mit ungefährem Wohnort (`at`, relativ zum Bett); die Welt sucht das nächste
+   * Feld, das vom Bett aus erreichbar ist. Hinter einem Tor kennt nur das Welt-Paket die Wohnorte.
+   */
+  animals: readonly { species: SpeciesId; at?: Point }[];
   /** So viele Tiere je Art leben hier: das erste am Wohnort oben, die anderen verteilt die Welt aus dem Seed */
   herd: number;
   /** Tor, hinter dem die Gegend liegt: Solange es zu ist, kommt man nicht hin (die Lichtung liegt hinter keinem) */
@@ -83,7 +86,7 @@ export function regionAnimalList(region: Region): { id: string; species: Species
  * Dahinter liegen die Welten der Tore als endlose Landschaft. Hinter dem Eistor liegt die Eis-Welt, ein Gletscherkessel
  * mit eigenem Zuhause und zehn eigenen Tierarten (noch unerreichbar, solange das Tor zu ist).
  */
-export const REGIONS: readonly [Region, ...Region[]] = [
+export const REGIONS: readonly [Region & { shape: { rx: number; ry: number } }, ...Region[]] = [
   {
     id: 'lichtung',
     name: 'Lichtung',
@@ -107,8 +110,8 @@ export const REGIONS: readonly [Region, ...Region[]] = [
   {
     id: 'eis',
     name: 'Eis-Welt',
-    shape: KESSEL.shape, // Gletscherkessel fest hinter dem Eistor, ringsum Eisklippen (mitwachsen-eis.ts)
-    animals: ICE_ANIMALS, // Wohnorte relativ zum Schneebett (mitwachsen-eis.ts)
+    // Gletscherkessel fest hinter dem Eistor; Form und Wohnorte kennt nur das Welt-Paket (mitwachsen-kessel.ts)
+    animals: (Object.keys(ICE_SPECIES) as IceSpeciesId[]).map((species) => ({ species })),
     herd: 3, // der Kessel ist viel kleiner als die Lichtung: zehn Arten, je drei Tiere
     behind: 'eis',
   },
@@ -117,7 +120,7 @@ export const REGIONS: readonly [Region, ...Region[]] = [
 /**
  * Die großen Tore: eines je Welt. Wo sie im Felsring stehen und in welcher Reihenfolge, würfelt der Seed jeder Welt.
  * Hinter jedem Tor liegt in seiner Richtung die passende Landschaft. Das Eistor öffnet der verlaufene Pinguin
- * (`{ key: 'pinguin' }`, mitwachsen-ritual.ts), die anderen gehen vorerst nie auf (`opens: 'never'`).
+ * (`{ key: 'pinguin' }`, worlds/eis/mitwachsen-ritual.ts), die anderen gehen vorerst nie auf (`opens: 'never'`).
  */
 export const GATES: readonly Gate[] = [
   { id: 'eis', theme: 'eis', kind: 'grosstor', region: 'lichtung', leadsTo: 'Eiswelt', opens: { key: 'pinguin' } },

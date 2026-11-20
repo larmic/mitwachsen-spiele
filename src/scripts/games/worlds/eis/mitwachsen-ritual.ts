@@ -2,16 +2,24 @@
 // geht es für immer auf (`gate`, sofort gespeichert). Das Ritual dauert 3 s: Der Pinguin watschelt vor die Tür, hüpft
 // zweimal, ein kalter Atemzug weht Schnee auf die Lichtung, nach 2,4 s rutscht er durch den Gang hinter die Mündung und
 // wartet dort; jeder Pfeil lässt die Figur solange nur hüpfen. Betritt die Figur die Eis-Welt, rutscht er voraus zum
-// Schneebett und zieht als erstes Tier auf der Schneewiese ein. Mit den Regeln des Führens nachgeladen
-// (mitwachsen-lead.ts); Bild und Ton macht die Ansicht.
+// Schneebett und zieht als erstes Tier auf der Schneewiese ein. Mit den Regeln des Führens (mitwachsen-lead.ts) Teil
+// des Welt-Pakets der Eis-Welt; Bild und Ton macht die Ansicht.
 // Spezifikation: docs/specs/mitwachsen.md (Regel 8a „Das Eistor geht auf“)
 
-import { DIRS } from '../../lib/games/front';
-import type { Point } from '../../data/games/mitwachsen';
-import { dirTo, freeNear, occupied } from './mitwachsen-free';
-import { GUIDE_GATE, RITUAL, SLIDE, bay, opening, type GuideEvents as Events, type Guided } from './mitwachsen-guide';
-import { atHome, meadowSpots } from './mitwachsen-meadow';
-import { canStep, type World } from './mitwachsen-world';
+import { DIRS } from '../../../../lib/games/front';
+import type { Point } from '../../../../data/games/mitwachsen';
+import { dirTo, freeNear, occupied } from '../../mitwachsen-free';
+import {
+  GUIDE_GATE,
+  RITUAL,
+  SLIDE,
+  bay,
+  opening,
+  type GuideEvents as Events,
+  type Guided,
+} from '../../mitwachsen-guide';
+import { atHome, meadowSpots } from '../../mitwachsen-meadow';
+import { canStep, type World } from '../../mitwachsen-world';
 
 type Walker = Guided['animals'][number];
 

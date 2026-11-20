@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { REGIONS, SPECIES, WILD_SPECIES, speciesOf } from './mitwachsen';
-import { ICE_ANIMALS, ICE_SPECIES } from './mitwachsen-eis';
+import { ICE_SPECIES } from './mitwachsen-eis';
+import { ICE_ANIMALS } from './worlds/eis/mitwachsen-kessel';
 
 describe('Tiere der Eis-Welt', () => {
   const eis = REGIONS.find((r) => r.id === 'eis')!;
@@ -18,6 +19,16 @@ describe('Tiere der Eis-Welt', () => {
       expect(WILD_SPECIES, id).not.toContain(id);
       expect(speciesOf(`eis:${id}:3`)).toBe(id);
     }
+  });
+
+  it('das Welt-Paket kennt für jede Art der Eis-Welt einen Wunschort, in derselben Reihenfolge; der Kern kennt keinen', () => {
+    expect(ICE_ANIMALS.map((a) => a.species)).toEqual(eis.animals.map((a) => a.species));
+    expect(eis.animals.every((a) => a.at === undefined)).toBe(true);
+  });
+
+  it('jede Gegend, die nicht hinter einem Tor liegt, kennt im Kern für jede Art einen Wunschort (sonst fehlte das Tier still)', () => {
+    for (const r of REGIONS.filter((g) => !g.behind))
+      for (const a of r.animals) expect(a.at, `${r.id}:${a.species}`).toBeDefined();
   });
 
   it('Wunschorte liegen im Kessel um die Schneewiese (relativ zum Schneebett), gut verteilt', () => {

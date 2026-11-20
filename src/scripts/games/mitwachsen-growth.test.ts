@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { grown, MAX_FLOWERS } from './mitwachsen-growth';
-import { createWorld } from './mitwachsen-world';
+import { worldOf } from './test-worlds';
 
-const world = createWorld(7);
+const world = worldOf(7);
 /** Felder der Lichtung rund ums Bett */
 const area: [number, number][] = [];
 for (let y = -40; y < 40; y++) for (let x = -50; x < 50; x++) area.push([x, y]);

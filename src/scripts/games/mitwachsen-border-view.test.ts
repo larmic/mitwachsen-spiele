@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TURN_MS, gateward, turnAlbum, type Turn } from './mitwachsen-border-view';
 import { crossings } from './mitwachsen-border';
-import { createWorld } from './mitwachsen-world';
+import { worldOf } from './test-worlds';
 
 describe('Bild der Weltgrenze', () => {
   it('die Leiste klappt beim Wechsel der Gegend um: erst flach, dann die neue Gegend; bei reduzierter Bewegung sofort', () => {
@@ -17,7 +17,7 @@ describe('Bild der Weltgrenze', () => {
   });
 
   it('der Pfeil über einem wartenden Tier zeigt zum nächsten ersten Feld seiner Seite (Tor bzw. Gangmündung)', () => {
-    const world = createWorld(1);
+    const world = worldOf(1);
     const c = crossings(world)[0]!;
     for (const side of ['lichtung', 'eis'] as const) {
       const [x, y] = c.seats.get(side)![0]!;

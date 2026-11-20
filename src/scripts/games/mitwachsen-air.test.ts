@@ -3,10 +3,10 @@ import { LOOK, REGIONS, figureParts } from '../../data/games/mitwachsen';
 import { Air, postures, stepSound, turnHead } from './mitwachsen-air';
 import { initialState, regionAnimals, type State } from './mitwachsen-state';
 import { BLOCK, gustOf, windy } from './mitwachsen-weather';
-import { createWorld } from './mitwachsen-world';
 import { IGLOO_LEDGE } from './mitwachsen-ice-look';
+import { worldOf } from './test-worlds';
 
-const world = createWorld(1);
+const world = worldOf(1);
 const EIS = world.homes.eis;
 /** alle Tiere wohnen auf ihrer Wiese (mit oder ohne den Pinguin) */
 const garden = (penguin = true) =>

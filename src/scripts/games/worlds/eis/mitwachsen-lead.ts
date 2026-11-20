@@ -2,13 +2,13 @@
 // Herz) und geht dann ein paar Felder voraus Richtung Bucht, dann wartet er und piept. Läuft sie weg, holt er sie ein
 // und stellt sich wieder vor sie; er blockiert nie. Nachts schläft er neben dem Bett, morgens führt er weiter. Wann er
 // fällig ist und wo die Bucht liegt, steht in mitwachsen-guide.ts; was in der Bucht geschieht (das Eistor geht auf, er
-// rutscht heim), in mitwachsen-ritual.ts. Die Ansicht lädt diese Regeln erst nach, wenn er fällig ist, und reicht sie
-// `step` herein (mitwachsen-state.ts); so bleibt die Spielseite schlank.
+// rutscht heim), in mitwachsen-ritual.ts. Beide gehören zum Welt-Paket der Eis-Welt (index.ts, `pack.lead`): Die
+// Ansicht reicht sie `step` erst herein, wenn er fällig ist (mitwachsen-state.ts); so bleibt die Spielseite schlank.
 // Spezifikation: docs/specs/mitwachsen.md („Der Pinguin holt dich ab“)
 
-import { DIRS } from '../../lib/games/front';
-import type { Point } from '../../data/games/mitwachsen';
-import { dirTo, freeNear, occupied } from './mitwachsen-free';
+import { DIRS } from '../../../../lib/games/front';
+import type { Point } from '../../../../data/games/mitwachsen';
+import { dirTo, freeNear, occupied } from '../../mitwachsen-free';
 import {
   APPEAR,
   DUE,
@@ -23,12 +23,12 @@ import {
   wanted,
   type GuideEvents as Events,
   type Guided,
-} from './mitwachsen-guide';
-import { homeAt } from './mitwachsen-home';
+} from '../../mitwachsen-guide';
+import { homeAt } from '../../mitwachsen-home';
 import { homeward, opens, slideOn } from './mitwachsen-ritual';
 
 export { hold } from './mitwachsen-ritual';
-import { canStep, type World } from './mitwachsen-world';
+import { canStep, type World } from '../../mitwachsen-world';
 
 type Walker = Guided['animals'][number];
 type Explored = (x: number, y: number) => boolean;

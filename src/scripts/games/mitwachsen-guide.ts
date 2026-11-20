@@ -1,6 +1,6 @@
 // Der verlaufene Pinguin holt die Figur ab – rein, ohne DOM: Hat das Eistor seinen Schlüssel (den Pinguin) und ist die
 // Leiste der Lichtung voll (je Art ein Tier auf der Wiese), taucht er am Bett neben der Figur auf und führt sie zur Bucht vor dem Eistor; dort geht
-// es mit ihm auf (die Regeln dazu in mitwachsen-lead.ts und mitwachsen-ritual.ts). Hier steht, was immer gebraucht
+// es mit ihm auf (die Regeln dazu im Welt-Paket der Eis-Welt: worlds/eis/mitwachsen-lead.ts und mitwachsen-ritual.ts). Hier steht, was immer gebraucht
 // wird: wann er fällig ist, dass er solange nicht im Kessel wohnt, ob er gerade führt, ob das Tor gerade aufgeht und wo
 // die Bucht liegt. Nichts davon wird gespeichert: Ob er da ist, folgt aus dem Spielstand. Teil der Regeln
 // (mitwachsen-state.ts) und der Ansicht.
@@ -33,7 +33,7 @@ export const PEEP_EVERY = 40; // höchstens so oft piept er (4 s), damit es nich
 // alle 260 ms), damit sie ihm folgen kann, ohne in ihn hineinzulaufen, und er sie einholt
 export const PACE = { lead: 2, chase: 2 };
 const BAY_DEPTH = 3; // die Bucht reicht so viele Reihen vor die Tür
-// Das Eistor geht auf (mitwachsen-ritual.ts): So viele Takte nach dem Öffnen rutscht der Pinguin durch den Gang hinter
+// Das Eistor geht auf (worlds/eis/mitwachsen-ritual.ts): So viele Takte nach dem Öffnen rutscht der Pinguin durch den Gang hinter
 // das Tor (2,4 s); so lange dauert das Ritual, in dem jeder Pfeil die Figur nur hüpfen lässt (3 s)
 export const SLIDE = 24;
 export const RITUAL = 30;
@@ -80,8 +80,8 @@ export type GuideEvents = { readonly type: string; readonly id?: string }[] & {
   ): unknown;
 };
 /**
- * Regeln des Führens (mitwachsen-lead.ts): Die Ansicht lädt sie erst nach, wenn der Pinguin fällig ist (`wanted`), und
- * reicht sie `step` herein; vorher taucht er nicht auf.
+ * Regeln des Führens (worlds/eis/mitwachsen-lead.ts, im Welt-Paket als `pack.lead`): Die Ansicht reicht sie `step`
+ * erst herein, wenn der Pinguin fällig ist (`pending`); vorher taucht er nicht auf.
  */
 export type GuideRules = {
   guide(s: Guided, world: World, cmd: 'move' | 'action' | 'tick', events: GuideEvents, explored: Explored): void;
@@ -108,7 +108,7 @@ export function wanted(s: Pick<Guided, 'openGates' | 'garden'>): boolean {
 }
 
 /**
- * Braucht es die Regeln des Pinguins (mitwachsen-lead.ts)? Solange er fällig ist und nach dem Öffnen, bis er auf der
+ * Braucht es die Regeln des Pinguins (worlds/eis/mitwachsen-lead.ts)? Solange er fällig ist und nach dem Öffnen, bis er auf der
  * Schneewiese wohnt
  */
 export const pending = (s: Pick<Guided, 'openGates' | 'garden'>) =>

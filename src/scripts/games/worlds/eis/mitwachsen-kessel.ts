@@ -3,44 +3,24 @@
 // Ringsum feste Eisklippen, der Gang ist der einzige Zugang. In der Mitte das Schneebett mit Schneewiese, Eisschale,
 // Wassertrog aus Eis, Iglu und Klangstein, seitlich das Eisloch, drei Fischkisten, ein Moosfleck, die beiden
 // Plattformen des Eis-Portals (hinter der Mündung und im Kreis um das Bett), vom Tor bis ans Bett die Rutschspur.
-// Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt“, Kessel)
+// Teil des Welt-Pakets der Eis-Welt (index.ts), nachgeladen.
+// Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Welt-Pakete“ und „Gletscherkessel“)
 
-import { fromKey } from '../../lib/games/chunks';
-import { hash, valueNoise } from '../../lib/games/rng';
-import type { Point } from '../../data/games/mitwachsen';
-import { KESSEL } from '../../data/games/mitwachsen-eis';
-import { HOMES } from '../../data/games/mitwachsen-homes';
-import { ICE_PORTAL } from '../../data/games/mitwachsen-portals';
-import { ICE_STONE } from '../../data/games/mitwachsen-stories';
-import type { Cell } from './mitwachsen-cell';
-import { placeHome } from './mitwachsen-home';
-import { PLATFORM_HALF, platformCells, ringSpots, type Portal, type PortalId } from './mitwachsen-portal';
-
-/** Gang hinter einem Tor, in Koordinaten u (entlang des Tors) und t (nach außen) */
-export type Gang = {
-  at: (u: number, t: number) => Point;
-  depth: number; // t der Torreihe
-  end: number; // letzte Reihe des Gangs durch den Felsring
-  half: number; // Boden des Gangs: u von −half bis half
-  wall: number; // daneben auf jeder Seite so viele Felder Wand
-};
-
-/** Lage des Kessels: Mitte (dort steht das Schneebett) und alle Felder samt Klippen */
-export type KesselPlace = { bed: Point; centre: number; cells: readonly Point[] };
-
-/**
- * Der gebaute Kessel: Bett, Felder der Eis-Welt (Kessel und Gang ab der Mitte), Wohnplätze ihrer Tiere, Klangstein und
- * das Eis-Portal (als Eintrag für `world.portals`)
- */
-export type Kessel = {
-  bed: Point;
-  realm: ReadonlySet<string>;
-  spots: readonly Point[];
-  stone: Point;
-  portal: [PortalId, Portal];
-};
+import { fromKey } from '../../../../lib/games/chunks';
+import { hash, valueNoise } from '../../../../lib/games/rng';
+import { REGIONS, type Point } from '../../../../data/games/mitwachsen';
+import { ICE_ANIMALS, KESSEL } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
+import { HOMES } from '../../../../data/games/mitwachsen-homes';
+import { ICE_PORTAL } from '../../../../data/games/mitwachsen-portals';
+import { ICE_STONE } from '../../../../data/games/mitwachsen-stories';
+import type { Cell } from '../../mitwachsen-cell';
+import { placeHome } from '../../mitwachsen-home';
+import type { Beyond, Gang, Kessel, KesselPlace } from '../../mitwachsen-pack';
+import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from '../../mitwachsen-portal';
+import { findSpawns } from '../../mitwachsen-spawns';
 
 const key = (x: number, y: number) => `${x},${y}`;
+const EIS = REGIONS.find((r) => r.id === 'eis')!; // die Eis-Welt steht fest in REGIONS
 const { rx, ry } = KESSEL.shape;
 const OUTER = { rx: rx + KESSEL.cliff, ry: ry + KESSEL.cliff }; // fester Außenrand der Klippen
 const NEIGHBOURS = [
@@ -61,7 +41,7 @@ function zone(seed: number, u: number, v: number): 'floor' | 'cliff' | null {
  * Wo der Kessel liegt: so nah wie möglich hinter dem Gang, aber ganz hinter dem Felsring (`beyond`), mit `KESSEL.gap`
  * Feldern Abstand. Weiter nach außen bleibt man jenseits des Felsrings, darum genügt je Spalte das innerste Feld.
  */
-export function placeKessel(seed: number, gang: Gang, beyond: (x: number, y: number) => boolean): KesselPlace {
+export function placeKessel(seed: number, gang: Gang, beyond: Beyond): KesselPlace {
   const A = OUTER.rx + KESSEL.gap,
     B = OUTER.ry + KESSEL.gap;
   let centre = gang.end + OUTER.ry;
@@ -88,7 +68,7 @@ const cliff = (h: number): Cell => ({ h, ground: 'ice', deco: 'rock', region: 'b
 export function buildKessel(
   seed: number,
   gang: Gang,
-  beyond: (x: number, y: number) => boolean,
+  beyond: Beyond,
   passage: (x: number, y: number) => Cell,
   map: Map<string, Cell>,
 ): Kessel {
@@ -124,7 +104,9 @@ export function buildKessel(
   for (let t = gang.depth + 1 + Math.floor((inner - gang.depth - 1) / 2); t < centre; t++)
     for (let u = -gang.half - gang.wall; u <= gang.half + gang.wall; u++) realm.add(key(...gang.at(u, t)));
   const stone: Point = [place.bed[0] + ICE_STONE[0], place.bed[1] + ICE_STONE[1]];
-  return { bed: place.bed, realm, spots: spotsOf(place, map), stone, portal: [ICE_PORTAL, portal] };
+  const spots = spotsOf(place, map);
+  const spawns = findSpawns(seed, { ...EIS, animals: ICE_ANIMALS }, spots, place.bed); // Wunschorte nur hier
+  return { bed: place.bed, realm, spots, spawns, stone, portal: [ICE_PORTAL, portal] };
 }
 
 /** Eisklippe in Terrassen: innen 3, dann 4, außen 5, hier und da ein Block höher */

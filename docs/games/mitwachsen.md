@@ -24,7 +24,7 @@ Hintergrund, Altersstufen und gemeinsame Regeln: [README](README.md). Dieses Dok
 
 ## Ansicht und Kamera
 
-- **3D-Ansicht:** echtes 3D mit Three.js, Kamera schräg von oben (etwa 55°, im Code einstellbar), Sonnenlicht mit Schatten, Nebel in der Ferne. Texturen wie in `src/lib/voxel/textures.ts`, pixelig. Three.js lädt erst beim Spielstart nach, die Startseite nie (Bundle-Gate).
+- **3D-Ansicht:** echtes 3D mit Three.js, Kamera schräg von oben (etwa 55°, im Code einstellbar), Sonnenlicht mit Schatten, Nebel in der Ferne. Texturen wie in `src/lib/voxel/textures.ts`, pixelig. Three.js lädt erst beim Spielstart nach, die Startseite nie (Bundle-Gate). Ebenso kommt jede Welt hinter einem Tor als eigenes Welt-Paket (heute die Eis-Welt), damit die Spielseite schlank bleibt, auch wenn noch viele Welten dazukommen.
 - **2D-Ansicht von vorn** als Rückfall ohne WebGL und während 3D lädt: Blöcke zeigen Ober- und Vorderseite.
 - **Die Figur bleibt in der Bildmitte**, die Kamera folgt ihr weich, die Welt läuft darunter durch. Gezeichnet wird nur, was im Bild ist.
 - **Karte** oben rechts: zeigt mehr als das Bild. Liegt das Zuhause außerhalb der Karte, zeigt ein Pfeil am Kartenrand dorthin.

@@ -26,7 +26,8 @@ export function findSpawns(seed: number, region: Region, land: readonly Point[],
   const all = regionAnimalList(region);
   for (const { id, species, n } of all) {
     if (n !== 1) continue;
-    const want = region.animals.find((a) => a.species === species)!.at; // jede Art der Liste hat einen Wunschort
+    const want = region.animals.find((a) => a.species === species)?.at; // das Welt-Paket reicht die Wunschorte herein
+    if (!want) continue;
     const at: Point = [bed[0] + want[0], bed[1] + want[1]];
     let best: Point | null = null,
       bestD = Infinity;

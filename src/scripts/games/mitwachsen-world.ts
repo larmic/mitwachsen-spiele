@@ -1,7 +1,8 @@
 // Welt von Mitwachsen – rein und deterministisch: Derselbe Seed ergibt immer dieselbe Welt.
 // In der Mitte die Lichtung mit dem Bett, ringsum natürliche Felsen mit acht großen Toren (vorerst zu). Außen herum
 // endlose Landschaft aus Rauschen, berechnet in Stücken. Ums Bett die Wiese, auf der gefundene Tiere zu Hause sind.
-// Hinter dem Eistor liegt die Eis-Welt, ein Gletscherkessel mit eigenem Zuhause (mitwachsen-kessel.ts).
+// Hinter dem Eistor liegt die Eis-Welt, ein Gletscherkessel mit eigenem Zuhause: Den baut ihr Welt-Paket
+// (worlds/eis/, nachgeladen und `createWorld` hereingereicht); ohne Paket endet der Gang an einer Eisklippe.
 // Spezifikation: docs/specs/mitwachsen.md
 
 import { CHUNK, ChunkCache, fromKey } from '../../lib/games/chunks';
@@ -20,7 +21,8 @@ import {
 import { BED_STONE, type StoryId } from '../../data/games/mitwachsen-stories';
 import type { Cell, Ground, TreeKind } from './mitwachsen-cell';
 import { LICHTUNG_HOME, realmsOf, type Realms } from './mitwachsen-home';
-import { buildKessel, placeKessel, type Gang, type Kessel } from './mitwachsen-kessel';
+import type { Gang, WorldPack } from './mitwachsen-pack';
+import { behind, type Behind } from './mitwachsen-behind';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal, type PortalId } from './mitwachsen-portal';
 import { findSpawns } from './mitwachsen-spawns';
 import { GATE_FLOOR, forecourt } from './mitwachsen-apron';
@@ -180,7 +182,8 @@ function stonesOf(places: readonly Layout[]): Map<StoryId, Point> {
 function buildStart(
   seed: number,
   places: readonly Layout[],
-): { map: Map<string, Cell>; spawns: Map<string, Point>; spots: Point[]; kessel: Kessel } {
+  eisPack: WorldPack | undefined,
+): { map: Map<string, Cell>; spawns: Map<string, Point>; spots: Point[]; kessel: Behind } {
   const map = new Map<string, Cell>();
   const set = (x: number, y: number, c: Cell) => map.set(key(x, y), c);
   const { rx, ry } = lichtung.shape;
@@ -255,8 +258,8 @@ function buildStart(
         else set(x, y, passage(seed, p.id, x, y));
       }
   }
-  // Hinter dem Eistor: der Gletscherkessel am Ende des Gangs (Eis-Welt)
-  const kessel = buildKessel(seed, gangOf(places), outside, (x, y) => passage(seed, 'eis', x, y), map);
+  // Hinter dem Eistor: der Gletscherkessel am Ende des Gangs (Eis-Welt), ohne ihr Paket eine Eisklippe
+  const kessel = behind(eisPack, seed, gangOf(places), outside, (x, y) => passage(seed, 'eis', x, y), map);
 
   placePlatforms(map, portalsOf(places));
 
@@ -311,11 +314,7 @@ function buildStart(
   for (const [k, c] of map)
     if (c.region === 'lichtung' && !c.solid && c.ground !== 'water' && !reached.has(k)) map.set(k, rock(3));
   const spots = reach.filter(([x, y]) => map.get(key(x, y))!.region === 'lichtung' && !map.get(key(x, y))!.garden);
-  const eis = REGIONS.find((r) => r.id === 'eis')!; // die Eis-Welt steht fest in REGIONS
-  const spawns = new Map([
-    ...findSpawns(seed, lichtung, spots, LICHTUNG_HOME.bed),
-    ...findSpawns(seed, eis, kessel.spots, kessel.bed),
-  ]);
+  const spawns = new Map([...findSpawns(seed, lichtung, spots, LICHTUNG_HOME.bed), ...kessel.spawns]);
   return { map, spawns, spots, kessel };
 }
 
@@ -609,8 +608,8 @@ function dress(seed: number, x: number, y: number, c: Cell): Cell {
   return out;
 }
 
-/** Lage des Gletscherkessels einer Welt; schnell, ohne die Welt zu bauen */
-export const kesselPlace = (seed: number) => placeKessel(seed, gangOf(layouts(seed)), outside);
+/** Lage des Gletscherkessels einer Welt (mit dem Paket der Eis-Welt); schnell, ohne die Welt zu bauen */
+export const kesselPlace = (seed: number, pack: WorldPack) => pack.place(seed, gangOf(layouts(seed)), outside);
 /** Liegt ein Feld ganz hinter dem Felsring der Lichtung (Landschaft, Gänge ins Freie, Kessel)? */
 export const beyondRing = outside;
 /** Die Portal-Plattformen der Lichtung (an den Toren); schnell, ohne die Welt zu bauen */
@@ -620,9 +619,11 @@ export const gatePlaces = (seed: number) => gatesOf(layouts(seed));
 const gatesOf = (places: readonly Layout[]) =>
   new Map<GateId, GatePlace>(places.map(({ id, cells, mid, out, angle }) => [id, { id, cells, mid, out, angle }]));
 
-export function createWorld(seed: number): World {
+/** Die Welt eines Seeds mit den geladenen Welt-Paketen (worlds/); die Lichtung ist mit und ohne sie dieselbe */
+export function createWorld(seed: number, packs: readonly WorldPack[]): World {
   const places = layouts(seed);
-  const { map: regions, spawns, spots, kessel } = buildStart(seed, places);
+  const eis = packs.find((p) => p.id === 'eis');
+  const { map: regions, spawns, spots, kessel } = buildStart(seed, places, eis);
   const cache = new ChunkCache<Cell>((cx, cy) => {
     const cells: Cell[] = [];
     for (let y = cy * CHUNK; y < (cy + 1) * CHUNK; y++)
@@ -645,8 +646,8 @@ export function createWorld(seed: number): World {
     gates: gatesOf(places),
     spawns,
     spotsOf: (realm) => ({ lichtung: spots, eis: kessel.spots })[realm],
-    portals: new Map([...portalsOf(places), kessel.portal]),
-    stones: new Map<StoryId, Point>([...stonesOf(places), ['eis-offen', kessel.stone]]),
+    portals: new Map([...portalsOf(places), ...kessel.portals]),
+    stones: new Map<StoryId, Point>([...stonesOf(places), ...kessel.stones]),
     // In der Eis-Welt überall kühles Licht (wie ganz nah am Eistor)
     climate: (x, y) => (kessel.realm.has(key(x, y)) ? { id: 'eis', strength: 1 } : climateOf(seed, places, x, y)),
   };

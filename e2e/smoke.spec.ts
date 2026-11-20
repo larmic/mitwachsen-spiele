@@ -410,7 +410,7 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
     el.openWorld(el.saved.id);
   });
   expect(await penguin()).toBe('fehlt'); // verlaufen: Er wohnt nicht im Kessel
-  // Aufwachen: Die Regeln des Pinguins kommen nach, gut 2 s später taucht er neben der Figur auf und führt
+  // Aufwachen: Die Regeln des Pinguins (Welt-Paket Eis) greifen, gut 2 s später taucht er neben ihr auf und führt
   await page.keyboard.press('ArrowDown');
   await expect
     .poll(
@@ -418,7 +418,7 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
         await ticks(10);
         return penguin();
       },
-      { timeout: 30_000 }, // die Regeln des Pinguins kommen per import() nach; ohne Grafikkarte dauert das
+      { timeout: 30_000 }, // ohne Grafikkarte dauert jeder Takt lange
     )
     .toBe('lead');
   // Figur und Pinguin in die Bucht vor dem Eistor (über die Komponente): Im nächsten Takt geht das Tor auf
@@ -496,6 +496,90 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
   await page.keyboard.press('ArrowDown');
   await frames(30);
   expect(errors).toEqual([]);
+});
+
+test.describe('ohne Welt-Paket', () => {
+  // Der Service Worker käme sonst am Abfangen vorbei (er hätte das Paket im Speicher)
+  test.use({ serviceWorkers: 'block' });
+  test('Spiel: Ohne das Paket der Eis-Welt startet es auf der Lichtung, ohne Loch und ohne Fehler; der Spielstand bleibt', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    const errors = watchErrors(page);
+    await page.goto('/spielen/');
+    await page.getByRole('button', { name: /Verstanden/ }).click();
+    const game = page.locator('larmic-mitwachsen');
+    await expect(game).toHaveClass(/ready/);
+    type Game = {
+      world: {
+        homes: { eis: { wake: [number, number][] }; lichtung: { bed: [number, number] } };
+        portals: Map<string, unknown>;
+        spotsOf(realm: string): unknown[];
+      };
+      state: {
+        player: { x: number; y: number; dir: string };
+        openGates: string[];
+        portals: string[];
+        sleeping: boolean;
+        animals: { realm: string }[];
+        garden: { id: string; species: string }[];
+      };
+      save(): void;
+    };
+    // Alter Spielstand: Eistor offen, Eis-Portal wach, zwei Eis-Tiere zu Hause, die Figur schläft im Kessel
+    const kessel = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const [x, y] = el.world.homes.eis.wake[0]!;
+      const garden = [
+        ...el.state.garden,
+        { id: 'eis:pinguin', species: 'pinguin' },
+        { id: 'eis:robbe:2', species: 'robbe' },
+      ];
+      el.state = { ...el.state, openGates: ['eis'], portals: ['eiskessel'], garden, player: { x, y, dir: 's' } };
+      el.save();
+      return [x, y];
+    });
+    // Das Paket lädt nicht (Netz kaputt): Das Spiel startet trotzdem, ohne Kessel
+    await page.route(/\/welt-eis\.[\w-]+\.js$/, (r) => r.abort());
+    await page.reload();
+    await expect(game).toHaveClass(/ready/);
+    const bare = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      return {
+        player: [el.state.player.x, el.state.player.y],
+        bed: el.world.homes.lichtung.bed,
+        kessel: el.world.spotsOf('eis').length,
+        portal: el.world.portals.has('eiskessel'),
+        iceAnimals: el.state.animals.filter((a) => a.realm === 'eis').length,
+        open: el.state.openGates,
+      };
+    });
+    expect(bare).toEqual({ player: bare.bed, bed: bare.bed, kessel: 0, portal: false, iceAnimals: 0, open: ['eis'] });
+    const sleeping = () => game.evaluate((el) => (el as unknown as Game).state.sleeping);
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(sleeping).toBe(false);
+    await waitFrames(page, 30);
+    // Gespeichert wird weiter die Position im Kessel, dazu alles andere aus dem alten Stand
+    await game.evaluate((el) => (el as unknown as Game).save());
+    const stored = await page.evaluate(() =>
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith('larmic.games.world.'))
+        .map(
+          (k) =>
+            JSON.parse(localStorage.getItem(k)!) as {
+              position: number[];
+              portals: string[];
+              homeAnimals: { id: string }[];
+            },
+        ),
+    );
+    expect(stored).toHaveLength(1);
+    expect(stored[0]!.position).toEqual(kessel);
+    expect(stored[0]!.portals).toContain('eiskessel');
+    expect(stored[0]!.homeAnimals.map((a) => a.id)).toEqual(expect.arrayContaining(['eis:pinguin', 'eis:robbe:2']));
+    // Nur das abgebrochene Laden selbst meldet der Browser; sonst keine Fehler
+    expect(errors.filter((e) => !/Failed to load resource/.test(e))).toEqual([]);
+  });
 });
 
 test.describe('ohne JavaScript', () => {

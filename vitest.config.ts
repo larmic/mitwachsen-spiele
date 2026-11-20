@@ -13,9 +13,10 @@ export default defineConfig({
       provider: 'v8',
       include: [
         'src/lib/**/*.ts',
-        'src/data/games/*.ts',
+        'src/data/games/**/*.ts',
         'src/scripts/games/{input-pace,pwa-update}.ts',
-        'src/scripts/games/mitwachsen-{air,border,chores,fog,free,gait,growth,guide,home,kessel,lead,meadow,portal,ritual,save,spawns,state,tired,travel,weather,world}.ts',
+        'src/scripts/games/mitwachsen-{air,behind,border,chores,fog,free,gait,growth,guide,home,meadow,portal,save,spawns,state,tired,travel,weather,world}.ts',
+        'src/scripts/games/worlds/*/*.ts',
         'scripts/{bundles,dist,pwa}.ts',
       ],
       reporter: [['text', { skipFull: true }], 'text-summary'],

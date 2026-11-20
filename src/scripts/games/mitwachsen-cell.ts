@@ -1,5 +1,5 @@
 // Ein Feld der Welt von Mitwachsen: Boden, Höhe, Zierde und wozu es gehört. Nur Typen; gebaut wird in
-// mitwachsen-world.ts (Lichtung, Landschaft) und mitwachsen-kessel.ts (Eis-Welt).
+// mitwachsen-world.ts (Lichtung, Landschaft) und worlds/eis/mitwachsen-kessel.ts (Eis-Welt).
 // Spezifikation: docs/specs/mitwachsen.md
 
 import type { GateId, RegionId } from '../../data/games/mitwachsen';

@@ -48,7 +48,7 @@ export const LICHTUNG_HOME = placeHome('lichtung', [0, 0]);
 
 /**
  * Gegenden einer Welt: die Lichtung (dazu die Landschaft draußen) und die Eis-Welt hinter dem Eistor, deren Felder
- * (`realm`, als "x,y") und Bett die Welt kennt (Gletscherkessel und Gang ab seiner Mitte, mitwachsen-kessel.ts)
+ * (`realm`, als "x,y") und Bett die Welt kennt (Gletscherkessel und Gang ab seiner Mitte, worlds/eis/mitwachsen-kessel.ts)
  */
 export function realmsOf(eis: { bed: Point; realm: ReadonlySet<string> }): Realms {
   return {

@@ -81,11 +81,31 @@ module.exports = {
       to: { path: 'sharp' },
     },
     {
+      name: 'world-packs-load-lazily',
+      severity: 'error',
+      comment:
+        'Welt-Pakete (src/scripts/games/worlds/<welt>/, dazu ihre Daten in src/data/games/worlds/<welt>/) kommen nur per import(): Nichts außerhalb der Pakete importiert statisch daraus, sonst rutscht es in die Spielseite. Tests und ihr Helfer test-worlds.ts ausgenommen.',
+      from: {
+        pathNot: ['^src/(scripts|data)/games/worlds/', '\\.test\\.ts$', '^src/scripts/games/test-worlds\\.ts$'],
+      },
+      to: {
+        path: '^src/(scripts|data)/games/worlds/',
+        dependencyTypesNot: ['dynamic-import', 'type-only'],
+      },
+    },
+    {
+      name: 'world-packs-stay-apart',
+      severity: 'error',
+      comment: 'Ein Welt-Paket importiert kein anderes, auch nicht dessen Daten: Jede Welt lädt für sich.',
+      from: { path: '^src/(?:scripts|data)/games/worlds/([^/]+)/' },
+      to: { path: '^src/(scripts|data)/games/worlds/', pathNot: '^src/(scripts|data)/games/worlds/$1/' },
+    },
+    {
       name: 'no-test-in-production',
       severity: 'error',
-      comment: 'Tests werden nur von Tests importiert.',
+      comment: 'Tests und ihre Helfer werden nur von Tests importiert.',
       from: { pathNot: '\\.test\\.ts$' },
-      to: { path: '\\.test\\.ts$' },
+      to: { path: '(\\.test\\.ts|/test-worlds\\.ts)$' },
     },
     {
       name: 'not-to-unresolvable',
