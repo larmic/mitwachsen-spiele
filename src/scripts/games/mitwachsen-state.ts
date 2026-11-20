@@ -12,6 +12,7 @@ import {
   realmOfAnimal,
   regionAnimalList,
   type GateId,
+  type Point,
   type RegionId,
   type SpeciesId,
 } from '../../data/games/mitwachsen';
@@ -22,6 +23,8 @@ import { homeAt, startRealm } from './mitwachsen-home';
 import { platformsToWake, stepOn } from './mitwachsen-portal';
 import { sheltering } from './mitwachsen-weather';
 import { PENGUIN, atHome, meadowSpots, shelterPlaces, windOk, type Home } from './mitwachsen-meadow';
+import { dirTo, freeNear, occupied } from './mitwachsen-free';
+import { crossBorder, type BorderEvent, type Mode } from './mitwachsen-border';
 
 export const SLEEP_LOCK = 30; // Takte nach dem Einschlafen, in denen Tasten nicht wecken (3 s)
 export const WAKE_GRACE = 15; // Takte nach dem Aufwachen, in denen das Bett nur ein Hindernis ist (1,5 s)
@@ -36,7 +39,7 @@ export type Animal = {
   x: number;
   y: number;
   dir: Dir;
-  mode: 'wander' | 'follow' | 'home';
+  mode: Mode; // umherlaufen, folgen, auf der Wiese wohnen oder an der Weltgrenze warten (mitwachsen-border.ts)
   home: Home;
   realm: RegionId; // Gegend, zu der das Tier gehört: Zu Hause ist es nur auf der Wiese ihres Betts
   spawn: readonly [number, number];
@@ -97,20 +100,13 @@ export type GameEvent =
   | { type: 'teleport'; id: GateId; to: 'gate' | 'home' }
   | { type: 'ready'; id: GateId } // nach der Ankunft von der Mitte gestiegen: Die Plattform ist wieder bereit
   | ChoreEvent // Handgriffe: pflücken, fangen, nachwachsen, füttern, schöpfen, tränken (mitwachsen-chores.ts)
+  | BorderEvent // Weltgrenze am Tor: warten, wieder einreihen, Gegend wechseln (mitwachsen-border.ts)
   | { type: 'call' }
   | { type: 'sleep' }
   | { type: 'wake' };
 
 const ALL_DIRS: Dir[] = ['n', 'e', 's', 'w'];
-const dirTo = (dx: number, dy: number): Dir =>
-  Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'e' : 'w') : dy > 0 ? 's' : 'n';
 const cheb = (ax: number, ay: number, bx: number, by: number) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
-
-/** Darf ein Tier auf diesem Feld umherlaufen? (Folgende Tiere gehen überall hin, wo die Figur war) */
-
-const occupied = (s: State, x: number, y: number, except?: string) =>
-  (!s.sleeping && s.player.x === x && s.player.y === y) ||
-  s.animals.some((a) => a.id !== except && a.x === x && a.y === y);
 
 /**
  * Darf ein Tier einen Schritt nach (tx, ty) gehen? Es bleibt in seinem Zuhause; wer draußen steht (`away`), zieht heim,
@@ -268,9 +264,13 @@ export function step(state: State, world: World, cmd: Cmd, explored: Explored = 
   if (cmd.type === 'tick') tick(s, world, events);
   else if (s.sleeping) wake(s, world, events);
   else if (cmd.type === 'move') {
-    const [fx, fy] = [s.player.x, s.player.y];
+    const from: Point = [s.player.x, s.player.y];
     move(s, world, cmd.dir, events);
-    if (s.player.x !== fx || s.player.y !== fy) landed(s, world, events);
+    // Neues Feld: Plattformen (reisen, wieder bereit), dann die Weltgrenze am Tor (warten, wieder einreihen)
+    if (s.player.x !== from[0] || s.player.y !== from[1]) {
+      landed(s, world, events);
+      crossBorder(s, world, from, events);
+    }
   } else action(s, world, events);
   // Portal-Plattformen in der Nähe erwachen (Regeln in mitwachsen-portal.ts)
   for (const id of s.sleeping ? [] : platformsToWake(world.portals, s.portals, s.player.x, s.player.y, explored)) {
@@ -290,7 +290,7 @@ function tick(s: State, world: World, events: GameEvent[]) {
   const t = s.tick - s.dayStart;
   const places = shelterPlaces(world, s.animals, (realm) => sheltering(world.seed, s.day, t, realm, windOk(s)));
   for (const a of s.animals) {
-    if (a.mode === 'follow') continue;
+    if (a.mode === 'follow' || a.mode === 'wait') continue; // folgt der Figur bzw. sitzt auf seinem Warteplatz
     const spot = places.get(a.id);
     const wet = spot !== undefined;
     const goal = spot ?? a.spawn;
@@ -541,8 +541,10 @@ function sleep(s: State, world: World, events: GameEvent[]) {
   s.sleeping = true;
   s.day++; // über Nacht wächst die Wiese
   s.sleptAt = s.tick;
-  // Folgende Tiere gehen heim: Tiere der Gegenden an ihren Platz, Tiere der Landschaft tauchen dort später wieder auf
-  for (const id of s.followers) {
+  // Folgende und an der Weltgrenze wartende Tiere gehen heim: Tiere der Gegenden an ihren Platz, Tiere der Landschaft
+  // tauchen dort später wieder auf
+  const waiting = s.animals.filter((a) => a.mode === 'wait').map((a) => a.id);
+  for (const id of [...s.followers, ...waiting]) {
     const a = s.animals.find((x) => x.id === id)!;
     a.mode = 'wander';
     if (a.home.kind === 'wild') {
@@ -575,27 +577,6 @@ function wake(s: State, world: World, events: GameEvent[]) {
   s.player.dir = 's';
   scatter(s, world); // ein neuer Morgen: Die verlorenen Tiere sind woanders unterwegs
   events.push({ type: 'wake' });
-}
-
-/** Nächstes freies Feld (Breitensuche), auf dem man stehen kann und das `ok` erfüllt */
-function freeNear(
-  s: State,
-  world: World,
-  from: readonly [number, number],
-  ok: (x: number, y: number) => boolean,
-  except?: string,
-): [number, number] | null {
-  const seen = new Set<string>();
-  const queue: [number, number][] = [[from[0], from[1]]];
-  while (queue.length && seen.size < 600) {
-    const [x, y] = queue.shift()!;
-    const k = `${x},${y}`;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    if (ok(x, y) && standHeight(world, s.openGates, x, y) !== null && !occupied(s, x, y, except)) return [x, y];
-    for (const [dx, dy] of Object.values(DIRS)) queue.push([x + dx, y + dy]);
-  }
-  return null;
 }
 
 /** Tiere der Landschaft in der Nähe der Figur auftauchen lassen, weit entfernte (umherlaufende) vergessen */

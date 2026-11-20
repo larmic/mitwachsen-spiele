@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Dir } from '../../lib/games/front';
+import { DIRS as DIRECTIONS, type Dir } from '../../lib/games/front';
 import { GATES, REGIONS, animalId, type RegionId } from '../../data/games/mitwachsen';
 import {
   SLEEP_LOCK,
@@ -16,10 +16,12 @@ import {
   type State,
 } from './mitwachsen-state';
 import { windOk } from './mitwachsen-meadow';
-import { createWorld, standHeight, type Cell, type World } from './mitwachsen-world';
+import { canStep, createWorld, standHeight, type Cell, type World } from './mitwachsen-world';
 import { startRealm, type Homestead } from './mitwachsen-home';
 import { BLOCK, raining, windy } from './mitwachsen-weather';
 import { platformArea } from './mitwachsen-portal';
+import { SEATS, crossings } from './mitwachsen-border';
+import { dirTo, freeNear } from './mitwachsen-free';
 
 /** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich; Zuhause der Eis-Welt (im Kessel von Seed 1) */
 const { lichtung: LICHTUNG, eis: EIS_HOME } = createWorld(1).homes;
@@ -1259,4 +1261,308 @@ describe('Klangsteine', () => {
     expect(s.heard).toEqual(['eis', 'bett']);
     expect(progressOf(s).heard).toEqual(['eis', 'bett']);
   });
+});
+
+describe('Weltgrenze am Tor', () => {
+  const world = createWorld(1);
+  const gate = world.gates.get('eis')!;
+  const crossing = crossings(world)[0]!;
+  const seats = (side: RegionId) => crossing.seats.get(side)!;
+  const inward = dirTo(...gate.out); // durchs Eistor zum Gletscherkessel
+  const outward = dirTo(-gate.out[0], -gate.out[1]);
+  /** Feld auf der Achse des Tors: k > 0 in der Bucht davor, 0 in der Torreihe, k < 0 im Gang dahinter */
+  const axis = (k: number): [number, number] => [gate.mid[0] - gate.out[0] * k, gate.mid[1] - gate.out[1] * k];
+  /** Letztes Feld des Gangs auf der Achse (die Mündung); eins weiter beginnt der Boden des Kessels */
+  let mouth = 0;
+  while (crossing.cells.has(axis(mouth - 1).join(','))) mouth--;
+  const follower = (id: string, [x, y]: [number, number], realm: RegionId = 'lichtung') =>
+    animal(id, x, y, { mode: 'follow', realm, home: { kind: 'region', region: realm } });
+  const ice = (id: string, at: [number, number]) => ({ ...follower(id, at, 'eis'), species: 'pinguin' as const });
+  /** Figur mit Blick in `dir` auf (x, y), dahinter die Kette (Eistor offen) */
+  function chain(at: [number, number], dir: Dir, animals: Animal[]): State {
+    const s = awake(world, ...at, animals);
+    return { ...s, openGates: ['eis'], followers: animals.map((a) => a.id), player: { ...s.player, dir } };
+  }
+  /** Vor dem Eistor: Hase, Pinguin, Fuchs und ein Tier der Landschaft folgen der Figur */
+  const beforeGate = () =>
+    chain(axis(1), inward, [
+      follower('lichtung:hase', axis(2)),
+      ice('eis:pinguin', axis(3)),
+      { ...follower('lichtung:fuchs', axis(4)), species: 'fuchs' },
+      { ...follower('wild:0:0:0', axis(5)), home: { kind: 'wild', cx: 0, cy: 0 } },
+    ]);
+  const byId = (s: State, id: string) => s.animals.find((a) => a.id === id)!;
+
+  it('Tiere der Lichtung setzen sich am ersten Torfeld in die Bucht, auch die hinteren; Eis-Tiere folgen weiter', () => {
+    let r = run(beforeGate(), world, inward); // in die Torreihe
+    expect([r.s.player.x, r.s.player.y]).toEqual(axis(0));
+    expect(r.events.filter((e) => e.type === 'wait')).toEqual([
+      { type: 'wait', id: 'lichtung:hase', species: 'hase' },
+      { type: 'wait', id: 'lichtung:fuchs', species: 'fuchs' },
+      { type: 'wait', id: 'wild:0:0:0', species: 'hase' },
+    ]);
+    expect(r.s.followers).toEqual(['eis:pinguin']);
+    // feste Warteplätze nebeneinander, der nächste zuerst; jedes schaut zur Figur
+    const waiting = ['lichtung:hase', 'lichtung:fuchs', 'wild:0:0:0'];
+    for (const [i, id] of waiting.entries()) {
+      const a = byId(r.s, id);
+      expect([a.mode, [a.x, a.y]], id).toEqual(['wait', seats('lichtung')[i]]);
+      expect(a.dir, id).toBe(dirTo(r.s.player.x - a.x, r.s.player.y - a.y));
+    }
+    r = run(r.s, world, inward); // der Pinguin rückt auf
+    expect([byId(r.s, 'eis:pinguin').x, byId(r.s, 'eis:pinguin').y]).toEqual(axis(0));
+    // Sie bleiben auf ihren Plätzen, ohne Ablauf nach Zeit
+    for (let i = 0; i < 600; i++) r = run(r.s, world, TICK);
+    for (const [i, id] of waiting.entries())
+      expect([byId(r.s, id).mode, [byId(r.s, id).x, byId(r.s, id).y]], id).toEqual(['wait', seats('lichtung')[i]]);
+  });
+
+  it('eine lange Kette: nach den festen Warteplätzen das nächste freie Feld daneben, jedes Tier auf eigenem Feld', () => {
+    const long = Array.from({ length: SEATS + 4 }, (_, i) => follower(`lichtung:hase:${i}`, axis(i + 2)));
+    const r = run(chain(axis(1), inward, long), world, inward);
+    expect(types(r.events).filter((t) => t === 'wait')).toHaveLength(SEATS + 4);
+    expect(r.s.followers).toEqual([]);
+    const at = r.s.animals.map((a) => [a.x, a.y] as [number, number]);
+    expect(at.slice(0, SEATS)).toEqual(seats('lichtung'));
+    expect(new Set(at.map((p) => p.join(','))).size).toBe(at.length);
+    for (const [x, y] of at.slice(SEATS)) {
+      expect([world.realm(x, y), crossing.cells.has(`${x},${y}`)]).toEqual(['lichtung', false]);
+      expect(Math.abs((x - gate.mid[0]) * gate.out[1] - (y - gate.mid[1]) * gate.out[0])).toBeGreaterThan(2); // neben dem Weg
+      // gleiche Bedingungen wie die festen Plätze: nicht neben dem Klangstein, höchstens 12 Felder vom Tor
+      expect([-1, 0, 1].some((dy) => [-1, 0, 1].some((dx) => world.cell(x + dx, y + dy).story))).toBe(false);
+      expect(crossing.fits('lichtung', [x, y])).toBe(true);
+    }
+  });
+
+  it('in Gegenrichtung genauso: Eis-Tiere setzen sich vor der Gangmündung in den Kessel, Tiere der Lichtung folgen weiter', () => {
+    const r = run(
+      chain(axis(mouth - 1), outward, [
+        ice('eis:pinguin', axis(mouth - 2)),
+        follower('lichtung:hase', axis(mouth - 3)),
+        { ...ice('eis:robbe', axis(mouth - 4)), species: 'robbe' },
+      ]),
+      world,
+      outward, // in die Mündung
+    );
+    expect(types(r.events).filter((t) => t === 'wait')).toHaveLength(2);
+    expect(r.s.followers).toEqual(['lichtung:hase']);
+    for (const [i, id] of ['eis:pinguin', 'eis:robbe'].entries()) {
+      const a = byId(r.s, id);
+      expect([a.mode, [a.x, a.y]], id).toEqual(['wait', seats('eis')[i]]);
+      expect(world.realm(a.x, a.y)).toBe('eis');
+    }
+  });
+
+  it('die Gegend wechselt genau an der Gangmitte: je Richtung ein Ereignis, im Gang flackert nichts', () => {
+    let s = chain(axis(1), inward, []);
+    const realms: { at: number; to: string }[] = [];
+    for (let k = 0; k >= mouth - 1; k--) {
+      const r = run(s, world, inward);
+      s = r.s;
+      for (const e of r.events) if (e.type === 'realm') realms.push({ at: k, to: e.to });
+    }
+    for (let k = mouth; k <= 1; k++) {
+      const r = run(s, world, outward);
+      s = r.s;
+      for (const e of r.events) if (e.type === 'realm') realms.push({ at: k, to: e.to });
+    }
+    const middle = Array.from({ length: 1 - mouth }, (_, i) => -i).find((k) => world.realm(...axis(k)) === 'eis')!;
+    expect(realms).toEqual([
+      { at: middle, to: 'eis' },
+      { at: middle + 1, to: 'lichtung' },
+    ]);
+  });
+
+  it('Warten und Wiederfolgen: Erst auf ihrer Seite außerhalb des Tors reihen sich die Wartenden hüpfend wieder ein', () => {
+    let r = run(beforeGate(), world, inward, inward, inward); // durchs Tor in den Gang
+    // zurück in die Torreihe (erst Platztausch mit dem Pinguin): noch im Durchgang, sie warten weiter, keiner setzt sich neu
+    r = run(r.s, world, outward, outward);
+    expect(types(r.events)).not.toContain('rejoin');
+    expect(types(r.events)).not.toContain('wait');
+    expect([r.s.player.x, r.s.player.y]).toEqual(axis(0));
+    r = run(r.s, world, outward); // in die Bucht
+    expect(r.events.filter((e) => e.type === 'rejoin').map((e) => (e as { id: string }).id)).toEqual([
+      'lichtung:hase',
+      'lichtung:fuchs',
+      'wild:0:0:0',
+    ]);
+    expect(r.s.followers).toEqual(['eis:pinguin', 'lichtung:hase', 'lichtung:fuchs', 'wild:0:0:0']);
+    for (const id of r.s.followers) expect(byId(r.s, id).mode, id).toBe('follow');
+  });
+
+  it('beim Schlafen gehen Wartende heim wie folgende Tiere', () => {
+    let s = run(beforeGate(), world, inward).s;
+    const [bx, by] = world.homes.lichtung.bed;
+    s = { ...s, player: { x: bx + 1, y: by, dir: 'w' } }; // gleich am Bett
+    s = run(s, world, ACT).s;
+    expect(s.sleeping).toBe(true);
+    expect(s.animals.some((a) => a.mode === 'wait')).toBe(false);
+    expect(byId(s, 'lichtung:hase').mode).toBe('wander');
+    expect(s.animals.find((a) => a.id === 'wild:0:0:0')).toBeUndefined(); // Tiere der Landschaft tauchen später auf
+  });
+
+  it('ein Tier zieht nur auf der Wiese seiner eigenen Gegend ein (Schneewiese im Gletscherkessel)', () => {
+    const home = world.homes.eis;
+    const [bx, by] = home.bed;
+    // Eine Richtung, in der man vom Rand der Schneewiese geradeaus auf sie läuft
+    const dir = (['n', 'e', 's', 'w'] as Dir[]).find((d) => {
+      const [dx, dy] = DIRECTIONS[d];
+      return [2, 3, 4, 5, 6, 7, 8, 9, 10].every((k) => standHeight(world, ['eis'], bx + dx * k, by + dy * k) !== null);
+    })!;
+    const [dx, dy] = DIRECTIONS[dir];
+    const at = (k: number): [number, number] => [bx + dx * k, by + dy * k];
+    let s = chain(at(7), dirTo(-dx, -dy), [follower('lichtung:hase', at(8)), ice('eis:pinguin', at(9))]);
+    const r = run(s, world, dirTo(-dx, -dy), dirTo(-dx, -dy), dirTo(-dx, -dy));
+    s = r.s;
+    expect(r.events.filter((e) => e.type === 'home')).toEqual([
+      { type: 'home', id: 'eis:pinguin', species: 'pinguin' },
+    ]);
+    expect(s.followers).toEqual(['lichtung:hase']);
+  });
+});
+
+describe('Invarianten bei wildem Drücken durchs offene Eistor', () => {
+  const DIRS4: Dir[] = ['n', 's', 'e', 'w'];
+  /** Nächster Schritt auf dem kürzesten Weg nach `to` (Breitensuche, Tiere zählen nicht) */
+  function towards(world: World, s: State, to: readonly [number, number]): Dir | null {
+    const start = `${s.player.x},${s.player.y}`;
+    const first = new Map<string, Dir | null>([[start, null]]);
+    const queue: [number, number][] = [[s.player.x, s.player.y]];
+    while (queue.length && first.size < 40000) {
+      const [x, y] = queue.shift()!;
+      if (x === to[0] && y === to[1]) return first.get(`${x},${y}`) ?? null;
+      for (const d of DIRS4) {
+        const [dx, dy] = DIRECTIONS[d];
+        const k = `${x + dx},${y + dy}`;
+        if (first.has(k) || !canStep(world, s.openGates, x, y, x + dx, y + dy)) continue;
+        first.set(k, first.get(`${x},${y}`) ?? d);
+        queue.push([x + dx, y + dy]);
+      }
+    }
+    return null;
+  }
+
+  for (const seed of [1, 2]) {
+    it(`Seed ${seed}: hin und her durchs Tor mit Tieren beider Gegenden: Wartende auf eigenen Feldern in ihrer Gegend, nie zwei auf einem Feld, alles wiederholbar`, () => {
+      const world = createWorld(seed);
+      const gate = world.gates.get('eis')!;
+      const { cells } = crossings(world)[0]!;
+      const bay: [number, number] = [gate.mid[0] - gate.out[0] * 6, gate.mid[1] - gate.out[1] * 6];
+      const snow = crossings(world)[0]!.seats.get('eis')!.at(-1)!; // im Kessel, nah an der Mündung, weit vom Bett
+      const play = () => {
+        const s0 = initialState(world, {}, seed);
+        // Kette: vier Tiere der Lichtung und vier Eis-Tiere, dicht hinter der Figur in der Bucht
+        const herd = [
+          ...s0.animals.filter((a) => a.realm === 'lichtung' && a.home.kind === 'region').slice(0, 4),
+          ...s0.animals.filter((a) => a.realm === 'eis').slice(0, 4),
+        ];
+        const [ox, oy] = [-gate.out[0], -gate.out[1]];
+        const chained = herd.map((a, i) => ({
+          ...a,
+          mode: 'follow' as const,
+          x: bay[0] + ox * (i + 1),
+          y: bay[1] + oy * (i + 1),
+        }));
+        let s: State = {
+          ...s0,
+          sleeping: false,
+          openGates: ['eis'],
+          player: { x: bay[0], y: bay[1], dir: 'n' },
+          animals: [...s0.animals.filter((a) => !herd.includes(a)), ...chained],
+          followers: chained.map((a) => a.id),
+        };
+        const seen = new Set<string>();
+        let r = seed * 48271;
+        for (let i = 0; i < 2400; i++) {
+          r = (Math.imul(r, 1103515245) + 12345) >>> 0;
+          // Abwechselnd zielstrebig in den Kessel und zurück in die Bucht, dazwischen wildes Drücken und Takte
+          const goal = Math.floor(i / 300) % 2 === 0 ? snow : bay;
+          const pick = r % 10;
+          const way = pick < 6 ? towards(world, s, goal) : null;
+          const cmd: Cmd = way
+            ? { type: 'move', dir: way }
+            : pick < 8
+              ? { type: 'move', dir: DIRS4[(r >>> 8) % 4]! }
+              : TICK;
+          const out = step(s, world, cmd);
+          s = out.state;
+          for (const e of out.events)
+            if (e.type === 'wait' || e.type === 'rejoin') seen.add(`${e.type} ${e.id.split(':')[0]}`);
+          if (!s.sleeping) expect(standHeight(world, s.openGates, s.player.x, s.player.y)).not.toBeNull();
+          const spots = s.animals.map((a) => `${a.x},${a.y}`);
+          if (!s.sleeping) spots.push(`${s.player.x},${s.player.y}`);
+          expect(new Set(spots).size).toBe(spots.length);
+          expect(new Set(s.followers).size).toBe(s.followers.length);
+          for (const a of s.animals) {
+            if (a.mode === 'home') expect(world.cell(a.x, a.y).garden).toBe(true);
+            if (a.realm === 'eis' && a.mode !== 'follow') expect(world.realm(a.x, a.y), a.id).toBe('eis');
+            if (a.mode !== 'wait') continue;
+            // Wartende: auf der eigenen Seite, nie im Durchgang (jedes auf eigenem Feld, siehe oben)
+            expect(world.realm(a.x, a.y), a.id).toBe(a.realm);
+            expect(cells.has(`${a.x},${a.y}`), a.id).toBe(false);
+            expect(s.followers).not.toContain(a.id);
+          }
+        }
+        return { s, seen };
+      };
+      const first = play();
+      // Die Grenze greift wirklich in beide Richtungen
+      expect([...first.seen].sort()).toEqual(['rejoin eis', 'rejoin lichtung', 'wait eis', 'wait lichtung']);
+      expect(play().s).toEqual(first.s);
+    });
+
+    it(`Seed ${seed}: Tiere bleiben in ihrer Gegend: aus der Bucht mit Tieren der Lichtung und aus dem Kessel mit Eis-Tieren hin und her, außerhalb des Durchgangs steht nie ein Tier in einer fremden Gegend, auch kein folgendes`, () => {
+      const world = createWorld(seed);
+      const gate = world.gates.get('eis')!;
+      const { cells, seats } = crossings(world)[0]!;
+      const bay: [number, number] = [gate.mid[0] - gate.out[0] * 6, gate.mid[1] - gate.out[1] * 6];
+      const snow = seats.get('eis')!.at(-1)!;
+      for (const [realm, start, other] of [
+        ['lichtung', bay, snow],
+        ['eis', snow, bay],
+      ] as const) {
+        const s0 = initialState(world, {}, seed);
+        // Kette: vier Tiere der eigenen Gegend auf freien Feldern dicht um die Figur, keine fremden
+        const herd = s0.animals.filter((a) => a.realm === realm && a.home.kind === 'region').slice(0, 4);
+        const crowd = { ...s0, sleeping: false, openGates: ['eis' as const], player: { x: start[0], y: start[1] } };
+        const chained: typeof herd = [];
+        for (const a of herd) {
+          const others = [...s0.animals.filter((t) => !herd.includes(t)), ...chained];
+          const [x, y] = freeNear(
+            { ...crowd, animals: others },
+            world,
+            start,
+            (x, y) => world.realm(x, y) === realm && !cells.has(`${x},${y}`),
+          )!;
+          chained.push({ ...a, mode: 'follow', x, y });
+        }
+        let s: State = {
+          ...s0,
+          ...crowd,
+          player: { x: start[0], y: start[1], dir: 'n' },
+          animals: [...s0.animals.filter((a) => !herd.includes(a)), ...chained],
+          followers: chained.map((a) => a.id),
+        };
+        let r = seed * 69621;
+        let crossed = 0;
+        for (let i = 0; i < 2400; i++) {
+          r = (Math.imul(r, 1103515245) + 12345) >>> 0;
+          const goal = Math.floor(i / 300) % 2 === 0 ? other : start;
+          const pick = r % 10;
+          const way = pick < 6 ? towards(world, s, goal) : null;
+          const cmd: Cmd = way
+            ? { type: 'move', dir: way }
+            : pick < 8
+              ? { type: 'move', dir: DIRS4[(r >>> 8) % 4]! }
+              : TICK;
+          const out = step(s, world, cmd);
+          s = out.state;
+          for (const e of out.events) if (e.type === 'wait' && e.id.startsWith(`${realm}:`)) crossed++;
+          for (const a of s.animals)
+            if (!cells.has(`${a.x},${a.y}`)) expect(world.realm(a.x, a.y), `${a.id} (${a.mode})`).toBe(a.realm);
+        }
+        expect(crossed, realm).toBeGreaterThan(0); // die Grenze hat wirklich gegriffen
+      }
+    });
+  }
 });

@@ -3,7 +3,8 @@ import { DIRS } from '../../lib/games/front';
 import { GATES, REGIONS, type GateId } from '../../data/games/mitwachsen';
 import { HOMES } from '../../data/games/mitwachsen-homes';
 import { BED_STONE, ICE_STONE } from '../../data/games/mitwachsen-stories';
-import { platformCells, platformLift } from './mitwachsen-portal';
+import { platformArea, platformCells, platformLift, withNeighbours } from './mitwachsen-portal';
+import { SEATS, crossings } from './mitwachsen-border';
 import {
   GATE_HALF,
   HOUSE_DEPTH,
@@ -515,6 +516,61 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
           }),
         );
       for (const [id, p] of ice) expect(gangNear(p), id).toBe(false);
+    });
+
+    it(`Seed ${seed}: Weltgrenze: erstes Feld je Seite; Warteplätze erreichbar, außerhalb der Durchgänge, nicht im Gang`, () => {
+      const all = crossings(w);
+      expect(all.map((c) => [c.gate.id, ...c.realms])).toEqual([['eis', 'lichtung', 'eis']]);
+      const c = all[0]!;
+      const key = ([x, y]: readonly [number, number]) => `${x},${y}`;
+      // Durchgang: Torreihe, Gang und Mündung, bei offenem Tor begehbar, bis vor den Boden des Kessels
+      expect(gate.cells.every((p) => c.cells.has(key(p)))).toBe(true);
+      for (const k of c.cells) {
+        const [x, y] = k.split(',').map(Number) as [number, number];
+        expect([standHeight(w, ['eis'], x, y) !== null, w.cell(x, y).region !== 'eis'], k).toEqual([true, true]);
+      }
+      // Erstes Feld: von der Lichtung aus die Torreihe, vom Kessel aus die Gangmündung (daneben Boden des Kessels)
+      const firsts = (side: string) => [...c.entries].filter(([, r]) => r === side).map(([k]) => k);
+      expect(firsts('lichtung').sort()).toEqual(gate.cells.map(key).sort());
+      expect(firsts('eis').length).toBeGreaterThan(0);
+      for (const k of firsts('eis')) {
+        const [x, y] = k.split(',').map(Number) as [number, number];
+        const floorNear = Object.values(DIRS).some(([dx, dy]) => w.cell(x + dx, y + dy).region === 'eis');
+        expect(floorNear, k).toBe(true);
+      }
+      // Warteplätze: je Seite SEATS Stück auf eigenen Feldern, der nächste zuerst
+      const passages = new Set([
+        ...platformArea(w.portals),
+        ...withNeighbours([...w.gates.values()].flatMap((g) => g.cells)),
+        ...withNeighbours([...c.cells].map((k) => k.split(',').map(Number) as [number, number])),
+      ]);
+      const open = new Set(fromLichtung(['eis']).map(key));
+      const across = ([x, y]: readonly [number, number]) =>
+        Math.abs((x - gate.mid[0]) * gate.out[1] - (y - gate.mid[1]) * gate.out[0]);
+      for (const side of ['lichtung', 'eis'] as const) {
+        const seats = c.seats.get(side)!;
+        expect(seats).toHaveLength(SEATS);
+        expect(new Set(seats.map(key)).size).toBe(SEATS);
+        const near = firsts(side).map((k) => k.split(',').map(Number) as [number, number]);
+        const dist = ([x, y]: readonly [number, number]) =>
+          Math.min(...near.map(([fx, fy]) => Math.max(Math.abs(x - fx), Math.abs(y - fy))));
+        expect(seats.map(dist)).toEqual(seats.map(dist).sort((a, b) => a - b)); // nebeneinander, der nächste zuerst
+        for (const p of seats) {
+          const stone = RING_1.some(([dx, dy]) => w.cell(p[0] + dx, p[1] + dy).story);
+          expect(
+            [
+              w.realm(...p),
+              open.has(key(p)),
+              passages.has(key(p)),
+              w.cell(p[0], p[1]).garden,
+              stone,
+              across(p) > GATE_HALF,
+            ],
+            `${side} ${key(p)}`,
+          ).toEqual([side, true, false, undefined, false, true]);
+          expect(dist(p)).toBeLessThanOrEqual(12);
+        }
+      }
     });
 
     it(`Seed ${seed}: Im Kessel und in der Eiswelt draußen wohnen keine Tiere der Landschaft`, () => {

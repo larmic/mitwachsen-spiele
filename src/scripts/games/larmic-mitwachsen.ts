@@ -9,6 +9,7 @@ import { projection, type Dir } from '../../lib/games/front';
 import type { World3D as World3DType } from './mitwachsen-3d';
 import { GAME_COLORS, LOOK, SPECIES, THEME_COLORS, TIRED_TALK } from '../../data/games/mitwachsen';
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
+import { sparks } from './mitwachsen-glyphs';
 import { Sfx } from './sfx';
 import { NOTE_COLORS, StoryPlayer } from './mitwachsen-story';
 import {
@@ -489,9 +490,19 @@ class LarmicMitwachsen extends HTMLElement {
           this.float('heart', e.id, GAME_COLORS.heart, now + 150);
           break;
         case 'aside':
-          // Ein Tier der Wiese hüpft zur Seite und ruft kurz – die Figur geht weiter, ohne anzuhalten
+        case 'wait':
+        case 'rejoin':
+          // Ein Tier der Wiese hüpft zur Seite und ruft kurz – die Figur geht weiter, ohne anzuhalten. An der Weltgrenze
+          // setzt sich ein Tier mit seinem Ton und einem Herz auf seinen Warteplatz bzw. hüpft vor Freude und reiht sich ein
           this.sfx.play(SPECIES[e.species].tone);
           this.hops.set(e.id, now);
+          if (e.type !== 'aside') {
+            this.float('heart', e.id, GAME_COLORS.heart, now + 150);
+            this.hops.set(`seat:${e.id}`, now); // gleitet zum Warteplatz bzw. zurück in die Kette, bis es dort ist
+          }
+          break;
+        case 'realm': // Weltwechsel an der Gangmitte: hoher Glockenton in die Eis-Welt, tiefer zurück
+          this.sfx.bell(e.to === 'eis');
           break;
         case 'home':
           // Zu Hause angekommen: Das Tier ruft seinen eigenen Ton, dazu ein heller Klang und ein Herz
@@ -555,24 +566,9 @@ class LarmicMitwachsen extends HTMLElement {
   }
 
   private burst(who: string, colors: readonly string[], n: number) {
-    if (this.reduced.matches) return;
     const b = this.bodies.get(who);
-    if (!b) return;
-    const { zoom } = this.size;
-    const [sx, sy] = this.project(b.x + 0.5, b.y + 0.5, b.z + 0.8);
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2;
-      const v = 1 + (i % 4) * 0.8;
-      this.particles.push({
-        x: sx,
-        y: sy,
-        vx: Math.cos(a) * v,
-        vy: -Math.abs(Math.sin(a)) * v * 1.4 - 1,
-        life: 40 + (i % 5) * 6,
-        color: colors[i % colors.length]!,
-        size: (3 + (i % 3) * 2) * zoom,
-      });
-    }
+    if (this.reduced.matches || !b) return;
+    this.particles.push(...sparks(this.project(b.x + 0.5, b.y + 0.5, b.z + 0.8), colors, n, this.size.zoom));
   }
 
   // ---------- Bild ----------
@@ -621,14 +617,16 @@ class LarmicMitwachsen extends HTMLElement {
       const z = pose?.z ?? (sits ? ground - 0.35 : ground); // sitzt im Gras
       const [tx, ty] = [t.x + (pose?.dx ?? 0), t.y + (pose?.dy ?? 0)];
       let b = this.bodies.get(id);
-      if (!b || snap || Math.abs(b.x - tx) + Math.abs(b.y - ty) > 2.5) b = { x: tx, y: ty, z, hop: 0 };
+      // An der Weltgrenze gleiten Tiere auch weitere Wege: zum Warteplatz und zurück in die Kette, bis sie angekommen sind
+      const far = this.hops.has(`seat:${id}`) ? 12 : 2.5;
+      if (!b || snap || Math.abs(b.x - tx) + Math.abs(b.y - ty) > far) b = { x: tx, y: ty, z, hop: 0 };
       const dx = tx - b.x,
         dy = ty - b.y,
         d = Math.hypot(dx, dy);
       const stepLen = SPEED * dt;
       if (d <= stepLen) {
-        b.x = tx;
-        b.y = ty;
+        [b.x, b.y] = [tx, ty];
+        this.hops.delete(`seat:${id}`);
       } else {
         b.x += (dx / d) * stepLen;
         b.y += (dy / d) * stepLen;

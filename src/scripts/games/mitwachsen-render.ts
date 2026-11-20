@@ -37,11 +37,8 @@ import {
   BUCKET_PARTS,
   BOOK_PARTS,
   SLEEPY_EYES,
-  speciesOf,
   type GateId,
   type Look,
-  type RegionId,
-  type SpeciesId,
 } from '../../data/games/mitwachsen';
 import { FISH_PARTS, ICE_COLORS } from '../../data/games/mitwachsen-eis';
 import { grown } from './mitwachsen-growth';
@@ -57,11 +54,13 @@ import { homeAt } from './mitwachsen-home';
 import { drawPlatform } from './mitwachsen-platform-2d';
 import { moodLife } from './mitwachsen-sky';
 import { turnHead } from './mitwachsen-air';
+import { Album } from './mitwachsen-album';
+import { ASK, HEART, NOTE, ZZZ, sprite, type Particle } from './mitwachsen-glyphs';
 
 /** Gleitende Position eines Wesens auf dem Bildschirm (in Feldern), dazu Hüpfer und Blickrichtung */
 export type Body = { x: number; y: number; z: number; hop: number; puff?: number }; // puff: Haltung im Iglu (Größe)
 export type Float = { kind: 'note' | 'heart' | 'zzz'; x: number; y: number; z: number; age: number; color: string };
-export type Particle = { x: number; y: number; vx: number; vy: number; life: number; color: string; size: number };
+export type { Particle };
 
 export type Scene = {
   width: number;
@@ -118,30 +117,11 @@ const facing = (state: State, sc: Scene) => (sc.pose === 'stand' ? state.player.
 const PAL_SAND: Palette = { D: [['#e3cf95', 1]], d: [['#d4bd7d', 1]], e: [['#efdeaa', 1]] };
 const PAL_PATH: Palette = { D: [['#c9a46e', 1]], d: [['#b48d58', 1]], e: [['#d8b783', 1]] };
 
-const HEART = ['.rr.rr.', 'rrrrrrr', 'rrrrrrr', '.rrrrr.', '..rrr..', '...r...'];
-const NOTE = ['..kkkk', '..k..k', '..k..k', 'kkk.kk', 'kkk.kk'];
-const ZZZ = ['zzzz', '..z.', '.z..', 'zzzz'];
-const ASK = ['.qqq.', 'q...q', '...q.', '..q..', '.....', '..q..']; // Fragezeichen über verlorenen Tieren
-
-function sprite(ctx: CanvasRenderingContext2D, grid: string[], color: string, cx: number, bottom: number, px: number) {
-  ctx.fillStyle = color;
-  const w = grid[0]?.length ?? 0;
-  grid.forEach((row, r) => {
-    for (let c = 0; c < w; c++)
-      if (row[c] !== '.')
-        ctx.fillRect(
-          Math.round(cx + (c - w / 2) * px),
-          Math.round(bottom + (r - grid.length) * px),
-          Math.ceil(px),
-          Math.ceil(px),
-        );
-  });
-}
-
 export class Renderer {
   /** Eis-Quader des Bilds (Iglu, Eisschale, Trog): jeder kommt in der Reihe seiner Vorderkante dran */
   private later: IceBox[] = [];
   private ice: typeof import('./mitwachsen-ice-sky') | Promise<unknown> | null = null;
+  private album = new Album(); // Leiste unten
   private blocks: Record<'grass' | 'dirt' | 'stone' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
 
   constructor(private readonly ctx: CanvasRenderingContext2D) {
@@ -223,13 +203,15 @@ export class Renderer {
     const followers = new Set(state.followers);
     if (sc.evening > 0) this.eveningGlow(sc);
     this.weather(sc);
-    const ice = this.iceSky(world, state); // Wetter der Eis-Welt, nur im Kessel geladen
+    const ice = this.iceSky(world, state); // Wetter der Eis-Welt und Bild der Weltgrenze, erst nachgeladen
     ice?.iceWeather(ctx, world, sc, P);
     for (const a of state.animals) {
       const b = sc.bodies.get(a.id);
       if (!b || !sc.explored(Math.round(b.x), Math.round(b.y))) continue; // im Nebel nichts verraten
       const [hx, hy] = P(b.x + 0.5, b.y + 0.5, b.z + b.hop + 1.05 * SPECIES[a.species].scale * 0.75);
       if (followers.has(a.id)) sprite(ctx, HEART, GAME_COLORS.heart, hx, hy, 2.5 * z);
+      else if (a.mode === 'wait')
+        ice?.waitArrow(ctx, world, P, a, b, [hx, hy], 3 * z); // Pfeil zum Tor
       else if (!state.met.includes(a.id)) {
         // Verloren: ein Fragezeichen schwebt über dem Kopf
         const bob = sc.reduced ? 0 : Math.sin(sc.now / 400 + b.x) * 2 * z;
@@ -249,73 +231,18 @@ export class Renderer {
     if (sc.night > 0) this.nightSky(sc);
     if (sc.aurora > 0) ice?.aurora(ctx, sc);
     this.life(sc);
-    this.album(state, sc, world.realm(state.player.x, state.player.y));
-  }
-
-  /** Wetter der Eis-Welt (mitwachsen-ice-sky.ts): erst nachgeladen, wenn die Figur im Kessel ist; bis dahin nichts */
-  private iceSky(world: World, state: State) {
-    // Scheitert das Laden, bleibt es beim Versprechen: dann eben ohne Eis-Wetter
-    if (!this.ice && world.realm(state.player.x, state.player.y) === 'eis')
-      this.ice = import('./mitwachsen-ice-sky').then((m) => (this.ice = m)).catch(() => undefined);
-    return this.ice instanceof Promise ? null : this.ice;
+    this.album.draw(ctx, state, sc, world.realm(state.player.x, state.player.y), ice);
   }
 
   /**
-   * Leiste unten: ein Platz je Art der Gegend, in der die Figur steht (`realm`), auf der Lichtung dahinter Tiere der
-   * Landschaft, die im Garten wohnen. Umriss mit Fragezeichen = noch verloren, in Farbe = gefunden, grüner Grund = zu
-   * Hause im Garten, Herz = folgt gerade.
+   * Wetter der Eis-Welt (mitwachsen-ice-sky.ts) und Bild der Weltgrenze (mitwachsen-border-view.ts): erst nachgeladen,
+   * wenn die Figur im Kessel oder das Eistor offen ist; bis dahin nichts
    */
-  private album(state: State, sc: Scene, realm: RegionId) {
-    const { ctx } = this;
-    // Je Gegend ein Platz pro Art (es gibt mehrere Tiere je Art: eines gefunden heißt die Art gefunden),
-    // dahinter Tiere der Landschaft im Garten einzeln
-    const of = (ids: readonly string[], region: string, species: string) =>
-      ids.some((id) => id.startsWith(`${region}:`) && speciesOf(id) === species);
-    const garden = state.garden.map((p) => p.id);
-    type Slot = { species: SpeciesId; met: boolean; home: boolean; follows: boolean };
-    const groups: Slot[][] = REGIONS.filter((r) => r.id === realm).map((r) =>
-      r.animals.map(({ species }) => ({
-        species,
-        met: of(state.met, r.id, species) || of(garden, r.id, species),
-        home: of(garden, r.id, species),
-        follows: of(state.followers, r.id, species),
-      })),
-    );
-    // Tiere der Landschaft gehören zur Lichtung
-    const wild = realm === 'lichtung' ? state.garden.filter((p) => p.id.startsWith('wild:')).slice(0, 10) : [];
-    if (wild.length)
-      groups.push(
-        wild.map((p) => ({ species: p.species, met: true, home: true, follows: state.followers.includes(p.id) })),
-      );
-    const count = groups.reduce((n, g) => n + g.length, 0);
-    const gap = 6,
-      groupGap = 18;
-    const room = sc.width - 24 - (count - 1) * gap - (groups.length - 1) * (groupGap - gap);
-    const size = Math.floor(Math.max(26, Math.min(52, 44 * sc.zoom, room / count)));
-    const total = count * size + (count - 1) * gap + (groups.length - 1) * (groupGap - gap);
-    let x = Math.round((sc.width - total) / 2);
-    const y = Math.round(sc.height - size - 14 - sc.bottomInset);
-    for (const group of groups) {
-      for (const a of group) {
-        const met = a.met;
-        ctx.fillStyle = a.home ? GAME_COLORS.slotHome : met ? GAME_COLORS.slotMet : GAME_COLORS.slotEmpty;
-        ctx.fillRect(x, y, size, size);
-        // Pixel-Rahmen ohne Eckpixel wie auf der Seite
-        ctx.fillStyle = GAME_COLORS.ink;
-        ctx.fillRect(x, y - 3, size, 3);
-        ctx.fillRect(x, y + size, size, 3);
-        ctx.fillRect(x - 3, y, 3, size);
-        ctx.fillRect(x + size, y, 3, size);
-        const sp = SPECIES[a.species];
-        const s = (size * 1.15) / (0.9 * TILE_W * sp.scale); // Tier füllt den Platz gut zu drei Vierteln
-        const P = projection(0.5, 0.5, x + size / 2, y + size * 0.86, s);
-        drawModel(ctx, P, sp.parts, 0.5, 0.5, 0, 'e', sp.scale, met ? undefined : GAME_COLORS.silhouette);
-        if (!met) sprite(ctx, ASK, GAME_COLORS.lost, x + size - 7, y + 13, Math.max(1.5, size / 26));
-        if (a.follows) sprite(ctx, HEART, GAME_COLORS.heart, x + size - 6, y + 12, Math.max(1.5, size / 22));
-        x += size + gap;
-      }
-      x += groupGap - gap;
-    }
+  private iceSky(world: World, state: State) {
+    // Scheitert das Laden, bleibt es beim Versprechen: dann eben ohne Eis-Wetter
+    if (!this.ice && (world.realm(state.player.x, state.player.y) === 'eis' || state.openGates.includes('eis')))
+      this.ice = import('./mitwachsen-ice-sky').then((m) => (this.ice = m)).catch(() => undefined);
+    return this.ice instanceof Promise ? null : this.ice;
   }
 
   private sky(sc: Scene) {

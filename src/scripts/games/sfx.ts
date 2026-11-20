@@ -200,6 +200,12 @@ export class Sfx {
   giggle(soft = false) {
     [659.25, 587.33].forEach((f, i) => this.note(f, 0.07, 'triangle', soft ? 0.02 : 0.04, 0.85, i * 0.11));
   }
+  /** Weltwechsel an der Gangmitte: ein Glockenton, hoch beim Betreten der Eis-Welt, tief beim Zurückkehren */
+  bell(high: boolean) {
+    const f = high ? 1318.51 : 392; // E6 bzw. G4
+    this.note(f, 1.1, 'sine', 0.09);
+    this.note(f * 2, 0.6, 'sine', 0.03); // heller Oberton
+  }
   lullaby() {
     [783.99, 659.25, 587.33, 523.25, 392].forEach((f, i) => this.note(f, 0.42, 'sine', 0.08, 1, i * 0.38));
   }

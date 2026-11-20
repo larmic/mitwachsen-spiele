@@ -254,6 +254,99 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
   expect(errors).toEqual([]);
 });
 
+test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten in der Bucht, die Leiste klappt um, ohne Fehler', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  await page.goto('/spielen/');
+  await page.getByRole('button', { name: /Verstanden/ }).click();
+  const game = page.locator('larmic-mitwachsen');
+  await expect(game).toHaveClass(/ready/);
+  type Game = {
+    world: {
+      gates: Map<string, { mid: [number, number]; out: [number, number] }>;
+      realm(x: number, y: number): string;
+    };
+    state: {
+      player: { x: number; y: number; dir: string };
+      openGates: string[];
+      sleeping: boolean;
+      followers: string[];
+      animals: { id: string; realm: string; mode: string; x: number; y: number; home: { kind: string } }[];
+    };
+    apply(cmd: { type: 'move'; dir: string }): void;
+    lift(): void;
+    renderer: { ice: { waitArrow?: unknown } | null; album: { turn: { shown?: string } } };
+  };
+  const frames = (n: number) =>
+    page.evaluate(
+      (count) =>
+        new Promise<void>((done) => {
+          let left = count;
+          const next = () => (--left <= 0 ? done() : requestAnimationFrame(next));
+          requestAnimationFrame(next);
+        }),
+      n,
+    );
+  // Über die Komponente: Tor offen, die Figur steht wach in der Bucht vor dem Eistor, drei Tiere der Lichtung folgen ihr
+  const ids = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const { mid, out } = el.world.gates.get('eis')!;
+    const at = (k: number) => [mid[0] - out[0] * k, mid[1] - out[1] * k] as const;
+    const chain = el.state.animals.filter((a) => a.realm === 'lichtung' && a.home.kind === 'region').slice(0, 3);
+    const animals = el.state.animals.map((a) => {
+      const i = chain.indexOf(a);
+      return i < 0 ? a : { ...a, mode: 'follow', x: at(i + 2)[0], y: at(i + 2)[1] };
+    });
+    const [x, y] = at(1);
+    el.state = {
+      ...el.state,
+      openGates: ['eis'],
+      sleeping: false,
+      animals,
+      followers: chain.map((a) => a.id),
+      player: { x, y, dir: 'n' },
+    };
+    el.lift();
+    return chain.map((a) => a.id);
+  });
+  await frames(30);
+  const inward = (n: number) =>
+    game.evaluate((node, steps) => {
+      const el = node as unknown as Game;
+      const { out } = el.world.gates.get('eis')!;
+      const dir = out[0] > 0 ? 'e' : out[0] < 0 ? 'w' : out[1] > 0 ? 's' : 'n';
+      for (let i = 0; i < steps; i++) el.apply({ type: 'move', dir });
+      return {
+        waiting: el.state.animals.filter((a) => a.mode === 'wait').map((a) => a.id),
+        realm: el.world.realm(el.state.player.x, el.state.player.y),
+      };
+    }, n);
+  // In die Torreihe: Die drei setzen sich in die Bucht; das Bild der Weltgrenze ist nachgeladen (Pfeil, Zeichen)
+  expect((await inward(1)).waiting.sort()).toEqual([...ids].sort());
+  await frames(60);
+  expect(await game.evaluate((el) => typeof (el as unknown as Game).renderer.ice?.waitArrow)).toBe('function');
+  // Durch den Gang bis in den Kessel: Die Leiste zeigt die Eis-Welt
+  let realm = '';
+  for (let i = 0; i < 80 && realm !== 'eis'; i++) realm = (await inward(1)).realm;
+  expect(realm).toBe('eis');
+  await frames(60);
+  expect(await game.evaluate((el) => (el as unknown as Game).renderer.album.turn.shown)).toBe('eis');
+  // Zurück in die Bucht: Die Wartenden reihen sich wieder ein
+  const back = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const { out } = el.world.gates.get('eis')!;
+    const dir = out[0] > 0 ? 'w' : out[0] < 0 ? 'e' : out[1] > 0 ? 'n' : 's';
+    for (let i = 0; i < 100 && el.state.followers.length < 3; i++) el.apply({ type: 'move', dir });
+    return { followers: el.state.followers, realm: el.world.realm(el.state.player.x, el.state.player.y) };
+  });
+  expect(back.realm).toBe('lichtung');
+  expect([...back.followers].sort()).toEqual([...ids].sort());
+  await frames(30);
+  expect(await game.evaluate((el) => (el as unknown as Game).renderer.album.turn.shown)).toBe('lichtung');
+  expect(errors).toEqual([]);
+});
+
 test.describe('ohne JavaScript', () => {
   test.use({ javaScriptEnabled: false });
   test('Inhalte bleiben lesbar, das Spiel erklärt sich Eltern', async ({ page }) => {
