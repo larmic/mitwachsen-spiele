@@ -131,6 +131,8 @@ test('Spiel: Portal-Plattform erwacht beim Herangehen, die Mitte bringt zum Bett
 test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offen), alle zehn Eis-Tiere, Pustewind, ohne Fehler', async ({
   page,
 }) => {
+  // Viele Bilder mit Wind und Schnee: Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte, das braucht mehr als 30 s
+  test.slow();
   const errors = watchErrors(page);
   await page.goto('/spielen/');
   await page.getByRole('button', { name: /Verstanden/ }).click();
@@ -265,6 +267,8 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
 test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten in der Bucht, die Leiste klappt um, ohne Fehler', async ({
   page,
 }) => {
+  // Viele Bilder mit Wind und Schnee: Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte, das braucht mehr als 30 s
+  test.slow();
   const errors = watchErrors(page);
   await page.goto('/spielen/');
   await page.getByRole('button', { name: /Verstanden/ }).click();
@@ -358,6 +362,8 @@ test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten
 test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kessel ein; nach dem Neuladen offen, ohne Fehler', async ({
   page,
 }) => {
+  // Viele Bilder mit Wind und Schnee: Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte, das braucht mehr als 30 s
+  test.slow();
   const errors = watchErrors(page);
   await page.goto('/spielen/');
   await page.getByRole('button', { name: /Verstanden/ }).click();
