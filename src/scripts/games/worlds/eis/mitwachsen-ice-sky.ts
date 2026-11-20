@@ -1,19 +1,16 @@
 // Wetter der Eis-Welt in der Luft, gleich für beide Ansichten (die 3D-Ansicht zeichnet die Ebene darüber mit ihrer
 // eigenen Projektion): leiser Schneefall, Pustewind mit Flockenwellen, Schneewirbeln und Pulverfahnen an den Klippen,
 // Glitzerluft danach, der Wimpel auf dem Iglu und nachts im Schneebett das Polarlicht. Alles, was sich bewegt, nur
-// ohne reduzierte Bewegung. Die Ansicht lädt dieses Modul erst, wenn die Figur im Kessel, das Eistor offen oder der
-// verlaufene Pinguin da ist (`import()`); mit ihm kommen das Bild der Weltgrenze (Zeichen der Gegend, Umklappen der
-// Leiste, Pfeil zum Tor) und der Pinguin am Tor (Umriss auf der Tür, goldene Bucht, Töne beim Öffnen des Eistors).
+// ohne reduzierte Bewegung. Teil des Welt-Pakets der Eis-Welt (über view-2d.ts); die Ansicht zeichnet es, wenn die
+// Figur im Kessel, das Eistor offen oder der verlaufene Pinguin da ist. view-2d.ts legt es mit dem Bild der Weltgrenze
+// und dem Pinguin am Tor in die Form `Sky` des Kerns (mitwachsen-view.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Wetter und Unterstand“)
 
-import type { Projection } from '../../lib/games/front';
-import { hash } from '../../lib/games/rng';
-import { IGLOO_H } from './mitwachsen-ice-look';
-import { wrap, type SkyScene } from './mitwachsen-sky';
-import type { World } from './mitwachsen-world';
-
-export { realmSign, turnAlbum, waitArrow } from './mitwachsen-border-view';
-export { gateScore, guestAt } from './mitwachsen-guest-look';
+import type { Projection } from '../../../../lib/games/front';
+import { hash } from '../../../../lib/games/rng';
+import { IGLOO_H } from '../../../../data/games/mitwachsen-eis';
+import { wrap, type SkyScene } from '../../mitwachsen-sky';
+import type { World } from '../../mitwachsen-world';
 
 const NEAR = 24; // Dinge in der Welt (Wirbel, Fahnen, Wimpel) nur so nah an der Kamera zeichnen
 const PENNANT = ['#e8504a', '#ffffff', '#3f8fd8', '#6dbd47']; // bunter Wimpel (kein Gold: das ist die Aktionsfarbe)

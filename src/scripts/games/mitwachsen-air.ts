@@ -9,7 +9,7 @@ import { gustOf, weatherLook, windy, type WeatherLook } from './mitwachsen-weath
 import type { State } from './mitwachsen-state';
 import { windOk } from './mitwachsen-meadow';
 import type { World } from './mitwachsen-world';
-import { IGLOO_LEDGE } from './mitwachsen-ice-look';
+import { IGLOO_LEDGE } from '../../data/games/mitwachsen-eis';
 
 /** Was die Ansicht an einem Tier verändert: etwas verschoben (zusammenrücken), größer oder kleiner, andere Höhe */
 export type Posture = { dx: number; dy: number; puff: number; z?: number };

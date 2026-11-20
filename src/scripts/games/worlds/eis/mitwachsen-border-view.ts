@@ -1,15 +1,16 @@
 // Bild der Weltgrenze, gleich für 2D und die Ebene über 3D: das Zeichen der Gegend links in der Leiste (grünes Blatt der
 // Lichtung, Schneeflocke der Eis-Welt), das Umklappen der Leiste beim Wechsel an der Gangmitte und der kleine Pfeil zum
-// Tor über wartenden Tieren. Das alles gibt es erst, wenn das Eistor offen ist (vorher gibt es nur eine Gegend): Die
-// Ansicht lädt es mit dem Wetter der Eis-Welt nach (mitwachsen-ice-sky.ts), nie mit der Spielseite.
+// Tor über wartenden Tieren. Das alles gibt es erst, wenn das Eistor offen ist (vorher gibt es nur eine Gegend): Es
+// kommt mit dem Wetter der Eis-Welt (mitwachsen-ice-sky.ts) im Welt-Paket der Eis-Welt, nie mit der Spielseite.
 // Spezifikation: docs/specs/mitwachsen.md (Regel 7a „Weltgrenze“, „Was angezeigt wird“: Leiste unten)
 
-import type { Projection } from '../../lib/games/front';
-import { fromKey } from '../../lib/games/chunks';
-import { GAME_COLORS, type Point, type RegionId } from '../../data/games/mitwachsen';
-import { crossings } from './mitwachsen-border';
-import { sprite } from './mitwachsen-glyphs';
-import type { World } from './mitwachsen-world';
+import type { Projection } from '../../../../lib/games/front';
+import { fromKey } from '../../../../lib/games/chunks';
+import { GAME_COLORS, type Point, type RegionId } from '../../../../data/games/mitwachsen';
+import type { Turn } from '../../mitwachsen-view';
+import { crossings } from '../../mitwachsen-border';
+import { sprite } from '../../mitwachsen-glyphs';
+import type { World } from '../../mitwachsen-world';
 
 export const TURN_MS = 400; // so lange klappt die Leiste beim Wechsel der Gegend um
 
@@ -22,9 +23,6 @@ const SIGN: Record<RegionId, readonly [string[], string]> = {
   ],
   eis: [['...f...', '.f.f.f.', '..fff..', 'fffffff', '..fff..', '.f.f.f.', '...f...'], '#3f8fd8'],
 };
-
-/** Was sich die Leiste über das Umklappen merkt: welche Gegend sie zeigt, welche davor und seit wann */
-export type Turn = { shown?: RegionId; from?: RegionId; at?: number };
 
 /**
  * Umklappen der Leiste: Wechselt die Gegend, wird die Leiste in `TURN_MS` erst flach und klappt dann mit den Tieren der

@@ -1,20 +1,20 @@
 // Leiste unten: die Tiere der Gegend, in der die Figur steht. Ist das Eistor offen (es gibt dann zwei Gegenden), steht
 // links ihr Zeichen, und beim Wechsel an der Gangmitte klappt die Leiste um; beides kommt mit dem Bild der Weltgrenze
-// (mitwachsen-border-view.ts), das die Ansicht erst dann nachlädt. Führt der verlaufene Pinguin die Figur zum Eistor,
+// (worlds/eis/mitwachsen-border-view.ts) aus dem Welt-Paket der Eis-Welt. Führt der verlaufene Pinguin die Figur zum Eistor,
 // hat er auf der Lichtung einen Gast-Platz mit Schneeflocke. Gleich für 2D und die Ebene über 3D.
 // Spezifikation: docs/specs/mitwachsen.md („Was angezeigt wird“, Leiste unten)
 
 import { TILE_W, drawModel, projection } from '../../lib/games/front';
 import { GAME_COLORS, REGIONS, SPECIES, speciesOf, type RegionId, type SpeciesId } from '../../data/games/mitwachsen';
-import type { Turn } from './mitwachsen-border-view';
 import { ASK, HEART, sprite } from './mitwachsen-glyphs';
 import { guideGate, leader } from './mitwachsen-guide';
 import type { State } from './mitwachsen-state';
+import type { Sky, Turn } from './mitwachsen-view';
 
 /** Was die Leiste vom Bild wissen muss */
 export type Bar = { width: number; height: number; zoom: number; now: number; reduced: boolean; bottomInset: number };
-/** Bild der Weltgrenze (nachgeladen): Zeichen der Gegend und Umklappen */
-export type Signs = Pick<typeof import('./mitwachsen-border-view'), 'turnAlbum' | 'realmSign'>;
+/** Bild der Weltgrenze (aus dem Welt-Paket nachgeladen): Zeichen der Gegend und Umklappen */
+export type Signs = Pick<Sky, 'turnAlbum' | 'realmSign'>;
 type Slot = { species: SpeciesId; met: boolean; home: boolean; follows: boolean; guest?: boolean };
 
 export class Album {

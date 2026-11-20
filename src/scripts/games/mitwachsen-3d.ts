@@ -28,7 +28,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { CHUNK, chunkOf, fromKey } from '../../lib/games/chunks';
+import { CHUNK, chunkOf, fromKey, withNeighbours } from '../../lib/games/chunks';
 import type { Dir, Part, Projection } from '../../lib/games/front';
 import { cycle, hash } from '../../lib/games/rng';
 import {
@@ -420,6 +420,21 @@ export class World3D {
    */
   rebuild(keys: readonly string[]) {
     for (const k of keys) if (this.chunks.has(k)) this.stale.add(k);
+  }
+
+  /**
+   * Ein Welt-Paket kam im Spiel an (`World.attach`): dieselbe Welt mit seinen Feldern. Plattformen und Klangsteine neu,
+   * nur die geänderten Stücke und ihre Nachbarn (deren Seitenflächen an der Grenze hängen an den geänderten Feldern)
+   * werden ausgetauscht (das alte bleibt sichtbar, bis das neue fertig ist), nichts flackert
+   */
+  adopt(world: World, chunks: readonly string[]) {
+    if (!this.world) return; // noch nichts gebaut: Das erste Bild baut alles mit der neuen Welt
+    this.world = world;
+    this.platforms.build(world);
+    this.notes.build(world);
+    this.gatesKey = '';
+    this.fogDirty = true;
+    this.rebuild(withNeighbours(chunks));
   }
 
   private reset(world: World) {

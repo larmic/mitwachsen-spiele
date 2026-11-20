@@ -17,7 +17,6 @@ import {
   cleanName,
   deleteWorld,
   loadIndex,
-  loadWorld,
   newWorld,
   progressFrom,
   saveWorld,
@@ -29,12 +28,12 @@ import {
 import { FREE_KEYS, InputPace, KEYS, STEP_MS, stops } from './input-pace';
 import { drawMap } from './mitwachsen-map';
 import { Fog, REVEAL, START_REVEAL } from './mitwachsen-fog';
-import { initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
+import { attachPack, initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
 import type { ChoreEvent } from './mitwachsen-chores';
-import { createWorld, standHeight, type World } from './mitwachsen-world';
+import { createWorld, gatePlaces, standHeight, type World } from './mitwachsen-world';
 import { pending, type GuideRules } from './mitwachsen-guide';
-import { loadPacks, type LoadedPack } from './mitwachsen-packs';
-import { worldItem } from './mitwachsen-world-list';
+import { Packs, type LoadedPack } from './mitwachsen-packs';
+import { randomId, randomSeed, renderMenu, savedOrNew, showName } from './mitwachsen-world-list';
 import { platformLift, portalColor } from './mitwachsen-portal';
 import { HOME_STAGGER, SNAP_DELAY, hopOf, snaps } from './mitwachsen-gait';
 import { windAt } from './mitwachsen-weather';
@@ -52,8 +51,6 @@ const SPEED = (1000 / STEP_MS) * 1.1; // Felder pro Sekunde beim Gleiten: etwas 
 const DOOR_MS = 1200; // geht das Eistor mit dem Pinguin auf, schwingen die Türflügel erst nach dem Eiszapfen-Lied auf
 
 const noop = () => {};
-const randomSeed = () => crypto.getRandomValues(new Uint32Array(1))[0]!;
-const randomId = () => randomSeed().toString(36) + Date.now().toString(36);
 
 class LarmicMitwachsen extends HTMLElement {
   private store!: Store;
@@ -88,7 +85,7 @@ class LarmicMitwachsen extends HTMLElement {
   private gates = new Map<string, number>(); // Zeitpunkt, an dem ein Tor aufging (0 = schon offen)
   private floats: (Float & { born: number; who?: string })[] = [];
   private particles: Particle[] = [];
-  // seit wann die Figur schläft (performance.now): für die Überblendung und App-Updates. Solange die Welt-Pakete laden,
+  // seit wann die Figur schläft (performance.now): für die Überblendung und App-Updates. Solange ein Welt-Paket lädt,
   // gibt es noch keine Figur: wie eine Welt, die schlafend öffnet (unendlich lange), sonst wartete ein App-Update
   private nightSince = -Infinity;
   private dayAt = 0;
@@ -103,7 +100,9 @@ class LarmicMitwachsen extends HTMLElement {
   private r3d: World3DType | null = null; // 3D-Ansicht, solange sie zeichnen kann
   private gl3d: World3DType | null = null; // die geladene 3D-Ansicht, auch wenn ihr Kontext gerade fehlt
   private guide?: GuideRules; // Regeln des verlaufenen Pinguins (aus dem Paket der Eis-Welt), sobald er fällig ist
-  private packs: readonly LoadedPack[] = []; // geladene Welt-Pakete (worlds/): heute nur die Eis-Welt
+  private packs = new Packs((pack) => this.arrive(pack)); // Welt-Pakete (worlds/), geladen erst bei Bedarf
+  private opening = ''; // Welt, die gerade öffnet (wartet vielleicht auf ein Paket)
+  private live = ''; // Welt, zu der `state` gehört; solange sie nicht `opening` ist, ruhen Takt und Speichern
 
   connectedCallback() {
     this.canvas = this.querySelector('canvas.mw-canvas')!;
@@ -118,14 +117,12 @@ class LarmicMitwachsen extends HTMLElement {
     this.store = browserStore().store;
     this.sfx.muted = this.store.getItem('larmic.games.muted') === '1';
     this.tired = loadTired(this.store, Date.now());
-    void loadPacks().then((packs) => this.begin(packs));
+    void this.openWorld(loadIndex(this.store).current).then(() => this.begin());
   }
 
-  /** Mit den geladenen Welt-Paketen die Welt öffnen und das Spiel starten */
-  private begin(packs: readonly LoadedPack[]) {
-    if (!this.isConnected || this.globals) return; // inzwischen weg (oder schon gestartet)
-    this.packs = packs;
-    this.openWorld(loadIndex(this.store).current);
+  /** Die Welt ist offen (mit den Welt-Paketen, die sie gleich braucht): das Spiel starten */
+  private begin() {
+    if (!this.isConnected || this.globals || !this.saved) return; // inzwischen weg (oder schon gestartet)
     this.listen();
     this.resize = new ResizeObserver(() => this.measure());
     this.resize.observe(this.canvas);
@@ -192,19 +189,23 @@ class LarmicMitwachsen extends HTMLElement {
 
   // ---------- Welten ----------
 
-  /** Welt laden (oder eine neue anlegen) und das Spiel darauf starten */
-  private openWorld(id: string | null) {
-    const loaded = id ? loadWorld(this.store, id) : null;
-    // Fehlt eine Welt aus dem Index (gelöscht, kaputt), entsteht sie neu unter derselben Kennung und mit ihren Namen
-    const entry = id ? loadIndex(this.store).worlds.find((w) => w.id === id) : undefined;
-    this.saved =
-      loaded ??
-      newWorld(id ?? randomId(), randomSeed(), entry?.worldName ?? 'Meine Welt', entry?.figureName ?? DEFAULT_FIGURE);
-    this.saved = { ...this.saved, visits: this.saved.visits + 1 };
+  /**
+   * Welt laden (oder eine neue anlegen) und das Spiel darauf starten. Braucht sie ein Welt-Paket, das noch fehlt (ihr
+   * Tor ist offen, der Pinguin fällig, die Figur war im Kessel oder nah am Tor), wartet sie kurz darauf (`Packs.wait`);
+   * so lange ruht die alte Welt (`live`): kein Takt, kein Speichern, eine gelöschte käme sonst zurück
+   */
+  private async openWorld(id: string | null) {
+    const saved = savedOrNew(this.store, id);
+    const p = progressFrom(saved);
+    this.opening = saved.id;
+    await this.packs.wait({ ...p, at: [p.position] }, gatePlaces(saved.seed));
+    if (this.opening !== saved.id) return; // inzwischen wurde eine andere Welt geöffnet
+    this.saved = { ...saved, visits: saved.visits + 1 };
     saveWorld(this.store, this.saved);
-    this.world = createWorld(this.saved.seed, this.packs);
+    this.world = createWorld(this.saved.seed, this.packs.loaded);
     this.seenAt = '';
     this.state = initialState(this.world, progressFrom(this.saved), this.saved.seed ^ this.saved.visits);
+    this.live = this.saved.id;
     // Nebel: Am Anfang ist nur ein kleines Stück um das Bett zu sehen (die Figur liegt darin)
     this.fog = Fog.from(this.saved.explored);
     if (this.fog.size === 0) this.fog.reveal(this.state.player.x, this.state.player.y, START_REVEAL);
@@ -220,11 +221,24 @@ class LarmicMitwachsen extends HTMLElement {
   }
 
   private save() {
-    if (!this.saved) return;
+    if (!this.saved || this.opening !== this.live) return; // eine Welt öffnet: `state` gehört nicht zu `saved`
     this.saved = { ...withProgress(this.saved, progressOf(this.state)), explored: this.fog.serialize() };
     saveWorld(this.store, this.saved);
     saveTired(this.store, this.tired);
     this.lastSave = performance.now();
+  }
+
+  /**
+   * Ein Welt-Paket ist angekommen: in die laufende Welt einbauen (nur die betroffenen Stücke entstehen neu, die 3D-Ansicht
+   * tauscht sie aus, ohne zu flackern), die Tiere seiner Welt ziehen ein, die Ansicht bekommt seine Zeichenteile
+   */
+  private arrive(pack: LoadedPack) {
+    this.renderer.view = pack.view ?? null;
+    if (!(this.world as World | undefined)) return; // entsteht gleich mit ihm; sonst immer einbauen (zweimal: egal)
+    const { world, chunks } = this.world.attach(pack);
+    this.world = world;
+    this.state = attachPack(this.state, world);
+    this.gl3d?.adopt(world, chunks);
   }
 
   /** Für Updates der App (pwa-register.ts): Was im Spiel gerade los ist; entschieden wird in pwa-update.ts */
@@ -261,12 +275,15 @@ class LarmicMitwachsen extends HTMLElement {
   }
 
   private apply(cmd: Cmd) {
+    if (this.opening !== this.live) return; // die alte Welt ruht, bis die neue steht
     if (cmd.type !== 'tick') this.lastInput = performance.now(); // jemand spielt
     if (cmd.type === 'move' && performance.now() < this.sitUntil) return; // die müde Figur sitzt kurz
     const { state, events } = step(this.state, this.world, cmd, (x, y) => this.fog.has(x, y), this.guide);
     this.state = state;
     // Ist die Leiste der Lichtung voll, gelten die Regeln des Pinguins aus dem Paket der Eis-Welt (bis er im Kessel wohnt)
-    if (!this.guide && pending(state)) this.guide = this.packs.find((p) => p.id === 'eis')?.lead;
+    if (!this.guide && pending(state)) this.guide = this.packs.get('eis')?.lead;
+    const { player, held } = state; // Paket der Eis-Welt holen, sobald ihr Tor eine Rolle spielt
+    void this.packs.want({ ...state, at: [[player.x, player.y], held] }, this.world.gates);
     this.lift();
     if (events.length) this.react(events);
     if (cmd.type === 'tick') this.ageTired();
@@ -524,7 +541,7 @@ class LarmicMitwachsen extends HTMLElement {
           this.sfx.pling();
           break;
         case 'gate': // das Eistor geht mit dem Pinguin auf: Eiszapfen-Lied, dann Türflügel, Rumms und Akkord
-          void import('./mitwachsen-ice-sky').then((m) => this.sfx.score(m.gateScore()), noop); // schon geladen
+          this.sfx.score(this.packs.get('eis')?.view?.sky.gateScore() ?? []); // Töne aus dem Welt-Paket
           this.gates.set(e.id, now + DOOR_MS);
           persist = true;
           break;
@@ -803,18 +820,7 @@ class LarmicMitwachsen extends HTMLElement {
   // ---------- Kopf und Menü ----------
 
   private renderName() {
-    const tag = this.querySelector('.mw-name');
-    if (!tag) return;
-    tag.replaceChildren(
-      ...[...this.saved.figureName.toUpperCase()]
-        .filter((ch) => ch.trim())
-        .map((ch) => {
-          const s = document.createElement('span');
-          s.textContent = ch;
-          return s;
-        }),
-    );
-    tag.setAttribute('aria-label', this.saved.figureName);
+    showName(this.querySelector('.mw-name'), this.saved.figureName);
   }
 
   private openMenu() {
@@ -829,14 +835,7 @@ class LarmicMitwachsen extends HTMLElement {
   }
 
   private renderMenu() {
-    const list = this.menu.querySelector('.mw-worlds')!;
-    list.replaceChildren(...loadIndex(this.store).worlds.map((w) => worldItem(w, w.id === this.saved.id)));
-    (this.menu.querySelector('#mw-world-name') as HTMLInputElement).value = this.saved.worldName;
-    (this.menu.querySelector('#mw-figure-name') as HTMLInputElement).value = this.saved.figureName;
-    this.menu.querySelector('.mw-code')!.textContent = worldCode(this.saved.seed);
-    const sound = this.menu.querySelector('[data-act="sound"]')!;
-    sound.setAttribute('aria-pressed', String(!this.sfx.muted));
-    sound.textContent = this.sfx.muted ? 'Ton ist aus' : 'Ton ist an';
+    renderMenu(this.menu, loadIndex(this.store), this.saved, this.sfx.muted);
   }
 
   /** Welt löschen mit Rückfrage im Menü: erster Klick fragt, zweiter löscht (innerhalb von 4 Sekunden) */
@@ -845,7 +844,7 @@ class LarmicMitwachsen extends HTMLElement {
     if (!confirmDelete(button)) return;
     const index = deleteWorld(this.store, id);
     // Die gespielte Welt ist weg: zur nächsten wechseln oder eine neue anlegen
-    if (id === this.saved.id) this.openWorld(index.current);
+    if (id === this.saved.id) void this.openWorld(index.current);
     else this.renderMenu();
   }
 
@@ -858,7 +857,7 @@ class LarmicMitwachsen extends HTMLElement {
     }
     if (t.dataset.world && t.dataset.world !== this.saved.id) {
       this.save();
-      this.openWorld(t.dataset.world);
+      void this.openWorld(t.dataset.world);
       return;
     }
     switch (t.dataset.act) {
@@ -871,7 +870,7 @@ class LarmicMitwachsen extends HTMLElement {
           this.saved.figureName,
         );
         saveWorld(this.store, this.saved);
-        this.openWorld(this.saved.id);
+        void this.openWorld(this.saved.id);
         break;
       case 'copy': {
         // Schreiben noch in der Geste des Klicks (Safari verlangt das), erst danach das Menü-Modul laden

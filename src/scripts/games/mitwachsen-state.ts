@@ -17,7 +17,10 @@ import {
   type SpeciesId,
 } from '../../data/games/mitwachsen';
 import { STORIES, told, type StoryId } from '../../data/games/mitwachsen-stories';
-import { canStep, standHeight, wildAnimals, type World } from './mitwachsen-world';
+import { beyondRing, canStep, standHeight, type World } from './mitwachsen-world';
+import { packAt } from './mitwachsen-pack';
+import { scatter, scatterArrivals } from './mitwachsen-scatter';
+import { canStay, wildAnimals } from './mitwachsen-wild';
 import { chore, regrow, type ChoreEvent } from './mitwachsen-chores';
 import { homeAt, startRealm } from './mitwachsen-home';
 import { landed, wakePortals, type PortalEvent } from './mitwachsen-travel';
@@ -146,26 +149,9 @@ const settle = (id: string, species: SpeciesId, [x, y]: Point, mode: Mode, home:
 
 export function initialState(world: World, saved: Partial<Progress> = {}, rngSeed = 1): State {
   const garden = saved.garden ?? [];
-  const atHomeIds = new Set(garden.map((p) => p.id));
   // Nur Tore, die überhaupt aufgehen können, bleiben aus dem Spielstand offen
   const open = (saved.openGates ?? []).filter((id) => GATES.some((g) => g.id === id && g.opens !== 'never'));
-  const animals: Animal[] = [];
-  for (const r of REGIONS)
-    for (const { id, species } of regionAnimalList(r)) {
-      const at = world.spawns.get(id); // die Welt kennt den erreichbaren Wohnort
-      // der verlaufene Pinguin wohnt nicht hinter seinem Tor, solange es den Schlüssel hat und zu ist (`lost`)
-      if (at && !atHomeIds.has(id) && !lost(id, open))
-        animals.push(settle(id, species, at, 'wander', { kind: 'region', region: r.id }, r.id));
-    }
-  const placed = new Map<RegionId, number>(); // je Gegend: so viele Tiere stehen schon auf ihrer Wiese
-  for (const p of garden) {
-    const realm = realmOfAnimal(p.id);
-    // Ohne das Paket ihrer Welt hat die Gegend keine Wiese: Das Tier bleibt im Spielstand, steht aber nirgends
-    if (!meadowSpots(world, realm).length) continue;
-    const i = placed.get(realm) ?? 0;
-    placed.set(realm, i + 1);
-    animals.push(settle(p.id, p.species, cycle(meadowSpots(world, realm), i), 'home', { kind: 'garden' }, realm));
-  }
+  const animals = placeAnimals(world, open, garden, new Set());
   const [bx, by] = world.homes[startRealm(world, open, saved.position)].bed;
   const s: State = {
     tick: 0,
@@ -193,42 +179,54 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     guideDue: -1,
     ritual: -1,
   };
-  // Fehlt das Paket einer Welt hinter einem Tor, wüsste die Welt nicht, ob die Figur dort war: Position behalten
-  if (saved.position && REGIONS.some((r) => r.behind && !world.spotsOf(r.id).length)) s.held = [...saved.position];
-  scatter(s, world); // jeder Besuch: Die Tiere wohnen woanders
+  // Fehlt das Paket der Welt, zu der die Position gehört, wüsste die Welt nicht, ob die Figur dort war: Position behalten
+  if (saved.position && !world.spotsOf('eis').length && packAt(saved.position, world.gates, beyondRing))
+    s.held = [...saved.position];
+  scatter(s, world, () => random(s)); // jeder Besuch: Die Tiere wohnen woanders
   syncWild(s, world);
   return s;
 }
 
-/** Wechselnde Plätze je Gegend: so weit mindestens vom Bett und voneinander (der Gletscherkessel ist klein) */
-export const SCATTER: Record<RegionId, { bed: number; apart: number }> = {
-  lichtung: { bed: 8, apart: 5 },
-  eis: { bed: 6, apart: 4 },
-};
+/**
+ * Tiere der Gegenden, die noch nicht da sind (`present`): frei umherlaufend an ihrem Wohnort, zu Hause auf der Wiese
+ * ihrer Gegend. Ohne das Paket ihrer Welt kennt die Welt weder Wohnort noch Wiese: Dann fehlen sie (noch nicht da), nie
+ * getroffen, nie gezeichnet, und bleiben doch im Spielstand.
+ */
+function placeAnimals(world: World, open: GateId[], garden: HomeAnimal[], present: ReadonlySet<string>): Animal[] {
+  const atHomeIds = new Set(garden.map((p) => p.id));
+  const animals: Animal[] = [];
+  for (const r of REGIONS)
+    for (const { id, species } of regionAnimalList(r)) {
+      const at = world.spawns.get(id); // die Welt kennt den erreichbaren Wohnort
+      // der verlaufene Pinguin wohnt nicht hinter seinem Tor, solange es den Schlüssel hat und zu ist (`lost`)
+      if (at && !atHomeIds.has(id) && !present.has(id) && !lost(id, open))
+        animals.push(settle(id, species, at, 'wander', { kind: 'region', region: r.id }, r.id));
+    }
+  const placed = new Map<RegionId, number>(); // je Gegend: so viele Tiere stehen schon auf ihrer Wiese
+  for (const p of garden) {
+    const realm = realmOfAnimal(p.id);
+    if (present.has(p.id) || !meadowSpots(world, realm).length) continue; // ohne Paket: keine Wiese
+    const i = placed.get(realm) ?? 0;
+    placed.set(realm, i + 1);
+    animals.push(settle(p.id, p.species, cycle(meadowSpots(world, realm), i), 'home', { kind: 'garden' }, realm));
+  }
+  return animals;
+}
 
 /**
- * Tiere der Gegenden, die frei umherlaufen, an neue Plätze verteilen (beim Öffnen und an jedem neuen Morgen):
- * zufällige erreichbare Felder ihrer Gegend, mit Abstand zu deren Bett und zueinander (`SCATTER`). Gleicher Zustand,
- * gleiche Plätze.
+ * Ein Welt-Paket kam mitten im Spiel an (`world`: die Welt mit ihm, `World.attach`). Die Tiere seiner Welt ziehen ein,
+ * auf ihre Wiese bzw. frei umherlaufend verteilt wie beim Öffnen (`scatter`), aber mit eigenem Zufall aus Seed und Tag:
+ * Der Zufall des Spielstands (`rng`) bleibt unberührt, alle anderen Tiere, Wiese, Portale und Nebel bleiben, wie sie
+ * sind (Tiere der Landschaft nur, wo sie noch stehen können). Die gehaltene Position braucht es nicht mehr: Die Figur
+ * ist, wo sie ist.
  */
-function scatter(s: State, world: World) {
-  const placed: [number, number][] = []; // die Gegenden liegen weit auseinander: eine Liste für alle genügt
-  for (const a of s.animals) {
-    if (a.mode !== 'wander' || a.home.kind !== 'region') continue;
-    const spots = world.spotsOf(a.realm);
-    const [bx, by] = world.homes[a.realm].bed;
-    const { bed, apart } = SCATTER[a.realm];
-    if (!spots.length) continue;
-    for (let tries = 0; tries < 80; tries++) {
-      const [x, y] = pick(spots, random(s));
-      if (cheb(x, y, bx, by) < bed || !atHome(world, a.home, x, y)) continue; // nicht an Toren
-      if (placed.some(([px, py]) => cheb(x, y, px, py) < apart) || occupied(s, x, y, a.id)) continue;
-      [a.x, a.y] = [x, y];
-      a.spawn = [x, y];
-      placed.push([x, y]);
-      break;
-    }
-  }
+export function attachPack(state: State, world: World): State {
+  const s: State = { ...state };
+  delete s.held;
+  s.animals = state.animals.filter((a) => canStay(world, a));
+  const fresh = placeAnimals(world, s.openGates, s.garden, new Set(s.animals.map((a) => a.id)));
+  s.animals.push(...scatterArrivals(s, fresh, world, s.day)); // verteilt nur die neuen Tiere
+  return s;
 }
 
 export const progressOf = (s: State): Progress => ({
@@ -538,7 +536,7 @@ function wake(s: State, world: World, events: GameEvent[]) {
   s.player.x = spot[0];
   s.player.y = spot[1];
   s.player.dir = 's';
-  scatter(s, world); // ein neuer Morgen: Die verlorenen Tiere sind woanders unterwegs
+  scatter(s, world, () => random(s)); // ein neuer Morgen: Die verlorenen Tiere sind woanders unterwegs
   events.push({ type: 'wake' });
 }
 

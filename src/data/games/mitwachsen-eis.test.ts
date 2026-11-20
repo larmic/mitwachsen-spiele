@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { REGIONS, SPECIES, WILD_SPECIES, speciesOf } from './mitwachsen';
 import { ICE_SPECIES } from './mitwachsen-eis';
 import { ICE_ANIMALS } from './worlds/eis/mitwachsen-kessel';
+import { ICE_MODELS } from './worlds/eis/mitwachsen-ice-models';
 
 describe('Tiere der Eis-Welt', () => {
   const eis = REGIONS.find((r) => r.id === 'eis')!;
@@ -41,9 +42,10 @@ describe('Tiere der Eis-Welt', () => {
     }
   });
 
-  it('jedes Modell hat Augen, die zur Kamera zeigen können (vorn und an beiden Seiten); der Lemming ist größer gezeichnet', () => {
+  it('jedes Modell (im Welt-Paket) hat Augen, die zur Kamera zeigen können (vorn und an beiden Seiten); der Lemming ist größer gezeichnet', () => {
+    expect(Object.keys(ICE_MODELS)).toEqual(Object.keys(ICE_SPECIES));
     for (const sp of Object.values(ICE_SPECIES)) {
-      const faces = new Set(sp.parts.map((p) => p[8]).filter(Boolean));
+      const faces = new Set(ICE_MODELS[sp.id].map((p) => p[8]).filter(Boolean));
       expect([...faces].sort(), sp.id).toEqual(['f', 'l', 'r']);
       expect(sp.name.length, sp.id).toBeGreaterThan(0);
     }

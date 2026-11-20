@@ -1,0 +1,96 @@
+// Haken der 2D-Ansicht für die Welten hinter den Toren: Was nur eine Welt zeigt (Eis-Welt: Iglu, Eisschale, Eistrog,
+// Fischkiste, Rutschspur, Wetter, Bild der Weltgrenze), zeichnet ihr Welt-Paket (worlds/<welt>/view-2d.ts, mit dem Paket
+// nachgeladen). Der Kern kennt nur die Haken: je Deko-Art eine Zeichnung (`drawDeco`), solange das Paket lädt ein
+// einfacher Block in Kartenfarbe. Gleich für 2D und die Ebene über 3D (dort nur Wetter und Leiste).
+// Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
+
+import { box, type Projection } from '../../lib/games/front';
+import type { RegionId } from '../../data/games/mitwachsen';
+import type { Deco } from './mitwachsen-cell';
+import type { Guest } from './mitwachsen-guest-look';
+import { mapColor } from './mitwachsen-map';
+import type { SkyScene } from './mitwachsen-sky';
+import type { State } from './mitwachsen-state';
+import type { Cell, World } from './mitwachsen-world';
+import type { Scored } from './sfx';
+
+/**
+ * Quader: x (rechts), y (nach vorn), z (Höhe), Breite, Tiefe, Höhe, Farbe der Seiten und oben, Art in 3D: `see` wird
+ * vor der Figur durchsichtig (wie Laub und der Hut des Riesenpilzes), `sway` wiegt sich im Wind (wie die Grasbüschel)
+ */
+export type Box = readonly [number, number, number, number, number, number, string, string, ('see' | 'sway')?];
+
+/** Einen Quader von vorn zeichnen (nichts, wenn keiner da ist) */
+export function drawBox(ctx: CanvasRenderingContext2D, P: Projection, b: Box | null | undefined) {
+  if (b) box(ctx, P, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]);
+}
+
+/** Was eine Zeichnung vom Bild weiß: Zeit, reduzierte Bewegung, geleerte Büsche und Fischkisten ("x,y") */
+export type DecoAt = { now: number; reduced: boolean; picked: Readonly<Record<string, number>> };
+
+/** Zeichnung einer Deko-Art: Quader, die in der Reihe ihrer Vorderkante drankommen; null: wie sonst zeichnen */
+export type DrawDeco = (world: World, c: Cell, x: number, y: number, at: DecoAt) => readonly Box[] | null;
+
+/** Was sich die Leiste über das Umklappen merkt: welche Gegend sie zeigt, welche davor und seit wann */
+export type Turn = { shown?: RegionId; from?: RegionId; at?: number };
+
+/**
+ * Wetter und Bild der Weltgrenze einer Welt: was Ansicht, Leiste und Töne beim Öffnen ihres Tors vom Paket brauchen.
+ * Der Kern kennt nur diese Form, jede Welt füllt sie in ihrem Paket (Eis-Welt: worlds/eis/view-2d.ts).
+ */
+export type Sky = {
+  /** Wetter in der Luft (die Ansicht ruft es, sobald die Welt Plätze hat) */
+  weather(ctx: CanvasRenderingContext2D, world: World, sc: SkyScene, P: Projection): void;
+  /** Licht am Nachthimmel (Eis-Welt: Polarlicht über dem Schneebett) */
+  aurora(ctx: CanvasRenderingContext2D, sc: SkyScene): void;
+  /** Pfeil zum Tor über einem wartenden Tier (bei hx, hy) */
+  waitArrow(
+    ctx: CanvasRenderingContext2D,
+    world: World,
+    P: Projection,
+    a: { x: number; y: number; realm: RegionId },
+    b: { x: number; y: number; z: number },
+    head: readonly [number, number],
+    px: number,
+  ): void;
+  /** Zeichen der Gegend in der Leiste, unten mittig bei (cx, bottom), `size` breit */
+  realmSign(ctx: CanvasRenderingContext2D, realm: RegionId, cx: number, bottom: number, size: number): void;
+  /** Umklappen der Leiste beim Wechsel der Gegend: gezeigte Gegend und wie weit die Leiste offen ist (0 … 1) */
+  turnAlbum(t: Turn, realm: RegionId, now: number, reduced: boolean): [RegionId, number];
+  /** Gast am Tor der Welt (der führende Pinguin), sonst null */
+  guestAt(world: World, state: State): Guest | null;
+  /** Töne beim Öffnen des Tors */
+  gateScore(): Scored[];
+};
+
+/** Zeichenteile einer Welt aus ihrem Paket */
+export type View2D = {
+  /** je Deko-Art, die nur diese Welt hat, ihre Zeichnung */
+  decos: Partial<Record<Deco, DrawDeco>>;
+  /** flach auf dem Boden eines Felds (Rutschspur, glänzt bei offenem Tor der Welt), sonst null */
+  ground(c: Cell, x: number, y: number, open: boolean): Box | null;
+  sky: Sky;
+};
+
+/** Deko-Arten, die nur ein Welt-Paket zeichnet: Ohne seine Zeichnung steht dort ein einfacher Block */
+const PACKED: ReadonlySet<Deco> = new Set<Deco>(['igloo', 'icebowl', 'fishcrate']);
+
+/**
+ * Quader eines Dings, das ein Welt-Paket zeichnet (`view`, null solange es lädt): seine Zeichnung je Deko-Art, ohne sie
+ * ein einfacher Block in der Farbe der Karte. null: kein Ding eines Pakets, die Ansicht zeichnet wie sonst.
+ */
+export function drawDeco(
+  view: View2D | null,
+  world: World,
+  c: Cell,
+  x: number,
+  y: number,
+  at: DecoAt,
+): readonly Box[] | null {
+  if (!c.deco) return null;
+  const draw = view?.decos[c.deco];
+  if (draw) return draw(world, c, x, y, at);
+  if (!PACKED.has(c.deco)) return null;
+  const color = mapColor(c);
+  return [[x + 0.15, y + 0.15, c.h, 0.7, 0.7, 0.5, color, color]];
+}

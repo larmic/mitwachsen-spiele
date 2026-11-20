@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHUNK, ChunkCache, chunkOf, fromKey } from './chunks';
+import { CHUNK, ChunkCache, chunkOf, fromKey, withNeighbours } from './chunks';
 import { cycle, hash, nextRandom, pick, rand01, valueNoise } from './rng';
 
 describe('Zufall aus dem Seed', () => {
@@ -72,6 +72,14 @@ describe('Stücke der Welt', () => {
     cache.get(CHUNK, 0);
     cache.get(2 * CHUNK, 0);
     expect(cache.get(0, 0)).toBe(0);
+  });
+
+  it('liefert zu geänderten Stücken ihre vier Nachbarn mit, jedes nur einmal (auch für negative Stücke)', () => {
+    expect(withNeighbours(['0,0']).sort()).toEqual(['-1,0', '0,-1', '0,0', '0,1', '1,0']);
+    const two = withNeighbours(['-2,3', '-1,3']);
+    expect(two).toHaveLength(8); // die beiden liegen nebeneinander und sind Nachbarn voneinander
+    expect(new Set(two)).toEqual(new Set(['-2,3', '-1,3', '-3,3', '0,3', '-2,2', '-2,4', '-1,2', '-1,4']));
+    expect(withNeighbours([])).toEqual([]);
   });
 });
 

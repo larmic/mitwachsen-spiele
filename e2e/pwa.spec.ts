@@ -55,6 +55,12 @@ test('Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotz
     .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null))
     .toMatch(/\/spielen\/sw\.js$/);
   const webgl = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
+  // Spielstand mit offenem Eistor: Beim nächsten Start braucht die Welt das Paket der Eis-Welt gleich
+  await page.locator('larmic-mitwachsen').evaluate((node) => {
+    const el = node as unknown as { state: { openGates: string[] }; save(): void };
+    el.state = { ...el.state, openGates: ['eis'] };
+    el.save();
+  });
 
   await context.setOffline(true);
   const fromSw: string[] = [];
@@ -67,7 +73,7 @@ test('Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotz
   // Auch das nachträglich geladene Three.js kommt ohne Netz aus dem Speicher
   if (webgl) await expect(game).toHaveClass(/three/);
   expect(fromSw).toContain('/spielen/');
-  // Auch das Welt-Paket der Eis-Welt kommt ohne Netz aus dem Speicher: Der Kessel steht samt Eis-Portal
+  // Auch das Welt-Paket der Eis-Welt (vorab gespeichert) kommt ohne Netz aus dem Speicher: Der Kessel steht samt Eis-Portal
   expect(
     fromSw.some((p) => /\/welt-eis\.[\w-]+\.js$/.test(p)),
     fromSw.join(', '),

@@ -15,10 +15,12 @@ export default defineConfig({
         'src/lib/**/*.ts',
         'src/data/games/**/*.ts',
         'src/scripts/games/{input-pace,pwa-update}.ts',
-        'src/scripts/games/mitwachsen-{air,behind,border,chores,fog,free,gait,growth,guide,home,meadow,portal,save,spawns,state,tired,travel,weather,world}.ts',
+        'src/scripts/games/mitwachsen-{air,behind,border,chores,fog,free,gait,growth,guide,home,meadow,pack,packs,portal,save,scatter,spawns,state,tired,travel,view,weather,wild,world}.ts',
         'src/scripts/games/worlds/*/*.ts',
         'scripts/{bundles,dist,pwa}.ts',
       ],
+      // Zeichnen auf dem Canvas in den Welt-Paketen (Wetter, Bild der Weltgrenze) prüft der Browser-Test
+      exclude: ['src/scripts/games/worlds/*/mitwachsen-{ice-sky,border-view}.ts'],
       reporter: [['text', { skipFull: true }], 'text-summary'],
       // Knapp unter dem gemessenen Stand: Sinkt die Abdeckung, fällt das Gate. Steigt sie, die Schwellen mitziehen.
       thresholds: {

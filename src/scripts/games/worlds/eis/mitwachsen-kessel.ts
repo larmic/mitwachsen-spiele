@@ -15,7 +15,7 @@ import { ICE_PORTAL } from '../../../../data/games/mitwachsen-portals';
 import { ICE_STONE } from '../../../../data/games/mitwachsen-stories';
 import type { Cell } from '../../mitwachsen-cell';
 import { placeHome } from '../../mitwachsen-home';
-import type { Beyond, Gang, Kessel, KesselPlace } from '../../mitwachsen-pack';
+import type { Beyond, Gang, Kessel, KesselPlace } from '../../mitwachsen-pack-types';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from '../../mitwachsen-portal';
 import { findSpawns } from '../../mitwachsen-spawns';
 

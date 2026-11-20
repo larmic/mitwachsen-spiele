@@ -41,7 +41,8 @@ const WORLD_GROUND: Partial<Record<Cell['ground'], string>> = {
   moss: '#8a76cc',
 };
 
-function colorOf(c: Cell): string {
+/** Farbe eines Felds auf der Karte (auch für Dinge, deren Zeichnung noch lädt: mitwachsen-view.ts) */
+export function mapColor(c: Cell): string {
   if (c.gate) return THEME_COLORS[c.gate].side;
   if (c.deco === 'gatetower') return THEME_COLORS[c.part!.id].side;
   if (c.deco === 'gate' || c.deco === 'trough' || c.deco === 'watertrough' || c.deco === 'fishcrate')
@@ -81,7 +82,7 @@ export function drawMap(
   for (let y = y0; y <= y0 + MAP_RADIUS * 2 + 2; y++)
     for (let x = x0; x <= x0 + MAP_RADIUS * 2 + 2; x++) {
       if (!explored(x, y)) continue;
-      ctx.fillStyle = colorOf(world.cell(x, y));
+      ctx.fillStyle = mapColor(world.cell(x, y));
       ctx.fillRect(Math.floor(ox + x * cell), Math.floor(oy + y * cell), Math.ceil(cell), Math.ceil(cell));
     }
 

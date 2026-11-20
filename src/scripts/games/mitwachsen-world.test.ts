@@ -16,10 +16,10 @@ import {
   kesselPlace,
   portalPlaces,
   standHeight,
-  wildAnimals,
   type Cell,
   type World,
 } from './mitwachsen-world';
+import { wildAnimals } from './mitwachsen-wild';
 import { homeAt } from './mitwachsen-home';
 import { APRON } from './mitwachsen-apron';
 import { EIS_PACK, PACKS, worldOf } from './test-worlds';
@@ -937,6 +937,52 @@ describe('Welt-Pakete', () => {
       expect(standHeight(bare, ['eis'], ...bare.homes.eis.bed)).toBeNull();
     });
   }
+
+  it('attach baut das Paket im Spiel ein: Feld für Feld wie gleich mit Paket gebaut, nur die betroffenen Stücke neu', () => {
+    const seed = 42;
+    const full = worldOf(seed);
+    const late = createWorld(seed, []);
+    // Gespielt wird schon: Stücke der Lichtung samt Felsring und um das Eistor sind berechnet
+    const [RX, RY] = [Math.ceil(lichtung.shape.rx * 1.3), Math.ceil(lichtung.shape.ry * 1.3)];
+    for (let y = -RY; y <= RY; y++) for (let x = -RX; x <= RX; x++) late.cell(x, y);
+    const { world, chunks } = late.attach(EIS_PACK);
+    const kessel = kesselPlace(seed, EIS_PACK).cells;
+    const differ: string[] = [];
+    for (const [x, y] of kessel)
+      if (JSON.stringify(world.cell(x, y)) !== JSON.stringify(full.cell(x, y))) differ.push(`${x},${y}`);
+    for (let y = -RY; y <= RY; y++)
+      for (let x = -RX; x <= RX; x++)
+        if (JSON.stringify(world.cell(x, y)) !== JSON.stringify(full.cell(x, y))) differ.push(`${x},${y}`);
+    expect(differ).toEqual([]);
+    expect(world.spotsOf('eis')).toEqual(full.spotsOf('eis'));
+    expect([...world.spawns]).toEqual([...full.spawns]);
+    expect([...world.portals]).toEqual([...full.portals]);
+    expect([...world.stones]).toEqual([...full.stones]);
+    expect(world.homes).toEqual(full.homes);
+    const [bx, by] = full.homes.eis.bed;
+    expect(world.realm(bx, by)).toBe('eis');
+    expect(world.climate(bx, by)).toEqual({ id: 'eis', strength: 1 });
+    // Neu entstehen nur Stücke, in denen sich etwas ändert (Gangende und Kessel), keins um das Bett der Lichtung
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks).not.toContain('0,0');
+    const gate = full.gates.get('eis')!;
+    for (const k of chunks) {
+      const [cx, cy] = k.split(',').map(Number) as [number, number];
+      const d = Math.hypot((cx + 0.5) * 16 - gate.mid[0], (cy + 0.5) * 16 - gate.mid[1]);
+      expect(d, k).toBeGreaterThan(8); // hinter dem Felsring, nicht am Tor selbst
+    }
+    expect(world.cell(0, 0)).toBe(late.cell(0, 0)); // unveränderte Stücke werden übernommen, nicht neu gebaut
+    expect(world.attach(EIS_PACK)).toEqual({ world, chunks: [] }); // zweimal einbauen ändert nichts
+  });
+
+  it('attach merkt sich, womit die Welt gebaut wurde, auch wenn die Liste der Pakete danach wächst', () => {
+    const list: (typeof EIS_PACK)[] = [];
+    const w = createWorld(3, list);
+    list.push(EIS_PACK); // so lädt das Spiel: erst in die Liste, dann einbauen
+    const { world, chunks } = w.attach(EIS_PACK);
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(world.spotsOf('eis').length).toBeGreaterThan(0);
+  });
 
   it('die Lage des Kessels kommt aus dem Paket, wie beim Bauen', () => {
     expect(kesselPlace(1, EIS_PACK).bed).toEqual(worldOf(1).homes.eis.bed);

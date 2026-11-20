@@ -41,7 +41,7 @@ import {
 } from '../../data/games/mitwachsen';
 import { FISH_PARTS, ICE_COLORS } from '../../data/games/mitwachsen-eis';
 import { grown } from './mitwachsen-growth';
-import { finTwitch, iceBoxes, type IceBox } from './mitwachsen-ice-look';
+import { drawBox, drawDeco, type Box, type DecoAt, type View2D } from './mitwachsen-view';
 import { drawStone, heardStone } from './mitwachsen-story';
 import type { WeatherLook } from './mitwachsen-weather';
 import type { Pose } from './mitwachsen-tired';
@@ -121,8 +121,9 @@ const PAL_PATH: Palette = { D: [['#c9a46e', 1]], d: [['#b48d58', 1]], e: [['#d8b
 
 export class Renderer {
   /** Eis-Quader des Bilds (Iglu, Eisschale, Trog): jeder kommt in der Reihe seiner Vorderkante dran */
-  private later: IceBox[] = [];
-  private ice: typeof import('./mitwachsen-ice-sky') | Promise<unknown> | null = null;
+  private later: Box[] = [];
+  view: View2D | null = null; // Zeichenteile der Eis-Welt aus ihrem Welt-Paket, sobald es geladen ist
+  private at: DecoAt = { now: 0, reduced: false, picked: {} };
   private album = new Album(); // Leiste unten
   private guest: Guest | null = null; // der Pinguin am Tor, solange er führt (Umriss, goldene Bucht; nachgeladen)
   private blocks: Record<'grass' | 'dirt' | 'stone' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
@@ -161,12 +162,12 @@ export class Renderer {
     const byId = new Map(state.animals.map((a) => [a.id, a]));
 
     this.later = [];
-    this.guest = (this.ice instanceof Promise ? null : this.ice)?.guestAt(world, state) ?? null;
+    this.at = { now: sc.now, reduced: sc.reduced, picked: state.picked };
+    this.guest = this.view?.sky.guestAt(world, state) ?? null;
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) this.ground(P, world, x, y, sc);
       for (let x = x0; x <= x1; x++) this.deco(P, world, state, sc, x, y);
-      for (const [bx, by, bz, w, d, bh, side, top] of this.later)
-        if (Math.ceil(by + d - 1e-6) - 1 === y) box(ctx, P, bx, by, bz, w, d, bh, side, top);
+      for (const b of this.later) if (Math.ceil(b[1] + b[4] - 1e-6) - 1 === y) drawBox(ctx, P, b);
       const ids = (rows.get(y) ?? []).sort((a, b) => sc.bodies.get(a)!.x - sc.bodies.get(b)!.x);
       for (const id of ids) {
         const b = sc.bodies.get(id)!;
@@ -208,7 +209,7 @@ export class Renderer {
     if (sc.evening > 0) this.eveningGlow(sc);
     this.weather(sc);
     const ice = this.iceSky(world, state); // Wetter der Eis-Welt und Bild der Weltgrenze, erst nachgeladen
-    if (world.spotsOf('eis').length) ice?.iceWeather(ctx, world, sc, P); // ohne Paket der Eis-Welt kein Iglu, kein Wetter
+    if (world.spotsOf('eis').length) ice?.weather(ctx, world, sc, P); // ohne Paket der Eis-Welt kein Iglu, kein Wetter
     for (const a of state.animals) {
       const b = sc.bodies.get(a.id);
       if (!b || !sc.explored(Math.round(b.x), Math.round(b.y))) continue; // im Nebel nichts verraten
@@ -239,16 +240,12 @@ export class Renderer {
   }
 
   /**
-   * Wetter der Eis-Welt (mitwachsen-ice-sky.ts) und Bild der Weltgrenze (mitwachsen-border-view.ts): erst nachgeladen,
-   * wenn die Figur im Kessel, das Eistor offen oder der verlaufene Pinguin da ist (Gast-Platz mit Schneeflocke); bis
-   * dahin nichts
+   * Wetter der Eis-Welt und Bild der Weltgrenze (aus ihrem Welt-Paket, worlds/eis/mitwachsen-ice-sky.ts): nur, wenn die
+   * Figur im Kessel, das Eistor offen oder der verlaufene Pinguin da ist (Gast-Platz mit Schneeflocke); sonst nichts
    */
   private iceSky(world: World, state: State) {
-    // Scheitert das Laden, bleibt es beim Versprechen: dann eben ohne Eis-Wetter
     const realm = world.realm(state.player.x, state.player.y);
-    if (!this.ice && (realm === 'eis' || state.openGates.includes('eis') || guideGate(state)))
-      this.ice = import('./mitwachsen-ice-sky').then((m) => (this.ice = m)).catch(() => undefined);
-    return this.ice instanceof Promise ? null : this.ice;
+    return realm === 'eis' || state.openGates.includes('eis') || guideGate(state) ? (this.view?.sky ?? null) : null;
   }
 
   private sky(sc: Scene) {
@@ -282,8 +279,8 @@ export class Renderer {
       // Böden der Welten hinter den Toren: einfache Blöcke in ihren Farben
       const frontH = world.cell(x, y + 1).h;
       for (let k = Math.max(0, Math.min(c.h - 1, frontH)); k < c.h; k++) box(this.ctx, P, x, y, k, 1, 1, 1, ...flat);
-      // Rutschspur zum Schneebett: glänzt, sobald das Eistor offen ist
-      if (c.slide && sc.gates.has('eis')) box(this.ctx, P, x + 0.12, y, c.h, 0.76, 1, 0.02, ...ICE_COLORS.slide);
+      // Rutschspur zum Schneebett (aus dem Welt-Paket): flach im Boden, unter Kanten und Nebelrand
+      drawBox(this.ctx, P, this.view?.ground(c, x, y, sc.gates.has('eis')));
       this.edges(P, world, x, y, c.h);
       this.haze(P, x, y, c.h, sc);
       return;
@@ -596,11 +593,8 @@ export class Renderer {
     const h = c.h;
     if (c.tufts) this.tufts(P, x, y, h, c.tufts);
     this.guest?.mark(ctx, P, x, y, h); // goldene Bucht vor dem Tor, zu dem der Pinguin führt
-    const crate =
-      c.deco === 'fishcrate' // nur an einer Fischkiste: das hier läuft für jedes Feld in jedem Bild
-        ? { full: !(`${x},${y}` in state.picked), twitch: sc.reduced ? 0 : finTwitch(sc.now, x, y) }
-        : undefined;
-    const ice = c.biome === 'eis' ? iceBoxes(world, c, x, y, crate) : null; // Iglu, Eisschale, Wassertrog, Fischkiste
+    // Dinge der Eis-Welt (Iglu, Eisschale, Wassertrog, Fischkiste) zeichnet ihr Welt-Paket; solange es lädt, ein Block
+    const ice = c.biome === 'eis' ? drawDeco(this.view, world, c, x, y, this.at) : null;
     // gezeichnet erst in der Reihe ihrer Vorderkante: sonst deckte der Boden der Reihen davor die Kuppel unten zu
     if (ice) return void this.later.push(...ice);
     switch (c.deco) {

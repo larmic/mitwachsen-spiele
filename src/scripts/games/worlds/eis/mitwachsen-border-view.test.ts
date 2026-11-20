@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { TURN_MS, gateward, turnAlbum, type Turn } from './mitwachsen-border-view';
-import { crossings } from './mitwachsen-border';
-import { worldOf } from './test-worlds';
+import type { Turn } from '../../mitwachsen-view';
+import { TURN_MS, gateward, turnAlbum } from './mitwachsen-border-view';
+import { crossings } from '../../mitwachsen-border';
+import { worldOf } from '../../test-worlds';
 
 describe('Bild der Weltgrenze', () => {
   it('die Leiste klappt beim Wechsel der Gegend um: erst flach, dann die neue Gegend; bei reduzierter Bewegung sofort', () => {

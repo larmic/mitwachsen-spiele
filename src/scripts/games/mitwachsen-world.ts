@@ -5,23 +5,21 @@
 // (worlds/eis/, nachgeladen und `createWorld` hereingereicht); ohne Paket endet der Gang an einer Eisklippe.
 // Spezifikation: docs/specs/mitwachsen.md
 
-import { CHUNK, ChunkCache, fromKey } from '../../lib/games/chunks';
+import { CHUNK, ChunkCache, chunkOf, fromKey } from '../../lib/games/chunks';
 import { cycle, hash, rand01, valueNoise } from '../../lib/games/rng';
 import {
   GAME_COLORS,
   GATES,
   REGIONS,
-  WILD_SPECIES,
   type GateId,
   type Point,
   type Rect,
   type RegionId,
-  type SpeciesId,
 } from '../../data/games/mitwachsen';
 import { BED_STONE, type StoryId } from '../../data/games/mitwachsen-stories';
 import type { Cell, Ground, TreeKind } from './mitwachsen-cell';
 import { LICHTUNG_HOME, realmsOf, type Realms } from './mitwachsen-home';
-import type { Gang, WorldPack } from './mitwachsen-pack';
+import type { Gang, WorldPack } from './mitwachsen-pack-types';
 import { behind, type Behind } from './mitwachsen-behind';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal, type PortalId } from './mitwachsen-portal';
 import { findSpawns } from './mitwachsen-spawns';
@@ -57,6 +55,12 @@ export type World = Realms & {
   readonly stones: ReadonlyMap<StoryId, Point>;
   /** Stimmung an einem Ort: Richtung des nächsten Tors und wie stark (0 am Bett … 1 am Felsring) */
   climate(x: number, y: number): Climate;
+  /**
+   * Ein Welt-Paket, das erst im Spiel ankam, einbauen: Die Welt ist danach Feld für Feld dieselbe wie gleich mit dem
+   * Paket gebaut (`world`); von den schon berechneten Stücken fallen nur die weg, die sich dabei ändern (`chunks`, als
+   * "cx,cy"). Hat die Welt das Paket schon, bleibt alles, wie es ist.
+   */
+  attach(pack: WorldPack): { world: World; chunks: readonly string[] };
 };
 
 export type Climate = { id: GateId; strength: number };
@@ -619,10 +623,27 @@ export const gatePlaces = (seed: number) => gatesOf(layouts(seed));
 const gatesOf = (places: readonly Layout[]) =>
   new Map<GateId, GatePlace>(places.map(({ id, cells, mid, out, angle }) => [id, { id, cells, mid, out, angle }]));
 
+/** Gleiche Felder? (zum Vergleich der festen Karte vor und nach dem Einbau eines Pakets) */
+const same = (a: Cell | undefined, b: Cell | undefined) => a === b || JSON.stringify(a) === JSON.stringify(b);
+/** Stücke ("cx,cy"), in denen sich die feste Karte zwischen `before` und `after` unterscheidet */
+function changedChunks(before: ReadonlyMap<string, Cell>, after: ReadonlyMap<string, Cell>): Set<string> {
+  const out = new Set<string>();
+  for (const k of new Set([...before.keys(), ...after.keys()]))
+    if (!same(before.get(k), after.get(k))) out.add(chunkOf(...fromKey(k)).join(','));
+  return out;
+}
+
 /** Die Welt eines Seeds mit den geladenen Welt-Paketen (worlds/); die Lichtung ist mit und ohne sie dieselbe */
-export function createWorld(seed: number, packs: readonly WorldPack[]): World {
+export const createWorld = (seed: number, packs: readonly WorldPack[]): World => build(seed, packs).world;
+
+/** Welt bauen; `from`: die Welt vor dem Einbau eines Pakets, ihre unveränderten Stücke werden übernommen (`attach`) */
+function build(
+  seed: number,
+  packs: readonly WorldPack[],
+  from?: { regions: ReadonlyMap<string, Cell>; cache: ChunkCache<Cell> },
+): { world: World; chunks: readonly string[] } {
   const places = layouts(seed);
-  const eis = packs.find((p) => p.id === 'eis');
+  const eis = packs.find((p) => p.id === 'eis'); // gebaut mit diesem Paket (die Liste kann danach noch wachsen)
   const { map: regions, spawns, spots, kessel } = buildStart(seed, places, eis);
   const cache = new ChunkCache<Cell>((cx, cy) => {
     const cells: Cell[] = [];
@@ -639,7 +660,9 @@ export function createWorld(seed: number, packs: readonly WorldPack[]): World {
         );
     return cells;
   });
-  return {
+  const chunks = from ? changedChunks(from.regions, regions) : new Set<string>();
+  if (from) cache.adopt(from.cache, chunks);
+  const world: World = {
     seed,
     cell: (x, y) => cache.get(x, y),
     ...realmsOf(kessel),
@@ -650,7 +673,9 @@ export function createWorld(seed: number, packs: readonly WorldPack[]): World {
     stones: new Map<StoryId, Point>([...stonesOf(places), ...kessel.stones]),
     // In der Eis-Welt überall kühles Licht (wie ganz nah am Eistor)
     climate: (x, y) => (kessel.realm.has(key(x, y)) ? { id: 'eis', strength: 1 } : climateOf(seed, places, x, y)),
+    attach: (pack) => (eis?.id === pack.id ? { world, chunks: [] } : build(seed, [...packs, pack], { regions, cache })),
   };
+  return { world, chunks: [...chunks] };
 }
 
 /** Höhe, auf der man auf einem Feld steht – null, wenn man dort nicht stehen kann */
@@ -673,29 +698,4 @@ export function canStep(
   const from = standHeight(world, open, fx, fy);
   const to = standHeight(world, open, tx, ty);
   return from !== null && to !== null && to - from <= 1;
-}
-
-// ---------- Tiere der endlosen Landschaft ----------
-
-export type WildSpawn = { id: string; species: SpeciesId; x: number; y: number };
-
-/** Tiere eines Stücks der Landschaft – immer dieselben an derselben Stelle; Kennung aus Stück und Nummer */
-export function wildAnimals(world: World, cx: number, cy: number): WildSpawn[] {
-  const roll = rand01(world.seed, cx, cy, 3);
-  const count = roll < 0.4 ? 1 : roll < 0.55 ? 2 : 0;
-  const out: WildSpawn[] = [];
-  for (let n = 0; n < count; n++) {
-    for (let t = 0; t < 16; t++) {
-      const h = hash(world.seed, cx, cy, n, t);
-      const x = cx * CHUNK + (h % CHUNK),
-        y = cy * CHUNK + ((h >>> 8) % CHUNK);
-      const c = world.cell(x, y);
-      // Nicht in der Eis-Welt und ihrem Land: Dort wohnen nur Eis-Tiere
-      const taken = out.some((o) => o.x === x && o.y === y);
-      if (c.region !== 'wild' || c.biome === 'eis' || standHeight(world, [], x, y) === null || taken) continue;
-      out.push({ id: `wild:${cx}:${cy}:${n}`, species: cycle(WILD_SPECIES, h >>> 16), x, y });
-      break;
-    }
-  }
-  return out;
 }

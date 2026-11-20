@@ -3,7 +3,7 @@ import { LOOK, REGIONS, figureParts } from '../../data/games/mitwachsen';
 import { Air, postures, stepSound, turnHead } from './mitwachsen-air';
 import { initialState, regionAnimals, type State } from './mitwachsen-state';
 import { BLOCK, gustOf, windy } from './mitwachsen-weather';
-import { IGLOO_LEDGE } from './mitwachsen-ice-look';
+import { IGLOO_LEDGE } from '../../data/games/mitwachsen-eis';
 import { worldOf } from './test-worlds';
 
 const world = worldOf(1);

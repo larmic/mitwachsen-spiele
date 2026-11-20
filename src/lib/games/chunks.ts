@@ -13,6 +13,26 @@ export function fromKey(key: string): [number, number] {
 }
 
 /** Zwischenspeicher für Stücke. `make` berechnet ein Stück als Liste von CHUNK × CHUNK Feldern (zeilenweise). */
+/**
+ * Stücke samt ihren vier Nachbarn: Eine Ansicht, die Seitenflächen am Rand eines Stücks mit Blick auf das Nachbarfeld
+ * weglässt, muss die Nachbarn eines geänderten Stücks mit neu bauen, sonst bleibt an der Grenze ein Loch
+ */
+export function withNeighbours(keys: Iterable<string>): string[] {
+  const out = new Set<string>();
+  for (const k of keys) {
+    const [cx, cy] = fromKey(k);
+    for (const [dx, dy] of [
+      [0, 0],
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const)
+      out.add(`${cx + dx},${cy + dy}`);
+  }
+  return [...out];
+}
+
 export class ChunkCache<T> {
   private readonly chunks = new Map<string, T[]>();
 
@@ -32,5 +52,10 @@ export class ChunkCache<T> {
       this.chunks.set(key, chunk);
     }
     return chunk[(y - cy * CHUNK) * CHUNK + (x - cx * CHUNK)]!; // Stücke sind immer CHUNK × CHUNK groß
+  }
+
+  /** Schon berechnete Stücke eines anderen Zwischenspeichers übernehmen, außer denen in `skip` (Schlüssel „cx,cy“) */
+  adopt(from: ChunkCache<T>, skip: ReadonlySet<string>) {
+    for (const [key, chunk] of from.chunks) if (!skip.has(key) && !this.chunks.has(key)) this.chunks.set(key, chunk);
   }
 }

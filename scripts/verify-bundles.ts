@@ -19,18 +19,20 @@ export const RULES: Rule[] = [
   {
     name: 'Spiel lädt 3D erst bei Bedarf',
     pages: /^spielen\//,
-    // Regeln, Welt, 2D-Ansicht und Daten des Spiels; 3D (Three.js) kommt erst per import(). 132 statt 128 KB seit dem
-    // gemeinsamen Einziehen an der Wiese (Wegsuche der Tiere auf die Wiese, mitwachsen-arrive.ts)
-    budget: 132 * 1024,
+    // Regeln, Welt, 2D-Ansicht und Daten des Spiels; 3D (Three.js) und die Welt-Pakete kommen erst per import().
+    // Gemessen 122,1 KB, seit die Eis-Welt nur bei Bedarf lädt und ihre Zeichenteile (Iglu, Fischkisten, Wetter) und
+    // die Modelle ihrer Tiere mitbringt (vorher 125,7 KB bei 132 KB); dazu etwa 4 KB Luft
+    budget: 126 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {
     name: 'Welt-Paket Eis',
     pages: /^spielen\/index\.html$/, // nur die Spielseite lädt Welt-Pakete
     chunks: /\/welt-eis\.[\w-]+\.js$/,
-    // Gletscherkessel (Gelände, Zuhause, Wohnorte der Eis-Tiere, Eis-Portal) und die Regeln des Pinguins: gemessen
-    // 12,3 KB, dazu etwa 4 KB Luft
-    budget: 16 * 1024,
+    // Gletscherkessel (Gelände, Zuhause, Wohnorte der Eis-Tiere, Eis-Portal), die Regeln des Pinguins, Zeichenteile
+    // der 2D-Ansicht (Iglu, Fischkisten, Rutschspur, Wetter, Bild der Weltgrenze, Pinguin am Tor) und die Modelle der
+    // zehn Eis-Tiere: gemessen 25,1 KB, dazu etwa 4 KB Luft
+    budget: 29 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
 ];

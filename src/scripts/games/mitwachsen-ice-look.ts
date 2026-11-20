@@ -1,17 +1,16 @@
 // Aussehen der Dinge im Gletscherkessel, gleich für 2D und 3D: Iglu, Eisschale, Wassertrog aus Eisblöcken, Fischkiste.
-// Rein (ohne DOM und Three.js): liefert Quader in Feldern, die beide Ansichten zeichnen.
+// Rein (ohne DOM und Three.js): liefert Quader in Feldern, die beide Ansichten zeichnen. Nicht in der Spielseite: Die
+// 2D-Ansicht bekommt es mit dem Welt-Paket der Eis-Welt (worlds/eis/view-2d.ts), die 3D-Ansicht lädt es mit Three.js.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt“, Kessel)
 
-import { ICE_COLORS } from '../../data/games/mitwachsen-eis';
+import { ICE_COLORS, IGLOO_H, IGLOO_LAYERS } from '../../data/games/mitwachsen-eis';
 import type { Cell } from './mitwachsen-cell';
 import { hash } from '../../lib/games/rng';
 import { homeAt, type Realms } from './mitwachsen-home';
+import type { Box } from './mitwachsen-view';
 
-/**
- * Quader: x (rechts), y (nach vorn), z (Höhe), Breite, Tiefe, Höhe, Farbe der Seiten und oben, Art in 3D: `see` wird
- * vor der Figur durchsichtig (wie Laub und der Hut des Riesenpilzes), `sway` wiegt sich im Wind (wie die Grasbüschel)
- */
-export type IceBox = readonly [number, number, number, number, number, number, string, string, ('see' | 'sway')?];
+/** Quader in Feldern (mitwachsen-view.ts): Lage, Maße, Farben, Art in 3D (`see` durchsichtig, `sway` im Wind) */
+export type IceBox = Box;
 
 /** Zustand einer Fischkiste: voll (sonst nur Holz und etwas Schnee) und wie weit eine Flosse gerade zuckt (0 … 1) */
 export type Crate = { full: boolean; twitch: number };
@@ -29,15 +28,9 @@ export function finTwitch(now: number, x: number, y: number): number {
   return t < TWITCH_MS ? Math.sin((t / TWITCH_MS) * Math.PI) : 0;
 }
 
-export const IGLOO_H = 2.8; // Höhe der Kuppel
-const LAYERS = 7; // Reihen aus Schneeblöcken
+const LAYERS = IGLOO_LAYERS; // Reihen aus Schneeblöcken
 const ARCH = 1.7; // bis zu dieser Höhe ist das Iglu vorn offen (weiter Bogen): Man sieht die Tiere darin
 const WALL = 0.45; // Dicke der Wand
-/**
- * Sims vorn über dem Bogen, auf der zweitobersten Reihe: Mitte des Platzes vor der obersten Reihe (vor der Rückwand
- * gemessen) und Höhe über dem Boden. Dort sitzt beim Polarlicht die Schneeeule (in 3D unter der Kopfzeile gut zu sehen).
- */
-export const IGLOO_LEDGE = { ahead: 3.08, z: (IGLOO_H * (LAYERS - 1)) / LAYERS } as const;
 const STRIP = 0.5; // Tiefe eines Schneeblocks: Jede Reihe besteht aus Streifen, so wird die Kuppel rund
 
 /**

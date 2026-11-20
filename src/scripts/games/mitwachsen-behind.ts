@@ -5,7 +5,7 @@
 import type { Point } from '../../data/games/mitwachsen';
 import type { StoryId } from '../../data/games/mitwachsen-stories';
 import type { Cell } from './mitwachsen-cell';
-import type { Beyond, Gang, Kessel, WorldPack } from './mitwachsen-pack';
+import type { Beyond, Gang, Kessel, WorldPack } from './mitwachsen-pack-types';
 import type { Portal, PortalId } from './mitwachsen-portal';
 
 /** Was hinter dem Tor liegt: die Welt aus dem Paket mit Portal und Klangstein, ohne Paket nur eine Klippe (ohne beide) */

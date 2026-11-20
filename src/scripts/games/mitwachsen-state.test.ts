@@ -4,8 +4,8 @@ import { GATES, REGIONS, animalId, type RegionId } from '../../data/games/mitwac
 import {
   SLEEP_LOCK,
   REGROW,
-  SCATTER,
   WAKE_GRACE,
+  attachPack,
   initialState,
   progressOf,
   regionAnimals,
@@ -16,6 +16,7 @@ import {
   type State,
 } from './mitwachsen-state';
 import { windOk } from './mitwachsen-meadow';
+import { SCATTER } from './mitwachsen-scatter';
 import { canStep, createWorld, standHeight, type Cell, type World } from './mitwachsen-world';
 import { startRealm, type Homestead } from './mitwachsen-home';
 import { BLOCK, raining, windy } from './mitwachsen-weather';
@@ -23,14 +24,15 @@ import { platformArea } from './mitwachsen-portal';
 import { SEATS, crossings } from './mitwachsen-border';
 import { dirTo, freeNear } from './mitwachsen-free';
 import { heardStone } from './mitwachsen-story';
-import { PACKS, worldOf } from './test-worlds';
+import { EIS_PACK, PACKS, worldOf } from './test-worlds';
+import { migrate, newWorld, progressFrom, withProgress, type SavedWorld } from './mitwachsen-save';
 
 /** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich; Zuhause der Eis-Welt (im Kessel von Seed 1) */
 const { lichtung: LICHTUNG, eis: EIS_HOME } = worldOf(1).homes;
 
 /** Kleine Testwelt: überall flaches Gras des Zuhauses, einzelne Felder überschreibbar */
 function fakeWorld(cells: Record<string, Partial<Cell>> = {}, home: Partial<Homestead> = {}): World {
-  return {
+  const world: World = {
     seed: 1,
     cell: (x, y) => ({ h: 1, ground: 'grass', deco: null, region: 'lichtung', solid: false, ...cells[`${x},${y}`] }),
     realm: () => 'lichtung',
@@ -41,7 +43,9 @@ function fakeWorld(cells: Record<string, Partial<Cell>> = {}, home: Partial<Home
     climate: () => ({ id: 'eis', strength: 0 }),
     portals: new Map(),
     stones: new Map(),
+    attach: () => ({ world, chunks: [] }),
   };
+  return world;
 }
 const animal = (id: string, x: number, y: number, extra: Partial<Animal> = {}): Animal => ({
   id,
@@ -974,6 +978,96 @@ describe('Zuhause je Gegend', () => {
     expect(progressOf(again).position).toEqual([again.player.x, again.player.y]); // mit Paket zählt wieder die Figur
     expect(full.realm(again.player.x, again.player.y)).toBe('eis');
     expect(again.animals.filter((a) => a.realm === 'eis' && a.mode === 'home')).toHaveLength(2);
+  });
+
+  it('Eis-Tiere ohne Wohnort (Paket noch nicht da): nie getroffen, nie gezeichnet, nirgends; der Spielstand bleibt', () => {
+    const bare = createWorld(1, []);
+    const met = ['eis:robbe:1', 'lichtung:hase'];
+    const s = initialState(bare, { met, position: [3, 2] }); // Tor zu, die Figur war auf der Lichtung
+    expect(s.animals.some((a) => a.id.startsWith('eis:'))).toBe(false);
+    expect(s.held).toBeUndefined(); // eine Position auf der Lichtung braucht kein Paket: Sie wird weiter gespeichert
+    let t = s;
+    for (let i = 0; i < 60; i++) t = step(t, bare, i % 3 ? { type: 'tick' } : { type: 'move', dir: 'e' }).state;
+    expect(t.animals.some((a) => a.id.startsWith('eis:'))).toBe(false);
+    expect(t.met.filter((id) => id.startsWith('eis:'))).toEqual(['eis:robbe:1']); // kein Eis-Tier neu getroffen
+    expect(progressOf(t).position).toEqual([t.player.x, t.player.y]);
+  });
+
+  it('Paket kommt mitten im Spiel an (attachPack): Eis-Tiere ziehen ein, alles andere bleibt, wie es ist', () => {
+    const bare = createWorld(1, []);
+    const { world } = bare.attach(PACKS[0]);
+    const saved = {
+      met: ['lichtung:hase', 'eis:robbe:1'],
+      garden: [{ id: 'lichtung:hase', species: 'hase' as const }],
+      portals: ['eis' as const],
+      heard: ['bett' as const],
+    };
+    let s = initialState(bare, saved, 7);
+    for (let i = 0; i < 30; i++) s = step(s, bare, i % 2 ? { type: 'tick' } : { type: 'move', dir: 's' }).state;
+    const before = s;
+    const after = attachPack(before, world);
+    // Tiere der Lichtung samt Wiese, Portale, Steine, Figur und Zufall unverändert
+    const lichtung = (x: State) => x.animals.filter((a) => !a.id.startsWith('eis:'));
+    expect(lichtung(after)).toEqual(lichtung(before));
+    expect({ ...after, animals: [] }).toEqual({ ...before, animals: [] });
+    // Die Eis-Tiere stehen verteilt im Kessel wie beim Öffnen (eigener Zufall aus Seed und Tag, gleich bei gleichem
+    // Stand); der verlaufene Pinguin nicht (Tor zu, er ist der Schlüssel)
+    const ice = after.animals.filter((a) => a.id.startsWith('eis:'));
+    expect(ice).toHaveLength(29);
+    const moved = ice.filter((a) => a.x !== world.spawns.get(a.id)![0] || a.y !== world.spawns.get(a.id)![1]);
+    expect(moved.length).toBeGreaterThan(20);
+    for (const a of ice) {
+      expect(world.realm(a.x, a.y), a.id).toBe('eis');
+      expect([a.x, a.y], a.id).toEqual([...a.spawn]);
+    }
+    expect(new Set(ice.map((a) => `${a.x},${a.y}`)).size).toBe(ice.length); // jedes an eigenem Platz
+    expect(attachPack(before, world)).toEqual(after);
+    expect(ice.some((a) => a.id === 'eis:pinguin')).toBe(false);
+    expect(attachPack(after, world)).toEqual(after); // zweimal einbauen ändert nichts
+    // Und es geht weiter wie in einer Welt, die gleich mit dem Paket entstand
+    let t = after;
+    for (let i = 0; i < 40; i++) t = step(t, world, i % 2 ? { type: 'tick' } : { type: 'move', dir: 'n' }).state;
+    expect(t.animals.filter((a) => a.id.startsWith('eis:'))).toHaveLength(29);
+  });
+
+  it('nach dem Einbau mitten im Spiel speichern und neu laden: gleiches Format, gleicher Stand wie mit Paket gestartet', () => {
+    const bare = createWorld(1, []);
+    const { world } = bare.attach(EIS_PACK);
+    const saved = { met: ['lichtung:hase'], portals: ['eis' as const], heard: ['bett' as const], day: 3 };
+    let s = initialState(bare, saved, 7);
+    for (let i = 0; i < 20; i++) s = step(s, bare, i % 2 ? { type: 'tick' } : { type: 'move', dir: 's' }).state;
+    const before = progressOf(s);
+    s = attachPack(s, world);
+    for (let i = 0; i < 20; i++) s = step(s, world, i % 2 ? { type: 'tick' } : { type: 'move', dir: 'w' }).state;
+    // Gespeichert wird wie immer (dieselben Felder, kein neues Format), auch durch JSON (localStorage)
+    const file = JSON.parse(JSON.stringify(withProgress(newWorld('a', 1, 'Welt'), progressOf(s)))) as SavedWorld;
+    expect(migrate(file)).toEqual(file);
+    expect(Object.keys(progressOf(s)).sort()).toEqual(Object.keys(before).sort());
+    expect(file.position).toEqual([s.player.x, s.player.y]); // gespeichert, wo die Figur war (nichts gehalten)
+    // Neu geladen (jetzt gleich mit Paket): derselbe Fortschritt, die Figur erwacht im Bett ihrer Gegend (wie immer),
+    // die Eis-Tiere an ihren Orten
+    const again = initialState(world, progressFrom(file), 7);
+    expect({ ...progressOf(again), position: file.position }).toEqual(progressOf(s));
+    expect([again.player.x, again.player.y]).toEqual([...world.homes.lichtung.bed]);
+    expect(again.animals.filter((a) => a.id.startsWith('eis:'))).toHaveLength(29);
+    // Gleich wie in einer Welt, die von Anfang an mit dem Paket gebaut wurde
+    expect(initialState(worldOf(1), progressFrom(file), 7)).toEqual(again);
+  });
+
+  it('Paket kommt an, während ein Stand aus dem Kessel gehalten wird: Eis-Tiere zu Hause ziehen ein, gehalten wird nicht mehr', () => {
+    const full = worldOf(1);
+    const bare = createWorld(1, []);
+    const position = [...full.homes.eis.wake[0]!] as [number, number];
+    const garden = [{ id: 'eis:robbe:2', species: 'robbe' as const }];
+    const s = initialState(bare, { position, openGates: ['eis'], garden });
+    expect(s.held).toEqual(position);
+    const { world } = bare.attach(EIS_PACK);
+    const t = attachPack(s, world);
+    expect(t.held).toBeUndefined();
+    expect([t.player.x, t.player.y]).toEqual([s.player.x, s.player.y]); // die Figur bleibt, wo sie ist (am Bett)
+    expect(t.animals.find((a) => a.id === 'eis:robbe:2')).toMatchObject({ mode: 'home', realm: 'eis' });
+    expect(t.animals.filter((a) => a.realm === 'eis')).toHaveLength(30); // der Pinguin wohnt bei offenem Tor im Kessel
+    expect(progressOf(t).position).toEqual([t.player.x, t.player.y]);
   });
 
   it('Tiere gehören zu ihrer Gegend, Tiere der Landschaft zur Lichtung', () => {

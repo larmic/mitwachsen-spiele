@@ -1,6 +1,6 @@
 // Smoke-Test der fertigen Seite: Startseite (Weg ins Spiel, Aufbau, Handy-Breite), Rechtliches, 404 und das Spiel.
 // Jede Seite muss ohne Fehler in der Konsole laden (pageerror und console.error).
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /** Sammelt Fehler der Seite; am Ende des Tests muss die Liste leer sein */
 function watchErrors(page: Page) {
@@ -28,6 +28,19 @@ const waitFrames = (page: Page, n: number) =>
       }),
     (n * 1000) / 60,
   );
+
+/**
+ * Das Welt-Paket der Eis-Welt holen und einbauen, wie im Spiel, sobald das Eistor eine Rolle spielt (die Tests öffnen das
+ * Tor von Hand über den Zustand, das Paket käme sonst erst im nächsten Takt)
+ */
+const withIce = (game: Locator) =>
+  game.evaluate((node) => {
+    const el = node as unknown as {
+      packs: { want(need: unknown, gates: unknown): Promise<void> };
+      world: { gates: unknown };
+    };
+    return el.packs.want({ openGates: ['eis'], garden: [], at: [] }, el.world.gates);
+  });
 
 for (const path of ['/', '/datenschutz/'])
   test(`Seite ${path} lädt ohne Fehler`, async ({ page }) => {
@@ -157,6 +170,7 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
   await expect(game).toHaveClass(/ready/);
   const webgl = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
   if (webgl) await expect(game).toHaveClass(/three/); // gezeichnet wird in 3D
+  await withIce(game);
   type Game = {
     world: { homes: { eis: { bed: [number, number]; wake: [number, number][] } }; realm(x: number, y: number): string };
     state: {
@@ -177,7 +191,7 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
     world: { cell(x: number, y: number): { garden?: boolean; solid: boolean; roof?: boolean } };
     state: { dayStart: number; tick: number };
     air: { frame(world: unknown, state: unknown, quiet: boolean, reduced: boolean): { weather: { wind: number } } };
-    renderer: { ice: { iceWeather?: unknown } | null };
+    renderer: { view: { sky: { weather?: unknown } } | null };
   };
   const frames = (n: number) => waitFrames(page, n);
   // Über die Komponente (wie die Regeln es sehen): Tor offen, die Figur steht wach neben dem Schneebett
@@ -255,7 +269,7 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
     await game.evaluate((node) => {
       const el = node as unknown as Game & WindGame;
       const sheltered = el.state.animals.filter((a) => a.realm === 'eis' && el.world.cell(a.x, a.y).roof).length;
-      return { sheltered: sheltered > 5, loaded: typeof el.renderer.ice?.iceWeather === 'function' };
+      return { sheltered: sheltered > 5, loaded: typeof el.renderer.view?.sky.weather === 'function' };
     }),
   ).toEqual({ sheltered: true, loaded: true });
   // ein paar Schritte durch den Kessel, dann ins Schneebett (der Schläfer liegt jetzt dort, darüber das Polarlicht)
@@ -295,9 +309,10 @@ test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten
     };
     apply(cmd: { type: 'move'; dir: string }): void;
     lift(): void;
-    renderer: { ice: { waitArrow?: unknown } | null; album: { turn: { shown?: string } } };
+    renderer: { view: { sky: { waitArrow?: unknown } } | null; album: { turn: { shown?: string } } };
   };
   const frames = (n: number) => waitFrames(page, n);
+  await withIce(game);
   // Über die Komponente: Tor offen, die Figur steht wach in der Bucht vor dem Eistor, drei Tiere der Lichtung folgen ihr
   const ids = await game.evaluate((node) => {
     const el = node as unknown as Game;
@@ -340,7 +355,7 @@ test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten
   // In die Torreihe: Die drei setzen sich in die Bucht; das Bild der Weltgrenze ist nachgeladen (Pfeil, Zeichen)
   expect((await inward(1)).waiting.sort()).toEqual([...ids].sort());
   await frames(60);
-  expect(await game.evaluate((el) => typeof (el as unknown as Game).renderer.ice?.waitArrow)).toBe('function');
+  expect(await game.evaluate((el) => typeof (el as unknown as Game).renderer.view?.sky.waitArrow)).toBe('function');
   // Durch den Gang bis in den Kessel: Die Leiste zeigt die Eis-Welt
   expect((await inward(80, 'eis')).realm).toBe('eis'); // in einem Aufruf: Jeder Aufruf wartet ohne Grafikkarte lange
   await frames(60);
@@ -390,7 +405,7 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
     apply(cmd: { type: 'move'; dir: string } | { type: 'tick' }): void;
     lift(): void;
     save(): void;
-    openWorld(id: string): void;
+    openWorld(id: string): Promise<void>;
     renderer: { album: { turn: { shown?: string } } };
   };
   const frames = (n: number) => waitFrames(page, n);
@@ -407,7 +422,7 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
     const lichtung = el.state.animals.filter((a) => a.realm === 'lichtung' && a.home.kind === 'region');
     el.state = { ...el.state, garden: lichtung.map((a) => ({ id: a.id, species: a.species })) };
     el.save();
-    el.openWorld(el.saved.id);
+    return el.openWorld(el.saved.id); // die Leiste ist voll: Der Pinguin ist fällig, die Welt wartet auf sein Paket
   });
   expect(await penguin()).toBe('fehlt'); // verlaufen: Er wohnt nicht im Kessel
   // Aufwachen: Die Regeln des Pinguins (Welt-Paket Eis) greifen, gut 2 s später taucht er neben ihr auf und führt
@@ -526,6 +541,7 @@ test.describe('ohne Welt-Paket', () => {
       };
       save(): void;
     };
+    await withIce(game); // für die Lage des Kessels
     // Alter Spielstand: Eistor offen, Eis-Portal wach, zwei Eis-Tiere zu Hause, die Figur schläft im Kessel
     const kessel = await game.evaluate((node) => {
       const el = node as unknown as Game;
@@ -579,6 +595,218 @@ test.describe('ohne Welt-Paket', () => {
     expect(stored[0]!.homeAnimals.map((a) => a.id)).toEqual(expect.arrayContaining(['eis:pinguin', 'eis:robbe:2']));
     // Nur das abgebrochene Laden selbst meldet der Browser; sonst keine Fehler
     expect(errors.filter((e) => !/Failed to load resource/.test(e))).toEqual([]);
+  });
+});
+
+test.describe('Welt-Paket nur bei Bedarf', () => {
+  // Der Service Worker holte beim Einrichten alles vorab, auch das Paket: Hier zählt, was die Seite selbst lädt
+  test.use({ serviceWorkers: 'block' });
+  test('Spiel: Mit geschlossenem Eistor startet es ohne das Paket der Eis-Welt, nah am Tor kommt es nach; mit offenem Eistor gleich beim Start', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    const errors = watchErrors(page);
+    const fetched: string[] = [];
+    page.on('request', (r) => {
+      if (/\/welt-eis\.[\w-]+\.js$/.test(r.url())) fetched.push(r.url());
+    });
+    await page.goto('/spielen/');
+    await page.getByRole('button', { name: /Verstanden/ }).click();
+    const game = page.locator('larmic-mitwachsen');
+    await expect(game).toHaveClass(/ready/);
+    type Game = {
+      world: {
+        gates: Map<string, { mid: [number, number]; out: [number, number] }>;
+        portals: Map<string, unknown>;
+        spotsOf(realm: string): unknown[];
+      };
+      state: { player: { x: number; y: number; dir: string }; openGates: string[]; animals: { realm: string }[] };
+      packs: { get(id: string): unknown };
+      apply(cmd: { type: 'tick' }): void;
+      save(): void;
+    };
+    const ice = () =>
+      game.evaluate((node) => {
+        const el = node as unknown as Game;
+        return {
+          pack: !!el.packs.get('eis'),
+          kessel: el.world.spotsOf('eis').length > 0,
+          portal: el.world.portals.has('eiskessel'),
+          animals: el.state.animals.filter((a) => a.realm === 'eis').length,
+        };
+      });
+    const sleeping = () => game.evaluate((el) => (el as unknown as { state: { sleeping: boolean } }).state.sleeping);
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(sleeping).toBe(false);
+    await waitFrames(page, 30);
+    // Neue Welt, Eistor zu, die Figur am Bett: kein Paket, kein Kessel, kein Eis-Tier
+    expect(fetched).toEqual([]);
+    expect(await ice()).toEqual({ pack: false, kessel: false, portal: false, animals: 0 });
+    // Die Figur kommt nah ans Eistor (über die Komponente): Im nächsten Takt kommt das Paket und wird eingebaut
+    await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const { mid, out } = el.world.gates.get('eis')!;
+      el.state = { ...el.state, player: { x: mid[0] - out[0] * 12, y: mid[1] - out[1] * 12, dir: 'n' } };
+      el.apply({ type: 'tick' });
+    });
+    await expect.poll(ice).toEqual({ pack: true, kessel: true, portal: true, animals: 29 }); // der Pinguin ist verlaufen
+    expect(fetched).toHaveLength(1);
+    await waitFrames(page, 30);
+    // Spielstand mit offenem Eistor: Das Paket kommt gleich beim Start, die Welt entsteht mit ihm
+    await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      el.state = { ...el.state, openGates: ['eis'] };
+      el.save();
+    });
+    fetched.length = 0;
+    await page.reload();
+    await expect(game).toHaveClass(/ready/);
+    expect(fetched).toHaveLength(1);
+    expect(await ice()).toEqual({ pack: true, kessel: true, portal: true, animals: 30 });
+    await waitFrames(page, 30);
+    expect(errors).toEqual([]);
+  });
+
+  test('Spiel: 2D mit reduzierter Bewegung zeigt Kessel, Iglu und Fischkisten aus dem Welt-Paket, ohne Fehler', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const errors = watchErrors(page);
+    await page.goto('/spielen/');
+    await page.getByRole('button', { name: /Verstanden/ }).click();
+    const game = page.locator('larmic-mitwachsen');
+    await expect(game).toHaveClass(/ready/);
+    await withIce(game);
+    type Game = {
+      world: {
+        homes: { eis: { bed: [number, number]; wake: [number, number][] } };
+        cell(x: number, y: number): { deco: string | null };
+      };
+      state: { player: { x: number; y: number; dir: string }; openGates: string[]; sleeping: boolean; wokeAt: number };
+      r3d: unknown;
+      lift(): void;
+      renderer: { later: unknown[][] };
+    };
+    /** Die Figur wach an einen Platz im Kessel, nur die 2D-Ansicht zeichnet; danach die Quader der Eis-Dinge im Bild */
+    const look = (where: 'bed' | 'fishcrate') =>
+      game.evaluate((node, w) => {
+        const el = node as unknown as Game;
+        const [bx, by] = el.world.homes.eis.bed;
+        let at = el.world.homes.eis.wake[0]!;
+        for (let y = by - 25; y <= by + 25 && w === 'fishcrate'; y++)
+          for (let x = bx - 25; x <= bx + 25; x++) if (el.world.cell(x, y).deco === 'fishcrate') at = [x, y + 1];
+        el.r3d = null; // ohne 3D: so zeichnet die 2D-Ansicht von vorn
+        el.state = {
+          ...el.state,
+          openGates: ['eis'],
+          sleeping: false,
+          wokeAt: -100,
+          player: { x: at[0], y: at[1], dir: 's' },
+        };
+        el.lift();
+      }, where);
+    const boxes = () =>
+      game.evaluate((node) => {
+        const later = (node as unknown as Game).renderer.later;
+        return {
+          see: later.filter((b) => b[8] === 'see').length,
+          crate: later.filter((b) => b[6] === '#7d6a55').length,
+        };
+      });
+    await look('bed');
+    await waitFrames(page, 20);
+    expect((await boxes()).see).toBeGreaterThan(20); // das Iglu aus Schneeblöcken, nicht nur ein Block
+    await look('fishcrate');
+    await waitFrames(page, 20);
+    expect((await boxes()).crate).toBeGreaterThan(4); // Fischkiste aus Treibholz
+    // Bei reduzierter Bewegung zuckt keine Flosse: Über gut 4 s (länger als der Abstand zweier Zuckungen) steht jede
+    // Schwanzflosse genau 0,3 über dem Boden ihrer Kiste
+    const fins = () =>
+      game.evaluate((node) =>
+        (node as unknown as Game).renderer.later
+          .filter((b) => b[3] === 0.06 && b[4] === 0.1 && b[5] === 0.24)
+          .map((b) => Math.round(((b[2] as number) % 1) * 1000)),
+      );
+    for (let i = 0; i < 8; i++) {
+      const lifts = await fins();
+      expect(lifts.length).toBeGreaterThan(0);
+      expect(new Set(lifts)).toEqual(new Set([300]));
+      await page.waitForTimeout(550);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  test('Spiel: Eine gelöschte Welt kommt nicht zurück, während die nächste auf ihr Welt-Paket wartet', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    const errors = watchErrors(page);
+    // Das Paket der Eis-Welt hängt im Netz, bis der Test es freigibt
+    let release = () => {};
+    const held = new Promise<void>((done) => (release = done));
+    await page.route(/\/welt-eis\.[\w-]+\.js$/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto('/spielen/');
+    await page.getByRole('button', { name: /Verstanden/ }).click();
+    const game = page.locator('larmic-mitwachsen');
+    await expect(game).toHaveClass(/ready/);
+    type Game = {
+      saved: { id: string };
+      state: { openGates: string[] };
+      opening: string;
+      live: string;
+      packs: { get(id: string): unknown };
+      world: { spotsOf(realm: string): unknown[] };
+      save(): void;
+      removeWorld(button: HTMLElement, id: string): Promise<void>;
+    };
+    const index = () =>
+      page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem('larmic.games.index') ?? '{}') as {
+            current: string;
+            worlds: { id: string }[];
+          },
+      );
+    // Welt A mit offenem Eistor (braucht das Paket), dann eine neue Welt B anlegen: Sie braucht es nicht und öffnet sofort
+    const a = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      el.state = { ...el.state, openGates: ['eis'] };
+      el.save();
+      return el.saved.id;
+    });
+    await page.locator('.mw-settings [data-act="new"]').evaluate((b) => (b as HTMLElement).click());
+    await expect.poll(() => game.evaluate((el) => (el as unknown as Game).live)).not.toBe(a);
+    const b = await game.evaluate((el) => (el as unknown as Game).saved.id);
+    expect((await index()).worlds.map((w) => w.id).sort()).toEqual([a, b].sort());
+    // B löschen (bestätigt): A öffnet und wartet auf das hängende Paket, B ruht
+    await game.evaluate((node, id) => {
+      const el = node as unknown as Game;
+      const button = document.createElement('button');
+      button.dataset.armed = '1'; // zweiter Klick der Rückfrage
+      void el.removeWorld(button, id);
+    }, b);
+    await expect.poll(() => game.evaluate((el) => (el as unknown as Game).opening)).toBe(a);
+    // Speichern in dieser Zeit (Seite verlassen, Takt, Menü) bringt B nicht zurück
+    await game.evaluate((node) => {
+      (node as unknown as Game).save();
+      window.dispatchEvent(new Event('pagehide'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await waitFrames(page, 10); // ein paar Takte, aber kürzer als PACK_WAIT_MS
+    expect(await game.evaluate((el) => (el as unknown as Game).live)).toBe(b); // A wartet noch
+    expect(await index()).toMatchObject({ current: a, worlds: [{ id: a }] });
+    // Das Paket kommt an: A steht mit Kessel, B bleibt weg
+    release();
+    await expect.poll(() => game.evaluate((el) => (el as unknown as Game).live)).toBe(a);
+    await expect.poll(() => game.evaluate((el) => (el as unknown as Game).world.spotsOf('eis').length > 0)).toBe(true);
+    await waitFrames(page, 30);
+    expect((await index()).worlds.map((w) => w.id)).toEqual([a]);
+    expect(await game.evaluate((el) => (el as unknown as Game).state.openGates)).toEqual(['eis']);
+    expect(errors).toEqual([]);
   });
 });
 
