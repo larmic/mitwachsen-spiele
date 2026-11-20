@@ -16,8 +16,11 @@ import { GATE_HALF, standHeight, type GatePlace, type World } from './mitwachsen
 export const SEATS = 16; // feste Warteplätze je Seite: genug für eine lange Kette, danach das nächste freie Feld
 const REACH = 12; // so weit liegen die Warteplätze höchstens vom ersten Feld ihrer Seite
 
-/** Was ein Tier tut: umherlaufen, folgen, auf der Wiese wohnen oder an der Weltgrenze warten */
-export type Mode = 'wander' | 'follow' | 'home' | 'wait';
+/**
+ * Was ein Tier tut: umherlaufen, folgen, auf der Wiese wohnen, an der Weltgrenze warten oder (der verlaufene Pinguin)
+ * die Figur zum Tor führen (mitwachsen-guide.ts)
+ */
+export type Mode = 'wander' | 'follow' | 'home' | 'wait' | 'lead';
 
 /** Durchgang zwischen zwei Gegenden: Torreihe, Gang und Mündung, das erste Feld je Seite und die Warteplätze davor */
 export type Crossing = {

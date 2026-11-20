@@ -1,12 +1,14 @@
 // Karte oben rechts: zeigt mehr als das Bild, genordet wie die Kamera (oben = vom Betrachter weg).
 // Erkundete Felder in ihren Farben, Unerkundetes als Nebel, die Figur als Punkt, das Bett als Häuschen.
-// Liegt das Bett außerhalb der Karte, zeigt ein Pfeil am Kartenrand den Weg nach Hause.
+// Liegt das Bett außerhalb der Karte, zeigt ein Pfeil am Kartenrand den Weg nach Hause; solange der verlaufene Pinguin
+// die Figur führt, zeigt er stattdessen zu seinem Tor.
 
 import { THEME_COLORS } from '../../data/games/mitwachsen';
 import type { State } from './mitwachsen-state';
 import type { Cell, World } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
 import { portalColor } from './mitwachsen-portal';
+import { guideGate } from './mitwachsen-guide';
 
 export const MAP_RADIUS = 28; // Felder vom Mittelpunkt bis zum Rand
 
@@ -98,21 +100,24 @@ export function drawMap(
     }
   }
 
-  // Bett der Gegend, in der die Figur steht, als Häuschen, sonst ein Pfeil am Rand dorthin
+  // Bett der Gegend, in der die Figur steht, als Häuschen, sonst ein Pfeil am Rand dorthin (führt der Pinguin: zum Tor)
   const [bx, by] = homeAt(world, state.player.x, state.player.y).bed;
   const hx = ox + (bx + 0.5) * cell,
     hy = oy + (by + 0.5) * cell;
   const s = Math.max(5, cell * 1.6);
-  const inside = hx > s && hx < size - s && hy > s && hy < size - s;
-  if (inside) {
+  const shown = (px: number, py: number) => px > s && px < size - s && py > s && py < size - s;
+  const [gx, gy] = [...world.gates.values()].find((g) => g.id === guideGate(state))?.mid ?? [bx, by];
+  const [tx, ty] = [ox + (gx + 0.5) * cell, oy + (gy + 0.5) * cell]; // wohin der Pfeil zeigt
+  if (shown(hx, hy)) {
     ctx.fillStyle = COLORS.ink;
     ctx.fillRect(hx - s / 2 - 1, hy - s / 2 - 1, s + 2, s + 2);
     ctx.fillStyle = COLORS.home;
     ctx.fillRect(hx - s / 2, hy - s / 4, s, (s * 3) / 4);
     ctx.fillStyle = COLORS.roof;
     ctx.fillRect(hx - s / 2, hy - s / 2, s, s / 3);
-  } else {
-    const ang = Math.atan2(hy - size / 2, hx - size / 2);
+  }
+  if (!shown(tx, ty)) {
+    const ang = Math.atan2(ty - size / 2, tx - size / 2);
     const r = size / 2 - 9;
     ctx.save();
     ctx.translate(size / 2 + Math.cos(ang) * r, size / 2 + Math.sin(ang) * r);

@@ -804,6 +804,19 @@ describe('Große Tore', () => {
     expect(s.openGates.filter((id) => never.includes(id))).toEqual([]);
   });
 
+  it('ohne Schlüssel am Eistor (`never`) taucht der verlaufene Pinguin nie auf, auch wenn alle Tiere der Lichtung zu Hause sind', () => {
+    const world = createWorld(1);
+    const garden = regionAnimals('lichtung').map((id) => ({ id, species: id.split(':')[1] as 'hase' }));
+    let s = initialState(world, { garden });
+    expect(s.animals.find((a) => a.id === 'eis:pinguin')!.realm).toBe('eis'); // er wohnt im (unerreichbaren) Kessel
+    expect(world.realm(...s.animals.find((a) => a.id === 'eis:pinguin')!.spawn)).toBe('eis');
+    const r = run(s, world, 'n', ...Array.from({ length: 300 }, () => TICK));
+    s = r.s;
+    expect(types(r.events)).not.toContain('guide');
+    expect(s.animals.some((a) => a.mode === 'lead')).toBe(false);
+    expect(s.guideDue).toBe(-1);
+  });
+
   it('das letzte gefundene Tier öffnet kein Tor (kein Ereignis)', () => {
     const world = createWorld(1);
     const others = regionAnimals('lichtung').filter((id) => id !== animalId('lichtung', 'hase'));

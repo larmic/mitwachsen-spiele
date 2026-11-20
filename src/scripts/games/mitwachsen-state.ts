@@ -26,6 +26,7 @@ import { sheltering } from './mitwachsen-weather';
 import { PENGUIN, atHome, meadowSpots, shelterPlaces, windOk, type Home } from './mitwachsen-meadow';
 import { dirTo, freeNear, occupied } from './mitwachsen-free';
 import { crossBorder, type BorderEvent, type Mode } from './mitwachsen-border';
+import { lost, type GuideEvent, type GuideRules } from './mitwachsen-guide';
 
 export const SLEEP_LOCK = 30; // Takte nach dem Einschlafen, in denen Tasten nicht wecken (3 s)
 export const WAKE_GRACE = 15; // Takte nach dem Aufwachen, in denen das Bett nur ein Hindernis ist (1,5 s)
@@ -70,6 +71,7 @@ export type State = {
   fish: boolean; // Netz mit Fischen in der linken Hand (nach dem Fangen an der Fischkiste, bis zur Eisschale)
   heard: StoryId[]; // Geschichten, deren Klangstein schon einmal erklungen ist
   calm: number; // Tag, an dem der Pinguin auf die Schneewiese gezogen ist: an ihm weht kein Pustewind (nicht gespeichert)
+  guideDue: number; // verlaufener Pinguin: Takt, ab dem er auftaucht bzw. aufgetaucht ist (nicht gespeichert, mitwachsen-guide.ts)
 };
 
 /** Was gespeichert wird */
@@ -100,6 +102,7 @@ export type GameEvent =
   | PortalEvent // Plattformen erwachen, reisen, wieder bereit (mitwachsen-travel.ts)
   | ChoreEvent // Handgriffe: pflücken, fangen, nachwachsen, füttern, schöpfen, tränken (mitwachsen-chores.ts)
   | BorderEvent // Weltgrenze am Tor: warten, wieder einreihen, Gegend wechseln (mitwachsen-border.ts)
+  | GuideEvent // der verlaufene Pinguin taucht auf und piept (mitwachsen-guide.ts)
   | { type: 'call' }
   | { type: 'sleep' }
   | { type: 'wake' };
@@ -124,48 +127,40 @@ function random(s: State): number {
 
 // ---------- Aufbau ----------
 
+/** Ein Tier an seinem Platz (Wohnort, Platz auf der Wiese oder in der Landschaft), schaut nach vorn */
+const settle = (id: string, species: SpeciesId, [x, y]: Point, mode: Mode, home: Home, realm: RegionId): Animal => ({
+  id,
+  species,
+  x,
+  y,
+  dir: 's',
+  mode,
+  home,
+  realm,
+  spawn: [x, y],
+  rest: 5,
+});
+
 export function initialState(world: World, saved: Partial<Progress> = {}, rngSeed = 1): State {
   const garden = saved.garden ?? [];
   const atHomeIds = new Set(garden.map((p) => p.id));
+  // Nur Tore, die überhaupt aufgehen können, bleiben aus dem Spielstand offen
+  const open = (saved.openGates ?? []).filter((id) => GATES.some((g) => g.id === id && g.opens !== 'never'));
   const animals: Animal[] = [];
   for (const r of REGIONS)
     for (const { id, species } of regionAnimalList(r)) {
       const at = world.spawns.get(id); // die Welt kennt den erreichbaren Wohnort
-      if (at && !atHomeIds.has(id))
-        animals.push({
-          id,
-          species,
-          x: at[0],
-          y: at[1],
-          dir: 's',
-          mode: 'wander',
-          home: { kind: 'region', region: r.id },
-          realm: r.id,
-          spawn: at,
-          rest: 5,
-        });
+      // der verlaufene Pinguin wohnt nicht hinter seinem Tor, solange es den Schlüssel hat und zu ist (`lost`)
+      if (at && !atHomeIds.has(id) && !lost(id, open))
+        animals.push(settle(id, species, at, 'wander', { kind: 'region', region: r.id }, r.id));
     }
   const placed = new Map<RegionId, number>(); // je Gegend: so viele Tiere stehen schon auf ihrer Wiese
   for (const p of garden) {
     const realm = realmOfAnimal(p.id);
     const i = placed.get(realm) ?? 0;
     placed.set(realm, i + 1);
-    const [x, y] = cycle(meadowSpots(world, realm), i);
-    animals.push({
-      id: p.id,
-      species: p.species,
-      x,
-      y,
-      dir: 's',
-      mode: 'home',
-      home: { kind: 'garden' },
-      realm,
-      spawn: [x, y],
-      rest: 5,
-    });
+    animals.push(settle(p.id, p.species, cycle(meadowSpots(world, realm), i), 'home', { kind: 'garden' }, realm));
   }
-  // Nur Tore, die überhaupt aufgehen können, bleiben aus dem Spielstand offen
-  const open = (saved.openGates ?? []).filter((id) => GATES.some((g) => g.id === id && g.opens !== 'never'));
   const [bx, by] = world.homes[startRealm(world, open, saved.position)].bed;
   const s: State = {
     tick: 0,
@@ -189,6 +184,7 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     dayStart: 0,
     heard: (saved.heard ?? []).filter((id) => world.stones.has(id)),
     calm: -1,
+    guideDue: -1,
   };
   scatter(s, world); // jeder Besuch: Die Tiere wohnen woanders
   syncWild(s, world);
@@ -244,9 +240,10 @@ export const regionAnimals = (region: RegionId): string[] =>
 
 /**
  * Ein Befehl. `explored(x, y)` sagt, ob ein Feld schon aus dem Nebel ist (der Nebel gehört der Ansicht): Nur dort
- * erwacht eine Portal-Plattform. Ohne Angabe gilt alles als erkundet.
+ * erwacht eine Portal-Plattform. Ohne Angabe gilt alles als erkundet. `guide` sind die Regeln des verlaufenen Pinguins
+ * (mitwachsen-lead.ts), die die Ansicht erst nachlädt, wenn er fällig ist; ohne sie taucht er nicht auf.
  */
-export function step(state: State, world: World, cmd: Cmd, explored: Explored = EVERYWHERE): Step {
+export function step(state: State, world: World, cmd: Cmd, explored: Explored = EVERYWHERE, guide?: GuideRules): Step {
   // Flache Kopie: Tiere werden beim Ändern ersetzt, nie verändert – alte Zustände bleiben gültig
   const s: State = {
     ...state,
@@ -265,6 +262,7 @@ export function step(state: State, world: World, cmd: Cmd, explored: Explored = 
   else if (cmd.type === 'move') {
     const from: Point = [s.player.x, s.player.y];
     move(s, world, cmd.dir, events);
+    guide?.meetGuide(s, world, events); // in den führenden Pinguin gelaufen: Er hüpft voraus oder tauscht den Platz
     // Neues Feld: Plattformen (reisen, wieder bereit), dann die Weltgrenze am Tor (warten, wieder einreihen)
     if (s.player.x !== from[0] || s.player.y !== from[1]) {
       landed(s, world, events);
@@ -272,6 +270,7 @@ export function step(state: State, world: World, cmd: Cmd, explored: Explored = 
     }
   } else action(s, world, events);
   wakePortals(s, world, explored, events); // Portal-Plattformen in der Nähe erwachen (mitwachsen-travel.ts)
+  guide?.guide(s, world, cmd.type, events, explored); // der verlaufene Pinguin taucht auf und führt
   return { state: s, events };
 }
 
@@ -285,7 +284,7 @@ function tick(s: State, world: World, events: GameEvent[]) {
   const t = s.tick - s.dayStart;
   const places = shelterPlaces(world, s.animals, (realm) => sheltering(world.seed, s.day, t, realm, windOk(s)));
   for (const a of s.animals) {
-    if (a.mode === 'follow' || a.mode === 'wait') continue; // folgt der Figur bzw. sitzt auf seinem Warteplatz
+    if (a.mode !== 'wander' && a.mode !== 'home') continue; // folgt, wartet an der Weltgrenze oder führt
     const spot = places.get(a.id);
     const wet = spot !== undefined;
     const goal = spot ?? a.spawn;
@@ -566,17 +565,6 @@ function syncWild(s: State, world: World) {
     for (let cx = pcx - WILD_RADIUS; cx <= pcx + WILD_RADIUS; cx++)
       for (const w of wildAnimals(world, cx, cy)) {
         if (present.has(w.id) || occupied(s, w.x, w.y)) continue;
-        s.animals.push({
-          id: w.id,
-          species: w.species,
-          x: w.x,
-          y: w.y,
-          dir: 's',
-          mode: 'wander',
-          home: { kind: 'wild', cx, cy },
-          realm: realmOfAnimal(w.id),
-          spawn: [w.x, w.y],
-          rest: 5,
-        });
+        s.animals.push(settle(w.id, w.species, [w.x, w.y], 'wander', { kind: 'wild', cx, cy }, realmOfAnimal(w.id)));
       }
 }

@@ -3,11 +3,12 @@
 // Gehört zur 3D-Ansicht und wird nur mit ihr nachgeladen (Three.js).
 //
 // Koordinaten: x entlang des Tors (Mitte 0), y nach oben, z nach vorn (+z schaut zur Lichtung bzw. zum Bett).
-// Ein Torhaus ist 9 Felder breit (Tor 5, Türme je 2) und reicht 3 Felder tief in den Fels. Eine Portal-Plattform ist
-// 3 × 3 Felder groß und flach.
+// Ein Torhaus ist 9 Felder breit (Tor 5, Türme je 2) und reicht 3 Felder tief in den Fels; seine zwei Türflügel sind
+// eigene Teile, die sich nach innen drehen. Eine Portal-Plattform ist 3 × 3 Felder groß und flach.
 
 import { THEME_COLORS, type GateTheme } from '../../data/games/mitwachsen';
 import { GOLD, SUB, platformLook, voxelSpan, type PlatformVoxel } from '../../data/games/mitwachsen-portals';
+import { GUEST_COLORS, GUEST_OUTLINE, GUEST_PX, GUEST_Y } from './mitwachsen-guest-look';
 import { Geo, col, type Tile, type V3 } from './mitwachsen-geo';
 
 /** Teile, die mit verschiedenen Materialien gezeichnet werden */
@@ -36,6 +37,12 @@ const TOWER_W = 2; // Turmbreite
 const TOWER_H = 6.6;
 const ARCH_Y = 4.7; // Unterkante des Torbogens
 const DEPTH = 2.5; // so weit reicht das Torhaus nach hinten
+const HINGE_Z = -0.75; // die Türflügel drehen sich um ihre hintere Kante nach innen (weg von der Lichtung)
+const GAP = 0.2; // geöffnet: Spalt zwischen Flügel und Rahmen, damit sie beim Drehen nirgends anstoßen
+const SEAM = 0.06; // Umriss: so weit bleibt er von der Mitte der Tür weg (dort treffen sich die Flügel)
+
+/** Ein Türflügel: eigene Teile, die um ihre Angel (x, z) um `angle` gedreht stehen (um die senkrechte Achse, Bogenmaß) */
+export type Wing = { parts: Parts; hinge: readonly [number, number]; angle: number };
 
 /** Quader mit Ecke (x0, y0, z0) und Gegenecke (x1, y1, z1) – im Torhaus leichter zu lesen als Ecke und Größe */
 function block(
@@ -54,8 +61,13 @@ function block(
   g.box(x0, y0, z0, x1 - x0, y1 - y0, z1 - z0, side, top ?? side, tile, topTile);
 }
 
-/** Ein mächtiges Torhaus: zwei Türme, Torbogen, geschlossene Doppeltür mit leuchtendem Zeichen, Schmuck der Welt */
-export function gatehouse(p: Parts, theme: GateTheme) {
+/**
+ * Ein mächtiges Torhaus: zwei Türme, Torbogen, Doppeltür mit leuchtendem Zeichen, Schmuck der Welt. `open` sagt, wie
+ * weit die Tür offen ist (0 zu … 1 ganz offen, die Flügel stehen dann quer im Gang); `outline` zeigt statt des Zeichens
+ * den Umriss des verlaufenen Pinguins mit Goldrahmen (solange er die Figur zum Tor führt). Liefert die zwei Türflügel,
+ * die die 3D-Ansicht an ihre Angel stellt und dreht; bei `open` 0 sieht alles aus wie die geschlossene Tür.
+ */
+export function gatehouse(p: Parts, theme: GateTheme, open = 0, outline = false): Wing[] {
   const wall = WALL[theme];
   const glow = THEME_COLORS[theme].portal;
   const wallBlock = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) =>
@@ -119,23 +131,119 @@ export function gatehouse(p: Parts, theme: GateTheme) {
     block(p.solid, -W - 0.2, ARCH_Y, -DEPTH + 0.4, W + 0.2, ARCH_Y + 0.9, 0.35, '#efe4d2', '#f7efe2', 'cloud');
   else wallBlock(-W, ARCH_Y, -DEPTH + 0.2, W, ARCH_Y + 1.2, 0.55);
 
-  // Geschlossene Doppeltür aus Holz mit Eisenbändern, vorn und hinten gleich
+  const wings = door(glow, open, outline);
+  decorate(p, theme);
+  return wings;
+}
+
+type Leaf = Wing & { side: -1 | 1 }; // links bzw. rechts
+type Corners = [x0: number, y0: number, z0: number, x1: number, y1: number, z1: number];
+
+/** Quader (Ecke und Gegenecke in Torhaus-Koordinaten) an einen Flügel heften: um seine Angel verschoben */
+function onLeaf(
+  l: Leaf,
+  part: keyof Parts,
+  [x0, y0, z0, x1, y1, z1]: Corners,
+  side: string,
+  top?: string,
+  tile?: Tile,
+) {
+  const [hx, hz] = l.hinge;
+  block(l.parts[part], x0 - hx, y0, z0 - hz, x1 - hx, y1, z1 - hz, side, top, tile);
+}
+
+/**
+ * Doppeltür aus Holz mit Eisenbändern, vorn und hinten gleich, als zwei Flügel um ihre äußere Angel. Geschlossen laufen
+ * Bänder und Zeichen über beide Flügel (sie gehören zum linken, so bleibt die Tür, wie sie war); offen hat jeder Flügel
+ * seine eigenen Bänder und Abstand zum Rahmen, ein Zeichen gibt es dann nicht mehr. Der Umriss sitzt vorn auf beiden.
+ */
+function door(glow: string, open: number, outline: boolean): Wing[] {
   const wood = '#6b4423',
     woodTop = '#7d5232',
     iron = '#3a3a44';
-  block(p.solid, -W + 0.05, 0, -0.75, -0.04, ARCH_Y, -0.35, wood, woodTop, 'planks');
-  block(p.solid, 0.04, 0, -0.75, W - 0.05, ARCH_Y, -0.35, wood, woodTop, 'planks');
-  for (const y of [0.7, 2.3, 3.9]) {
-    block(p.solid, -W + 0.05, y, -0.33, W - 0.05, y + 0.2, -0.28, iron);
-    block(p.solid, -W + 0.05, y, -0.82, W - 0.05, y + 0.2, -0.77, iron);
+  const outer = W - 0.05 - (open > 0 ? GAP : 0);
+  const leaves = ([-1, 1] as const).map((side): Leaf => ({
+    parts: parts(),
+    hinge: [side * outer, HINGE_Z],
+    angle: (-side * open * Math.PI) / 2,
+    side,
+  }));
+  const bands = (l: Leaf, x0: number, x1: number) => {
+    for (const y of [0.7, 2.3, 3.9]) {
+      onLeaf(l, 'solid', [x0, y, -0.33, x1, y + 0.2, -0.28], iron);
+      onLeaf(l, 'solid', [x0, y, -0.82, x1, y + 0.2, -0.77], iron);
+    }
+  };
+  for (const l of leaves) {
+    const [x0, x1] = l.side < 0 ? [-outer, -0.04] : [0.04, outer];
+    onLeaf(l, 'solid', [x0, 0, -0.75, x1, ARCH_Y, -0.35], wood, woodTop, 'planks');
+    if (open > 0) bands(l, x0, x1);
   }
-  // Leuchtendes Zeichen der Welt in der Mitte der Tür (vorn und hinten)
-  for (const z of [-0.3, -0.86]) {
-    block(p.bright, -0.55, 2.0, z, 0.55, 3.1, z + 0.06, glow);
-    block(p.bright, -0.3, 2.25, z + (z > -0.5 ? 0.05 : -0.04), 0.3, 2.85, z + (z > -0.5 ? 0.09 : 0.0), '#ffffff');
-  }
+  const [left, right] = leaves as [Leaf, Leaf];
+  if (open === 0) bands(left, -W + 0.05, W - 0.05);
+  // Leuchtendes Zeichen der Welt in der Mitte der geschlossenen Tür (vorn und hinten)
+  if (open === 0 && !outline)
+    for (const z of [-0.3, -0.86]) {
+      onLeaf(left, 'bright', [-0.55, 2.0, z, 0.55, 3.1, z + 0.06], glow);
+      const [z0, z1] = z > -0.5 ? [z + 0.05, z + 0.09] : [z - 0.04, z];
+      onLeaf(left, 'bright', [-0.3, 2.25, z0, 0.3, 2.85, z1], '#ffffff');
+    }
+  if (outline) penguinOutline(left, right);
+  return leaves.map(({ parts, hinge, angle }) => ({ parts, hinge, angle }));
+}
 
-  decorate(p, theme);
+/**
+ * Umriss des verlaufenen Pinguins mit Goldrahmen auf der Tür, vorn und hinten wie das Zeichen (Pixel aus
+ * `GUEST_OUTLINE`, je eine Lage auf dem Holz): Jedes Pixel gehört zum Flügel, auf dessen Seite es liegt, und hält
+ * Abstand zur Mitte (`SEAM`). Gold ersetzt die Pixel darunter, es liegt nichts übereinander.
+ */
+function penguinOutline(left: Leaf, right: Leaf) {
+  const rows = GUEST_OUTLINE.length;
+  GUEST_OUTLINE.forEach((row, r) => {
+    [...row].forEach((ch, c) => {
+      const color = GUEST_COLORS[ch as keyof typeof GUEST_COLORS];
+      if (!color) return;
+      const [x0, x1] = [(c - row.length / 2) * GUEST_PX, (c + 1 - row.length / 2) * GUEST_PX];
+      const y = GUEST_Y + (rows - 1 - r) * GUEST_PX;
+      const [l, a, b] = x0 + x1 < 0 ? [left, x0, Math.min(x1, -SEAM)] : [right, Math.max(x0, SEAM), x1];
+      for (const [z0, z1] of [
+        [-0.35, -0.26],
+        [-0.84, -0.75],
+      ] as const)
+        onLeaf(l, 'bright', [a, y, z0, b, y + GUEST_PX, z1], color.side, color.top);
+    });
+  });
+}
+
+/**
+ * Goldene Bucht vor dem Tor, solange der verlaufene Pinguin die Figur dorthin führt: ein schmaler Goldrand um die drei
+ * Reihen vor der Tür, so breit wie das Tor, vorn vor dem Sockel der Türme. Er liegt je Feld knapp über dessen Boden:
+ * `rise(u, t)` ist die Höhe des Felds u (−2 … 2 entlang des Tors) in Reihe t (1 … 3) gegenüber der Tormitte. Felder
+ * gleicher Höhe teilen sich ein Stück Rand, an einer Stufe setzt er ab.
+ */
+export function goldenBay(p: Parts, rise: (u: number, t: number) => number = () => 0) {
+  const [w, depth] = [0.12, 3];
+  const strip = (x0: number, x1: number, z0: number, z1: number, y: number) =>
+    block(p.bright, x0, y + 0.02, z0, x1, y + 0.07, z1, GOLD.side, GOLD.top);
+  /** Felder `from` … `to` als Stücke gleicher Höhe: [erstes, letztes, Höhe] */
+  const runs = (from: number, to: number, h: (i: number) => number) => {
+    const out: [number, number, number][] = [];
+    for (let i = from; i <= to; i++) {
+      const last = out[out.length - 1];
+      if (last && last[2] === h(i)) last[1] = i;
+      else out.push([i, i, h(i)]);
+    }
+    return out;
+  };
+  const front = (t: number) => (t === 1 ? 0.85 : t - 0.5); // vordere Kante der Reihe t
+  for (const [a, b, y] of runs(-2, 2, (u) => rise(u, 1))) strip(a - 0.5, b + 0.5, 0.85, 0.85 + w, y);
+  for (const [a, b, y] of runs(-2, 2, (u) => rise(u, depth))) strip(a - 0.5, b + 0.5, depth + 0.5 - w, depth + 0.5, y);
+  for (const [u, x0] of [
+    [-2, -W],
+    [2, W - w],
+  ] as const)
+    for (const [a, b, y] of runs(1, depth, (t) => rise(u, t)))
+      strip(x0, x0 + w, a === 1 ? front(1) + w : front(a), b === depth ? depth + 0.5 - w : b + 0.5, y);
 }
 
 /** Schmuck je Welt: Krone der Türme, Dinge am Torbogen */

@@ -9,7 +9,7 @@ import { projection, type Dir } from '../../lib/games/front';
 import type { World3D as World3DType } from './mitwachsen-3d';
 import { GAME_COLORS, LOOK, SPECIES, TIRED_TALK } from '../../data/games/mitwachsen';
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
-import { sparks } from './mitwachsen-glyphs';
+import { SPARKS, fly, sparks } from './mitwachsen-glyphs';
 import { Sfx } from './sfx';
 import { NOTE_COLORS, StoryPlayer } from './mitwachsen-story';
 import {
@@ -32,9 +32,9 @@ import { Fog, REVEAL, START_REVEAL } from './mitwachsen-fog';
 import { initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
 import type { ChoreEvent } from './mitwachsen-chores';
 import { createWorld, standHeight, type World } from './mitwachsen-world';
+import { wanted, type GuideRules } from './mitwachsen-guide';
 import { platformLift, portalColor } from './mitwachsen-portal';
 import { SNAP_DELAY, hopOf, snaps } from './mitwachsen-gait';
-import { FISH_SPARKS } from '../../data/games/mitwachsen-eis';
 import { windAt } from './mitwachsen-weather';
 import { Air, postures, stepSound } from './mitwachsen-air';
 import { idlePose, type Pose } from './mitwachsen-tired';
@@ -48,15 +48,7 @@ const SIT_MS = 2500; // so lange setzt sich die müde Figur hin (Laufen geht in 
 const INFO_KEY = 'larmic.games.mitwachsen.info'; // Hinweis für Eltern schon gesehen
 const SPEED = (1000 / STEP_MS) * 1.1; // Felder pro Sekunde beim Gleiten: etwas schneller als der Takt, also weich
 
-/** Funken der Handgriffe: an Busch, Fischkiste und Wasser, dann an Futtertrog, Eisschale und Wassertrog */
-const SPARKS = {
-  pick: ['#c8323a', '#ef5b5b', '#3f9a3c'],
-  catch: FISH_SPARKS.catch,
-  fill: ['#3f8fd8', '#7fc0f0', '#ffffff'],
-  berries: ['#c8323a', '#ef5b5b', '#ffd47e'],
-  fish: FISH_SPARKS.feed,
-  pour: ['#3f8fd8', '#7fc0f0', '#ffd47e'],
-} as const;
+const noop = () => {};
 const randomSeed = () => crypto.getRandomValues(new Uint32Array(1))[0]!;
 const randomId = () => randomSeed().toString(36) + Date.now().toString(36);
 
@@ -105,6 +97,8 @@ class LarmicMitwachsen extends HTMLElement {
   private touchUi!: HTMLElement;
   private r3d: World3DType | null = null; // 3D-Ansicht, solange sie zeichnen kann
   private gl3d: World3DType | null = null; // die geladene 3D-Ansicht, auch wenn ihr Kontext gerade fehlt
+  private guide?: GuideRules; // Regeln des verlaufenen Pinguins: erst nachgeladen, wenn er fällig ist
+  private guiding?: Promise<unknown>; // sie werden geladen (scheitert das Laden, bleibt es ohne ihn)
 
   connectedCallback() {
     this.canvas = this.querySelector('canvas.mw-canvas')!;
@@ -256,8 +250,10 @@ class LarmicMitwachsen extends HTMLElement {
   private apply(cmd: Cmd) {
     if (cmd.type !== 'tick') this.lastInput = performance.now(); // jemand spielt
     if (cmd.type === 'move' && performance.now() < this.sitUntil) return; // die müde Figur sitzt kurz
-    const { state, events } = step(this.state, this.world, cmd, (x, y) => this.fog.has(x, y));
+    const { state, events } = step(this.state, this.world, cmd, (x, y) => this.fog.has(x, y), this.guide);
     this.state = state;
+    // Sind alle Tiere der Lichtung zu Hause, kommen die Regeln des Pinguins nach
+    if (!this.guiding && wanted(state)) this.guiding = import('./mitwachsen-lead').then((m) => (this.guide = m), noop);
     this.lift();
     if (events.length) this.react(events);
     if (cmd.type === 'tick') this.ageTired();
@@ -489,17 +485,13 @@ class LarmicMitwachsen extends HTMLElement {
         case 'follow':
           this.float('heart', e.id, GAME_COLORS.heart, now + 150);
           break;
+        case 'guide':
+        case 'arrive':
+        case 'peep':
         case 'aside':
         case 'wait':
         case 'rejoin':
-          // Ein Tier der Wiese hüpft zur Seite und ruft kurz – die Figur geht weiter, ohne anzuhalten. An der Weltgrenze
-          // setzt sich ein Tier mit seinem Ton und einem Herz auf seinen Warteplatz bzw. hüpft vor Freude und reiht sich ein
-          this.sfx.play(SPECIES[e.species].tone);
-          this.hops.set(e.id, now);
-          if (e.type !== 'aside') {
-            this.float('heart', e.id, GAME_COLORS.heart, now + 150);
-            this.hops.set(`seat:${e.id}`, now); // gleitet zum Warteplatz bzw. zurück in die Kette, bis es dort ist
-          }
+          this.cheer(e, now);
           break;
         case 'realm': // Weltwechsel an der Gangmitte: hoher Glockenton in die Eis-Welt, tiefer zurück
           this.sfx.bell(e.to === 'eis');
@@ -548,6 +540,21 @@ class LarmicMitwachsen extends HTMLElement {
     if (persist) this.save();
   }
 
+  /**
+   * Ein Tier ruft kurz mit seinem Ton und hüpft: Ein Tier der Wiese hüpft zur Seite (die Figur geht weiter, ohne
+   * anzuhalten). An der Weltgrenze setzt sich ein Tier mit Herz auf seinen Warteplatz bzw. hüpft vor Freude und reiht
+   * sich wieder ein. Der verlaufene Pinguin taucht in einer kleinen Schneewolke auf und piept; bei der Figur angekommen,
+   * zeigt er ein Herz.
+   */
+  private cheer(e: GameEvent & { id: string; species: keyof typeof SPECIES }, now: number) {
+    if (e.type === 'guide') this.burst(e.id, SPARKS.snow, 14, { x: e.x, y: e.y, z: this.world.cell(e.x, e.y).h });
+    this.sfx.play(SPECIES[e.species].tone);
+    this.hops.set(e.id, now);
+    if (e.type !== 'arrive' && e.type !== 'wait' && e.type !== 'rejoin') return;
+    this.float('heart', e.id, GAME_COLORS.heart, now + 150);
+    if (e.type !== 'arrive') this.hops.set(`seat:${e.id}`, now); // gleitet zum Warteplatz bzw. zurück in die Kette
+  }
+
   /** Ins Bett gebracht: Schlaflied, Nacht; der Tag ist zu Ende, morgen ist die Figur wieder ausgeschlafen */
   private goodNight(now: number) {
     this.story.stop();
@@ -565,8 +572,9 @@ class LarmicMitwachsen extends HTMLElement {
     this.floats.push({ kind, who, color, born, x: 0, y: 0, z: 0, age: 0 });
   }
 
-  private burst(who: string, colors: readonly string[], n: number) {
-    const b = this.bodies.get(who);
+  /** Funken am Wesen `who` (oder am Punkt `at`, wenn es noch nicht zu sehen ist) */
+  private burst(who: string, colors: readonly string[], n: number, at?: Omit<Body, 'hop'>) {
+    const b = at ?? this.bodies.get(who);
     if (this.reduced.matches || !b) return;
     this.particles.push(...sparks(this.project(b.x + 0.5, b.y + 0.5, b.z + 0.8), colors, n, this.size.zoom));
   }
@@ -717,14 +725,7 @@ class LarmicMitwachsen extends HTMLElement {
       if (!b) continue;
       floats.push({ ...f, x: b.x, y: b.y, z: b.z + (f.who === 'player' ? 1.5 : 0.9), age: t - f.born });
     }
-    const k = dt * 60; // Partikel laufen in Zeit, nicht in Bildern (120-Hz-Schirme)
-    for (const p of this.particles) {
-      p.x += p.vx * k;
-      p.y += p.vy * k;
-      p.vy += 0.22 * k;
-      p.life -= k;
-    }
-    this.particles = this.particles.filter((p) => p.life > 0);
+    this.particles = fly(this.particles, dt);
 
     const gates = new Map<string, number>();
     for (const [id, since] of this.gates) gates.set(id, since === 0 ? 1 : fade(since, 900));

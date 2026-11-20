@@ -1,18 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type { BufferGeometry } from 'three';
 import { GATES } from '../../data/games/mitwachsen';
-import { gatehouse, parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
+import { gatehouse, goldenBay, parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
 
 type Face = { axis: number; dir: number; at: number; min: [number, number]; max: [number, number]; part: string };
 
-/** Achsenparallele Flächen einer Geometrie (je vier Ecken hintereinander, wie Geo sie anlegt) */
+/**
+ * Achsenparallele Flächen einer Geometrie (je vier Ecken hintereinander, wie Geo sie anlegt). Schräge Flächen (halb
+ * offene Türflügel) liegen nie in einer Ebene mit achsenparallelen und fallen weg.
+ */
 function faces(g: BufferGeometry, part: string): Face[] {
   const pos = g.getAttribute('position').array;
   const nor = g.getAttribute('normal').array;
   const out: Face[] = [];
   for (let v = 0; v < pos.length / 3; v += 4) {
     const n = [nor[v * 3]!, nor[v * 3 + 1]!, nor[v * 3 + 2]!];
-    const axis = n.findIndex((c) => Math.abs(c) > 0.5);
+    const axis = n.findIndex((c) => Math.abs(c) > 0.99);
+    if (axis < 0) continue;
     const [u, w] = [0, 1, 2].filter((k) => k !== axis) as [number, number];
     const pts = [0, 1, 2, 3].map((k) => [pos[(v + k) * 3]!, pos[(v + k) * 3 + 1]!, pos[(v + k) * 3 + 2]!]);
     out.push({
@@ -28,8 +32,11 @@ function faces(g: BufferGeometry, part: string): Face[] {
 }
 
 /** Paare von Flächen, die in derselben Ebene in dieselbe Richtung schauen und sich überdecken: Sie flackern (Z-Fighting) */
-function fighting(p: Parts): string[] {
-  const all = Object.entries(p).flatMap(([name, geo]) => (geo.empty ? [] : faces(geo.build(), name)));
+function fighting(p: Parts, extra: [string, BufferGeometry][] = []): string[] {
+  const all = [
+    ...Object.entries(p).flatMap(([name, geo]) => (geo.empty ? [] : faces(geo.build(), name))),
+    ...extra.flatMap(([name, g]) => faces(g, name)),
+  ];
   // nur Flächen in derselben Ebene mit derselben Richtung können sich überdecken
   const planes = new Map<string, Face[]>();
   for (const f of all) {
@@ -50,12 +57,46 @@ function fighting(p: Parts): string[] {
   return found;
 }
 
+/**
+ * Ein Torhaus samt Türflügeln, so wie die 3D-Ansicht sie aufstellt: jeder Flügel um seine Angel gedreht. Liefert die
+ * Teile des Hauses, die Flügel und ihre Geometrie an ihrem Platz. Halb offen stehen die Flügel schräg: Dann vergleicht
+ * der Test jeden Flügel für sich (ungedreht) und das Haus ohne sie, denn schräge Flächen liegen nie in einer Ebene mit
+ * achsenparallelen (und ihre Ränder taugen nicht für den Vergleich in `fighting`).
+ */
+function house(theme: (typeof GATES)[number]['id'], open: number, outline: boolean) {
+  const p = parts();
+  const wings = gatehouse(p, theme, open, outline);
+  if (outline) goldenBay(p);
+  const placed = wings.flatMap((w, i) =>
+    Object.entries(w.parts).flatMap(([name, geo]): [string, BufferGeometry][] =>
+      geo.empty ? [] : [[`Flügel ${i} ${name}`, geo.build().rotateY(w.angle).translate(w.hinge[0], 0, w.hinge[1])]],
+    ),
+  );
+  return { p, wings, placed };
+}
+/** Grenzen einer Geometrie (min, max je Achse) */
+const bounds = (gs: BufferGeometry[]) => {
+  const pts = gs.flatMap((g) => [...g.getAttribute('position').array]);
+  const axis = (k: number) => pts.filter((_, i) => i % 3 === k);
+  const span = (k: number) => [Math.min(...axis(k)), Math.max(...axis(k))] as const;
+  return [span(0), span(1), span(2)] as const;
+};
+
 describe('Torhäuser und Portal-Plattformen flackern nicht', () => {
   for (const g of GATES) {
-    it(`${g.id}: keine zwei Flächen liegen deckungsgleich in einer Ebene`, () => {
-      const p = parts();
-      gatehouse(p, g.id);
-      expect(fighting(p)).toEqual([]);
+    it(`${g.id}: keine zwei Flächen liegen deckungsgleich in einer Ebene (Tür zu, halb und ganz offen)`, () => {
+      for (const open of [0, 0.5, 1]) {
+        const { p, wings, placed } = house(g.id, open, false);
+        expect(fighting(p, open === 0.5 ? [] : placed), `offen ${open}`).toEqual([]);
+        for (const w of wings) expect(fighting(w.parts), `Flügel bei ${open}`).toEqual([]); // jeder Flügel für sich
+      }
+    });
+    it(`${g.id}: mit Umriss des Pinguins und goldener Bucht ebenso`, () => {
+      for (const open of [0, 0.5, 1]) {
+        const { p, wings, placed } = house(g.id, open, true);
+        expect(fighting(p, open === 0.5 ? [] : placed), `offen ${open}`).toEqual([]);
+        for (const w of wings) expect(fighting(w.parts), `Flügel bei ${open}`).toEqual([]);
+      }
     });
     it(`${g.id}: Portal-Plattform in jedem Zustand ebenso (am Tor und am Bett)`, () => {
       for (const side of ['gate', 'home'] as const) {
@@ -75,6 +116,43 @@ describe('Torhäuser und Portal-Plattformen flackern nicht', () => {
       }
     });
   }
+
+  it('Türflügel: zu ganz geschlossen (kein Spalt zum Rahmen, ungedreht), offen quer im Gang und frei vom Mauerwerk', () => {
+    const closed = house('eis', 0, false);
+    expect(closed.wings.map((w) => Math.abs(w.angle))).toEqual([0, 0]);
+    const [[x0, x1], , [z0, z1]] = bounds(closed.placed.map(([, g]) => g));
+    expect([x0, x1, z0, z1].map((v) => +v.toFixed(2))).toEqual([-2.45, 2.45, -0.9, -0.21]); // wie die Tür bisher
+    const open = house('eis', 1, false);
+    for (const [i, w] of open.wings.entries()) {
+      const [[a, b], , [c, d]] = bounds(open.placed.filter(([n]) => n.startsWith(`Flügel ${i}`)).map(([, g]) => g));
+      expect(Math.min(Math.abs(a), Math.abs(b))).toBeGreaterThan(1.7); // am Rand des Gangs (halb so breit: 2,5)
+      expect(Math.max(Math.abs(a), Math.abs(b))).toBeLessThan(2.35); // nicht im Sockel der Türme (ab 2,35)
+      expect(d).toBeLessThanOrEqual(-0.75 + 0.01); // hinter der Türlinie, nach innen aufgeschwungen
+      expect(c).toBeLessThan(-2.5);
+      expect(Math.abs(w.angle)).toBeCloseTo(Math.PI / 2);
+    }
+  });
+
+  it('goldene Bucht: der Rand liegt je Feld knapp über dessen eigenem Boden, auch an Stufen ohne Flackern', () => {
+    // Reihe 3 rechts eine Stufe höher, Reihe 2 links eine tiefer (so liegt die Bucht oft vor dem Tor)
+    const rise = (u: number, t: number) => (u === 2 && t === 3 ? 1 : u === -2 && t === 2 ? -1 : 0);
+    const p = parts();
+    goldenBay(p, rise);
+    expect(fighting(p)).toEqual([]);
+    const pos = p.bright.build().getAttribute('position').array;
+    for (let i = 0; i < pos.length; i += 3) {
+      const [x, y, z] = [pos[i]!, pos[i + 1]!, pos[i + 2]!];
+      // jede Ecke gehört zu einem Feld der Bucht, auf dessen Höhe (Ecken auf der Grenze zweier Felder: eins davon)
+      const near = (v: number) => [Math.round(v - 0.01), Math.round(v + 0.01)];
+      const heights = near(x).flatMap((u) =>
+        near(z).map((t) => rise(Math.max(-2, Math.min(2, u)), Math.max(1, Math.min(3, t)))),
+      );
+      expect(
+        heights.some((h) => y >= h + 0.02 - 1e-6 && y <= h + 0.07 + 1e-6),
+        `${x} ${y} ${z}`,
+      ).toBe(true);
+    }
+  });
 
   it('verdeckte Flächen fallen weg: Eine wache Plattform hat nur so viele Flächen, wie man sehen kann', () => {
     const sets = platformSets('sand', 'gate');

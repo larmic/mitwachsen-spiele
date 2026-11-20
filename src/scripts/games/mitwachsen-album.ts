@@ -1,19 +1,21 @@
 // Leiste unten: die Tiere der Gegend, in der die Figur steht. Ist das Eistor offen (es gibt dann zwei Gegenden), steht
 // links ihr Zeichen, und beim Wechsel an der Gangmitte klappt die Leiste um; beides kommt mit dem Bild der Weltgrenze
-// (mitwachsen-border-view.ts), das die Ansicht erst dann nachlädt. Gleich für 2D und die Ebene über 3D.
+// (mitwachsen-border-view.ts), das die Ansicht erst dann nachlädt. Führt der verlaufene Pinguin die Figur zum Eistor,
+// hat er auf der Lichtung einen Gast-Platz mit Schneeflocke. Gleich für 2D und die Ebene über 3D.
 // Spezifikation: docs/specs/mitwachsen.md („Was angezeigt wird“, Leiste unten)
 
 import { TILE_W, drawModel, projection } from '../../lib/games/front';
 import { GAME_COLORS, REGIONS, SPECIES, speciesOf, type RegionId, type SpeciesId } from '../../data/games/mitwachsen';
 import type { Turn } from './mitwachsen-border-view';
 import { ASK, HEART, sprite } from './mitwachsen-glyphs';
+import { leader } from './mitwachsen-guide';
 import type { State } from './mitwachsen-state';
 
 /** Was die Leiste vom Bild wissen muss */
 export type Bar = { width: number; height: number; zoom: number; now: number; reduced: boolean; bottomInset: number };
 /** Bild der Weltgrenze (nachgeladen): Zeichen der Gegend und Umklappen */
 export type Signs = Pick<typeof import('./mitwachsen-border-view'), 'turnAlbum' | 'realmSign'>;
-type Slot = { species: SpeciesId; met: boolean; home: boolean; follows: boolean };
+type Slot = { species: SpeciesId; met: boolean; home: boolean; follows: boolean; guest?: boolean };
 
 export class Album {
   private turn: Turn = {}; // Umklappen beim Wechsel der Gegend
@@ -22,7 +24,8 @@ export class Album {
    * Ein Platz je Art der Gegend `realm` (eine Art gilt als gefunden, sobald eines ihrer Tiere gefunden ist), auf der
    * Lichtung dahinter Tiere der Landschaft, die im Garten wohnen. Umriss mit Fragezeichen = noch verloren, in Farbe =
    * gefunden, grüner Grund = zu Hause im Garten, Herz = folgt gerade. Ist das Eistor offen (`signs` geladen), steht
-   * links das Zeichen der Gegend, und wechselt sie, klappt die Leiste um.
+   * links das Zeichen der Gegend, und wechselt sie, klappt die Leiste um. Ein Gast (der führende Pinguin) hat ganz
+   * rechts einen eigenen Platz mit dem Zeichen seiner Gegend, der Schneeflocke.
    */
   draw(ctx: CanvasRenderingContext2D, state: State, sc: Bar, realm: RegionId, signs: Signs | null) {
     // Zwei Gegenden gibt es erst, wenn das Eistor offen ist: erst dann steht das Zeichen der Gegend davor
@@ -50,6 +53,7 @@ export class Album {
     for (const group of groups) {
       for (const a of group) {
         slot(ctx, a, x, y, size);
+        if (a.guest) signs?.realmSign(ctx, 'eis', x + size * 0.2, y + size * 0.36, size * 0.3);
         x += size + gap;
       }
       x += groupGap - gap;
@@ -77,6 +81,12 @@ function slots(state: State, realm: RegionId): Slot[][] {
     groups.push(
       wild.map((p) => ({ species: p.species, met: true, home: true, follows: state.followers.includes(p.id) })),
     );
+  // Gast: der verlaufene Pinguin, solange er die Figur zum Eistor führt (er gehört in die Eis-Welt)
+  const guest = realm === 'lichtung' ? leader(state) : undefined;
+  if (guest)
+    groups.push([
+      { species: guest.species, met: state.met.includes(guest.id), home: false, follows: false, guest: true },
+    ]);
   return groups;
 }
 

@@ -43,13 +43,15 @@ import {
   BUCKET_PARTS,
   BOOK_PARTS,
   SLEEPY_EYES,
+  type GateId,
   type Look,
 } from '../../data/games/mitwachsen';
 import { FISH_PARTS, ICE_COLORS } from '../../data/games/mitwachsen-eis';
 import { Geo, atlas, snapToShadowTexel, type Tile, type V3 } from './mitwachsen-geo';
 import { grown } from './mitwachsen-growth';
 import { iceBoxes } from './mitwachsen-ice-look';
-import { gatehouse, parts, type Parts } from './mitwachsen-gatehouse';
+import { gatehouse, goldenBay, parts, type Parts } from './mitwachsen-gatehouse';
+import { guideGate } from './mitwachsen-guide';
 import { Platforms3D } from './mitwachsen-platform-3d';
 import { StoneNotes, stoneInto } from './mitwachsen-story-3d';
 import type { Scene } from './mitwachsen-render';
@@ -165,6 +167,7 @@ export class World3D {
   private picked: Record<string, number> = {}; // Büsche ohne Beeren und leere Fischkisten (aus den Regeln)
   private day = 0; // Tag der Welt: bestimmt, was nachgewachsen ist
   private slide = false; // Eistor offen: Die Rutschspur zum Schneebett glänzt
+  private gatesKey = ''; // wie die Torhäuser gebaut sind: Öffnung je Tor und wohin der Pinguin führt
   private models = new Map<string, BufferGeometry>();
   private bodies = new Map<string, Mesh>();
   private signs = new Group();
@@ -393,6 +396,7 @@ export class World3D {
     fog.color.copy(sky);
 
     this.updateFog(cam.x, cam.y);
+    this.syncGates(world, state, sc);
     this.syncChunks(world, cam.x, cam.y);
     this.syncBodies(state, sc);
     this.syncSigns(state);
@@ -418,7 +422,7 @@ export class World3D {
   private reset(world: World) {
     this.world = world;
     this.fogDirty = true;
-    this.buildGates(world);
+    this.gatesKey = '';
     this.platforms.build(world);
     this.notes.build(world);
     for (const c of this.chunks.values())
@@ -463,15 +467,38 @@ export class World3D {
     group.clear();
   }
 
-  /** Die großen Tore: mächtige Torhäuser im Felsring, je Welt geschmückt, zur Lichtung schauend */
-  private buildGates(world: World) {
+  /** Torhäuser neu bauen, wenn sich die Öffnung eines Tors ändert oder der Pinguin zu führen beginnt bzw. aufhört */
+  private syncGates(world: World, state: State, sc: Scene) {
+    const guest = guideGate(state);
+    const key = `${guest}|${[...sc.gates].map(([id, v]) => `${id}:${v.toFixed(2)}`).join()}`;
+    if (key === this.gatesKey) return;
+    this.gatesKey = key;
+    this.buildGates(world, (id) => sc.gates.get(id) ?? 0, guest);
+  }
+
+  /**
+   * Die großen Tore: mächtige Torhäuser im Felsring, je Welt geschmückt, zur Lichtung schauend. `open` sagt je Tor, wie
+   * weit die Tür offen ist (die Flügel stehen an ihrer Angel und sind gedreht); am Tor `guest` (dorthin führt der
+   * verlaufene Pinguin) steht sein Umriss auf der Tür, und die Bucht davor ist golden markiert.
+   */
+  private buildGates(world: World, open: (id: GateId) => number = () => 0, guest: GateId | null = null) {
     this.clear(this.gateGroup);
     for (const g of world.gates.values()) {
       const p = parts();
-      gatehouse(p, g.id);
-      const [mx, my] = g.mid;
-      const group = this.place(new Group(), mx, my, world.cell(mx, my).h, [-g.out[0], -g.out[1]]);
+      const wings = gatehouse(p, g.id, open(g.id), g.id === guest);
+      const [[mx, my], [fx, fy]] = [g.mid, [-g.out[0], -g.out[1]]];
+      const h = world.cell(mx, my).h;
+      // Goldrand der Bucht je Feld auf dessen Höhe: u entlang des Tors (die x-Achse des Torhauses), t Reihen davor
+      if (g.id === guest) goldenBay(p, (u, t) => world.cell(mx + u * fy + t * fx, my - u * fx + t * fy).h - h);
+      const group = this.place(new Group(), mx, my, h, [fx, fy]);
       group.add(...this.meshes(p));
+      for (const w of wings) {
+        const wing = new Group();
+        wing.position.set(w.hinge[0], 0, w.hinge[1]);
+        wing.rotation.y = w.angle;
+        wing.add(...this.meshes(w.parts));
+        group.add(wing);
+      }
       this.gateGroup.add(group);
     }
   }

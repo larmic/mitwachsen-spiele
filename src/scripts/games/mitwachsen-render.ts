@@ -31,7 +31,6 @@ import {
   MOOD_LIGHT,
   REGIONS,
   SPECIES,
-  THEME_COLORS,
   figureParts,
   BASKET_PARTS,
   BUCKET_PARTS,
@@ -52,6 +51,9 @@ import { cycle, hash } from '../../lib/games/rng';
 import type { Cell, TreeKind, World } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
 import { drawPlatform } from './mitwachsen-platform-2d';
+import { bigGate } from './mitwachsen-gate-look';
+import type { Guest } from './mitwachsen-guest-look';
+import { guideGate } from './mitwachsen-guide';
 import { moodLife } from './mitwachsen-sky';
 import { turnHead } from './mitwachsen-air';
 import { Album } from './mitwachsen-album';
@@ -122,6 +124,7 @@ export class Renderer {
   private later: IceBox[] = [];
   private ice: typeof import('./mitwachsen-ice-sky') | Promise<unknown> | null = null;
   private album = new Album(); // Leiste unten
+  private guest: Guest | null = null; // der Pinguin am Tor, solange er führt (Umriss, goldene Bucht; nachgeladen)
   private blocks: Record<'grass' | 'dirt' | 'stone' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
 
   constructor(private readonly ctx: CanvasRenderingContext2D) {
@@ -158,6 +161,7 @@ export class Renderer {
     const byId = new Map(state.animals.map((a) => [a.id, a]));
 
     this.later = [];
+    this.guest = (this.ice instanceof Promise ? null : this.ice)?.guestAt(world, state) ?? null;
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) this.ground(P, world, x, y, sc);
       for (let x = x0; x <= x1; x++) this.deco(P, world, state, sc, x, y);
@@ -236,11 +240,13 @@ export class Renderer {
 
   /**
    * Wetter der Eis-Welt (mitwachsen-ice-sky.ts) und Bild der Weltgrenze (mitwachsen-border-view.ts): erst nachgeladen,
-   * wenn die Figur im Kessel oder das Eistor offen ist; bis dahin nichts
+   * wenn die Figur im Kessel, das Eistor offen oder der verlaufene Pinguin da ist (Gast-Platz mit Schneeflocke); bis
+   * dahin nichts
    */
   private iceSky(world: World, state: State) {
     // Scheitert das Laden, bleibt es beim Versprechen: dann eben ohne Eis-Wetter
-    if (!this.ice && (world.realm(state.player.x, state.player.y) === 'eis' || state.openGates.includes('eis')))
+    const realm = world.realm(state.player.x, state.player.y);
+    if (!this.ice && (realm === 'eis' || state.openGates.includes('eis') || guideGate(state)))
       this.ice = import('./mitwachsen-ice-sky').then((m) => (this.ice = m)).catch(() => undefined);
     return this.ice instanceof Promise ? null : this.ice;
   }
@@ -589,6 +595,7 @@ export class Renderer {
     const { ctx } = this;
     const h = c.h;
     if (c.tufts) this.tufts(P, x, y, h, c.tufts);
+    this.guest?.mark(ctx, P, x, y, h); // goldene Bucht vor dem Tor, zu dem der Pinguin führt
     const crate =
       c.deco === 'fishcrate' // nur an einer Fischkiste: das hier läuft für jedes Feld in jedem Bild
         ? { full: !(`${x},${y}` in state.picked), twitch: sc.reduced ? 0 : finTwitch(sc.now, x, y) }
@@ -657,22 +664,10 @@ export class Renderer {
       case 'fence':
         this.fence(P, world, x, y, h, 1);
         break;
-      case 'biggate': {
-        // Großes Tor (zu): Holztür mit Eisenbändern, darüber der Torbogen in den Farben seiner Welt
-        const theme = THEME_COLORS[c.gate!];
-        box(ctx, P, x, y + 0.35, h, 1, 0.3, 4.7, '#6b4423', '#7d5232');
-        for (const z of [0.7, 2.3, 3.9]) box(ctx, P, x, y + 0.3, h + z, 1, 0.4, 0.18, '#3a3a44');
-        box(ctx, P, x, y + 0.1, h + 4.7, 1, 0.8, 1.2, theme.side, theme.top);
-        const [mx, my] = world.gates.get(c.gate!)!.mid;
-        if (x === mx && y === my) box(ctx, P, x + 0.3, y + 0.28, h + 2.2, 0.4, 0.04, 0.6, theme.portal); // Zeichen in der Mitte
+      case 'biggate': // Torhaus: Tür (je nach Öffnung), Türme, Torbogen; führt der Pinguin hierher, sein Umriss
+      case 'gatetower':
+        bigGate(ctx, P, world, c, x, y, h, sc.gates, this.guest);
         break;
-      }
-      case 'gatetower': {
-        const theme = THEME_COLORS[c.part!.id];
-        box(ctx, P, x, y, h, 1, 1, 6.6, theme.side, theme.top);
-        box(ctx, P, x + 0.3, y + 0.3, h + 6.6, 0.4, 0.4, 0.6, theme.portal);
-        break;
-      }
       case 'portal':
       case 'portalrim':
         drawPlatform(ctx, P, world, state, x, y, h, c.portal!);
