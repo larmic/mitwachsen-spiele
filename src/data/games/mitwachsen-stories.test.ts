@@ -2,22 +2,24 @@ import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { GATES } from './mitwachsen';
 import { STORIES, melodyLength } from './mitwachsen-stories';
+import { STORY_TEXTS } from './mitwachsen-story-texts';
 
 describe('Geschichten der Klangsteine', () => {
   it('gibt es am Bett, für jedes große Tor und am Schneebett (zweite Fassung der Eis-Geschichte)', () => {
     expect(Object.keys(STORIES).sort()).toEqual(['bett', ...GATES.map((g) => g.id), 'eis-offen'].sort());
+    expect(Object.keys(STORY_TEXTS).sort()).toEqual(Object.keys(STORIES).sort());
     // beide Fassungen der Eis-Geschichte beginnen gleich und klingen gleich
-    const [first, open] = [STORIES.eis, STORIES['eis-offen']];
+    const [first, open] = [STORY_TEXTS.eis, STORY_TEXTS['eis-offen']];
     expect(open.text.startsWith('Hinter diesem Tor ist es so kalt, dass sogar das Wasser zu Eis wird. Jetzt ist')).toBe(
       true,
     );
     expect(first.text.split('. ')[0]).toBe(open.text.split('. ')[0]);
-    expect(open.melody).toEqual(first.melody);
+    expect(STORIES['eis-offen'].melody).toEqual(STORIES.eis.melody);
   });
 
   it('stehen wortgleich in der Doku (docs/games/mitwachsen.md), zum Vorlesen und Einsprechen', () => {
     const doc = readFileSync('docs/games/mitwachsen.md', 'utf8').replace(/\s+/g, ' ');
-    for (const [id, s] of Object.entries(STORIES)) {
+    for (const [id, s] of Object.entries(STORY_TEXTS)) {
       expect(doc.includes(`**${s.title}**`), `Titel ${id}`).toBe(true);
       expect(doc.includes(s.text), `Text ${id}`).toBe(true);
     }
