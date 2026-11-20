@@ -275,10 +275,9 @@ class LarmicMitwachsen extends HTMLElement {
     }
   }
 
-  /** Die Figur setzt sich kurz hin, gähnt und sagt es in einer Sprechblase */
+  /** Die Figur setzt sich kurz hin, gähnt und sagt es in einer Sprechblase. Ein gehaltener Pfeil bleibt gehalten: Danach läuft sie weiter */
   private getTired(kind: TiredEvent) {
     this.sitUntil = performance.now() + SIT_MS;
-    this.pace.clear();
     this.sfx.yawn();
     this.bubble.dataset.kind = kind;
     this.bubble.querySelector('.mw-bubble-text')!.textContent = TIRED_TALK[kind];
@@ -690,7 +689,7 @@ class LarmicMitwachsen extends HTMLElement {
     this.lastFrame = t;
     if (!this.size.w) this.measure();
     if (!this.size.w) return;
-    // Gehaltener Pfeil oder gemerkter Tipp: im ruhigen Takt weiterlaufen
+    // Gehaltener Pfeil oder gemerkter Tipp: im ruhigen Takt weiterlaufen (sitzt die müde Figur, verwirft apply den Schritt)
     const next = this.paused() ? null : this.pace.poll(t);
     if (next) this.apply({ type: 'move', dir: next });
     this.glide(dt, t);
