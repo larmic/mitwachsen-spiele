@@ -104,16 +104,32 @@ describe('Der Pinguin holt dich ab: Auftauchen', () => {
     expect(open.animals.find((a) => a.id === GUIDE)!.mode).toBe('wander'); // Tor offen: Er wohnt im Kessel
   });
 
-  it('erscheint nur mit allen Tieren der Lichtung zu Hause; Tiere der Landschaft zählen nicht', () => {
-    const wild = { id: 'wild:0:0:0', species: 'fuchs' as const };
-    const missing = everyone().slice(1);
+  it('erscheint, sobald die Leiste voll ist (je Art ein Tier der Lichtung zu Hause); Tiere der Landschaft zählen nicht', () => {
+    const first = everyone()[0]!.species;
+    const wild = { id: 'wild:0:0:0', species: first };
+    const missing = everyone().filter((a) => a.species !== first); // eine ganze Art fehlt
+    const onePerSpecies = [...new Map(everyone().map((a) => [a.species, a])).values()];
     expect(wanted({ openGates: [], garden: everyone() })).toBe(true);
-    expect(wanted({ openGates: [], garden: [...missing, wild] })).toBe(false);
+    expect(wanted({ openGates: [], garden: onePerSpecies })).toBe(true); // die anderen drei je Art braucht es nicht
+    expect(wanted({ openGates: [], garden: [...missing, wild] })).toBe(false); // ein Tier der Landschaft ersetzt die Art nicht
     expect(wanted({ openGates: ['eis'], garden: everyone() })).toBe(false); // Tor schon offen
     for (const garden of [missing, [...missing, wild]]) {
       const r = run({ ...initialState(world, { garden }), sleeping: false, wokeAt: -100 }, world, ...ticks(200));
       expect(guideOf(r.s), String(garden.length)).toBeUndefined();
     }
+  });
+
+  it('kommt erst, wenn die Figur in der Nähe des Betts der Lichtung steht (so weit die Wiese reicht)', () => {
+    const home = world.homes.lichtung;
+    const awake = { ...initialState(world, { garden: everyone() }), sleeping: false, wokeAt: -100 };
+    const far = { x: home.bed[0] + home.meadow + 4, y: home.bed[1], dir: 's' as const };
+    let r = run({ ...awake, player: far }, world, ...ticks(200));
+    expect(guideOf(r.s)).toBeUndefined(); // Leiste voll, aber weit weg vom Bett
+    const [wx, wy] = home.wake[0]!;
+    r = run({ ...r.s, player: { x: wx, y: wy, dir: 's' } }, world, ...ticks(DUE - 1));
+    expect(guideOf(r.s)).toBeUndefined(); // am Bett: noch gut 2 s …
+    r = run(r.s, world, ...ticks(2));
+    expect(guideOf(r.s)?.mode).toBe('lead'); // … dann taucht er auf
   });
 
   for (const seed of [1, 2, 3]) {

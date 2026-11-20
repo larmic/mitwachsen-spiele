@@ -253,7 +253,7 @@ class LarmicMitwachsen extends HTMLElement {
     if (cmd.type === 'move' && performance.now() < this.sitUntil) return; // die müde Figur sitzt kurz
     const { state, events } = step(this.state, this.world, cmd, (x, y) => this.fog.has(x, y), this.guide);
     this.state = state;
-    // Sind alle Tiere der Lichtung zu Hause, kommen die Regeln des Pinguins nach (sie gelten, bis er im Kessel wohnt)
+    // Ist die Leiste der Lichtung voll, kommen die Regeln des Pinguins nach (sie gelten, bis er im Kessel wohnt)
     if (!this.guiding && pending(state)) this.guiding = import('./mitwachsen-lead').then((m) => (this.guide = m), noop);
     this.lift();
     if (events.length) this.react(events);

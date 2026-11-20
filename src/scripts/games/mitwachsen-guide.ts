@@ -1,5 +1,5 @@
-// Der verlaufene Pinguin holt die Figur ab – rein, ohne DOM: Hat das Eistor seinen Schlüssel (den Pinguin) und wohnen
-// alle Tiere der Lichtung auf der Wiese, taucht er neben der Figur auf und führt sie zur Bucht vor dem Eistor; dort geht
+// Der verlaufene Pinguin holt die Figur ab – rein, ohne DOM: Hat das Eistor seinen Schlüssel (den Pinguin) und ist die
+// Leiste der Lichtung voll (je Art ein Tier auf der Wiese), taucht er am Bett neben der Figur auf und führt sie zur Bucht vor dem Eistor; dort geht
 // es mit ihm auf (die Regeln dazu in mitwachsen-lead.ts und mitwachsen-ritual.ts). Hier steht, was immer gebraucht
 // wird: wann er fällig ist, dass er solange nicht im Kessel wohnt, ob er gerade führt, ob das Tor gerade aufgeht und wo
 // die Bucht liegt. Nichts davon wird gespeichert: Ob er da ist, folgt aus dem Spielstand. Teil der Regeln
@@ -96,12 +96,15 @@ const keyed = (open: readonly GateId[]) =>
 /** Wohnt dieses Tier gerade nicht in seiner Gegend, weil es sich verlaufen hat? (der Pinguin, solange sein Tor zu ist) */
 export const lost = (id: string, open: readonly GateId[]) => id === GUIDE && keyed(open);
 
-const LICHTUNG = regionAnimalList(REGIONS[0]).map((a) => a.id); // Tiere der Landschaft zählen nicht
-/** Soll er da sein? Schlüssel am Tor, Tor zu, alle Tiere der Lichtung auf der Wiese */
+const LICHTUNG = regionAnimalList(REGIONS[0]); // Tiere der Landschaft zählen nicht
+/**
+ * Soll er da sein? Schlüssel am Tor, Tor zu, und die Leiste der Lichtung ist voll: Von jeder Art der Lichtung wohnt
+ * mindestens ein Tier auf der Wiese (wie viele es je Art sind, sieht das Kind nirgends)
+ */
 export function wanted(s: Pick<Guided, 'openGates' | 'garden'>): boolean {
   if (!keyed(s.openGates)) return false;
   const home = new Set(s.garden.map((p) => p.id));
-  return LICHTUNG.every((id) => home.has(id));
+  return REGIONS[0].animals.every(({ species }) => LICHTUNG.some((a) => a.species === species && home.has(a.id)));
 }
 
 /**

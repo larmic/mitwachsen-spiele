@@ -87,7 +87,7 @@ function spotNear(s: Guided, world: World, explored: Explored): Point | null {
 }
 
 /**
- * Nach jedem Befehl: Ist er fällig, taucht er auf (gut 2 s nach dem Einzug des letzten Tiers der Lichtung, nach dem
+ * Nach jedem Befehl: Ist er fällig und steht die Figur am Bett der Lichtung, taucht er auf (gut 2 s danach, nach dem
  * Laden beim Aufwachen). Ist er da, führt er im Takt; beim Einschlafen setzt er sich neben das Bett, beim Aufwachen
  * piept er zur Begrüßung. Stehen beide in der Bucht, geht das Tor auf, und er rutscht heim (mitwachsen-ritual.ts).
  */
@@ -99,7 +99,7 @@ export function guide(s: Guided, world: World, cmd: 'move' | 'action' | 'tick', 
   }
   const woke = events.some((e) => e.type === 'wake');
   if (!g) {
-    if (s.sleeping || !wanted(s)) return;
+    if (!due(s, world)) return;
     if (!woke && cmd === 'tick' && s.guideDue < 0) s.guideDue = s.tick + DUE;
     if (woke || (cmd === 'tick' && s.guideDue >= 0 && s.tick >= s.guideDue)) appear(s, world, explored, events);
     return;
@@ -109,6 +109,20 @@ export function guide(s: Guided, world: World, cmd: 'move' | 'action' | 'tick', 
   if (woke) return peep(s, g, events); // morgens: zur Begrüßung
   if (opens(s, world, g, events)) return; // beide in der Bucht: Das Eistor geht auf
   if (cmd === 'tick' && !s.sleeping) lead(s, world, g, events, explored);
+}
+
+/**
+ * Soll er jetzt kommen? Wach, Leiste der Lichtung voll und die Figur auf der Lichtung in der Nähe des Betts (höchstens
+ * so weit, wie die Wiese reicht). Geht sie vorher weg, beginnen die gut 2 s am Bett neu.
+ */
+function due(s: Guided, world: World) {
+  if (s.sleeping || !wanted(s)) return false;
+  const { x, y } = s.player;
+  const home = homeAt(world, x, y);
+  if (home.realm === 'lichtung' && Math.max(Math.abs(x - home.bed[0]), Math.abs(y - home.bed[1])) <= home.meadow)
+    return true;
+  s.guideDue = -1;
+  return false;
 }
 
 function appear(s: Guided, world: World, explored: Explored, events: Events) {
