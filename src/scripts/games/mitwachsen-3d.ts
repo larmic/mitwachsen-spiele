@@ -5,6 +5,9 @@
 // Koordinaten: Welt-x → x, Welt-y (nach vorn/unten) → z, Höhe → y. Ein Feld ist eine Einheit.
 // Die Kamera schaut schräg von oben (PITCH) aus Süden auf die Figur; ↑ läuft also vom Betrachter weg.
 // Die Welt wird in Stücken zu einem Mesh gebaut: Boden, Zierde und Wasser, alles mit einer Textur-Kachel.
+// Was nur eine Welt hinter einem Tor zeigt (Eis-Welt: Iglu, Fischkisten, Kessel, Tür und Eiszapfen des Eistors), baut
+// der 3D-Teil ihres Welt-Pakets (`View3D`, mitwachsen-view-3d.ts), nachgeladen, sobald das Paket an der Welt hängt
+// (`use`); bis dahin steht dort Schlichtes. Three.js liegt im Build in einer eigenen Datei, die beide teilen.
 
 import {
   BufferGeometry,
@@ -46,22 +49,23 @@ import {
   type GateId,
   type Look,
 } from '../../data/games/mitwachsen';
-import { FISH_PARTS, ICE_COLORS } from '../../data/games/mitwachsen-eis';
+import { FISH_PARTS } from '../../data/games/mitwachsen-eis';
 import { Geo, atlas, snapToShadowTexel, type Tile, type V3 } from './mitwachsen-geo';
 import { grown } from './mitwachsen-growth';
-import { iceBoxes } from './mitwachsen-ice-look';
 import { parts, type Parts } from './mitwachsen-gatehouse';
 import { gate } from './mitwachsen-gates-3d';
-import { goldenBay } from './mitwachsen-guest-3d';
 import { GUIDE_GATE, guideGate } from './mitwachsen-guide';
 import { ritualGlow } from './mitwachsen-guest-look';
 import { Platforms3D } from './mitwachsen-platform-3d';
 import { StoneNotes, stoneInto } from './mitwachsen-story-3d';
+import type { LoadedPack } from './mitwachsen-packs';
 import type { Scene } from './mitwachsen-render';
 import type { State } from './mitwachsen-state';
 import type { Cell, TreeKind, World } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
 import { turnHead } from './mitwachsen-air';
+import { drawDeco, type DecoAt } from './mitwachsen-view';
+import { Views3D } from './mitwachsen-view-3d';
 
 export const PITCH = (55 * Math.PI) / 180; // Neigung der Kamera: 90° wäre senkrecht von oben
 /** Beeren am Busch: [x, Höhe, z] im Feld; oben auf der Kuppe und an der Vorderseite (zur Kamera) */
@@ -117,12 +121,8 @@ const GROUND_TILES: Record<Exclude<Cell['ground'], 'water' | 'lava' | 'sky'>, [T
   cloud: ['cloud', 'cloud', 'cloud'],
   moss: ['mossTop', 'mossSide', 'dirt'],
 };
-/** Im Gletscherkessel (Boden und Klippen): Schnee obenauf, darunter Eis; die Rutschspur glänzt aus Eis */
-const KESSEL_TILES: [Tile, Tile, Tile] = ['snowTop', 'ice', 'ice'];
-/** Rahmen des Betts: aus Holz, in der Eis-Welt aus Schnee (Seite, oben, Kachel) */
+/** Rahmen des Betts: aus Holz (Seite, oben, Kachel); in einer Welt hinter einem Tor sagt es ihr Paket */
 const WOOD_FRAME: readonly [string, string | null, Tile] = [GAME_COLORS.bed.frame, null, 'planks'];
-const SNOW_FRAME: readonly [string, string | null, Tile] = [...ICE_COLORS.snow, 'white'];
-const bedFrame = (c: Cell) => (c.biome === 'eis' ? SNOW_FRAME : WOOD_FRAME);
 const SKY = new Color('#9fd6f0');
 const NIGHT_SKY = new Color('#141a3a');
 const CLOUD_SKY = new Color('#a9b4bf'); // Himmel bei Wolken und Regen
@@ -167,9 +167,10 @@ export class World3D {
   private platforms!: Platforms3D; // Portal-Plattformen
   private chunks = new Map<string, Chunk>();
   private stale = new Set<string>(); // Stücke, die neu gebaut werden müssen; bis dahin bleibt das alte stehen
-  private picked: Record<string, number> = {}; // Büsche ohne Beeren und leere Fischkisten (aus den Regeln)
+  private at: DecoAt = { now: 0, reduced: true, picked: {} }; // für drawDeco, `picked`: Büsche ohne Beeren, leere Kisten
   private day = 0; // Tag der Welt: bestimmt, was nachgewachsen ist
-  private slide = false; // Eistor offen: Die Rutschspur zum Schneebett glänzt
+  private opened: readonly GateId[] = []; // offene Tore: danach glänzt z. B. die Rutschspur zum Schneebett
+  private views = new Views3D(); // 3D-Teile der Welt-Pakete, sobald geladen
   private gatesKey = ''; // wie die Torhäuser gebaut sind: Öffnung je Tor und wohin der Pinguin führt
   private models = new Map<string, BufferGeometry>();
   private bodies = new Map<string, Mesh>();
@@ -327,6 +328,7 @@ export class World3D {
 
   /** Alles freigeben, auch den WebGL-Kontext sofort (ältere iPads erlauben nur wenige gleichzeitig) */
   dispose() {
+    this.views.stop(); // kein Nachladen eines gescheiterten 3D-Teils mehr
     this.scene.traverse((o) => {
       if (o instanceof Mesh) (o.geometry as BufferGeometry).dispose(); // Stücke, Tore, Schläfer, Tafeln, Wesen; doppeltes dispose schadet nicht
     });
@@ -353,12 +355,12 @@ export class World3D {
   render(world: World, state: State, sc: Scene) {
     if (this.world !== world) this.reset(world);
     this.explored = sc.explored;
-    this.picked = state.picked;
-    const slide = state.openGates.includes('eis');
-    if (state.day !== this.day || slide !== this.slide) {
-      // ein neuer Tag: Stücke neu bauen, denn es sind Blumen und Pilze nachgewachsen (oder die Rutschspur glänzt)
+    if (this.at.picked !== state.picked) this.at = { ...this.at, picked: state.picked }; // in 3D zuckt nichts
+    if (state.day !== this.day || state.openGates.join() !== this.opened.join()) {
+      // ein neuer Tag: Stücke neu bauen, denn es sind Blumen und Pilze nachgewachsen (oder ein Tor ging auf, dann
+      // glänzt etwa die Rutschspur)
       this.day = state.day;
-      this.slide = slide;
+      this.opened = [...state.openGates];
       for (const k of this.chunks.keys()) this.stale.add(k);
     }
     const cam = sc.cam;
@@ -437,6 +439,18 @@ export class World3D {
     this.rebuild(withNeighbours(chunks));
   }
 
+  /**
+   * Ein Welt-Paket hängt an der Welt: seinen 3D-Teil nachladen (einmal; scheitert es, nach `RETRY_3D_MS` wieder). Ist er
+   * da, entstehen alle Stücke und Tore neu (das alte bleibt sichtbar, bis das neue fertig ist); bis dahin steht dort
+   * Schlichtes, ohne Fehler.
+   */
+  use(pack: Pick<LoadedPack, 'id' | 'view3d'>) {
+    void this.views.use(pack, () => {
+      this.gatesKey = '';
+      for (const k of this.chunks.keys()) this.stale.add(k);
+    });
+  }
+
   private reset(world: World) {
     this.world = world;
     this.fogDirty = true;
@@ -508,11 +522,12 @@ export class World3D {
     for (const g of world.gates.values()) {
       const p = parts();
       const [[mx, my], [fx, fy]] = [g.mid, [-g.out[0], -g.out[1]]];
+      const look = this.views.look(g.id); // aus dem Welt-Paket hinter dem Tor
       // Richtung zur Kamera (sie steht immer im Süden) in Torhaus-Koordinaten: danach richtet sich das Schild
-      const wings = gate(p, g.id, open(g.id), g.id === guest, g.id === GUIDE_GATE ? lit : 0, [-fx || 0, fy || 0]);
+      const wings = gate(p, g.id, open(g.id), g.id === guest, g.id === GUIDE_GATE ? lit : 0, [-fx || 0, fy || 0], look);
       const h = world.cell(mx, my).h;
       // Goldrand der Bucht je Feld auf dessen Höhe: u entlang des Tors (die x-Achse des Torhauses), t Reihen davor
-      if (g.id === guest) goldenBay(p, (u, t) => world.cell(mx + u * fy + t * fx, my - u * fx + t * fy).h - h);
+      if (g.id === guest) look?.bay(p, (u, t) => world.cell(mx + u * fy + t * fx, my - u * fx + t * fy).h - h);
       const group = this.place(new Group(), mx, my, h, [fx, fy]);
       group.add(...this.meshes(p));
       for (const w of wings) {
@@ -584,7 +599,7 @@ export class World3D {
       for (let x = cx * CHUNK; x < (cx + 1) * CHUNK; x++) {
         const c = grown(world.seed, this.day, x, y, world.cell(x, y)); // mit allem, was schon nachgewachsen ist
         this.terrain(solid, water, lava, world, c, x, y);
-        if (!this.ice(solid, leaves, canopy, c, x, y)) this.decoration(solid, leaves, canopy, bright, c, x, y);
+        if (!this.packed(solid, leaves, canopy, c, x, y)) this.decoration(solid, leaves, canopy, bright, c, x, y);
       }
     const meshes: Mesh[] = [];
     const add = (g: Geo, mat: MeshLambertMaterial | MeshBasicMaterial, shadows: boolean) => {
@@ -640,14 +655,13 @@ export class World3D {
     }
     const h = c.h;
     const stone = c.ground === 'stone';
-    const kessel = c.biome === 'eis' && c.region !== 'wild' && (c.region === 'border' || c.ground === 'snow');
-    const [topTile, sideTop, below] = kessel ? KESSEL_TILES : GROUND_TILES[c.ground];
+    const own = this.views.ground(c, this.opened); // Boden einer Welt hinter einem Tor (Eis-Welt: Schnee und Eis, Rutschspur)
+    const [topTile, sideTop, below] = own?.tiles ?? GROUND_TILES[c.ground];
     const shade = stone ? 0 : (c.shade ?? 0);
     const tint = new Color(1, 1, 1).multiplyScalar(0.93 + shade * 0.07);
     if (c.tint && c.ground === 'grass') tint.multiply(new Color(c.tint)); // Stimmung der Richtung
-    const glossy = c.slide && this.slide; // Rutschspur aus glänzendem Eis
-    const top = glossy ? new Color(ICE_COLORS.slide[1]) : tint;
-    g.quad([x, h, y + 1], [x + 1, h, y + 1], [x + 1, h, y], [x, h, y], [0, 1, 0], glossy ? 'ice' : topTile, top);
+    const top = own?.top ? new Color(own.top) : tint;
+    g.quad([x, h, y + 1], [x + 1, h, y + 1], [x + 1, h, y], [x, h, y], [0, 1, 0], topTile, top);
     const sides: [number, number, V3][] = [
       [0, 1, [0, 0, 1]],
       [0, -1, [0, 0, -1]],
@@ -669,15 +683,15 @@ export class World3D {
   }
 
   /**
-   * Dinge im Gletscherkessel: Iglu (vor der Figur durchsichtig wie Laub), Eisschale, Wassertrog aus Eis, Fischkiste
-   * (voll oder leer aus den Regeln; ihre Schwanzflossen wiegen sich im Wind wie die Grasbüschel)
+   * Dinge einer Welt hinter einem Tor aus dem 3D-Teil ihres Pakets (Eis-Welt: Iglu, vor der Figur durchsichtig wie
+   * Laub, Eisschale, Wassertrog aus Eis, Fischkiste voll oder leer aus den Regeln, ihre Schwanzflossen wiegen sich im
+   * Wind wie die Grasbüschel); solange er lädt, ein einfacher Block. false: kein solches Ding, wie sonst bauen.
    */
-  private ice(g: Geo, blades: Geo, canopy: Geo, c: Cell, x: number, y: number): boolean {
-    const crate = c.deco === 'fishcrate' ? { full: !(`${x},${y}` in this.picked), twitch: 0 } : undefined;
-    const ice = c.biome === 'eis' ? iceBoxes(this.world!, c, x, y, crate) : null;
-    for (const [bx, by, bz, w, d, bh, side, top, kind] of ice ?? [])
+  private packed(g: Geo, blades: Geo, canopy: Geo, c: Cell, x: number, y: number): boolean {
+    const boxes = drawDeco(this.views.decos, this.world!, c, x, y, this.at);
+    for (const [bx, by, bz, w, d, bh, side, top, kind] of boxes ?? [])
       (kind === 'see' ? canopy : kind === 'sway' ? blades : g).box(bx, bz, by, w, bh, d, side, top);
-    return !!ice;
+    return !!boxes;
   }
 
   private decoration(g: Geo, blades: Geo, canopy: Geo, bright: Geo, c: Cell, x: number, y: number) {
@@ -691,7 +705,7 @@ export class World3D {
         // Beerenbusch: niedrig und rund (zwei Stufen), rote Beeren oben und vorn – kein Baumwipfel
         canopy.box(x + 0.08, h, y + 0.12, 0.84, 0.5, 0.76, '#3f9a3c', '#5ab651', 'leaves');
         canopy.box(x + 0.2, h + 0.5, y + 0.22, 0.6, 0.16, 0.56, '#3f9a3c', '#5ab651', 'leaves');
-        if (!(`${x},${y}` in this.picked))
+        if (!(`${x},${y}` in this.at.picked))
           for (const [bx, by, bz] of BERRIES) g.box(x + bx, h + by, y + bz, 0.09, 0.09, 0.09, '#c8323a', '#ef5b5b');
         break;
       case 'flower':
@@ -805,7 +819,7 @@ export class World3D {
           g.box(x + 0.12 + i * 0.22, h + 1.5, y + 0.43, 0.1, 0.07, 0.1, i % 2 ? '#e77fb3' : '#ffffff');
         break;
       case 'bed':
-        g.box(x + 0.06, h, y + 0.05, 0.88, 0.28, 0.9, ...bedFrame(c));
+        g.box(x + 0.06, h, y + 0.05, 0.88, 0.28, 0.9, ...this.views.bedFrame(c, WOOD_FRAME));
         g.box(x + 0.1, h + 0.28, y + 0.08, 0.8, 0.12, 0.26, GAME_COLORS.bed.pillow);
         g.box(x + 0.08, h + 0.28, y + 0.34, 0.84, 0.1, 0.6, GAME_COLORS.bed.blanket);
         break;

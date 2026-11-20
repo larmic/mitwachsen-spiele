@@ -4,7 +4,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
 import { ICE_COLORS } from '../../../../data/games/mitwachsen-eis';
-import { finTwitch, iceBoxes } from '../../mitwachsen-ice-look';
+import { finTwitch, iceBoxes } from './mitwachsen-ice-look';
 import type { DrawDeco, View2D } from '../../mitwachsen-view';
 import { gateScore, guestAt } from '../../mitwachsen-guest-look';
 import { realmSign, turnAlbum, waitArrow } from './mitwachsen-border-view';

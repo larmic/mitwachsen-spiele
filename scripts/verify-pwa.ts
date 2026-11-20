@@ -1,7 +1,9 @@
 // Guard-Gate nach dem Build (Teil von npm run verify): Das Spiel als App – installierbar und ohne Netz spielbar.
 // Manifest und Icons stimmen, jede Seite verweist auf das Manifest, und der Service Worker des Spiels speichert alles,
-// was die Spielseite braucht (auch das nachträglich geladene Three.js), nur von der eigenen Seite, in einer Version,
-// die zum Inhalt passt, und alles zusammen im Budget. Logik und Tests: scripts/pwa.ts, scripts/pwa.test.ts
+// was die Spielseite braucht (auch das nachträglich geladene Three.js und alle Welt-Pakete samt ihren 3D-Teilen: Das
+// Kind muss ohne Netz in jede offene Welt gehen können, ein Paket erst bei Bedarf zu holen, scheiterte offline), nur von
+// der eigenen Seite, in einer Version, die zum Inhalt passt, und alles zusammen im Budget. Die Ausgabe zeigt Kern,
+// 3D-Ansicht, Three.js und je Welt-Paket getrennt. Logik und Tests: scripts/pwa.ts, scripts/pwa.test.ts
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -13,6 +15,7 @@ import {
   checkServiceWorker,
   parseServiceWorker,
   precacheBytes,
+  precacheParts,
   type PwaOptions,
 } from './pwa.ts';
 import { distFile } from '../src/lib/pwa/precache.ts';
@@ -22,8 +25,10 @@ import { SITE } from '../src/data/site.ts';
 const DIST = 'dist';
 /**
  * Höchstens so viele Bytes speichert der Service Worker vorab – jedes Gerät lädt sie mit jeder neuen Version ganz.
- * Knapp über dem Stand von heute (rund 980 KiB, davon gut 550 KiB Three.js): Wächst es, bewusst anheben. 1024 statt
- * 960 KiB seit den eigenen Zugängen je Welt (mitwachsen-gate-<welt>.ts, gut 35 KiB im 3D-Teil).
+ * Knapp über dem Stand von heute (rund 986 KiB, davon knapp 518 KiB Three.js, 24 KiB das Paket der Eis-Welt und 2 KiB
+ * sein 3D-Teil): Wächst es, bewusst anheben. 1024 statt 960 KiB seit den eigenen Zugängen je Welt
+ * (mitwachsen-gate-<welt>.ts, gut 35 KiB im 3D-Teil). Das Schneiden in Kern, Three.js und Welt-Pakete kostete nur
+ * knapp 2 KiB (Importe zwischen den Dateien), das Budget bleibt.
  */
 const PRECACHE_BUDGET = 1024 * 1024;
 const OPTS: PwaOptions = { origin: SITE.url, manifest: '/manifest.webmanifest', sw: SERVICE_WORKER };
@@ -70,3 +75,4 @@ if (problems.length) {
 const kib = (n: number) => `${(n / 1024).toFixed(1)} KiB`;
 console.log(`✓ App-Gate: Manifest und Icons gültig, Service Worker speichert alles für ${SERVICE_WORKER.entry}`);
 console.log(`  vorab gespeichert: ${precached.length} Dateien, ${kib(bytes)} von ${kib(PRECACHE_BUDGET)} Budget`);
+for (const part of precacheParts(precached, read)) console.log(`    ${part.name}: ${kib(part.bytes)}`);

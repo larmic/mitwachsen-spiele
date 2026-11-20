@@ -2,7 +2,8 @@
 // Ermittelt, welches JavaScript eine fertige Seite beim Laden holt: die Skripte im HTML (eingebettet und als Datei) und
 // alles, was diese statisch importieren. Dynamische Importe (`import("…")`) zählen nicht, sie laden erst später und nur bei Bedarf.
 // Nachgeladene Pakete (z. B. die Welt-Pakete des Spiels) misst eine Regel mit `chunks` für sich: das Paket samt seinen
-// statischen Importen, abzüglich dessen, was die Seite beim Laden schon hat.
+// statischen Importen, abzüglich dessen, was die Seite beim Laden schon hat und, mit `after`, was die Pakete schon
+// mitbringen, nach denen es erst kommt (der 3D-Teil einer Welt nach der 3D-Ansicht und dem Paket der Welt).
 
 export type Rule = {
   name: string;
@@ -11,6 +12,11 @@ export type Rule = {
   forbidden: RegExp; // darf im geladenen Code nicht vorkommen
   /** Statt der Seite: jedes nachgeladene Paket, dessen Pfad hierzu passt (z. B. /\/welt-eis\.[\w-]+\.js$/); es muss eins geben */
   chunks?: RegExp;
+  /**
+   * Nur mit `chunks`: Das Paket kommt erst nach diesen nachgeladenen Paketen (z. B. /\/mitwachsen-3d\.[\w-]+\.js$/);
+   * was sie samt ihren statischen Importen mitbringen (etwa Three.js), ist dann schon da und zählt nicht
+   */
+  after?: RegExp;
 };
 
 /** Größe je Regel und Seite bzw. Paket, für die Ausgabe des Gates */
@@ -88,21 +94,24 @@ export const loaded = (html: string, read: Read): string[] =>
 
 /**
  * Nachgeladene Pakete einer Seite, die zu `chunks` passen, je mit den Dateien, die es nachlädt: das Paket und seine
- * statischen Importe, ohne das, was die Seite beim Laden schon hat
+ * statischen Importe, ohne das, was die Seite beim Laden schon hat und was die Pakete aus `after` samt ihren statischen
+ * Importen mitbringen
  */
-export function packs(html: string, read: Read, chunks: RegExp): { file: string; files: string[] }[] {
-  const core = new Set(loaded(html, read));
-  const all = closure([...core], read, (code) => [...staticImports(code), ...dynamicImports(code)]);
+export function packs(html: string, read: Read, chunks: RegExp, after?: RegExp): { file: string; files: string[] }[] {
+  const core = loaded(html, read);
+  const all = closure(core, read, (code) => [...staticImports(code), ...dynamicImports(code)]);
+  const before = after ? all.filter((f) => after.test(f)) : [];
+  const have = new Set([...core, ...closure(before, read, staticImports)]);
   return all
     .filter((f) => chunks.test(f))
-    .map((file) => ({ file, files: closure([file], read, staticImports).filter((f) => !core.has(f)) }));
+    .map((file) => ({ file, files: closure([file], read, staticImports).filter((f) => f === file || !have.has(f)) }));
 }
 
 const size = (code: string) => new TextEncoder().encode(code).length;
 
 /** Verstöße eines nachgeladenen Pakets gegen seine Regel */
 function checkPacks(page: string, html: string, read: Read, rule: Rule & { chunks: RegExp }, usage: Usage[]): string[] {
-  const found = packs(html, read, rule.chunks);
+  const found = packs(html, read, rule.chunks, rule.after);
   if (!found.length) return [`${page}: kein nachgeladenes Paket für „${rule.name}“ (${rule.chunks})`];
   const problems: string[] = [];
   for (const { file, files } of found) {

@@ -3,7 +3,7 @@
 // Spezifikation: docs/specs/mitwachsen.md („Was angezeigt wird“: Große Tore)
 
 import type { GateTheme } from '../../data/games/mitwachsen';
-import type { GateBuild, Parts, Wing } from './mitwachsen-gate-kit';
+import type { GateBuild, GateLook, Parts, Wing } from './mitwachsen-gate-kit';
 import { build as eis } from './mitwachsen-gate-eis';
 import { build as sand } from './mitwachsen-gate-sand';
 import { build as wasser } from './mitwachsen-gate-wasser';
@@ -18,7 +18,8 @@ const BUILD: Record<GateTheme, GateBuild> = { eis, sand, wasser, lava, hoehle, w
 /**
  * Ein Zugang: Geometrie in `p`, dazu seine Türflügel (nur das Eistor hat welche). `open` 0 zu … 1 offen, `outline` der
  * Umriss des verlaufenen Tiers, `lit` wie weit dessen Ritual leuchtet, `cam` die Richtung zur Kamera in
- * Torhaus-Koordinaten (x, z): Danach richtet jeder Zugang sein Schild aus.
+ * Torhaus-Koordinaten (x, z): Danach richtet jeder Zugang sein Schild aus. `look`: was das Welt-Paket hinter dem Tor
+ * beiträgt (Eis-Welt: Tür, Eiszapfen), solange es lädt nichts.
  */
 export function gate(
   p: Parts,
@@ -27,6 +28,7 @@ export function gate(
   outline = false,
   lit = 0,
   cam: readonly [number, number] = [0, 1],
+  look?: GateLook,
 ): Wing[] {
-  return BUILD[theme](p, { open, outline, lit, cam });
+  return BUILD[theme](p, { open, outline, lit, cam, look });
 }

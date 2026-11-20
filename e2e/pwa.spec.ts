@@ -40,7 +40,10 @@ test('Startseite meldet keinen Service Worker an', async ({ page }) => {
   expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
 });
 
-test('Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotzdem', async ({ page, context }) => {
+test('Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotzdem, samt Eis-Welt und ihrem 3D-Teil', async ({
+  page,
+  context,
+}) => {
   const errors = watchErrors(page);
   await page.goto('/spielen/');
   await page.getByRole('button', { name: /Verstanden/ }).click();
@@ -78,6 +81,19 @@ test('Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotz
     fromSw.some((p) => /\/welt-eis\.[\w-]+\.js$/.test(p)),
     fromSw.join(', '),
   ).toBe(true);
+  // Mit WebGL holt die 3D-Ansicht auch Three.js (eigene Datei) und den 3D-Teil der Eis-Welt (Iglu, Tür und Eiszapfen
+  // des Eistors) ohne Netz aus dem Speicher, sobald das Paket an der Welt hängt
+  if (webgl) {
+    for (const file of [/\/three\.[\w-]+\.js$/, /\/welt-eis-3d\.[\w-]+\.js$/])
+      await expect.poll(() => fromSw.some((p) => file.test(p)), `${file} aus dem Service Worker`).toBe(true);
+    // … und baut ihn ein: Das Eistor hat seinen Schmuck aus dem 3D-Teil (Tür, Eiszapfen), nicht nur geholt
+    const look = () =>
+      game.evaluate((el) => {
+        const gl3d = (el as unknown as { gl3d: { views: { look(g: string): unknown } } | null }).gl3d;
+        return !!gl3d?.views.look('eis');
+      });
+    await expect.poll(look, 'Schmuck des Eistors aus dem 3D-Teil').toBe(true);
+  } else test.info().annotations.push({ type: 'ohne WebGL', description: '3D-Teil offline nicht geprüft' });
   const portals = () =>
     game.evaluate((el) => [...(el as unknown as { world: { portals: Map<string, unknown> } }).world.portals.keys()]);
   expect(await portals()).toContain('eiskessel');

@@ -11,10 +11,11 @@ import type { GuideRules } from './mitwachsen-guide';
 import { needsPack, type Need } from './mitwachsen-pack';
 import type { WorldPack } from './mitwachsen-pack-types';
 import type { View2D } from './mitwachsen-view';
+import type { View3D } from './mitwachsen-view-3d';
 import { beyondRing } from './mitwachsen-world';
 
-/** Ein geladenes Welt-Paket mit den Regeln und Zeichenteilen, die es der Ansicht mitbringt */
-export type LoadedPack = WorldPack<GuideRules, View2D>;
+/** Ein geladenes Welt-Paket mit den Regeln und Zeichenteilen, die es der Ansicht mitbringt (3D-Teil auf Abruf) */
+export type LoadedPack = WorldPack<GuideRules, View2D, View3D>;
 
 /** So lange wartet der Start höchstens auf ein Paket, das die Welt gleich braucht; dann geht es ohne los */
 export const PACK_WAIT_MS = 4000;

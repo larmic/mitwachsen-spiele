@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { build, raster } from './mitwachsen-gate-eis';
 import { parts, type GateCtx, type Parts } from './mitwachsen-gate-kit';
+import { gateLook } from './worlds/eis/view-3d-gate';
 
 const CAMS = [
   [0, 1],
@@ -29,9 +30,10 @@ function quads(p: Parts) {
   });
 }
 
-function gateAt(g: GateCtx) {
+/** Ein Zustand des Eistors, mit Tür und Eiszapfen aus dem Welt-Paket der Eis-Welt (`look` null: solange es lädt) */
+function gateAt(g: GateCtx, look: GateCtx['look'] | null = gateLook) {
   const p = parts();
-  const wings = build(p, g);
+  const wings = build(p, { ...g, look: look ?? undefined });
   return { wings, q: quads(p) };
 }
 
@@ -79,5 +81,17 @@ describe('Eistor: Eisschlucht mit Eisorgel', () => {
     const changed = lit.filter((f, i) => f.color !== dark[i]!.color);
     expect(changed.some((f) => f.lo[1]! > 6.25)).toBe(true); // Orgel
     expect(changed.some((f) => f.hi[1]! < 4.75)).toBe(true); // Eiszapfen
+  });
+
+  it('solange das Welt-Paket der Eis-Welt lädt: dieselbe Schlucht, die Eiszapfen leuchten nicht, schlichte Tür', () => {
+    const at = (look: GateCtx['look'] | null) => gateAt({ open: 0, outline: true, lit: 1, cam: [0, 1] }, look);
+    const [plain, full] = [at(null), at(gateLook)];
+    expect(plain.q.map((f) => f.lo.join())).toEqual(full.q.map((f) => f.lo.join())); // dieselbe Form
+    const icicles = (q: typeof plain.q) =>
+      q.filter((f) => f.part === 'bright' && f.lo[1]! > 3.5 && f.hi[1]! < 4.8).map((f) => f.color);
+    expect(new Set(icicles(plain.q)).size).toBe(1); // alle gleich, kein Leuchten
+    expect(icicles(full.q)).not.toEqual(icicles(plain.q));
+    expect(plain.wings).toHaveLength(2);
+    for (const w of plain.wings) expect(w.parts.bright.empty).toBe(true); // ohne Umriss des Pinguins
   });
 });

@@ -1,5 +1,6 @@
-// Doppeltür des Eistors und Portal-Plattformen der 3D-Ansicht: die zwei Türflügel mit Umriss des verlaufenen Pinguins
-// und leuchtenden Eiszapfen, und flache Plattformen aus Voxeln. Die Zugänge selbst bauen mitwachsen-gate-<welt>.ts.
+// Torhaus und Portal-Plattformen der 3D-Ansicht: die zwei Flügel einer Doppeltür als schlichte Bretter (geschmückt
+// mit Beschlägen, Zeichen und Umriss des verlaufenen Pinguins wird sie im Welt-Paket hinter ihrem Tor, Eis-Welt:
+// worlds/eis/view-3d-gate.ts) und flache Plattformen aus Voxeln. Die Zugänge selbst bauen mitwachsen-gate-<welt>.ts.
 // Liefert nur Geometrie in eigenen Koordinaten; die 3D-Ansicht stellt sie an ihren Platz. Gehört zur 3D-Ansicht und
 // wird nur mit ihr nachgeladen (Three.js).
 //
@@ -9,7 +10,6 @@
 
 import type { GateTheme } from '../../data/games/mitwachsen';
 import { GOLD, SUB, platformLook, voxelSpan, type PlatformVoxel } from '../../data/games/mitwachsen-portals';
-import { GUEST_OUTLINE, GUEST_PX, GUEST_Y, guestPixel } from './mitwachsen-guest-look';
 import { Geo, col, type Tile, type V3 } from './mitwachsen-geo';
 import { parts, type Parts, type Wing } from './mitwachsen-gate-kit';
 
@@ -19,8 +19,7 @@ export const W = 2.5; // halbe Torbreite
 export const ARCH_Y = 4.7; // Unterkante des Torbogens
 const HINGE_Z = -0.75; // die Türflügel drehen sich um ihre hintere Kante nach innen (weg von der Lichtung)
 const GAP = 0.2; // geöffnet: Spalt zwischen Flügel und Rahmen, damit sie beim Drehen nirgends anstoßen
-const ICE_GLOW = '#7fd6ff'; // eisblau leuchtende Eiszapfen, wenn das Eistor aufgeht
-const SEAM = 0.06; // Umriss: so weit bleibt er von der Mitte der Tür weg (dort treffen sich die Flügel)
+const [WOOD, WOOD_TOP] = ['#6b4423', '#7d5232']; // Holz der Türflügel
 
 /** Quader mit Ecke (x0, y0, z0) und Gegenecke (x1, y1, z1) – im Torhaus leichter zu lesen als Ecke und Größe */
 export function block(
@@ -39,11 +38,12 @@ export function block(
   g.box(x0, y0, z0, x1 - x0, y1 - y0, z1 - z0, side, top ?? side, tile, topTile);
 }
 
-type Leaf = Wing & { side: -1 | 1 }; // links bzw. rechts
+/** Ein Türflügel samt Seite: links (−1) bzw. rechts (1) */
+export type Leaf = Wing & { side: -1 | 1 };
 type Corners = [x0: number, y0: number, z0: number, x1: number, y1: number, z1: number];
 
 /** Quader (Ecke und Gegenecke in Torhaus-Koordinaten) an einen Flügel heften: um seine Angel verschoben */
-function onLeaf(
+export function onLeaf(
   l: Leaf,
   part: keyof Parts,
   [x0, y0, z0, x1, y1, z1]: Corners,
@@ -56,71 +56,30 @@ function onLeaf(
 }
 
 /**
- * Doppeltür aus Holz mit Eisenbändern, vorn und hinten gleich, als zwei Flügel um ihre äußere Angel. Geschlossen laufen
- * Bänder und Zeichen über beide Flügel (sie gehören zum linken, so bleibt die Tür, wie sie war); offen hat jeder Flügel
- * seine eigenen Bänder und Abstand zum Rahmen, ein Zeichen gibt es dann nicht mehr. Der Umriss sitzt vorn auf beiden.
+ * Die zwei Flügel einer Doppeltür aus Holz um ihre äußere Angel, je mit ihrem Brett (ohne Beschläge, ohne Zeichen):
+ * geschlossen ganz zu, offen mit Spalt zum Rahmen und nach innen gedreht (`open` 0 … 1). Das Welt-Paket hinter dem Tor
+ * schmückt sie (Eis-Welt: Eisenbänder, Zeichen, Umriss des Pinguins); bis es da ist, steht die Tür so schlicht.
  */
-export function door(glow: string, open: number, outline: boolean, lit: number): Wing[] {
-  const wood = '#6b4423',
-    woodTop = '#7d5232',
-    iron = '#3a3a44';
+export function leaves(open: number): [Leaf, Leaf] {
   const outer = W - 0.05 - (open > 0 ? GAP : 0);
-  const leaves = ([-1, 1] as const).map((side): Leaf => ({
+  const [left, right] = ([-1, 1] as const).map((side): Leaf => ({
     parts: parts(),
     hinge: [side * outer, HINGE_Z],
     angle: (-side * open * Math.PI) / 2,
     side,
-  }));
-  const bands = (l: Leaf, x0: number, x1: number) => {
-    for (const y of [0.7, 2.3, 3.9]) {
-      onLeaf(l, 'solid', [x0, y, -0.33, x1, y + 0.2, -0.28], iron);
-      onLeaf(l, 'solid', [x0, y, -0.82, x1, y + 0.2, -0.77], iron);
-    }
-  };
-  for (const l of leaves) {
+  })) as [Leaf, Leaf];
+  for (const l of [left, right]) {
     const [x0, x1] = l.side < 0 ? [-outer, -0.04] : [0.04, outer];
-    onLeaf(l, 'solid', [x0, 0, -0.75, x1, ARCH_Y, -0.35], wood, woodTop, 'planks');
-    if (open > 0) bands(l, x0, x1);
+    onLeaf(l, 'solid', [x0, 0, -0.75, x1, ARCH_Y, -0.35], WOOD, WOOD_TOP, 'planks');
   }
-  const [left, right] = leaves as [Leaf, Leaf];
-  if (open === 0) bands(left, -W + 0.05, W - 0.05);
-  // Leuchtendes Zeichen der Welt in der Mitte der geschlossenen Tür (vorn und hinten)
-  if (open === 0 && !outline)
-    for (const z of [-0.3, -0.86]) {
-      onLeaf(left, 'bright', [-0.55, 2.0, z, 0.55, 3.1, z + 0.06], glow);
-      const [z0, z1] = z > -0.5 ? [z + 0.05, z + 0.09] : [z - 0.04, z];
-      onLeaf(left, 'bright', [-0.3, 2.25, z0, 0.3, 2.85, z1], '#ffffff');
-    }
-  if (outline) penguinOutline(left, right, lit);
-  return leaves.map(({ parts, hinge, angle }) => ({ parts, hinge, angle }));
+  return [left, right];
 }
 
-/**
- * Umriss des verlaufenen Pinguins mit Goldrahmen auf der Tür, vorn und hinten wie das Zeichen (Pixel aus
- * `GUEST_OUTLINE`, je eine Lage auf dem Holz): Jedes Pixel gehört zum Flügel, auf dessen Seite es liegt, und hält
- * Abstand zur Mitte (`SEAM`). Gold ersetzt die Pixel darunter, es liegt nichts übereinander. Bis `lit` füllt er sich
- * von unten mit den Farben des Pinguins (`guestPixel`).
- */
-function penguinOutline(left: Leaf, right: Leaf, lit: number) {
-  const rows = GUEST_OUTLINE.length;
-  GUEST_OUTLINE.forEach((row, r) => {
-    [...row].forEach((_, c) => {
-      const color = guestPixel(r, c, lit);
-      if (!color) return;
-      const [x0, x1] = [(c - row.length / 2) * GUEST_PX, (c + 1 - row.length / 2) * GUEST_PX];
-      const y = GUEST_Y + (rows - 1 - r) * GUEST_PX;
-      const [l, a, b] = x0 + x1 < 0 ? [left, x0, Math.min(x1, -SEAM)] : [right, Math.max(x0, SEAM), x1];
-      for (const [z0, z1] of [
-        [-0.35, -0.26],
-        [-0.84, -0.75],
-      ] as const)
-        onLeaf(l, 'bright', [a, y, z0, b, y + GUEST_PX, z1], color.side, color.top);
-    });
-  });
-}
+/** Türflügel ohne Seite, wie die 3D-Ansicht sie aufstellt */
+export const wings = (ls: readonly Leaf[]): Wing[] => ls.map(({ parts, hinge, angle }) => ({ parts, hinge, angle }));
 
-/** Farbe eines Eiszapfens am Bogen bei `x`: Geht das Eistor auf, leuchten sie bis `lit` von links nach rechts eisblau */
-export const icicle = (x: number, lit: number) => ((x + W) / (2 * W) < lit ? ICE_GLOW : '#d4f1ff');
+/** Schlichte Doppeltür, solange das Welt-Paket hinter dem Tor lädt: nur die zwei Bretter */
+export const plainDoor = (open: number): Wing[] => wings(leaves(open));
 
 /** Voxel einer Plattform, Gold-Voxel mit `gold: true` */
 export type GoldVoxel = PlatformVoxel & { gold?: true };

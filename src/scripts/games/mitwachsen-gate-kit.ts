@@ -26,7 +26,26 @@ export type Wing = { parts: Parts; hinge: readonly [number, number]; angle: numb
  * Richtung zur Kamera in Torhaus-Koordinaten (x, z), eine der vier Achsen. Die Kamera dreht sich nie; liegt der Zugang
  * im Westen, Osten oder Süden der Lichtung, sieht sie ihn von der Seite oder von hinten.
  */
-export type GateCtx = { open: number; outline: boolean; lit: number; cam: readonly [number, number] };
+export type GateCtx = {
+  open: number;
+  outline: boolean;
+  lit: number;
+  cam: readonly [number, number];
+  /** Was das Welt-Paket hinter diesem Tor zum Zugang beiträgt (Eis-Welt: Tür, Eiszapfen); fehlt, solange es lädt */
+  look?: GateLook;
+};
+
+/**
+ * Teile eines Zugangs aus dem Welt-Paket seiner Welt (worlds/<welt>/view-3d.ts, mit ihm nachgeladen): die Türflügel
+ * (`door`, mit Zeichen oder Umriss des verlaufenen Tiers, bis `lit` gefüllt), die Farbe eines Eiszapfens bei `x` und
+ * die goldene Bucht vor dem Tor, solange das Tier die Figur dorthin führt (`bay`, `rise(u, t)` Höhe je Feld der Bucht
+ * gegenüber der Tormitte). Bis das Paket da ist, baut der Zugang schlicht (Tür ohne Beschläge, Eiszapfen ohne Leuchten).
+ */
+export type GateLook = {
+  door: (open: number, outline: boolean, lit: number) => Wing[];
+  icicle: (x: number, lit: number) => string;
+  bay: (p: Parts, rise?: (u: number, t: number) => number) => void;
+};
 /** Bauplan eines Zugangs: legt Geometrie in `p` an und liefert Türflügel, falls er welche hat */
 export type GateBuild = (p: Parts, g: GateCtx) => Wing[];
 

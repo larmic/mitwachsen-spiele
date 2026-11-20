@@ -15,7 +15,7 @@ export default defineConfig({
         'src/lib/**/*.ts',
         'src/data/games/**/*.ts',
         'src/scripts/games/{input-pace,pwa-update}.ts',
-        'src/scripts/games/mitwachsen-{air,behind,border,chores,fog,free,gait,growth,guide,home,meadow,pack,packs,portal,save,scatter,spawns,state,tired,travel,view,weather,wild,world}.ts',
+        'src/scripts/games/mitwachsen-{air,behind,border,chores,fog,free,gait,growth,guide,home,meadow,pack,packs,portal,save,scatter,spawns,state,tired,travel,view,view-3d,weather,wild,world}.ts',
         'src/scripts/games/worlds/*/*.ts',
         'scripts/{bundles,dist,pwa}.ts',
       ],

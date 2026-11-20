@@ -3,11 +3,12 @@
 // Eiszapfen. Darin bleibt die Doppeltür mit dem Umriss des Pinguins (er öffnet sie, das Ritual lässt die Eiszapfen
 // leuchten). Über dem Bogen ragt eine Krone aus Orgelpfeifen aus Eis, ihre Kerne leuchten mit dem Ritual auf; liegt der
 // Zugang nicht hinten, zeigt eine Schneeflocke als Schild zur Kamera. Im Boden der Schlucht leuchtet eine Eisrinne.
-// Gehört zur 3D-Ansicht und wird nur mit ihr nachgeladen (Three.js).
+// Gehört zur 3D-Ansicht und wird nur mit ihr nachgeladen (Three.js). Tür mit Beschlägen und Umriss des Pinguins und das
+// Leuchten der Eiszapfen bringt das Welt-Paket der Eis-Welt (`g.look`, worlds/eis/view-3d-gate.ts); bis es da ist,
+// stehen schlichte Türbretter und die Eiszapfen leuchten nicht.
 
-import { THEME_COLORS } from '../../data/games/mitwachsen';
 import { VOX, Vox, hash3, type GateBuild, type Part } from './mitwachsen-gate-kit';
-import { ARCH_Y, W, door, icicle } from './mitwachsen-gatehouse';
+import { ARCH_Y, W, plainDoor } from './mitwachsen-gatehouse';
 
 const SNOW = '#f6f9fc',
   SNOW_SIDE = '#e6eef5',
@@ -132,8 +133,8 @@ function snowDrips(v: Ice) {
     }
 }
 
-/** Eiszapfen unter dem Bogen, vor der Tür; bis `lit` leuchten sie nacheinander eisblau (Ritual) */
-function icicles(v: Ice, lit: number) {
+/** Eiszapfen unter dem Bogen, vor der Tür; bis `lit` leuchten sie nacheinander eisblau (Ritual, Farbe aus dem Paket) */
+function icicles(v: Ice, lit: number, icicle: (x: number, lit: number) => string = () => ZAPF) {
   const k = r8(FRONT) - 1;
   for (let x = -W + 0.25; x < W - 0.1; x += 0.5) {
     const i = r8(x),
@@ -221,7 +222,7 @@ export function raster(g: Parameters<GateBuild>[1]): Vox {
   crown(v, Math.max(g.lit, g.open));
   v.carve();
   snowDrips(v);
-  icicles(v, g.lit);
+  icicles(v, g.lit, g.look?.icicle);
   flakes(v, g.cam);
   rinne(v);
   return v;
@@ -229,6 +230,6 @@ export function raster(g: Parameters<GateBuild>[1]): Vox {
 
 export const build: GateBuild = (p, g) => {
   raster(g).emit(p);
-  // Die Doppeltür wie bisher: Angel, Zeichen oder Umriss des Pinguins, Ritual
-  return door(THEME_COLORS.eis.portal, g.open, g.outline, g.lit);
+  // Die Doppeltür aus dem Welt-Paket (Angel, Zeichen oder Umriss des Pinguins, Ritual), bis dahin schlichte Bretter
+  return g.look?.door(g.open, g.outline, g.lit) ?? plainDoor(g.open);
 };

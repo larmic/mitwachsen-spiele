@@ -1,0 +1,98 @@
+// Haken der 3D-Ansicht für die Welten hinter den Toren: Was nur eine Welt in 3D zeigt (Eis-Welt: Iglu,
+// Eisschale, Eistrog, Fischkiste, Rutschspur, Schnee und Eis im Kessel, Bett aus Schnee, Tür und Eiszapfen des Eistors,
+// goldene Bucht), baut der 3D-Teil ihres Welt-Pakets (worlds/<welt>/view-3d.ts). Das Paket lädt ihn per import() erst,
+// wenn es an der Welt hängt und die 3D-Ansicht da ist (`WorldPack.view3d`); bis dahin baut die 3D-Ansicht schlicht:
+// ein Block in Kartenfarbe je Ding der Welt (`drawDeco`), Böden und Bett wie auf der Lichtung, schlichte Türbretter.
+// `Views3D` hält die geladenen 3D-Teile für die 3D-Ansicht (rein, ohne Three.js; läuft mit ihr nachgeladen).
+// Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
+
+import type { GateId } from '../../data/games/mitwachsen';
+import type { Cell } from './mitwachsen-cell';
+import type { GateLook } from './mitwachsen-gate-kit';
+import type { Tile } from './mitwachsen-geo';
+import type { View2D } from './mitwachsen-view';
+import type { WorldPack } from './mitwachsen-pack-types';
+
+/** Nach so vielen ms wird ein gescheiterter 3D-Teil neu versucht (wie die Pakete, `RETRY_MS` in mitwachsen-packs.ts) */
+export const RETRY_3D_MS = 30_000;
+
+/** Boden eines Felds: Kacheln oben, oberste Seitenkachel, Seiten darunter; `top` färbt die Oberseite (Rutschspur) */
+export type Ground = { tiles: readonly [Tile, Tile, Tile]; top?: string };
+
+/** Rahmen des Betts: Farbe der Seiten, oben (null: wie die Seiten), Kachel */
+export type Frame = readonly [string, string | null, Tile];
+
+/** Der 3D-Teil eines Welt-Pakets */
+export type View3D = {
+  /** das Tor dieser Welt: Nur an ihm baut `look` mit */
+  gate: GateId;
+  /** Tür, Eiszapfen und Bucht seines Zugangs */
+  look: GateLook;
+  /** je Deko-Art, die nur diese Welt hat, ihre Quader (wie in 2D, `DrawDeco`; in 3D zuckt nichts) */
+  decos: View2D['decos'];
+  /** Boden eines Felds dieser Welt (`open`: die offenen Tore), sonst null: wie auf der Lichtung */
+  ground(c: Cell, open: readonly GateId[]): Ground | null;
+  /** Rahmen des Betts dieser Welt, sonst null: Holz */
+  bedFrame(c: Cell): Frame | null;
+};
+
+/** Die 3D-Teile der Welt-Pakete, die die 3D-Ansicht schon hat, und ihr Nachladen */
+export class Views3D {
+  constructor(private readonly retryMs = RETRY_3D_MS) {}
+
+  private views: View3D[] = [];
+  private asked = new Set<string>(); // Welt-Pakete, deren 3D-Teil schon lädt oder da ist
+  private retries: ReturnType<typeof setTimeout>[] = []; // nächste Versuche nach gescheitertem Laden
+  /** Dinge aller geladenen Welten je Deko-Art (für `drawDeco`) */
+  decos: Pick<View2D, 'decos'> = { decos: {} };
+
+  /**
+   * 3D-Teil eines Welt-Pakets nachladen, einmal je Paket; `ready`, sobald er da ist. Scheitert es, bleibt alles
+   * schlicht (ohne Fehler), und nach `retryMs` (`RETRY_3D_MS`, 30 s wie bei den Paketen) oder beim nächsten Aufruf wird es
+   * wieder versucht, bis er da ist oder die 3D-Ansicht geht (`stop`).
+   */
+  use(pack: Pick<WorldPack<unknown, unknown, View3D>, 'id' | 'view3d'>, ready: () => void): Promise<void> {
+    if (!pack.view3d || this.asked.has(pack.id)) return Promise.resolve();
+    this.asked.add(pack.id);
+    return pack.view3d().then(
+      (view) => {
+        this.views = [...this.views, view];
+        this.decos = { decos: Object.assign({}, ...this.views.map((v) => v.decos)) as View2D['decos'] };
+        ready();
+      },
+      () => {
+        this.asked.delete(pack.id);
+        this.retries.push(setTimeout(() => void this.use(pack, ready), this.retryMs));
+      },
+    );
+  }
+
+  /** Keine weiteren Versuche (die 3D-Ansicht geht) */
+  stop() {
+    for (const t of this.retries) clearTimeout(t);
+    this.retries = [];
+  }
+
+  /** Tür, Eiszapfen und Bucht am Tor `gate` aus dem Paket seiner Welt, solange es fehlt nichts */
+  look(gate: GateId): GateLook | undefined {
+    return this.views.find((v) => v.gate === gate)?.look;
+  }
+
+  /** Boden eines Felds aus dem 3D-Teil eines Pakets (`open`: die offenen Tore), sonst null */
+  ground(c: Cell, open: readonly GateId[]): Ground | null {
+    for (const v of this.views) {
+      const own = v.ground(c, open);
+      if (own) return own;
+    }
+    return null;
+  }
+
+  /** Rahmen des Betts aus dem 3D-Teil eines Pakets, sonst `wood` */
+  bedFrame(c: Cell, wood: Frame): Frame {
+    for (const v of this.views) {
+      const own = v.bedFrame(c);
+      if (own) return own;
+    }
+    return wood;
+  }
+}

@@ -1,13 +1,13 @@
 // Aussehen der Dinge im Gletscherkessel, gleich für 2D und 3D: Iglu, Eisschale, Wassertrog aus Eisblöcken, Fischkiste.
-// Rein (ohne DOM und Three.js): liefert Quader in Feldern, die beide Ansichten zeichnen. Nicht in der Spielseite: Die
-// 2D-Ansicht bekommt es mit dem Welt-Paket der Eis-Welt (worlds/eis/view-2d.ts), die 3D-Ansicht lädt es mit Three.js.
+// Rein (ohne DOM und Three.js): liefert Quader in Feldern, die beide Ansichten zeichnen. Teil des Welt-Pakets der
+// Eis-Welt (nicht im Kern, nicht in der 3D-Ansicht): 2D über view-2d.ts, 3D über den 3D-Teil view-3d.ts.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt“, Kessel)
 
-import { ICE_COLORS, IGLOO_H, IGLOO_LAYERS } from '../../data/games/mitwachsen-eis';
-import type { Cell } from './mitwachsen-cell';
-import { hash } from '../../lib/games/rng';
-import { homeAt, type Realms } from './mitwachsen-home';
-import type { Box } from './mitwachsen-view';
+import { ICE_COLORS, IGLOO_H, IGLOO_LAYERS } from '../../../../data/games/mitwachsen-eis';
+import type { Cell } from '../../mitwachsen-cell';
+import { hash } from '../../../../lib/games/rng';
+import { homeAt, type Realms } from '../../mitwachsen-home';
+import type { Box } from '../../mitwachsen-view';
 
 /** Quader in Feldern (mitwachsen-view.ts): Lage, Maße, Farben, Art in 3D (`see` durchsichtig, `sway` im Wind) */
 export type IceBox = Box;

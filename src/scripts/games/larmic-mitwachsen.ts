@@ -148,6 +148,7 @@ class LarmicMitwachsen extends HTMLElement {
       if (!this.isConnected || !this.globals) return;
       const canvas = this.querySelector<HTMLCanvasElement>('canvas.mw-canvas3d')!;
       this.gl3d = this.r3d = new World3D(canvas, LOOK);
+      for (const pack of this.packs.loaded) this.gl3d.use(pack); // 3D-Teile der Welt-Pakete, die schon da sind
       this.classList.add('three');
       this.measure();
       // Verliert das Gerät den Kontext (App-Wechsel, Speicherdruck), springt die 2D-Ansicht ein, bis er zurück ist
@@ -230,10 +231,12 @@ class LarmicMitwachsen extends HTMLElement {
 
   /**
    * Ein Welt-Paket ist angekommen: in die laufende Welt einbauen (nur die betroffenen Stücke entstehen neu, die 3D-Ansicht
-   * tauscht sie aus, ohne zu flackern), die Tiere seiner Welt ziehen ein, die Ansicht bekommt seine Zeichenteile
+   * tauscht sie aus, ohne zu flackern), die Tiere seiner Welt ziehen ein, die Ansicht bekommt seine Zeichenteile (die
+   * 3D-Ansicht lädt ihre nach)
    */
   private arrive(pack: LoadedPack) {
     this.renderer.view = pack.view ?? null;
+    this.gl3d?.use(pack); // sein 3D-Teil kommt nach (mit Three.js)
     if (!(this.world as World | undefined)) return; // entsteht gleich mit ihm; sonst immer einbauen (zweimal: egal)
     const { world, chunks } = this.world.attach(pack);
     this.world = world;

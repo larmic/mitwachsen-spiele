@@ -120,6 +120,35 @@ describe('Bundle-Gate', () => {
       expect(check('spielen/index.html', html, gone, [PACK])[0]).toMatch(/fehlt/);
     });
 
+    it('mit `after`: zählt nicht, was die Pakete davor schon mitbringen (Three.js der 3D-Ansicht, das Paket der Welt)', () => {
+      const late: Record<string, string> = {
+        ...lazy,
+        '/_astro/core.js': 'import"./shared.js";import(`./view.1.js`);import("./welt-eis.1.js");',
+        '/_astro/view.1.js': 'import"./three.js";export const v=1;',
+        '/_astro/welt-eis.1.js': 'import"./ice.js";import("./welt-eis-3d.1.js");',
+        '/_astro/welt-eis-3d.1.js': 'import"./three.js";import"./ice.js";import"./door.js";',
+        '/_astro/door.js': 'export const door=1;',
+      };
+      const read = (p: string) => late[p] ?? null;
+      const D3 = /\/welt-eis-3d\.[\w-]+\.js$/;
+      expect(packs(html, read, D3)[0]!.files).toEqual([
+        '/_astro/welt-eis-3d.1.js',
+        '/_astro/three.js',
+        '/_astro/ice.js',
+        '/_astro/door.js',
+      ]);
+      expect(packs(html, read, D3, /\/(view|welt-eis)\.[\w-]+\.js$/)[0]!.files).toEqual([
+        '/_astro/welt-eis-3d.1.js',
+        '/_astro/door.js',
+      ]);
+      // Three.js kommt mit der Ansicht davor: Das Verbot gilt dann nur für das, was das Paket selbst mitbringt
+      const rule: Rule = { ...PACK, chunks: D3, after: /\/(view|welt-eis)\.[\w-]+\.js$/ };
+      expect(check('spielen/index.html', html, read, [rule])).toEqual([]);
+      expect(check('spielen/index.html', html, read, [{ ...rule, after: undefined }])[0]).toMatch(/three\.js/);
+      // ein Paket, das selbst zu `after` passt, zählt trotzdem sich selbst
+      expect(packs(html, read, D3, /welt-eis/)[0]!.files).toEqual(['/_astro/welt-eis-3d.1.js']);
+    });
+
     it('zählt das Paket nicht in die Seite und gilt nur für ihre Seiten', () => {
       const core: Rule = { name: 'Kern', pages: /^spielen\//, budget: 1000, forbidden: /WebGLRenderer/ };
       const usage: Usage[] = [];

@@ -7,6 +7,7 @@
 // – Jede Seite verweist auf das Manifest.
 // – Was vorab gespeichert wird, bleibt im Budget: Jedes Gerät lädt es bei jeder neuen Version ganz (am HTTP-Cache
 //   vorbei), auch über das Mobilfunknetz. Wächst es, fällt das Gate; dann bewusst entscheiden und das Budget anheben.
+//   Die Ausgabe zeigt die Teile getrennt: Kern, Three.js und je Welt-Paket (samt seinem 3D-Teil).
 import { cacheVersion, distFile, htmlRefs, precacheList, type ReadFile } from '../src/lib/pwa/precache.ts';
 
 export type PwaOptions = {
@@ -69,6 +70,41 @@ export function checkServiceWorker(read: ReadFile, scripts: string[], opts: PwaO
 /** Gesamtgröße der vorab gespeicherten Dateien in Bytes; fehlende Dateien zählen nicht (meldet checkServiceWorker) */
 export function precacheBytes(files: string[], read: ReadFile): number {
   return files.reduce((sum, f) => sum + (read(distFile(f))?.byteLength ?? 0), 0);
+}
+
+/** Teil des vorab Gespeicherten, für die Ausgabe des Gates: Name und Bytes */
+export type PrecachePart = { name: string; bytes: number };
+
+/**
+ * Zu welchem Teil eine Datei gehört: die 3D-Ansicht (`mitwachsen-3d`, nachgeladen), Three.js, ein Welt-Paket
+ * (`welt-<welt>`, sein 3D-Teil `welt-<welt>-3d`) oder Kern (auch Teile, die Kern, 3D-Ansicht und Pakete teilen)
+ */
+export function partOf(file: string): string {
+  if (/\/mitwachsen-3d\.[\w-]+\.js$/.test(file)) return '3D-Ansicht';
+  if (/\/three\.[\w-]+\.js$/.test(file)) return 'Three.js';
+  const world = /\/welt-([a-z]+)(-3d)?\.[\w-]+\.js$/.exec(file);
+  if (world) return `Welt-Paket ${world[1]}${world[2] ? ' (3D)' : ''}`;
+  return 'Kern';
+}
+
+/**
+ * Vorab Gespeichertes nach Teilen: Kern (Spielseite, Skripte, Schriften, Bilder, Töne), 3D-Ansicht, Three.js und je
+ * Welt-Paket getrennt (sein 3D-Teil für sich), in dieser Reihenfolge; fehlende Dateien zählen nicht
+ */
+export function precacheParts(files: string[], read: ReadFile): PrecachePart[] {
+  const parts = new Map<string, number>([
+    ['Kern', 0],
+    ['3D-Ansicht', 0],
+    ['Three.js', 0],
+  ]);
+  for (const f of files) {
+    const name = partOf(f);
+    parts.set(name, (parts.get(name) ?? 0) + (read(distFile(f))?.byteLength ?? 0));
+  }
+  const rank = (n: string) => ['Kern', '3D-Ansicht', 'Three.js'].indexOf(n) >>> 0; // Pakete (-1) zuletzt
+  return [...parts]
+    .map(([name, bytes]) => ({ name, bytes }))
+    .sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
 }
 
 /** Verstoß, wenn die vorab gespeicherten Dateien zusammen größer sind als `budget` Bytes */

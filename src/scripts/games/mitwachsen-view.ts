@@ -77,10 +77,11 @@ const PACKED: ReadonlySet<Deco> = new Set<Deco>(['igloo', 'icebowl', 'fishcrate'
 
 /**
  * Quader eines Dings, das ein Welt-Paket zeichnet (`view`, null solange es lädt): seine Zeichnung je Deko-Art, ohne sie
- * ein einfacher Block in der Farbe der Karte. null: kein Ding eines Pakets, die Ansicht zeichnet wie sonst.
+ * ein einfacher Block in der Farbe der Karte. null: kein Ding eines Pakets, die Ansicht zeichnet wie sonst. Gleich für
+ * 2D und 3D (dort mit den Zeichnungen aus dem 3D-Teil des Pakets, `View3D.decos`).
  */
 export function drawDeco(
-  view: View2D | null,
+  view: Pick<View2D, 'decos'> | null,
   world: World,
   c: Cell,
   x: number,

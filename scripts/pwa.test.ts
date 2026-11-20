@@ -5,6 +5,8 @@ import {
   checkPrecacheSize,
   checkServiceWorker,
   parseServiceWorker,
+  partOf,
+  precacheParts,
   pngSize,
   precacheBytes,
   type PwaOptions,
@@ -173,6 +175,45 @@ describe('App-Gate: Budget für vorab Gespeichertes', () => {
     expect(precacheBytes(files, read)).toBe(1000);
     expect(precacheBytes([...files, '/fehlt.js'], read)).toBe(1000);
     expect(precacheBytes([], read)).toBe(0);
+  });
+
+  it('zeigt die Teile getrennt: Kern, 3D-Ansicht, Three.js, je Welt-Paket und sein 3D-Teil', () => {
+    expect(partOf('/_astro/three.BfBt_9-z.js')).toBe('Three.js');
+    expect(partOf('/_astro/welt-eis.Cdn6.js')).toBe('Welt-Paket eis');
+    expect(partOf('/_astro/welt-eis-3d.Cmi3.js')).toBe('Welt-Paket eis (3D)');
+    expect(partOf('/_astro/mitwachsen-3d.Bbfb.js')).toBe('3D-Ansicht');
+    expect(partOf('/_astro/mitwachsen-gatehouse.Dssf.js')).toBe('Kern'); // geteilt von Kern, 3D-Ansicht und Paket
+    expect(partOf('/spielen/')).toBe('Kern');
+    const more: Record<string, number> = {
+      ...sizes,
+      '_astro/three.x.js': 5000,
+      '_astro/welt-eis.x.js': 70,
+      '_astro/welt-eis-3d.x.js': 30,
+      '_astro/welt-wald.x.js': 40,
+      '_astro/mitwachsen-3d.x.js': 900,
+    };
+    const readMore = (path: string) => (path in more ? new Uint8Array(more[path]!) : null);
+    const all = [
+      ...files,
+      '/_astro/welt-wald.x.js',
+      '/_astro/welt-eis-3d.x.js',
+      '/_astro/three.x.js',
+      '/_astro/mitwachsen-3d.x.js',
+    ];
+    expect(precacheParts([...all, '/_astro/welt-eis.x.js', '/fehlt.js'], readMore)).toEqual([
+      { name: 'Kern', bytes: 1000 },
+      { name: '3D-Ansicht', bytes: 900 },
+      { name: 'Three.js', bytes: 5000 },
+      { name: 'Welt-Paket eis', bytes: 70 },
+      { name: 'Welt-Paket eis (3D)', bytes: 30 },
+      { name: 'Welt-Paket wald', bytes: 40 },
+    ]);
+    // ohne 3D-Ansicht, Three.js und Pakete: Kern, 3D-Ansicht und Three.js stehen trotzdem da
+    expect(precacheParts(files, read)).toEqual([
+      { name: 'Kern', bytes: 1000 },
+      { name: '3D-Ansicht', bytes: 0 },
+      { name: 'Three.js', bytes: 0 },
+    ]);
   });
 
   it('lässt genau das Budget durch und meldet jedes Byte darüber', () => {

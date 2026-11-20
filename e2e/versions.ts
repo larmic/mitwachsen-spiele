@@ -1,5 +1,5 @@
 // Vorbereitung des Browser-Tests (globalSetup in playwright.config.ts): leitet aus dem Build in dist/ eine zweite
-// Fassung der Seite ab (.e2e/v2), so als wäre Three.js neu gebaut worden. Die 3D-Datei bekommt neuen Inhalt und einen
+// Fassung der Seite ab (.e2e/v2), so als wäre die 3D-Ansicht neu gebaut worden. Die 3D-Datei bekommt neuen Inhalt und einen
 // neuen Namen, die alte gibt es auf dem Server nicht mehr, der Verweis im Spiel zeigt auf die neue. Den Service Worker
 // schreibt derselbe Code wie beim Build neu (src/integrations/service-worker.ts): neue Liste, neue Version.
 // Kein zweiter Build und nichts Testspezifisches in der Seite. Der Test-Server (e2e/serve.ts) liefert die Fassung mit

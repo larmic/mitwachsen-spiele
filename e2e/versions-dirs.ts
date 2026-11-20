@@ -2,5 +2,5 @@
 // Eigene Datei ohne Imports, damit der Test-Server (e2e/serve.ts, läuft direkt mit Node) sie lesen kann.
 export const VERSIONS: Record<string, string> = { '1': 'dist', '2': '.e2e/v2' };
 
-/** Die per import() nachgeladene 3D-Ansicht mit Three.js (Name mit Hash) */
+/** Die per import() nachgeladene 3D-Ansicht (Name mit Hash; Three.js liegt daneben in three.<hash>.js) */
 export const CHUNK = /^\/?_astro\/mitwachsen-3d\.[\w-]+\.js$/;

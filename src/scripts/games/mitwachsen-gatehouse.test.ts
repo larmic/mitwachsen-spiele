@@ -3,7 +3,7 @@ import type { BufferGeometry } from 'three';
 import { GATES } from '../../data/games/mitwachsen';
 import { parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
 import { gate as gatehouse } from './mitwachsen-gates-3d';
-import { goldenBay } from './mitwachsen-guest-3d';
+import { gateLook, goldenBay } from './worlds/eis/view-3d-gate';
 import { GUEST_COLORS, GUEST_FILLED, GUEST_OUTLINE, guestPixel, ritualGlow } from './mitwachsen-guest-look';
 import { RITUAL } from './mitwachsen-guide';
 
@@ -67,9 +67,10 @@ function fighting(p: Parts, extra: [string, BufferGeometry][] = []): string[] {
  * der Test jeden Flügel für sich (ungedreht) und das Haus ohne sie, denn schräge Flächen liegen nie in einer Ebene mit
  * achsenparallelen (und ihre Ränder taugen nicht für den Vergleich in `fighting`).
  */
-function house(theme: (typeof GATES)[number]['id'], open: number, outline: boolean, lit = 0) {
+function house(theme: (typeof GATES)[number]['id'], open: number, outline: boolean, lit = 0, packed = true) {
   const p = parts();
-  const wings = gatehouse(p, theme, open, outline, lit);
+  const look = packed && theme === 'eis' ? gateLook : undefined; // Tür und Eiszapfen aus dem Welt-Paket
+  const wings = gatehouse(p, theme, open, outline, lit, [0, 1], look);
   if (outline) goldenBay(p);
   const placed = wings.flatMap((w, i) =>
     Object.entries(w.parts).flatMap(([name, geo]): [string, BufferGeometry][] =>
@@ -135,6 +136,25 @@ describe('Torhäuser und Portal-Plattformen flackern nicht', () => {
       expect(d).toBeLessThanOrEqual(-0.75 + 0.01); // hinter der Türlinie, nach innen aufgeschwungen
       expect(c).toBeLessThan(-2.5);
       expect(Math.abs(w.angle)).toBeCloseTo(Math.PI / 2);
+    }
+  });
+
+  it('Eistor, solange das Welt-Paket lädt: schlichte Türbretter an derselben Stelle, ohne Flackern, nichts leuchtet', () => {
+    for (const open of [0, 0.5, 1]) {
+      const plain = house('eis', open, true, 1, false);
+      const full = house('eis', open, true, 1);
+      expect(plain.wings.map((w) => [w.hinge, w.angle])).toEqual(full.wings.map((w) => [w.hinge, w.angle]));
+      expect(fighting(plain.p, open === 0.5 ? [] : plain.placed), `offen ${open}`).toEqual([]);
+      // nur die Bretter: keine Bänder, kein Umriss, kein Zeichen
+      for (const w of plain.wings) {
+        expect(w.parts.bright.empty).toBe(true);
+        expect(w.parts.solid.build().getAttribute('position').count).toBe(20); // ein Quader (ohne Unterseite)
+      }
+      if (open === 0) {
+        const [a, b] = [plain.placed, full.placed].map((ps) => bounds(ps.map(([, g]) => g)));
+        // Bänder und Umriss liegen vorn und hinten auf den Brettern
+        expect(a?.slice(0, 2)).toEqual(b?.slice(0, 2)); // so breit und hoch wie die geschmückte Tür
+      }
     }
   });
 
