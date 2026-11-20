@@ -21,6 +21,7 @@ import {
   type World,
 } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
+import { APRON } from './mitwachsen-apron';
 
 /** Alle Felder, die von `start` aus zu Fuß erreichbar sind (bis `limit` Felder) */
 function reachable(world: World, open: GateId[], start: readonly [number, number], limit = 30000) {
@@ -863,6 +864,26 @@ describe('Torhaus und Felsring', () => {
         const at = (u: number, t: number) =>
           w.cell(g.mid[0] + along[0] * u + g.out[0] * t, g.mid[1] + along[1] * u + g.out[1] * t);
         for (const [u, t] of inside) expect(at(u!, t!).h, `${w.seed} ${g.id} u=${u} t=${t}`).toBe(at(u!, 0).h);
+      }
+  });
+
+  it('vor jedem Zugang liegt ein Vorfeld im Boden seiner Welt, nach vorn schmaler; begehbar bleibt alles wie zuvor', () => {
+    const U = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6];
+    for (const w of [1, 42, 2026].map(createWorld))
+      for (const g of w.gates.values()) {
+        const along = [g.out[1], -g.out[0]] as const;
+        const xy = (u: number, t: number) =>
+          [g.mid[0] + along[0] * u - g.out[0] * t, g.mid[1] + along[1] * u - g.out[1] * t] as const;
+        const row = (t: number) => U.filter((u) => w.cell(...xy(u, t)).ground === APRON[g.id]);
+        // direkt vor der Torreihe mitten im Weg, weiter vorn weniger (Sand und Schnee gibt es auch sonst auf der Lichtung)
+        expect(w.cell(...xy(0, 1)).ground, `${w.seed} ${g.id}`).toBe(APRON[g.id]);
+        expect(row(1).length).toBeGreaterThanOrEqual(row(5).length);
+        // Klangstein und Bäume bleiben fest wie zuvor; alles andere im Vorfeld ist Lichtung und begehbar
+        const cells = [1, 2, 3].flatMap((t) => row(t).map((u) => xy(u, t)));
+        for (const at of cells.filter((p) => !w.cell(...p).solid)) {
+          expect(w.cell(...at).region).toBe('lichtung');
+          expect(standHeight(w, [], ...at), `${w.seed} ${g.id} ${at.join()}`).not.toBeNull();
+        }
       }
   });
 });

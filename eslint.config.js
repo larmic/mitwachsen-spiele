@@ -52,13 +52,6 @@ export default defineConfig(
     },
   },
   {
-    files: ['src/scripts/games/mitwachsen-gatehouse.ts'],
-    rules: {
-      complexity: ['error', 24],
-      'max-lines-per-function': ['error', { max: 169, skipBlankLines: true, skipComments: true }],
-    },
-  },
-  {
     files: ['src/scripts/games/mitwachsen-map.ts'],
     rules: { 'max-lines-per-function': ['error', { max: 84, skipBlankLines: true, skipComments: true }] },
   },
@@ -81,10 +74,10 @@ export default defineConfig(
   {
     files: ['src/scripts/games/mitwachsen-world.ts'],
     rules: {
-      complexity: ['error', 79],
+      complexity: ['error', 65],
       'max-depth': ['error', 5],
-      'max-lines': ['error', { max: 572, skipBlankLines: true, skipComments: true }],
-      'max-lines-per-function': ['error', { max: 139, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['error', { max: 568, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['error', { max: 125, skipBlankLines: true, skipComments: true }],
     },
   },
   // Konfigurationsdateien laufen in Node

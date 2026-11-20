@@ -22,9 +22,10 @@ import { SITE } from '../src/data/site.ts';
 const DIST = 'dist';
 /**
  * Höchstens so viele Bytes speichert der Service Worker vorab – jedes Gerät lädt sie mit jeder neuen Version ganz.
- * Knapp über dem Stand von heute (rund 894 KiB, davon gut 550 KiB Three.js): Wächst es, bewusst anheben.
+ * Knapp über dem Stand von heute (rund 980 KiB, davon gut 550 KiB Three.js): Wächst es, bewusst anheben. 1024 statt
+ * 960 KiB seit den eigenen Zugängen je Welt (mitwachsen-gate-<welt>.ts, gut 35 KiB im 3D-Teil).
  */
-const PRECACHE_BUDGET = 960 * 1024;
+const PRECACHE_BUDGET = 1024 * 1024;
 const OPTS: PwaOptions = { origin: SITE.url, manifest: '/manifest.webmanifest', sw: SERVICE_WORKER };
 
 const filesIn = (dir: string): string[] =>

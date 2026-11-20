@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { BufferGeometry } from 'three';
 import { GATES } from '../../data/games/mitwachsen';
-import { gatehouse, parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
+import { parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
+import { gate as gatehouse } from './mitwachsen-gates-3d';
 import { goldenBay } from './mitwachsen-guest-3d';
 import { GUEST_COLORS, GUEST_FILLED, GUEST_OUTLINE, guestPixel, ritualGlow } from './mitwachsen-guest-look';
 import { RITUAL } from './mitwachsen-guide';

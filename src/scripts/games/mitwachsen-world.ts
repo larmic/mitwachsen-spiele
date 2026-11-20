@@ -23,6 +23,7 @@ import { LICHTUNG_HOME, realmsOf, type Realms } from './mitwachsen-home';
 import { buildKessel, placeKessel, type Gang, type Kessel } from './mitwachsen-kessel';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal, type PortalId } from './mitwachsen-portal';
 import { findSpawns } from './mitwachsen-spawns';
+import { GATE_FLOOR, forecourt } from './mitwachsen-apron';
 
 export type { Cell, Deco, Ground, TreeKind } from './mitwachsen-cell';
 export type { Portal };
@@ -236,14 +237,8 @@ function buildStart(
   // Große Tore: Platz davor frei, Tor und Türme in der Torreihe, dahinter ein Gang durch den Fels in die Welt
   for (const p of places) {
     const span = GATE_HALF + TOWER;
-    // Bucht vor dem Torhaus, auf der Seite des Portals breiter, damit es gleich neben dem Turm stehen kann
-    const [u0, u1] = p.side < 0 ? [-PORTAL_SIDE - 2, BAY_HALF] : [-BAY_HALF, PORTAL_SIDE + 2];
-    for (let u = u0; u <= u1; u++)
-      for (let t = p.depth - 1; t >= p.depth - 60; t--) {
-        const [x, y] = p.at(u, t);
-        if (map.get(key(x, y))?.region === 'lichtung' && t < p.depth - 2) break; // weiter innen ist schon Lichtung
-        set(x, y, grass('lichtung'));
-      }
+    // Bucht vor dem Torhaus, auf der Seite des Portals breiter, damit es gleich neben dem Turm stehen kann; darin das Vorfeld
+    forecourt(seed, map, p, p.side < 0 ? [-PORTAL_SIDE - 2, BAY_HALF] : [-BAY_HALF, PORTAL_SIDE + 2]);
     for (let u = -span; u <= span; u++) {
       const [x, y] = p.at(u, p.depth);
       if (Math.abs(u) <= GATE_HALF) set(x, y, { ...grass('border'), ground: 'stone', deco: 'biggate', gate: p.id });
@@ -255,6 +250,8 @@ function buildStart(
         // Hinter den Türmen steckt das Torhaus im Fels (3D: 2,5 Felder tief). Dort bleibt der Fels flach wie das Turmfeld,
         // sonst stünden seine Wände genau in den Turmwänden und flackerten mit ihnen (Z-Fighting)
         if (Math.abs(u) > GATE_HALF) set(x, y, rock(t <= p.depth + HOUSE_DEPTH ? 1 : ringHeight(1.1)));
+        // Die ersten Reihen des Gangs gehören zum Zugang (Steg, Platten, Bach …): dort wächst nichts durch
+        else if (t <= p.depth + GATE_FLOOR) set(x, y, { ...passage(seed, p.id, x, y), deco: null, tufts: 0 });
         else set(x, y, passage(seed, p.id, x, y));
       }
   }
@@ -605,7 +602,7 @@ function dress(seed: number, x: number, y: number, c: Cell): Cell {
               ? 'birch'
               : 'oak';
   }
-  if (c.ground === 'grass' && !c.deco && !c.garden && !c.gate) {
+  if (c.ground === 'grass' && !c.deco && !c.garden && !c.gate && c.tufts === undefined) {
     const r = rand01(seed, x, y, 11);
     if (r < 0.7) out.tufts = 1 + (hash(seed, x, y, 13) % 3);
   }

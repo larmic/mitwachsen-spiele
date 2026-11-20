@@ -46,7 +46,7 @@ Hintergrund, Altersstufen und gemeinsame Regeln: [README](README.md). Dieses Dok
 | | |
 | --- | --- |
 | Tiere zum Entdecken | zwölf Arten: Hase, Igel, Schaf, Eichhörnchen, Ente, Kuh, Fuchs, Frosch, Biene, Schildkröte, Bär und Zicklein mit kleinen Hörnern, je vier Tiere (aus dem ersten Spieltest: die Lichtung war zu leer; Bär und Zicklein hat sich mein Sohn gewünscht). Die Leiste zeigt jede Art einmal. |
-| Tore | acht, eines je Welt (Eis, Sand, Wasser, Lava, Höhle, Wald, Wolken, Pilze), Lage und Reihenfolge je Welt gewürfelt, alle vorerst zu. Jedes Torhaus ist im Stil seiner Welt geschmückt |
+| Tore | acht, eines je Welt (Eis, Sand, Wasser, Lava, Höhle, Wald, Wolken, Pilze), Lage und Reihenfolge je Welt gewürfelt, alle vorerst zu. Jede Welt hat ihren eigenen Zugang (siehe unten) |
 
 Die Leiste unten ist die **Liste der entdeckten Tiere**: Umriss mit Fragezeichen = noch nicht entdeckt, in Farbe = entdeckt, Herz = folgt gerade. Grün hinterlegt = zu Hause auf der Wiese. Wie sich die Tore später öffnen, hängt an der Geschichte (siehe Ideen: Tiere befreien).
 
@@ -69,7 +69,7 @@ Die Lichtung ist das Zuhause mit dem Bett. Hinter jedem der acht großen Tore li
 **Was alle Welten verbindet:**
 
 - **Die Welt wächst beim Laufen:** Alles entsteht aus dem Seed, Stück für Stück, wenn die Figur dorthin kommt. Derselbe Seed ergibt immer dieselbe Welt, ein anderer eine andere: Die Tore stehen in jeder Welt woanders und in anderer Reihenfolge. In Richtung jedes Tors liegt seine Welt, endlos.
-- **Mächtiges Torhaus:** Neun Felder breit, hohe Türme, eine geschlossene Doppeltür mit leuchtendem Zeichen in der Farbe der Welt, und Schmuck, der verrät, was dahinter wartet (Eiszapfen, Wasserfälle, glühende Lava-Adern, Kristalle, Laubkronen, ein Regenbogen, Riesenpilze). Vor dem Tor ist eine freie Bucht; steht das Kind davor, lichtet sich der Nebel im Gang dahinter, und es sieht schon ein Stück der Welt. Hinter das Tor kommt man nicht, auch nicht außen herum.
+- **Jede Welt hat ihren eigenen Zugang** (Entwurf „Welten-Zugänge“, umgesetzt am 20.11.2026): Eis eine Schlucht zwischen Gletscherwänden mit Eisbogen, Orgelkrone und der Doppeltür; Sand ein Sandsteinbogen mit rieselndem Sandvorhang, Quelle und Palmen; Wasser eine Lagune zwischen Klippen, über die ein Steg Brett für Brett wächst, mit rot-weißem Leuchtturm; Lava Säulenbasalt mit einem glühenden Bach, der zu Stein erkaltet, unter einem großen Glutbaum (nichts brennt); Höhle eine geschichtete Felswand mit rundem Höhlenmund, Tropfsteinen und Kristallen, ein Rollstein rollt in eine Nische und Kristall-Lampen gehen an; Wald ein Riesenbaum mit Herbstwipfel, durch dessen Stamm der Weg führt, ein Specht klopft die Tür auf; Wolken eine schlafende Riesenwolke, die aufwacht und den Weg freigibt, dazu ein Regenbogen; Pilze ein flacher roter Hut im Weg, der aufploppt und als gedrungener Fliegenpilz zur Seite rückt, dahinter ein Moosbogen mit bunten Hüten. Die Kamera dreht sich nie, die Zugänge liegen aber rundum im Felsring; darum erkennt man jeden auch von der Seite und von hinten: am hohen Wahrzeichen über dem Fels, an einem Zeichen der Welt, das immer zur Kamera schaut, und am Vorfeld, einem Fächer aus dem Boden der Welt vor dem Zugang. Geöffnet wird vorerst nur das Eistor (mit dem Pinguin); die Übergänge der anderen sind gebaut und warten auf ihre Geschichte. Vor dem Tor ist eine freie Bucht; steht das Kind davor, lichtet sich der Nebel im Gang dahinter, und es sieht schon ein Stück der Welt. Hinter das Tor kommt man nicht, auch nicht außen herum.
 - **Portal-Plattform neben dem Tor:** Eine flache Platte mit runden Ecken (3 × 3 Felder, alle begehbar) im Material der Welt, mit einem Bild der Welt auf der Mitte und kleiner Zierde in den Ecken; man steigt von überall auf. Kommt das Kind nah heran, erwacht sie: Das Bild leuchtet, ein goldener Rahmen legt sich um die Mitte, Funken kreisen, und sie bleibt wach. Gleichzeitig erwacht ihr Gegenstück im Kreis um das Bett, in Richtung ihres Tors (vorher ein leerer grauer Sockel, der nicht verrät, wohin er führt). Wer auf die Mitte tritt, reist zum Gegenstück, folgende Tiere reisen mit. Nach der Ankunft zeigen goldene Pfeile nach außen: erst runter, dann wieder rauf, und es geht zurück.
 - **Eigene Tiere:** Jede Welt bekommt ihre eigenen verlorenen Tiere, sobald man hinein kann. Die Vorschläge unten sind Ideen, gemeinsam mit dem Kind auszusuchen.
 - **Gleiche Regeln:** Klettern, Nebel, Folgen und Schlafen bleiben überall gleich. Neu ist nur, wie die Welt aussieht und klingt.
@@ -360,7 +360,7 @@ Die heutigen Portale (drei Felder breit, Säulen und Krone, man läuft von vorn 
 
 ### Tore je Welt verschieden (Notiz vom 17.11.2026)
 
-Die Eingänge zu den Welten wirken alle gleich (gleiches Torhaus, nur Schmuck und Farbe anders). Jede Welt soll einen ganz eigenen Eingang bekommen, an dem man schon von Weitem erkennt, wohin er führt:
+**Umgesetzt am 20.11.2026** (siehe oben, „Jede Welt hat ihren eigenen Zugang“). Die Eingänge zu den Welten wirkten alle gleich (gleiches Torhaus, nur Schmuck und Farbe anders). Jede Welt soll einen ganz eigenen Eingang bekommen, an dem man schon von Weitem erkennt, wohin er führt:
 
 - **Höhle:** ein Bergeingang, dunkle Öffnung im Fels, mit Kristallen am Rand.
 - **Eis:** ein Durchgang zwischen Gletschern bzw. ein Bogen aus Eis.

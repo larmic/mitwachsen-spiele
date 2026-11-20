@@ -50,7 +50,8 @@ import { FISH_PARTS, ICE_COLORS } from '../../data/games/mitwachsen-eis';
 import { Geo, atlas, snapToShadowTexel, type Tile, type V3 } from './mitwachsen-geo';
 import { grown } from './mitwachsen-growth';
 import { iceBoxes } from './mitwachsen-ice-look';
-import { gatehouse, parts, type Parts } from './mitwachsen-gatehouse';
+import { parts, type Parts } from './mitwachsen-gatehouse';
+import { gate } from './mitwachsen-gates-3d';
 import { goldenBay } from './mitwachsen-guest-3d';
 import { GUIDE_GATE, guideGate } from './mitwachsen-guide';
 import { ritualGlow } from './mitwachsen-guest-look';
@@ -491,8 +492,9 @@ export class World3D {
     this.clear(this.gateGroup);
     for (const g of world.gates.values()) {
       const p = parts();
-      const wings = gatehouse(p, g.id, open(g.id), g.id === guest, g.id === GUIDE_GATE ? lit : 0);
       const [[mx, my], [fx, fy]] = [g.mid, [-g.out[0], -g.out[1]]];
+      // Richtung zur Kamera (sie steht immer im Süden) in Torhaus-Koordinaten: danach richtet sich das Schild
+      const wings = gate(p, g.id, open(g.id), g.id === guest, g.id === GUIDE_GATE ? lit : 0, [-fx || 0, fy || 0]);
       const h = world.cell(mx, my).h;
       // Goldrand der Bucht je Feld auf dessen Höhe: u entlang des Tors (die x-Achse des Torhauses), t Reihen davor
       if (g.id === guest) goldenBay(p, (u, t) => world.cell(mx + u * fy + t * fx, my - u * fx + t * fy).h - h);
