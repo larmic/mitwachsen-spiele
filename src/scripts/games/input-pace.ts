@@ -29,8 +29,9 @@ export const FREE_KEYS = new Set([
 
 /**
  * Begegnungen: Tier gefunden oder angestoßen, Beeren gepflückt, Fische gefangen, Futter oder Wasser gebracht, Wasser
- * geschöpft, Plattform erwacht, gereist, Klangstein, das Eistor geht auf (und jeder Hüpfer, solange es aufgeht), ins Bett gegangen. Danach bleibt die Figur stehen, bis der Pfeil neu gedrückt wird
- * (`clear`); sonst liefe sie mit gehaltenem Pfeil gleich weiter und tauschte den Platz mit dem neuen Tier.
+ * geschöpft, Plattform erwacht, gereist, Klangstein, das Eistor geht auf (und jeder Hüpfer, solange es aufgeht), ins
+ * Bett gegangen. Danach bleibt die Figur kurz stehen (`pause`, so lange wie die Wartezeit am Anfang, damit man Herz und
+ * Noten sieht) und läuft mit gehaltenem Pfeil weiter. Nur aus dem Bett muss der Pfeil neu gedrückt werden (`AGAIN`).
  */
 export const ENCOUNTERS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['type']>([
   'sing',
@@ -45,15 +46,21 @@ export const ENCOUNTERS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['typ
   'story',
   'gate',
   'hop',
-  'sleep', // sonst weckte der noch gehaltene Pfeil sie nach dem Einschlafen, und sie liefe gleich wieder ins Bett
+  'sleep',
 ]);
+/** Danach erst nach neuem Druck weiter: sonst weckte der noch gehaltene Pfeil sie gleich wieder, und sie liefe zurück ins Bett */
+const AGAIN: ReadonlySet<GameEvent['type']> = new Set<GameEvent['type']>(['sleep']);
+
+/** Wie eine Begegnung die Figur anhält: kurz (`pause`), bis zum nächsten Druck (`clear`) oder gar nicht */
+export type Stop = 'pause' | 'clear' | null;
 
 /**
  * Hält dieser Zug die Figur an (Begegnung)? Nicht, wenn nur das führende Tier singt: Der Pinguin, der zum Tor führt,
  * hüpft dabei voraus oder tauscht den Platz, er blockiert nie (docs/specs/mitwachsen.md, „Der Pinguin holt dich ab“).
  */
-export function stops(events: readonly GameEvent[], leader?: string): boolean {
-  return events.some((e) => ENCOUNTERS.has(e.type) && !(e.type === 'sing' && e.id === leader));
+export function stops(events: readonly GameEvent[], leader?: string): Stop {
+  if (events.some((e) => AGAIN.has(e.type))) return 'clear';
+  return events.some((e) => ENCOUNTERS.has(e.type) && !(e.type === 'sing' && e.id === leader)) ? 'pause' : null;
 }
 
 export class InputPace {
@@ -99,9 +106,18 @@ export class InputPace {
     return true;
   }
 
+  /** Begegnung (`stops`): kurz stehen bleiben, dann läuft ein gehaltener Pfeil weiter; oder alles vergessen */
+  halt(stop: Stop, now: number) {
+    if (stop === 'clear') this.clear();
+    else if (stop === 'pause') {
+      this.pending = null;
+      this.since = now; // die Wartezeit wie nach einem frischen Druck
+    }
+  }
+
   /**
-   * Alles vergessen, z. B. wenn das Menü aufgeht oder die Seite den Fokus verliert – und bei einer Begegnung (Tier
-   * gefunden, Beeren gepflückt): Die Figur bleibt stehen, bis der Pfeil neu gedrückt wird.
+   * Alles vergessen, z. B. wenn das Menü aufgeht oder die Seite den Fokus verliert, und nach dem Schlafengehen: Die Figur
+   * bleibt stehen, bis der Pfeil neu gedrückt wird.
    */
   clear() {
     this.down = [];

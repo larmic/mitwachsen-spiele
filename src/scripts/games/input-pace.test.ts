@@ -100,10 +100,26 @@ describe('Ruhiger Takt der Eingabe', () => {
 
   it('der führende Pinguin hält nicht an, wenn die Figur in ihn läuft; jedes andere Tier schon', () => {
     const sing = (id: string) => ({ type: 'sing', id, species: 'pinguin', first: false }) as const;
-    expect(stops([{ type: 'step', climb: 0 }, sing('eis:pinguin')], 'eis:pinguin')).toBe(false);
-    expect(stops([sing('eis:pinguin')])).toBe(true); // führt nicht (wohnt schon im Kessel): Begegnung wie jedes Tier
-    expect(stops([sing('eis:robbe')], 'eis:pinguin')).toBe(true);
-    expect(stops([sing('eis:pinguin'), { type: 'portal', id: 'eiskessel' }], 'eis:pinguin')).toBe(true);
+    expect(stops([{ type: 'step', climb: 0 }, sing('eis:pinguin')], 'eis:pinguin')).toBeNull();
+    expect(stops([sing('eis:pinguin')])).toBe('pause'); // führt nicht (wohnt schon im Kessel): Begegnung wie jedes Tier
+    expect(stops([sing('eis:robbe')], 'eis:pinguin')).toBe('pause');
+    expect(stops([sing('eis:pinguin'), { type: 'portal', id: 'eiskessel' }], 'eis:pinguin')).toBe('pause');
+  });
+
+  it('nach einer Begegnung steht die Figur kurz und läuft mit gehaltenem Pfeil weiter; aus dem Bett erst nach neuem Druck', () => {
+    expect(stops([{ type: 'sleep' }])).toBe('clear');
+    expect(stops([{ type: 'step', climb: 0 }])).toBeNull();
+    const pace = new InputPace();
+    pace.press('e', 0);
+    pace.halt('pause', 100); // Begegnung, der Pfeil bleibt gehalten
+    expect(steps(pace, 100, HOLD_MS - 20)).toEqual([]); // kurz stehen …
+    const later = steps(pace, 100 + HOLD_MS - 20, 1000);
+    expect(later[0]).toBeLessThanOrEqual(100 + HOLD_MS + 16); // … dann weiter im Takt
+    expect(later.length).toBeGreaterThan(2);
+    const bed = new InputPace();
+    bed.press('e', 0);
+    bed.halt('clear', 100);
+    expect(steps(bed, 100, 2000)).toEqual([]);
   });
 
   it('Aktionen zählen höchstens im eigenen Takt', () => {

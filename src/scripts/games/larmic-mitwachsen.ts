@@ -453,9 +453,9 @@ class LarmicMitwachsen extends HTMLElement {
     const now = performance.now();
     let persist = false;
     let homes = 0; // Tiere, die in diesem Zug einziehen
-    // Begegnung (Tier gefunden oder getroffen, Beeren, Fische, Füttern, Portal): Die Figur bleibt stehen, bis der Pfeil
-    // neu gedrückt wird. Sonst liefe sie mit gehaltenem Pfeil gleich weiter und tauschte den Platz mit dem neuen Tier.
-    if (stops(events, this.state.animals.find((a) => a.mode === 'lead')?.id)) this.pace.clear();
+    // Begegnung (Tier gefunden oder getroffen, Beeren, Fische, Füttern, Portal): Die Figur bleibt kurz stehen, dann läuft
+    // sie mit gehaltenem Pfeil weiter; aus dem Bett erst nach neuem Druck (stops in input-pace.ts)
+    this.pace.halt(stops(events, this.state.animals.find((a) => a.mode === 'lead')?.id), now);
     for (const e of events) {
       switch (e.type) {
         case 'step':
