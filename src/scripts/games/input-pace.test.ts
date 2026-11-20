@@ -76,7 +76,7 @@ describe('Ruhiger Takt der Eingabe', () => {
     expect(pace.poll(STEP_MS * 3)).toBeNull();
   });
 
-  it('Begegnungen halten die Figur an: Tiere, Beeren, Fische, Futter, Wasser, Plattformen, Klangsteine, das Eistor', () => {
+  it('Begegnungen halten die Figur an: Tiere, Beeren, Fische, Futter, Wasser, Plattformen, Klangsteine, das Eistor, das Bett', () => {
     for (const type of [
       'sing',
       'follow',
@@ -90,6 +90,7 @@ describe('Ruhiger Takt der Eingabe', () => {
       'story',
       'gate', // das Eistor geht auf: Die Figur bleibt stehen …
       'hop', // … und jeder Pfeil lässt sie nur hüpfen, bis es offen ist
+      'sleep', // ins Bett gelaufen: Der gehaltene Pfeil weckt sie nicht gleich wieder
     ] as const)
       expect(ENCOUNTERS.has(type), type).toBe(true);
     // Laufen, Anstoßen, Platz machen, Heimkommen und Nachwachsen halten nicht an

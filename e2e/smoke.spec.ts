@@ -12,6 +12,23 @@ function watchErrors(page: Page) {
   return errors;
 }
 
+/**
+ * Zeichnen abwarten: so lange, wie `n` Bilder bei 60 Hz dauern, und mindestens zwei Bilder. Nicht `n` Bilder: Die
+ * CI-Rechner zeichnen WebGL ohne Grafikkarte, ein Bild braucht dort leicht eine halbe Sekunde, und `n` Bilder sprengten
+ * jede Zeitgrenze. Die Spielzeit (Takt, Animationen) läuft nach der Uhr, also reicht die Zeit.
+ */
+const waitFrames = (page: Page, n: number) =>
+  page.evaluate(
+    (ms) =>
+      new Promise<void>((done) => {
+        const end = performance.now() + ms;
+        let drawn = 0;
+        const next = () => (++drawn >= 2 && performance.now() >= end ? done() : requestAnimationFrame(next));
+        requestAnimationFrame(next);
+      }),
+    (n * 1000) / 60,
+  );
+
 for (const path of ['/', '/datenschutz/'])
   test(`Seite ${path} lädt ohne Fehler`, async ({ page }) => {
     const errors = watchErrors(page);
@@ -131,8 +148,8 @@ test('Spiel: Portal-Plattform erwacht beim Herangehen, die Mitte bringt zum Bett
 test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offen), alle zehn Eis-Tiere, Pustewind, ohne Fehler', async ({
   page,
 }) => {
-  // Viele Bilder mit Wind und Schnee: Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte, das braucht mehr als 30 s
-  test.slow();
+  // Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte: Jedes Bild und jeder Aufruf in die Seite dauert dort lange
+  test.setTimeout(180_000);
   const errors = watchErrors(page);
   await page.goto('/spielen/');
   await page.getByRole('button', { name: /Verstanden/ }).click();
@@ -162,17 +179,7 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
     air: { frame(world: unknown, state: unknown, quiet: boolean, reduced: boolean): { weather: { wind: number } } };
     renderer: { ice: { iceWeather?: unknown } | null };
   };
-  /** Einige Bilder abwarten */
-  const frames = (n: number) =>
-    page.evaluate(
-      (count) =>
-        new Promise<void>((done) => {
-          let left = count;
-          const next = () => (--left <= 0 ? done() : requestAnimationFrame(next));
-          requestAnimationFrame(next);
-        }),
-      n,
-    );
+  const frames = (n: number) => waitFrames(page, n);
   // Über die Komponente (wie die Regeln es sehen): Tor offen, die Figur steht wach neben dem Schneebett
   const realm = await game.evaluate((node) => {
     const el = node as unknown as Game;
@@ -267,8 +274,8 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
 test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten in der Bucht, die Leiste klappt um, ohne Fehler', async ({
   page,
 }) => {
-  // Viele Bilder mit Wind und Schnee: Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte, das braucht mehr als 30 s
-  test.slow();
+  // Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte: Jedes Bild und jeder Aufruf in die Seite dauert dort lange
+  test.setTimeout(180_000);
   const errors = watchErrors(page);
   await page.goto('/spielen/');
   await page.getByRole('button', { name: /Verstanden/ }).click();
@@ -290,16 +297,7 @@ test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten
     lift(): void;
     renderer: { ice: { waitArrow?: unknown } | null; album: { turn: { shown?: string } } };
   };
-  const frames = (n: number) =>
-    page.evaluate(
-      (count) =>
-        new Promise<void>((done) => {
-          let left = count;
-          const next = () => (--left <= 0 ? done() : requestAnimationFrame(next));
-          requestAnimationFrame(next);
-        }),
-      n,
-    );
+  const frames = (n: number) => waitFrames(page, n);
   // Über die Komponente: Tor offen, die Figur steht wach in der Bucht vor dem Eistor, drei Tiere der Lichtung folgen ihr
   const ids = await game.evaluate((node) => {
     const el = node as unknown as Game;
@@ -323,25 +321,28 @@ test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten
     return chain.map((a) => a.id);
   });
   await frames(30);
-  const inward = (n: number) =>
-    game.evaluate((node, steps) => {
-      const el = node as unknown as Game;
-      const { out } = el.world.gates.get('eis')!;
-      const dir = out[0] > 0 ? 'e' : out[0] < 0 ? 'w' : out[1] > 0 ? 's' : 'n';
-      for (let i = 0; i < steps; i++) el.apply({ type: 'move', dir });
-      return {
-        waiting: el.state.animals.filter((a) => a.mode === 'wait').map((a) => a.id),
-        realm: el.world.realm(el.state.player.x, el.state.player.y),
-      };
-    }, n);
+  /** Schritte zum Kessel hin: `n` Schritte, mit `until` so viele, bis die Figur in dieser Gegend steht (höchstens 80) */
+  const inward = (n: number, until = '') =>
+    game.evaluate(
+      (node, [steps, goal]) => {
+        const el = node as unknown as Game;
+        const { out } = el.world.gates.get('eis')!;
+        const dir = out[0] > 0 ? 'e' : out[0] < 0 ? 'w' : out[1] > 0 ? 's' : 'n';
+        const there = () => el.world.realm(el.state.player.x, el.state.player.y) === goal;
+        for (let i = 0; i < steps && !there(); i++) el.apply({ type: 'move', dir });
+        return {
+          waiting: el.state.animals.filter((a) => a.mode === 'wait').map((a) => a.id),
+          realm: el.world.realm(el.state.player.x, el.state.player.y),
+        };
+      },
+      [n, until] as const,
+    );
   // In die Torreihe: Die drei setzen sich in die Bucht; das Bild der Weltgrenze ist nachgeladen (Pfeil, Zeichen)
   expect((await inward(1)).waiting.sort()).toEqual([...ids].sort());
   await frames(60);
   expect(await game.evaluate((el) => typeof (el as unknown as Game).renderer.ice?.waitArrow)).toBe('function');
   // Durch den Gang bis in den Kessel: Die Leiste zeigt die Eis-Welt
-  let realm = '';
-  for (let i = 0; i < 80 && realm !== 'eis'; i++) realm = (await inward(1)).realm;
-  expect(realm).toBe('eis');
+  expect((await inward(80, 'eis')).realm).toBe('eis'); // in einem Aufruf: Jeder Aufruf wartet ohne Grafikkarte lange
   await frames(60);
   expect(await game.evaluate((el) => (el as unknown as Game).renderer.album.turn.shown)).toBe('eis');
   // Zurück in die Bucht: Die Wartenden reihen sich wieder ein
@@ -362,8 +363,8 @@ test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten
 test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kessel ein; nach dem Neuladen offen, ohne Fehler', async ({
   page,
 }) => {
-  // Viele Bilder mit Wind und Schnee: Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte, das braucht mehr als 30 s
-  test.slow();
+  // Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte: Jedes Bild und jeder Aufruf in die Seite dauert dort lange
+  test.setTimeout(180_000);
   const errors = watchErrors(page);
   await page.goto('/spielen/');
   await page.getByRole('button', { name: /Verstanden/ }).click();
@@ -392,16 +393,7 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
     openWorld(id: string): void;
     renderer: { album: { turn: { shown?: string } } };
   };
-  const frames = (n: number) =>
-    page.evaluate(
-      (count) =>
-        new Promise<void>((done) => {
-          let left = count;
-          const next = () => (--left <= 0 ? done() : requestAnimationFrame(next));
-          requestAnimationFrame(next);
-        }),
-      n,
-    );
+  const frames = (n: number) => waitFrames(page, n);
   const penguin = () =>
     game.evaluate((el) => (el as unknown as Game).state.animals.find((a) => a.id === 'eis:pinguin')?.mode ?? 'fehlt');
   /** Takte der Regeln gleich hier abspielen (unabhängig davon, wie schnell der Takt der Seite unter Last läuft) */
@@ -421,10 +413,13 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
   // Aufwachen: Die Regeln des Pinguins kommen nach, gut 2 s später taucht er neben der Figur auf und führt
   await page.keyboard.press('ArrowDown');
   await expect
-    .poll(async () => {
-      await ticks(10);
-      return penguin();
-    })
+    .poll(
+      async () => {
+        await ticks(10);
+        return penguin();
+      },
+      { timeout: 30_000 }, // die Regeln des Pinguins kommen per import() nach; ohne Grafikkarte dauert das
+    )
     .toBe('lead');
   // Figur und Pinguin in die Bucht vor dem Eistor (über die Komponente): Im nächsten Takt geht das Tor auf
   await game.evaluate((node) => {
