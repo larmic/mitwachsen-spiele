@@ -7,7 +7,7 @@
 import { chunkOf } from '../../lib/games/chunks';
 import { projection, type Dir } from '../../lib/games/front';
 import type { World3D as World3DType } from './mitwachsen-3d';
-import { GAME_COLORS, HOME, LOOK, SPECIES, THEME_COLORS, TIRED_TALK } from '../../data/games/mitwachsen';
+import { GAME_COLORS, LOOK, SPECIES, THEME_COLORS, TIRED_TALK } from '../../data/games/mitwachsen';
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
 import { Sfx } from './sfx';
 import { NOTE_COLORS, StoryPlayer } from './mitwachsen-story';
@@ -195,11 +195,11 @@ class LarmicMitwachsen extends HTMLElement {
     this.saved = { ...this.saved, visits: this.saved.visits + 1 };
     saveWorld(this.store, this.saved);
     this.world = createWorld(this.saved.seed);
-    // Nebel: Am Anfang ist nur ein kleines Stück um das Bett zu sehen
-    this.fog = Fog.from(this.saved.explored);
-    if (this.fog.size === 0) this.fog.reveal(HOME.bed[0], HOME.bed[1], START_REVEAL);
     this.seenAt = '';
     this.state = initialState(this.world, progressFrom(this.saved), this.saved.seed ^ this.saved.visits);
+    // Nebel: Am Anfang ist nur ein kleines Stück um das Bett zu sehen (die Figur liegt darin)
+    this.fog = Fog.from(this.saved.explored);
+    if (this.fog.size === 0) this.fog.reveal(this.state.player.x, this.state.player.y, START_REVEAL);
     this.bodies.clear();
     this.floats = [];
     this.particles = [];
@@ -712,8 +712,8 @@ class LarmicMitwachsen extends HTMLElement {
         who: this.state.sleeping ? 'bed' : 'player',
         color: GAME_COLORS.star,
         born: t,
-        x: 0,
-        y: 0,
+        x: this.state.player.x, // im Schlaf liegt die Figur im Bett ihrer Gegend: Dort steigt das Zzz auf
+        y: this.state.player.y,
         z: 0,
         age: 0,
       });
@@ -723,7 +723,7 @@ class LarmicMitwachsen extends HTMLElement {
     const floats: Float[] = [];
     for (const f of this.floats) {
       if (t < f.born) continue;
-      const b = f.who === 'bed' ? { x: HOME.bed[0], y: HOME.bed[1], z: 1.3, hop: 0 } : this.bodies.get(f.who!);
+      const b = f.who === 'bed' ? { x: f.x, y: f.y, z: 1.3, hop: 0 } : this.bodies.get(f.who!);
       if (!b) continue;
       floats.push({ ...f, x: b.x, y: b.y, z: b.z + (f.who === 'player' ? 1.5 : 0.9), age: t - f.born });
     }

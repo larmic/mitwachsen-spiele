@@ -28,7 +28,6 @@ import {
 import {
   GAME_COLORS,
   GATES,
-  HOME,
   MOOD_LIGHT,
   REGIONS,
   SPECIES,
@@ -51,6 +50,7 @@ import type { Climate } from './mitwachsen-world';
 import type { State } from './mitwachsen-state';
 import { cycle, hash } from '../../lib/games/rng';
 import type { Cell, TreeKind, World } from './mitwachsen-world';
+import { homeAt } from './mitwachsen-home';
 import { drawPlatform } from './mitwachsen-platform-2d';
 
 /** Gleitende Position eines Wesens auf dem Bildschirm (in Feldern), dazu Hüpfer und Blickrichtung */
@@ -823,7 +823,7 @@ export class Renderer {
         break;
       case 'shelterpilz': {
         // Riesenpilz: Stiel mit Kragen, darüber der rote Hut mit Tupfen (über die ganze Breite des Unterstands)
-        const { x0, y0, x1, y1 } = HOME.shelter;
+        const { x0, y0, x1, y1 } = homeAt(world, x, y).shelter;
         box(ctx, P, x + 0.15, y + 0.15, h, 0.7, 0.7, 3.2, '#efe4d2', '#f7efe2');
         box(ctx, P, x0 - 0.6, y0 - 0.8, h + 3.2, x1 - x0 + 2.2, y1 - y0 + 2.6, 0.45, '#d9473a', '#e0574a');
         box(ctx, P, x0 + 0.3, y0 - 0.1, h + 3.65, x1 - x0 + 0.4, y1 - y0 + 1.2, 0.45, '#d9473a', '#e0574a');

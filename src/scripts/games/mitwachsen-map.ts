@@ -2,9 +2,10 @@
 // Erkundete Felder in ihren Farben, Unerkundetes als Nebel, die Figur als Punkt, das Bett als Häuschen.
 // Liegt das Bett außerhalb der Karte, zeigt ein Pfeil am Kartenrand den Weg nach Hause.
 
-import { GATES, HOME, THEME_COLORS } from '../../data/games/mitwachsen';
+import { GATES, THEME_COLORS } from '../../data/games/mitwachsen';
 import type { State } from './mitwachsen-state';
 import type { Cell, World } from './mitwachsen-world';
+import { homeAt } from './mitwachsen-home';
 
 export const MAP_RADIUS = 28; // Felder vom Mittelpunkt bis zum Rand
 
@@ -97,8 +98,8 @@ export function drawMap(
     }
   }
 
-  // Bett als Häuschen, sonst ein Pfeil am Rand dorthin
-  const [bx, by] = HOME.bed;
+  // Bett der Gegend, in der die Figur steht, als Häuschen, sonst ein Pfeil am Rand dorthin
+  const [bx, by] = homeAt(world, state.player.x, state.player.y).bed;
   const hx = ox + (bx + 0.5) * cell,
     hy = oy + (by + 0.5) * cell;
   const s = Math.max(5, cell * 1.6);

@@ -1,5 +1,5 @@
-// Inhalte von Mitwachsen (Stufe ab 3): Gegenden, Tore, Zuhause, Tiere (Modell und Ton) und Figur.
-// Neue Gegenden und Tiere kommen hier dazu; Regeln und Generator bleiben gleich.
+// Inhalte von Mitwachsen (Stufe ab 3): Gegenden, Tore, Tiere (Modell und Ton) und Figur.
+// Neue Gegenden und Tiere kommen hier dazu (ihr Zuhause in mitwachsen-homes.ts); Regeln und Generator bleiben gleich.
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md
 
 import { eyes, type Part } from '../../lib/games/front';
@@ -33,6 +33,8 @@ export type Region = {
   animals: readonly { species: SpeciesId; at: Point }[];
   /** So viele Tiere je Art leben hier: das erste am Wohnort oben, die anderen verteilt die Welt aus dem Seed */
   herd: number;
+  /** Tor, hinter dem die Gegend liegt: Solange es zu ist, kommt man nicht hin (die Lichtung liegt hinter keinem) */
+  behind?: GateId;
 };
 
 export type Gate = {
@@ -41,7 +43,8 @@ export type Gate = {
   region: RegionId; // Gegend, in der das Tor steht
   leadsTo: string; // was dahinter liegt (kommt später)
   theme: GateTheme; // Blöcke oben auf dem Tor verraten, worum es dahinter geht
-  locked: boolean; // vorerst verschlossen; öffnet nicht, auch wenn alle Tiere gefunden sind
+  /** Wann das Tor aufgeht: nie, oder wenn das Tier dieser Art es aufschließt (Schlüssel) */
+  opens: 'never' | { key: SpeciesId };
   sign?: Point; // Tafel mit den Tieren der Gegend (noch keine)
 };
 
@@ -53,6 +56,12 @@ export const animalId = (region: RegionId, species: SpeciesId, n = 1) =>
 export function speciesOf(id: string): SpeciesId | null {
   const [region, species = ''] = id.split(':');
   return REGIONS.some((r) => r.id === region) && Object.hasOwn(SPECIES, species) ? (species as SpeciesId) : null;
+}
+
+/** Gegend, zu der ein Tier gehört: die aus seiner Kennung; Tiere der Landschaft gehören zur Lichtung */
+export function realmOfAnimal(id: string): RegionId {
+  const region = id.split(':')[0];
+  return REGIONS.find((r) => r.id === region)?.id ?? REGIONS[0].id;
 }
 
 /** Alle Tiere einer Gegend: je Art `herd` Stück, in fester Reihenfolge */
@@ -92,44 +101,18 @@ export const REGIONS: readonly [Region, ...Region[]] = [
 
 /**
  * Die großen Tore: eines je Welt. Wo sie im Felsring stehen und in welcher Reihenfolge, würfelt der Seed jeder Welt.
- * Hinter jedem Tor liegt in seiner Richtung die passende Landschaft. Vorerst sind alle verschlossen.
+ * Hinter jedem Tor liegt in seiner Richtung die passende Landschaft. Vorerst geht keines auf (`opens: 'never'`).
  */
 export const GATES: readonly Gate[] = [
-  { id: 'eis', theme: 'eis', kind: 'grosstor', region: 'lichtung', leadsTo: 'Eiswelt', locked: true },
-  { id: 'sand', theme: 'sand', kind: 'grosstor', region: 'lichtung', leadsTo: 'Sandwelt', locked: true },
-  { id: 'wasser', theme: 'wasser', kind: 'grosstor', region: 'lichtung', leadsTo: 'Wasserwelt', locked: true },
-  { id: 'lava', theme: 'lava', kind: 'grosstor', region: 'lichtung', leadsTo: 'Lavaberge', locked: true },
-  { id: 'hoehle', theme: 'hoehle', kind: 'grosstor', region: 'lichtung', leadsTo: 'Höhlenwelt', locked: true },
-  { id: 'wald', theme: 'wald', kind: 'grosstor', region: 'lichtung', leadsTo: 'Wald', locked: true },
-  { id: 'wolken', theme: 'wolken', kind: 'grosstor', region: 'lichtung', leadsTo: 'Wolkenwelt', locked: true },
-  { id: 'pilze', theme: 'pilze', kind: 'grosstor', region: 'lichtung', leadsTo: 'Pilzwald', locked: true },
+  { id: 'eis', theme: 'eis', kind: 'grosstor', region: 'lichtung', leadsTo: 'Eiswelt', opens: 'never' },
+  { id: 'sand', theme: 'sand', kind: 'grosstor', region: 'lichtung', leadsTo: 'Sandwelt', opens: 'never' },
+  { id: 'wasser', theme: 'wasser', kind: 'grosstor', region: 'lichtung', leadsTo: 'Wasserwelt', opens: 'never' },
+  { id: 'lava', theme: 'lava', kind: 'grosstor', region: 'lichtung', leadsTo: 'Lavaberge', opens: 'never' },
+  { id: 'hoehle', theme: 'hoehle', kind: 'grosstor', region: 'lichtung', leadsTo: 'Höhlenwelt', opens: 'never' },
+  { id: 'wald', theme: 'wald', kind: 'grosstor', region: 'lichtung', leadsTo: 'Wald', opens: 'never' },
+  { id: 'wolken', theme: 'wolken', kind: 'grosstor', region: 'lichtung', leadsTo: 'Wolkenwelt', opens: 'never' },
+  { id: 'pilze', theme: 'pilze', kind: 'grosstor', region: 'lichtung', leadsTo: 'Pilzwald', opens: 'never' },
 ];
-
-export const HOME = {
-  bed: [0, 0] as Point,
-  wake: [
-    [1, 0],
-    [0, 1],
-    [1, 1],
-    [-1, 0],
-    [-1, 1],
-  ] as readonly Point[], // freie Plätze am Bett zum Aufwachen
-  clear: 2, // so weit um das Bett bleibt es flach und frei
-  /**
-   * Gegenstücke der Portal-Plattformen stehen im Kreis um das Bett, jedes in Richtung seines Tors; schlafend sind sie
-   * leere graue Sockel. Radius 9: Die Plattformen (3 × 3) berühren einander nicht und ragen nicht in die Wiese.
-   */
-  portalRing: 9,
-  /**
-   * Zuhause der gefundenen Tiere: eine offene Wiese rund um das Bett (ohne Zaun), mit Futter und Wasser.
-   * Folgende Tiere, die sie betreten, bleiben dort und verteilen sich.
-   */
-  meadow: 6, // Radius der Wiese um das Bett
-  food: [-4, 3] as Point, // Futtertrog
-  water: [4, 3] as Point, // Wassertrog
-  shelter: { x0: -3, y0: -5, x1: 3, y1: -3 } satisfies Rect, // unter dem Riesenpilz: Bei Regen gehen die Tiere der Wiese hierher
-  shelterStem: [0, -4] as Point, // Stiel des Riesenpilzes (in der Mitte, unter dem Hutrand zu sehen, fest)
-};
 
 // ---------- Tiere ----------
 

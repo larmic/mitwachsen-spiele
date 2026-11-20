@@ -21,7 +21,7 @@ export type Story = {
   voice?: string; // Adresse der Aufnahme, sobald es sie gibt
 };
 
-/** Klangstein am Bett: links vorn, gleich außerhalb des freien Platzes ums Bett (HOME.clear) */
+/** Klangstein am Bett: links vorn, gleich außerhalb des freien Platzes ums Bett (`HOMES.lichtung.clear` in mitwachsen-homes.ts) */
 export const BED_STONE: Point = [-3, 1];
 
 // Töne der Pentatonik

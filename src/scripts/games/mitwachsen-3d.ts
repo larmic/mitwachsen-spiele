@@ -34,7 +34,6 @@ import { cycle, hash } from '../../lib/games/rng';
 import {
   GAME_COLORS,
   GATES,
-  HOME,
   MOOD_LIGHT,
   REGIONS,
   SPECIES,
@@ -54,6 +53,7 @@ import { StoneNotes, stoneInto } from './mitwachsen-story-3d';
 import type { Scene } from './mitwachsen-render';
 import type { State } from './mitwachsen-state';
 import type { Cell, TreeKind, World } from './mitwachsen-world';
+import { homeAt } from './mitwachsen-home';
 
 export const PITCH = (55 * Math.PI) / 180; // Neigung der Kamera: 90° wäre senkrecht von oben
 /** Beeren am Busch: [x, Höhe, z] im Feld; oben auf der Kuppe und an der Vorderseite (zur Kamera) */
@@ -160,6 +160,7 @@ export class World3D {
   private signs = new Group();
   private signKey = '';
   private sleeper = new Group();
+  private sleeperAt = ''; // Bett, in dem der Schläfer gebaut ist
   private notes = new StoneNotes(); // Noten über den Klangsteinen
   private size = { w: 1, h: 1 };
   private world: World | null = null;
@@ -841,7 +842,7 @@ export class World3D {
    * hoch, dass man die Tiere in den vorderen Reihen darunter sieht.
    */
   private shelterPilz(g: Geo, canopy: Geo, x: number, y: number, h: number) {
-    const { x0, y0, x1, y1 } = HOME.shelter;
+    const { x0, y0, x1, y1 } = homeAt(this.world!, x, y).shelter; // Unterstand der Gegend dieses Stiels
     const stem = '#efe4d2',
       stemTop = '#f7efe2',
       red = '#d9473a',
@@ -963,10 +964,16 @@ export class World3D {
     }
   }
 
+  /** Die schlafende Figur im Bett der Gegend, in der sie liegt (neu gebaut, wenn das Bett ein anderes ist) */
   private syncSleeper(state: State) {
-    if (!this.sleeper.children.length) {
+    const [x, y] = homeAt(this.world!, state.player.x, state.player.y).bed;
+    if (state.sleeping && this.sleeperAt !== `${x},${y}`) {
+      for (const o of [...this.sleeper.children]) {
+        if (o instanceof Mesh) (o.geometry as BufferGeometry).dispose();
+        this.sleeper.remove(o);
+      }
+      this.sleeperAt = `${x},${y}`;
       const g = new Geo();
-      const [x, y] = HOME.bed;
       g.box(x + 0.32, 1.38, y + 0.1, 0.36, 0.3, 0.24, this.look.skin);
       g.box(x + 0.31, 1.62, y + 0.09, 0.38, 0.1, 0.26, this.look.hair);
       g.box(x + 0.1, 1.38, y + 0.36, 0.8, 0.14, 0.56, GAME_COLORS.bed.blanket);

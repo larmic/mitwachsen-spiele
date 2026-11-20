@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DIRS } from '../../lib/games/front';
-import { GATES, HOME, REGIONS, type GateId } from '../../data/games/mitwachsen';
+import { GATES, REGIONS, type GateId } from '../../data/games/mitwachsen';
+import { HOMES } from '../../data/games/mitwachsen-homes';
 import { BED_STONE } from '../../data/games/mitwachsen-stories';
 import { platformCells, platformLift } from './mitwachsen-portal';
 import {
@@ -16,6 +17,7 @@ import {
   type Cell,
   type World,
 } from './mitwachsen-world';
+import { homeAt } from './mitwachsen-home';
 
 /** Alle Felder, die von `start` aus zu Fuß erreichbar sind (bis `limit` Felder) */
 function reachable(world: World, open: GateId[], start: readonly [number, number], limit = 30000) {
@@ -33,7 +35,9 @@ function reachable(world: World, open: GateId[], start: readonly [number, number
   return [...seen].map((k) => k.split(',').map(Number) as [number, number]);
 }
 const lichtung = REGIONS[0];
-const START = HOME.wake[0]!;
+/** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich */
+const LICHTUNG = createWorld(1).homes.lichtung;
+const START = LICHTUNG.wake[0]!;
 const SEEDS = [1, 42, 2026, 7, 99, 123456, 15838, 23757, 55433, 95028];
 
 describe('Welt aus dem Seed', () => {
@@ -56,13 +60,13 @@ describe('Start auf der Lichtung', () => {
     const w = createWorld(seed);
 
     it(`Seed ${seed}: In der Mitte steht nur das Bett, ringsum ist es frei`, () => {
-      expect(w.cell(HOME.bed[0], HOME.bed[1]).deco).toBe('bed');
-      for (let y = -HOME.clear; y <= HOME.clear; y++)
-        for (let x = -HOME.clear; x <= HOME.clear; x++) {
-          if (x === HOME.bed[0] && y === HOME.bed[1]) continue;
+      expect(w.cell(LICHTUNG.bed[0], LICHTUNG.bed[1]).deco).toBe('bed');
+      for (let y = -LICHTUNG.clear; y <= LICHTUNG.clear; y++)
+        for (let x = -LICHTUNG.clear; x <= LICHTUNG.clear; x++) {
+          if (x === LICHTUNG.bed[0] && y === LICHTUNG.bed[1]) continue;
           expect(standHeight(w, [], x, y), `${x},${y}`).toBe(1);
         }
-      for (const [x, y] of HOME.wake) expect(standHeight(w, [], x, y)).not.toBeNull();
+      for (const [x, y] of LICHTUNG.wake) expect(standHeight(w, [], x, y)).not.toBeNull();
     });
 
     it(`Seed ${seed}: Alle Tiere wohnen erreichbar auf der Lichtung (vier je Art), die Landschaft bleibt draußen`, () => {
@@ -120,7 +124,7 @@ describe('Start auf der Lichtung', () => {
 
     it(`Seed ${seed}: Die großen Tore liegen weit vom Bett`, () => {
       for (const { mid } of w.gates.values())
-        expect(Math.hypot(mid[0] - HOME.bed[0], mid[1] - HOME.bed[1])).toBeGreaterThan(60);
+        expect(Math.hypot(mid[0] - LICHTUNG.bed[0], mid[1] - LICHTUNG.bed[1])).toBeGreaterThan(60);
     });
 
     it(`Seed ${seed}: In der Landschaft klettert man eine Stufe hinauf und fällt beliebig tief herunter`, () => {
@@ -159,7 +163,7 @@ describe('Start auf der Lichtung', () => {
           expect(w.cell(x, y).gate).toBe(g.id);
           expect(standHeight(w, [], x, y)).toBeNull();
         }
-        expect(g.locked).toBe(true);
+        expect(g.opens).toBe('never');
       }
     });
 
@@ -215,22 +219,55 @@ describe('Start auf der Lichtung', () => {
       const w = createWorld(seed);
       const reach = new Set(reachable(w, [], START).map(([x, y]) => `${x},${y}`));
       let meadow = 0;
-      for (let y = -HOME.meadow; y <= HOME.meadow; y++)
-        for (let x = -HOME.meadow; x <= HOME.meadow; x++) {
-          if (Math.hypot(x, y) > HOME.meadow) continue;
-          const c = w.cell(HOME.bed[0] + x, HOME.bed[1] + y);
+      for (let y = -LICHTUNG.meadow; y <= LICHTUNG.meadow; y++)
+        for (let x = -LICHTUNG.meadow; x <= LICHTUNG.meadow; x++) {
+          if (Math.hypot(x, y) > LICHTUNG.meadow) continue;
+          const c = w.cell(LICHTUNG.bed[0] + x, LICHTUNG.bed[1] + y);
           if (c.deco === 'bed' || c.portal) continue;
           expect(c.garden, `${x},${y}`).toBe(true);
           if (c.solid) continue; // Tröge
           meadow++;
-          expect(standHeight(w, [], HOME.bed[0] + x, HOME.bed[1] + y)).toBe(1);
-          expect(reach.has(`${HOME.bed[0] + x},${HOME.bed[1] + y}`)).toBe(true);
+          expect(standHeight(w, [], LICHTUNG.bed[0] + x, LICHTUNG.bed[1] + y)).toBe(1);
+          expect(reach.has(`${LICHTUNG.bed[0] + x},${LICHTUNG.bed[1] + y}`)).toBe(true);
         }
       expect(meadow).toBeGreaterThan(90);
-      expect(w.cell(...HOME.food).deco).toBe('trough');
-      expect(w.cell(...HOME.water).deco).toBe('watertrough');
+      expect(w.cell(...LICHTUNG.food).deco).toBe('trough');
+      expect(w.cell(...LICHTUNG.water).deco).toBe('watertrough');
       // Tiere der Lichtung wohnen nicht auf der Wiese
       for (const [x, y] of w.spawns.values()) expect(w.cell(x, y).garden).toBeUndefined();
+    });
+  }
+});
+
+describe('Zuhause je Gegend', () => {
+  for (const seed of [1, 42]) {
+    it(`Seed ${seed}: jede Gegend hat ein Zuhause: Bett, Wiese, Tröge und Unterstand liegen in ihr, wie HOMES sie legt`, () => {
+      const w = createWorld(seed);
+      expect(w.homes.lichtung.bed).toEqual([0, 0]); // das Bett der Lichtung steht in ihrer Mitte
+      for (const r of REGIONS) {
+        const home = w.homes[r.id];
+        const plan = HOMES[r.id];
+        const at = ([x, y]: readonly [number, number]) => [home.bed[0] + x, home.bed[1] + y];
+        expect(home.realm).toBe(r.id);
+        expect(w.cell(...home.bed).deco).toBe('bed');
+        expect(home.food).toEqual(at(plan.food));
+        expect(home.water).toEqual(at(plan.water));
+        expect(home.shelterStem).toEqual(at(plan.shelterStem));
+        expect(home.wake).toEqual(plan.wake.map(at));
+        expect(w.cell(...home.food).deco).toBe('trough');
+        expect(w.cell(...home.water).deco).toBe('watertrough');
+        expect(w.cell(...home.shelterStem).deco).toBe('shelterpilz');
+        for (const [x, y] of home.wake) expect(standHeight(w, [], x, y)).not.toBeNull();
+        for (const p of [home.bed, home.food, home.water, home.shelterStem, ...home.wake])
+          expect(w.realm(...p), p.join(',')).toBe(r.id);
+        expect(homeAt(w, ...home.bed)).toBe(home);
+        const spots = w.spotsOf(r.id);
+        expect(spots.length).toBeGreaterThan(1000);
+        for (const [x, y] of spots) {
+          expect(w.realm(x, y)).toBe(r.id);
+          expect(w.cell(x, y).garden).toBeUndefined();
+        }
+      }
     });
   }
 });
@@ -361,24 +398,30 @@ describe('Portal-Plattformen', () => {
         // am Tor gleich neben dem Turm, im Ring um das Bett etwa neun Felder weit
         const { mid } = w.gates.get(g.id)!;
         expect(Math.hypot(p.gate[0] - mid[0], p.gate[1] - mid[1]), `${g.id} nah am Tor`).toBeLessThanOrEqual(7);
-        expect(Math.abs(Math.hypot(p.home[0] - HOME.bed[0], p.home[1] - HOME.bed[1]) - HOME.portalRing)).toBeLessThan(
-          1,
-        );
+        expect(
+          Math.abs(Math.hypot(p.home[0] - LICHTUNG.bed[0], p.home[1] - LICHTUNG.bed[1]) - LICHTUNG.portalRing),
+        ).toBeLessThan(1);
         expect(cheb(p.gate, w.stones.get(g.id)!), `${g.id}: Klangstein nicht an der Plattform`).toBeGreaterThan(2);
       }
     });
   }
 
   it('im Ring um das Bett: keine Plattform berührt eine andere, die Wiese, das Bett, Tröge, Unterstand oder Klangstein (viele Seeds)', () => {
-    const fixed: (readonly [number, number])[] = [HOME.bed, HOME.food, HOME.water, HOME.shelterStem, BED_STONE];
-    const { x0, y0, x1, y1 } = HOME.shelter;
+    const fixed: (readonly [number, number])[] = [
+      LICHTUNG.bed,
+      LICHTUNG.food,
+      LICHTUNG.water,
+      LICHTUNG.shelterStem,
+      BED_STONE,
+    ];
+    const { x0, y0, x1, y1 } = LICHTUNG.shelter;
     for (let seed = 1; seed <= 3000; seed++) {
       const homes = [...portalPlaces(seed).values()].map((p) => p.home);
       for (const a of homes) {
         for (const b of homes) if (a !== b) expect(cheb(a, b), `Seed ${seed}`).toBeGreaterThanOrEqual(4);
         for (const { x, y } of platformCells(a)) {
-          const [dx, dy] = [x - HOME.bed[0], y - HOME.bed[1]];
-          expect(Math.hypot(dx, dy), `Seed ${seed}: nicht auf der Wiese`).toBeGreaterThan(HOME.meadow + 0.5);
+          const [dx, dy] = [x - LICHTUNG.bed[0], y - LICHTUNG.bed[1]];
+          expect(Math.hypot(dx, dy), `Seed ${seed}: nicht auf der Wiese`).toBeGreaterThan(LICHTUNG.meadow + 0.5);
           expect(x >= x0 && x <= x1 && y >= y0 && y <= y1, `Seed ${seed}: Unterstand`).toBe(false);
         }
         // auch der freie Ring um die Plattform liegt nicht auf Bett, Trog, Pilzstiel oder Klangstein

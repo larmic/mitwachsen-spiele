@@ -8,7 +8,6 @@ import { cycle, hash, rand01, valueNoise } from '../../lib/games/rng';
 import {
   GAME_COLORS,
   GATES,
-  HOME,
   REGIONS,
   WILD_SPECIES,
   regionAnimalList,
@@ -19,6 +18,7 @@ import {
   type SpeciesId,
 } from '../../data/games/mitwachsen';
 import { BED_STONE, type StoryId } from '../../data/games/mitwachsen-stories';
+import { LICHTUNG_HOME, REALMS, type Realms } from './mitwachsen-home';
 import { PLATFORM_HALF, platformCells, ringSpots, type PlatformSpot, type Portal } from './mitwachsen-portal';
 
 export type Ground =
@@ -99,13 +99,14 @@ export type Cell = {
   story?: StoryId; // Klangstein dieser Geschichte
 };
 
-export type World = {
+/** Eine Welt: Felder, Gegenden mit ihrem Zuhause (`Realms`), Wohnorte, Tore, Portale und Klangsteine */
+export type World = Realms & {
   readonly seed: number;
   cell(x: number, y: number): Cell;
-  /** Wohnort jedes Tiers der Lichtung: nächstes vom Bett aus erreichbares Feld zum Wunschort */
+  /** Wohnort jedes Tiers der Gegenden: nächstes vom Bett aus erreichbares Feld zum Wunschort */
   readonly spawns: ReadonlyMap<string, Point>; // je Tier-Kennung
-  /** Alle vom Bett aus erreichbaren Felder der Lichtung außerhalb der Wiese: hier dürfen Tiere wohnen */
-  readonly spots: readonly Point[];
+  /** Alle vom Bett aus erreichbaren Felder einer Gegend außerhalb der Wiese: hier dürfen ihre Tiere wohnen */
+  spotsOf(realm: RegionId): readonly Point[];
   /** Portale: je Tor eines daneben und eines im Kreis um das Bett, mit dem Feld, auf dem man herauskommt */
   readonly portals: ReadonlyMap<GateId, Portal>;
   /** Die großen Tore: Lage und Reihenfolge würfelt der Seed */
@@ -119,6 +120,7 @@ export type World = {
 export type Climate = { id: GateId; strength: number };
 
 export const inRect = (r: Rect, x: number, y: number) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
+
 const key = (x: number, y: number) => `${x},${y}`;
 
 const grass = (region: Cell['region']): Cell => ({ h: 1, ground: 'grass', deco: null, region, solid: false });
@@ -207,8 +209,8 @@ function layouts(seed: number): Layout[] {
 function portalsOf(places: readonly Layout[]): Map<GateId, Portal> {
   const homes = ringSpots(
     places.map((p) => p.angle),
-    HOME.portalRing,
-    HOME.bed,
+    LICHTUNG_HOME.portalRing,
+    LICHTUNG_HOME.bed,
   );
   return new Map(
     places.map((p, i): [GateId, Portal] => [
@@ -254,26 +256,26 @@ function buildStart(
         continue;
       }
       const c = grass('lichtung');
-      const near = Math.max(Math.abs(x - HOME.bed[0]), Math.abs(y - HOME.bed[1]));
-      if (near <= HOME.clear) {
+      const near = Math.max(Math.abs(x - LICHTUNG_HOME.bed[0]), Math.abs(y - LICHTUNG_HOME.bed[1]));
+      if (near <= LICHTUNG_HOME.clear) {
         set(x, y, c); // am Bett flach und frei
         continue;
       }
       const roll = rand01(seed, x, y, 1);
       const wet = valueNoise(seed + 31, x, y, 9);
-      if (wet < 0.15 && near > HOME.clear + 2) {
+      if (wet < 0.15 && near > LICHTUNG_HOME.clear + 2) {
         set(x, y, { ...water('lichtung'), deco: roll < 0.2 ? 'lily' : null });
         continue;
       }
-      if (wet < 0.2 && near > HOME.clear + 1) {
+      if (wet < 0.2 && near > LICHTUNG_HOME.clear + 1) {
         set(x, y, { ...c, ...(roll < 0.35 ? { deco: 'reed' as const } : { ground: 'sand' as const }) });
         continue;
       }
       const hill = valueNoise(seed + 30, x, y, 10);
-      c.h = near <= HOME.clear + 2 ? 1 : hill < 0.45 ? 1 : hill < 0.68 ? 2 : 3;
+      c.h = near <= LICHTUNG_HOME.clear + 2 ? 1 : hill < 0.45 ? 1 : hill < 0.68 ? 2 : 3;
       const forest = valueNoise(seed + 32, x, y, 16) > 0.62; // lichte Haine: etwas mehr Bäume, aber einzeln
       const meadow = valueNoise(seed + 33, x, y, 12) > 0.6; // Blumenwiesen
-      const far = near > HOME.clear + 1 && !obstacleNear(x, y);
+      const far = near > LICHTUNG_HOME.clear + 1 && !obstacleNear(x, y);
       if (far && roll < (forest ? 0.07 : 0.012)) Object.assign(c, { deco: 'tree', solid: true });
       else if (far && roll < (forest ? 0.09 : 0.02))
         Object.assign(c, { deco: 'bush', solid: true }); // Beerenbusch
@@ -282,7 +284,7 @@ function buildStart(
       else if (far && roll < (meadow ? 0.475 : 0.16)) Object.assign(c, { h: c.h + 1, ground: 'stone' }); // Stein zum Klettern
       set(x, y, c);
     }
-  set(HOME.bed[0], HOME.bed[1], { ...grass('lichtung'), deco: 'bed', solid: true });
+  set(LICHTUNG_HOME.bed[0], LICHTUNG_HOME.bed[1], { ...grass('lichtung'), deco: 'bed', solid: true });
 
   // Große Tore: Platz davor frei, Tor und Türme in der Torreihe, dahinter ein Gang durch den Fels in die Welt
   for (const p of places) {
@@ -317,12 +319,12 @@ function buildStart(
   placePlatforms(map, portalsOf(places));
 
   // Wiese ums Bett: eben und frei, mit Futter und Wasser; am Rand ein paar Blumen
-  const r = HOME.meadow;
+  const r = LICHTUNG_HOME.meadow;
   for (let dy = -r - 1; dy <= r + 1; dy++)
     for (let dx = -r - 1; dx <= r + 1; dx++) {
       const d = Math.hypot(dx, dy);
       if (d > r + 0.5) continue;
-      const [x, y] = [HOME.bed[0] + dx, HOME.bed[1] + dy];
+      const [x, y] = [LICHTUNG_HOME.bed[0] + dx, LICHTUNG_HOME.bed[1] + dy];
       const c = map.get(key(x, y));
       if (!c || c.deco === 'bed' || c.portal) continue;
       const edgeFlower = d > r - 0.5 && hash(seed, x, y, 15) % 3 === 0;
@@ -333,14 +335,14 @@ function buildStart(
       });
     }
   for (const [[x, y], deco] of [
-    [HOME.food, 'trough'],
-    [HOME.water, 'watertrough'],
+    [LICHTUNG_HOME.food, 'trough'],
+    [LICHTUNG_HOME.water, 'watertrough'],
   ] as const)
     set(x, y, { ...grass('lichtung'), garden: true, deco, solid: true });
-  for (let y = HOME.shelter.y0; y <= HOME.shelter.y1; y++)
-    for (let x = HOME.shelter.x0; x <= HOME.shelter.x1; x++)
+  for (let y = LICHTUNG_HOME.shelter.y0; y <= LICHTUNG_HOME.shelter.y1; y++)
+    for (let x = LICHTUNG_HOME.shelter.x0; x <= LICHTUNG_HOME.shelter.x1; x++)
       set(x, y, { ...grass('lichtung'), garden: true, roof: true });
-  set(HOME.shelterStem[0], HOME.shelterStem[1], {
+  set(LICHTUNG_HOME.shelterStem[0], LICHTUNG_HOME.shelterStem[1], {
     ...grass('lichtung'),
     garden: true,
     deco: 'shelterpilz',
@@ -424,7 +426,7 @@ function smooth(map: Map<string, Cell>) {
   }
 }
 
-/** Felder, die vom Bett aus zu Fuß erreichbar sind */
+/** Felder, die vom Bett der Lichtung aus zu Fuß erreichbar sind */
 function reachOf(map: Map<string, Cell>): Point[] {
   const stand = (x: number, y: number) => {
     const c = map.get(key(x, y));
@@ -432,7 +434,7 @@ function reachOf(map: Map<string, Cell>): Point[] {
   };
   const reach: Point[] = [];
   const seen = new Set<string>();
-  const queue: Point[] = HOME.wake.filter(([x, y]) => stand(x, y) !== null);
+  const queue: Point[] = LICHTUNG_HOME.wake.filter(([x, y]) => stand(x, y) !== null);
   for (const p of queue) seen.add(key(p[0], p[1]));
   while (queue.length) {
     const [x, y] = queue.shift()!;
@@ -477,8 +479,8 @@ function findSpawns(seed: number, land: Point[]): Map<string, Point> {
   for (const gap of [9, 5, 1]) {
     for (const p of shuffled) {
       if (!rest.length) break;
-      const [x, y] = p;
-      if (Math.max(Math.abs(x - HOME.bed[0]), Math.abs(y - HOME.bed[1])) < 6 || !free(p, gap)) continue;
+      const [dx, dy] = [p[0] - LICHTUNG_HOME.bed[0], p[1] - LICHTUNG_HOME.bed[1]]; // Abstand zum Bett
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 6 || !free(p, gap)) continue;
       const { id } = rest.shift()!;
       taken.push(p);
       spawns.set(id, p);
@@ -720,9 +722,10 @@ export function createWorld(seed: number): World {
   return {
     seed,
     cell: (x, y) => cache.get(x, y),
+    ...REALMS,
     gates: gatesOf(places),
     spawns,
-    spots,
+    spotsOf: (realm) => ({ lichtung: spots })[realm],
     portals: portalsOf(places),
     stones: stonesOf(places),
     climate: (x, y) => climateOf(seed, places, x, y),

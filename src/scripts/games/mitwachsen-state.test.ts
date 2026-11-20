@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Dir } from '../../lib/games/front';
-import { HOME, REGIONS, animalId } from '../../data/games/mitwachsen';
+import { GATES, REGIONS, animalId, type RegionId } from '../../data/games/mitwachsen';
 import {
   SLEEP_LOCK,
   BERRY_REGROW,
@@ -15,17 +15,23 @@ import {
   type State,
 } from './mitwachsen-state';
 import { createWorld, standHeight, type Cell, type World } from './mitwachsen-world';
+import { startRealm, type Homestead } from './mitwachsen-home';
 import { BLOCK, raining } from './mitwachsen-weather';
 import { platformArea } from './mitwachsen-portal';
 
+/** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich */
+const LICHTUNG = createWorld(1).homes.lichtung;
+
 /** Kleine Testwelt: überall flaches Gras des Zuhauses, einzelne Felder überschreibbar */
-function fakeWorld(cells: Record<string, Partial<Cell>> = {}): World {
+function fakeWorld(cells: Record<string, Partial<Cell>> = {}, home: Partial<Homestead> = {}): World {
   return {
     seed: 1,
     cell: (x, y) => ({ h: 1, ground: 'grass', deco: null, region: 'lichtung', solid: false, ...cells[`${x},${y}`] }),
+    realm: () => 'lichtung',
+    homes: { lichtung: { ...LICHTUNG, ...home } },
     gates: new Map(),
     spawns: new Map(),
-    spots: [],
+    spotsOf: () => [],
     climate: () => ({ id: 'eis', strength: 0 }),
     portals: new Map(),
     stones: new Map(),
@@ -39,6 +45,7 @@ const animal = (id: string, x: number, y: number, extra: Partial<Animal> = {}): 
   dir: 's',
   mode: 'wander',
   home: { kind: 'region', region: 'lichtung' },
+  realm: 'lichtung',
   spawn: [x, y],
   rest: 99,
   ...extra,
@@ -72,10 +79,10 @@ describe('Aufwachen und Schlafen', () => {
     const world = createWorld(1);
     const s0 = initialState(world);
     expect(s0.sleeping).toBe(true);
-    expect([s0.player.x, s0.player.y]).toEqual([...HOME.bed]);
+    expect([s0.player.x, s0.player.y]).toEqual([...LICHTUNG.bed]);
     const { s, events } = run(s0, world, 'e');
     expect(s.sleeping).toBe(false);
-    expect([s.player.x, s.player.y]).toEqual([...HOME.wake[0]!]);
+    expect([s.player.x, s.player.y]).toEqual([...LICHTUNG.wake[0]!]);
     expect(types(events)).toEqual(['wake']);
   });
 
@@ -95,7 +102,7 @@ describe('Aufwachen und Schlafen', () => {
 
   it('läuft ins Bett und schläft ein, ganz ohne Aktionstaste', () => {
     const world = createWorld(1);
-    const [bx, by] = HOME.bed;
+    const [bx, by] = LICHTUNG.bed;
     const r = run(awake(world, bx + 1, by), world, 'w');
     expect(types(r.events)).toEqual(['sleep']);
     expect(r.s.sleeping).toBe(true);
@@ -106,7 +113,7 @@ describe('Aufwachen und Schlafen', () => {
     let s = run(initialState(world), world, 'e').s; // wach neben dem Bett
     expect(s.sleeping).toBe(false);
     const toBed = DIRS_TO_BED.find(
-      ([dx, dy]) => s.player.x + dx === HOME.bed[0] && s.player.y + dy === HOME.bed[1],
+      ([dx, dy]) => s.player.x + dx === LICHTUNG.bed[0] && s.player.y + dy === LICHTUNG.bed[1],
     )![2];
     expect(types(run(s, world, toBed).events)).toEqual(['bump']);
     for (let i = 0; i < WAKE_GRACE; i++) s = run(s, world, TICK).s;
@@ -334,7 +341,7 @@ describe('Tage', () => {
     let s = initialState(world, { day: 4 });
     expect(s.day).toBe(4);
     s = run(s, world, 'e').s;
-    s = { ...s, player: { ...s.player, x: HOME.bed[0] + 1, y: HOME.bed[1], dir: 'w' } };
+    s = { ...s, player: { ...s.player, x: LICHTUNG.bed[0] + 1, y: LICHTUNG.bed[1], dir: 'w' } };
     s = run(s, world, ACT).s;
     expect(s.day).toBe(5);
     expect(progressOf(s).day).toBe(5);
@@ -355,14 +362,14 @@ describe('Tiere an wechselnden Stellen', () => {
   });
 
   it('immer auf erreichbaren Feldern der Lichtung, mit Abstand zum Bett und zueinander', () => {
-    const spots = new Set(world.spots.map(([x, y]) => `${x},${y}`));
+    const spots = new Set(world.spotsOf('lichtung').map(([x, y]) => `${x},${y}`));
     for (const seed of [1, 2, 3]) {
       const s = initialState(world, {}, seed);
       const region = s.animals.filter((a) => a.home.kind === 'region');
       expect(region).toHaveLength(REGIONS[0].animals.length * REGIONS[0].herd); // je Art eine Herde
       for (const a of region) {
         expect(spots.has(`${a.x},${a.y}`), a.id).toBe(true);
-        expect(Math.max(Math.abs(a.x - HOME.bed[0]), Math.abs(a.y - HOME.bed[1]))).toBeGreaterThanOrEqual(8);
+        expect(Math.max(Math.abs(a.x - LICHTUNG.bed[0]), Math.abs(a.y - LICHTUNG.bed[1]))).toBeGreaterThanOrEqual(8);
       }
     }
   });
@@ -373,7 +380,7 @@ describe('Tiere an wechselnden Stellen', () => {
     s = run(s, world, 'e').s; // aufwachen
     const hase = s.animals.find((a) => a.id === 'lichtung:hase')!;
     const before = where(s);
-    s = { ...s, player: { ...s.player, x: HOME.bed[0] + 1, y: HOME.bed[1] } };
+    s = { ...s, player: { ...s.player, x: LICHTUNG.bed[0] + 1, y: LICHTUNG.bed[1] } };
     s = run(s, world, ACT).s; // schlafen
     for (let i = 0; i < SLEEP_LOCK; i++) s = run(s, world, TICK).s;
     s = run(s, world, 'e').s; // neuer Morgen
@@ -411,7 +418,7 @@ describe('Jeder Tag beginnt mit Sonne', () => {
     let s: State = {
       ...initialState(world),
       sleeping: false,
-      player: { x: HOME.bed[0] + 1, y: HOME.bed[1], dir: 'w' },
+      player: { x: LICHTUNG.bed[0] + 1, y: LICHTUNG.bed[1], dir: 'w' },
     };
     let rain = 1;
     while (!raining(world.seed, s.day, rain * BLOCK)) rain++;
@@ -543,7 +550,13 @@ describe('Wiese ums Bett', () => {
 });
 
 describe('Große Tore', () => {
-  it('bleiben verschlossen, auch wenn alle Tiere der Lichtung gefunden sind', () => {
+  const never = GATES.filter((g) => g.opens === 'never').map((g) => g.id);
+
+  it('alle acht stehen vorerst auf „never“', () => {
+    expect(never).toHaveLength(8);
+  });
+
+  it('Tore mit opens „never“ öffnen nie, auch wenn alle Tiere der Lichtung gefunden sind', () => {
     const world = createWorld(1);
     const s = initialState(world, { met: regionAnimals('lichtung') });
     expect(s.openGates).toEqual([]);
@@ -551,11 +564,12 @@ describe('Große Tore', () => {
       expect(standHeight(world, s.openGates, x, y)).toBeNull();
   });
 
-  it('übernehmen aus einem alten Spielstand kein offenes, verschlossenes Tor', () => {
-    expect(initialState(createWorld(1), { openGates: ['eis'] }).openGates).toEqual([]);
+  it('Tore mit opens „never“ öffnen nie, auch nicht aus einem alten Spielstand', () => {
+    const s = initialState(createWorld(1), { openGates: never });
+    expect(s.openGates.filter((id) => never.includes(id))).toEqual([]);
   });
 
-  it('das letzte gefundene Tier öffnet kein verschlossenes Tor (kein Ereignis)', () => {
+  it('das letzte gefundene Tier öffnet kein Tor (kein Ereignis)', () => {
     const world = createWorld(1);
     const others = regionAnimals('lichtung').filter((id) => id !== animalId('lichtung', 'hase'));
     let s = initialState(world, { met: others });
@@ -567,6 +581,102 @@ describe('Große Tore', () => {
     };
     const r = run(s, world, ACT);
     expect(types(r.events)).not.toContain('gate');
+    expect(r.s.openGates).toEqual([]);
+  });
+});
+
+describe('Zuhause je Gegend', () => {
+  it('startet am Bett der Gegend, in der die gespeicherte Position liegt', () => {
+    const world = createWorld(1);
+    expect(world.realm(20, -14)).toBe('lichtung');
+    const s = initialState(world, { position: [20, -14] });
+    expect([s.player.x, s.player.y]).toEqual([...world.homes.lichtung.bed]);
+    // Das Bett kommt aus dem Zuhause der Gegend: Liegt es woanders, schläft die Figur dort
+    const moved = fakeWorld({}, { bed: [5, 7] });
+    const t = initialState(moved, { position: [2, 3] });
+    expect([t.player.x, t.player.y]).toEqual([5, 7]);
+  });
+
+  it('unbekannte oder kaputte Position: Start am Bett der Lichtung', () => {
+    const world = createWorld(1);
+    const bed = [...world.homes.lichtung.bed];
+    for (const position of [undefined, [5000, -7000], [Number.NaN, 2], [1.5, 0]] as const) {
+      const s = initialState(world, { position: position && [position[0], position[1]] });
+      expect([s.player.x, s.player.y], String(position)).toEqual(bed);
+    }
+  });
+
+  it('schläft im Bett der Gegend, in der die Figur steht, und wacht dort auf', () => {
+    const w = fakeWorld({ '5,7': { deco: 'bed', solid: true } }, { bed: [5, 7], wake: [[5, 8]] });
+    let s = awake(w, 6, 7);
+    s = { ...s, player: { ...s.player, dir: 'w' } };
+    s = run(s, w, ACT).s;
+    expect(s.sleeping).toBe(true);
+    expect([s.player.x, s.player.y]).toEqual([5, 7]);
+    for (let i = 0; i < SLEEP_LOCK; i++) s = run(s, w, TICK).s;
+    s = run(s, w, 'e').s;
+    expect(s.sleeping).toBe(false);
+    expect([s.player.x, s.player.y]).toEqual([5, 8]);
+  });
+
+  it('Tiere gehören zu ihrer Gegend, Tiere der Landschaft zur Lichtung', () => {
+    const world = createWorld(4);
+    const s = initialState(world, { garden: [{ id: 'wild:0:2:0', species: 'fuchs' }] });
+    for (const a of s.animals) expect(a.realm, a.id).toBe('lichtung');
+    expect(s.animals.find((a) => a.id === 'wild:0:2:0')!.realm).toBe('lichtung');
+  });
+
+  // Zweite Gegend zum Ausprobieren (die Eis-Welt gibt es noch nicht): Alles östlich von x = 20 gehört zu ihr, ihr Bett
+  // steht bei (24, 0), ihre Wiese reicht von x = 21 bis 27
+  const EIS = 'eis' as RegionId;
+  const twoRealms = (cells: Record<string, Partial<Cell>> = {}): World => {
+    for (let y = -3; y <= 3; y++) for (let x = 21; x <= 27; x++) cells[`${x},${y}`] ??= { garden: true };
+    const w = fakeWorld(cells);
+    const eis = { ...LICHTUNG, realm: EIS, bed: [24, 0] as const, shelter: { x0: 22, y0: -3, x1: 26, y1: -2 } };
+    return { ...w, realm: (x) => (x > 20 ? EIS : 'lichtung'), homes: { ...w.homes, [EIS]: eis } };
+  };
+
+  it('liegt die gespeicherte Position hinter einem Tor, das zu ist: Start am Bett der Lichtung', () => {
+    const world = twoRealms();
+    const regions = [REGIONS[0], { ...REGIONS[0], id: EIS, behind: 'eis' as const }] as const;
+    expect(startRealm(world, [], [24, 0], regions)).toBe('lichtung');
+    expect(startRealm(world, ['eis'], [24, 0], regions)).toBe(EIS);
+    expect(startRealm(world, [], [3, 0], regions)).toBe('lichtung');
+  });
+
+  it('ein Tier zieht nur auf der Wiese seiner eigenen Gegend ein', () => {
+    const w = twoRealms();
+    let s = awake(w, 28, 0, [
+      animal('lichtung:hase', 29, 0, { mode: 'follow' }),
+      animal('eis:hase', 30, 0, { mode: 'follow', realm: EIS }),
+    ]);
+    s = { ...s, followers: ['lichtung:hase', 'eis:hase'], player: { ...s.player, dir: 'w' } };
+    const r = run(s, w, 'w', 'w', 'w', 'w');
+    const homes = r.events.filter((e) => e.type === 'home');
+    expect(homes).toEqual([{ type: 'home', id: 'eis:hase', species: 'hase' }]);
+    expect(r.s.followers).toEqual(['lichtung:hase']); // der Hase der Lichtung folgt weiter
+    expect(r.s.garden).toEqual([{ id: 'eis:hase', species: 'hase' }]);
+  });
+
+  it('am Trog freuen sich nur die Tiere der Wiese, auf der er steht', () => {
+    const w = twoRealms({
+      '-1,0': { deco: 'trough', solid: true, garden: true },
+      '1,0': { deco: 'watertrough', solid: true, garden: true },
+      '28,0': { deco: 'trough', solid: true },
+      '29,1': { deco: 'watertrough', solid: true },
+    });
+    const resident = (id: string, x: number, realm: RegionId) =>
+      animal(id, x, 2, { mode: 'home', home: { kind: 'garden' }, realm });
+    const herd = [resident('lichtung:hase', 0, 'lichtung'), resident('eis:hase', 24, EIS)];
+    const full = (x: number, y: number): State => ({ ...awake(w, x, y, herd), basket: true, bucket: true });
+    expect(run(full(0, 0), w, 'w', 'e').events).toEqual([
+      { type: 'feed', ids: ['lichtung:hase'] },
+      { type: 'pour', ids: ['lichtung:hase'] },
+    ]);
+    expect(run(full(29, 0), w, 'w', 's').events).toEqual([
+      { type: 'feed', ids: ['eis:hase'] },
+      { type: 'pour', ids: ['eis:hase'] },
+    ]);
   });
 });
 
@@ -628,7 +738,7 @@ describe('Invarianten bei wildem Drücken', () => {
 describe('Randfälle aus der Prüfung', () => {
   it('schläft am Bett, auch wenn ein folgendes Tier direkt hinter der Figur steht', () => {
     const world = createWorld(1);
-    const [bx, by] = HOME.bed;
+    const [bx, by] = LICHTUNG.bed;
     let s = awake(world, bx + 1, by, [animal('lichtung:hase', bx + 1, by + 1, { mode: 'follow' })]);
     s = { ...s, followers: ['lichtung:hase'], player: { ...s.player, dir: 'n' } };
     const r = run(s, world, ACT);
@@ -808,7 +918,7 @@ describe('Portal-Plattformen', () => {
 
   it('Schlafen vergisst die Ankunft', () => {
     const r = go(at(gx - 1, gy, { portals: ['lava'] }), gx, gy);
-    const s = { ...r.s, wokeAt: -100, player: { x: HOME.bed[0] + 1, y: HOME.bed[1], dir: 'w' as const } };
+    const s = { ...r.s, wokeAt: -100, player: { x: LICHTUNG.bed[0] + 1, y: LICHTUNG.bed[1], dir: 'w' as const } };
     const slept = step(s, world, { type: 'move', dir: 'w' }).state;
     expect([slept.sleeping, slept.arrived]).toEqual([true, null]);
   });
