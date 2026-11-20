@@ -57,7 +57,7 @@ Die Lichtung ist das Zuhause mit dem Bett. Hinter jedem der acht großen Tore li
 | Welt | Stand | Thema (`GateTheme`) |
 | --- | --- | --- |
 | **Lichtung** | spielbar | – |
-| **Eiswelt** | Kessel gebaut, Tor zu | `eis` |
+| **Eiswelt** | Kessel und Tiere da, Tor zu | `eis` |
 | **Sandwelt** | Landschaft gebaut, Tor zu | `sand` |
 | **Wasserwelt** | Landschaft gebaut, Tor zu | `wasser` |
 | **Lavaberge** | Landschaft gebaut, Tor zu | `lava` |
@@ -81,10 +81,23 @@ Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzel
 
 ### Eiswelt
 
-- **Kessel gebaut, Tor zu:** Hinter dem Eistor führt der Gang in einen Gletscherkessel (etwa 44 × 38 Felder), fest am Ende des Gangs, ringsum hohe Eisklippen mit Schnee obenauf (sie antworten wie Felsen mit Wackeln und „boing“). Der Gang ist der einzige Weg hinein. In der Mitte das Schneebett, darum die Schneewiese mit einer Futterschale aus Eis (links vor dem Bett) und einem Wassertrog aus Eisblöcken (rechts), dahinter ein großes Iglu als Unterstand: vorn ein weiter Bogen, durch den man hineinsieht, hinten eine feste Wand; vor der Figur wird die Kuppel durchsichtig. Seitlich ein Eisloch zum Wasserschöpfen. Um das Bett bleibt viel Platz (später für Klangstein und Portal). Sanfte Schneehügel (nie mehr als eine Stufe) und glatte Eisflächen, kühles Licht. Vom Tor bis ans Bett liegt die Rutschspur des Pinguins schon bereit; sie glänzt erst, wenn das Tor offen ist. Solange das Tor zu ist, kommt man nicht hinein; vom Tor aus sieht man nur ein Stück des Gangs. Im Kessel und im Land der Eiswelt draußen laufen keine Tiere der Lichtung herum.
+- **Kessel und Tiere da, Tor zu:** Hinter dem Eistor führt der Gang in einen Gletscherkessel (etwa 44 × 38 Felder), fest am Ende des Gangs, ringsum hohe Eisklippen mit Schnee obenauf (sie antworten wie Felsen mit Wackeln und „boing“). Der Gang ist der einzige Weg hinein. In der Mitte das Schneebett, darum die Schneewiese mit einer Futterschale aus Eis (links vor dem Bett) und einem Wassertrog aus Eisblöcken (rechts), dahinter ein großes Iglu als Unterstand: vorn ein weiter Bogen, durch den man hineinsieht, hinten eine feste Wand; vor der Figur wird die Kuppel durchsichtig. Seitlich ein Eisloch zum Wasserschöpfen. Um das Bett bleibt viel Platz (später für Klangstein und Portal). Sanfte Schneehügel (nie mehr als eine Stufe) und glatte Eisflächen, kühles Licht. Vom Tor bis ans Bett liegt die Rutschspur des Pinguins schon bereit; sie glänzt erst, wenn das Tor offen ist. Solange das Tor zu ist, kommt man nicht hinein; vom Tor aus sieht man nur ein Stück des Gangs. Im Kessel wohnen die zehn Eis-Tiere (unten), je drei; im Kessel und im Land der Eiswelt draußen laufen keine Tiere der Lichtung herum. Die Leiste unten zeigt immer die Tiere der Gegend, in der die Figur steht: auf der Lichtung wie bisher, im Kessel die Eis-Tiere.
 - **Aussehen:** Schneefelder, glitzernde Eisblöcke zum Klettern, zugefrorene Seen, verschneite Tannen, Iglus. Kühles, helles Licht, sanfter Schneefall (nicht bei reduzierter Bewegung).
 - **Besonderes:** Auf Eis rutscht die Figur nicht (das wäre für ein kleines Kind frustrierend), es knirscht nur beim Laufen.
-- **Tiere (Ideen):** Pinguin, Eisbär, Robbe, Schneehase, Schneeeule.
+- **Tiere:** zehn Arten, je drei Tiere (der Kessel ist viel kleiner als die Lichtung). Alle Töne in der Pentatonik, von tief bis hoch, damit man jedes Tier am Ton erkennt. Der Schneehase fehlt mit Absicht: Er sähe aus wie der Hase der Lichtung.
+
+  | Tier | Merkmal | Ton | Gangart |
+  | --- | --- | --- | --- |
+  | Pinguin | aufrecht, schwarzer Rücken, weißer Bauch, gelb-orange Ohrflecken, oranger Schnabel und Füße | fröhliches Tröten, aufwärts (G–A) | watschelt |
+  | Eisbärkind | das größte Tier: rund und cremeweiß, kleine runde Ohren, schwarze Nase | tiefes, freundliches Brummen (C–D tief) | normaler Hüpfer |
+  | Robbe | grauer Seehund, liegt flach, dunkle Tupfen, weiße Barthaare, große Kulleraugen | kurzes, hohes Bellen (zweimal E) | robbt |
+  | Schneeeule | rund und weiß mit schwarzen Tupfen, große gelbe Augen | weiches Huhu (G, dann E) | flattert kurz |
+  | Walross | groß, braun-rosa, liegend, zwei lange weiße Stoßzähne, heller Schnauzbart | tiefes Grunzen (ein langes tiefes C) | robbt |
+  | Rentier | braun auf hohen dunklen Beinen, weißer Hals, großes helles Geweih | kurzes Grunzen (D–C) | normaler Hüpfer |
+  | Polarfuchs | schlank und bläulich-weiß, spitze Ohren, riesiger buschiger Schwanz mit grauer Spitze | helles Kläffen (A, dann C) | springt hoch |
+  | Moschusochse | dunkles Zottelfell bis fast zum Boden, heller Sattel, Hörner nach unten gebogen | tiefes Muhen (tiefes G) | normaler Hüpfer |
+  | Papageitaucher | klein, schwarz-weiß, weißes Gesicht, großer bunter Schnabel | schnelles Schnarren (E–G–E, hoch) | huscht |
+  | Lemming | winzig, rund und goldbraun, schwarze Kappe, rosa Näschen (etwas größer gezeichnet) | Piepsen in schneller Folge (A–C–A–C) | huscht |
 - **Portal-Plattform:** Eisscholle mit Schneekante, Eisspitzen in den Ecken; Bild: Schneeflocke.
 
 ### Sandwelt

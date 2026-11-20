@@ -11,7 +11,6 @@ import {
   GATES,
   REGIONS,
   WILD_SPECIES,
-  regionAnimalList,
   type GateId,
   type Point,
   type Rect,
@@ -23,6 +22,7 @@ import type { Cell, Ground, TreeKind } from './mitwachsen-cell';
 import { LICHTUNG_HOME, realmsOf, type Realms } from './mitwachsen-home';
 import { buildKessel, placeKessel, type Gang, type Kessel } from './mitwachsen-kessel';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from './mitwachsen-portal';
+import { findSpawns } from './mitwachsen-spawns';
 
 export type { Cell, Deco, Ground, TreeKind } from './mitwachsen-cell';
 export type { Portal };
@@ -311,7 +311,12 @@ function buildStart(
   for (const [k, c] of map)
     if (c.region === 'lichtung' && !c.solid && c.ground !== 'water' && !reached.has(k)) map.set(k, rock(3));
   const spots = reach.filter(([x, y]) => map.get(key(x, y))!.region === 'lichtung' && !map.get(key(x, y))!.garden);
-  return { map, spawns: findSpawns(seed, spots), spots, kessel };
+  const eis = REGIONS.find((r) => r.id === 'eis')!; // die Eis-Welt steht fest in REGIONS
+  const spawns = new Map([
+    ...findSpawns(seed, lichtung, spots, LICHTUNG_HOME.bed),
+    ...findSpawns(seed, eis, kessel.spots, kessel.bed),
+  ]);
+  return { map, spawns, spots, kessel };
 }
 
 /** Gang hinter dem Eistor: Er führt in den Gletscherkessel */
@@ -397,44 +402,6 @@ function reachOf(map: Map<string, Cell>): Point[] {
     }
   }
   return reach;
-}
-
-/**
- * Wohnorte der Tiere: Felder der Lichtung, die vom Bett aus zu Fuß erreichbar sind. Das erste Tier jeder Art wohnt
- * nah an seinem Wunschort, die weiteren verteilt der Seed über die ganze Lichtung (mit Abstand zueinander und zum Bett).
- */
-function findSpawns(seed: number, land: Point[]): Map<string, Point> {
-  const spawns = new Map<string, Point>();
-  const taken: Point[] = [];
-  const free = (p: Point, gap: number) => taken.every(([x, y]) => (x - p[0]) ** 2 + (y - p[1]) ** 2 >= gap * gap);
-  const all = regionAnimalList(lichtung);
-  for (const { id, species, n } of all) {
-    if (n !== 1) continue;
-    const at = lichtung.animals.find((a) => a.species === species)!.at;
-    let best: Point | null = null,
-      bestD = Infinity;
-    for (const p of land) {
-      const d = (p[0] - at[0]) ** 2 + (p[1] - at[1]) ** 2;
-      if (d < bestD && free(p, 1)) [best, bestD] = [p, d];
-    }
-    if (!best) continue;
-    taken.push(best);
-    spawns.set(id, best);
-  }
-  // Die weiteren: Felder in einer Reihenfolge aus dem Seed, jedes mit Abstand zu allen anderen
-  const shuffled = [...land].sort((a, b) => hash(seed, a[0], a[1], 77) - hash(seed, b[0], b[1], 77));
-  const rest = all.filter((a) => a.n !== 1);
-  for (const gap of [9, 5, 1]) {
-    for (const p of shuffled) {
-      if (!rest.length) break;
-      const [dx, dy] = [p[0] - LICHTUNG_HOME.bed[0], p[1] - LICHTUNG_HOME.bed[1]]; // Abstand zum Bett
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < 6 || !free(p, gap)) continue;
-      const { id } = rest.shift()!;
-      taken.push(p);
-      spawns.set(id, p);
-    }
-  }
-  return spawns;
 }
 
 /** Welt eines Feldes außerhalb der Lichtung: die des Tors, in dessen Richtung es liegt (Grenzen leicht gewellt) */

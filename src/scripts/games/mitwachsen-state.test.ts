@@ -4,6 +4,7 @@ import { GATES, REGIONS, animalId, type RegionId } from '../../data/games/mitwac
 import {
   SLEEP_LOCK,
   BERRY_REGROW,
+  SCATTER,
   WAKE_GRACE,
   initialState,
   progressOf,
@@ -289,6 +290,23 @@ describe('Tiere', () => {
     expect([s.animals[0]!.x, s.animals[0]!.y, s.animals[0]!.dir]).toEqual([1, 1, 'w']);
   });
 
+  it('Eis-Tiere laufen nur im Kessel umher (auch bei offenem Eistor)', () => {
+    const w = createWorld(2);
+    for (const openGates of [[], ['eis' as const]]) {
+      let s: State = { ...initialState(w, {}, 4), sleeping: false, openGates };
+      const visited = new Set<string>();
+      for (let i = 0; i < 3000; i++) {
+        s = run(s, w, TICK).s;
+        for (const a of s.animals)
+          if (a.realm === 'eis') {
+            visited.add(`${a.x},${a.y}`);
+            expect([w.cell(a.x, a.y).region, w.cell(a.x, a.y).garden], a.id).toEqual(['eis', undefined]);
+          }
+      }
+      expect(visited.size).toBeGreaterThan(100); // sie laufen wirklich umher
+    }
+  });
+
   it('läuft umher, aber nur in seinem Zuhause', () => {
     const cells: Record<string, Partial<Cell>> = {};
     for (let x = -10; x <= 10; x++)
@@ -365,13 +383,32 @@ describe('Tiere an wechselnden Stellen', () => {
     const spots = new Set(world.spotsOf('lichtung').map(([x, y]) => `${x},${y}`));
     for (const seed of [1, 2, 3]) {
       const s = initialState(world, {}, seed);
-      const region = s.animals.filter((a) => a.home.kind === 'region');
+      const region = s.animals.filter((a) => a.home.kind === 'region' && a.realm === 'lichtung');
       expect(region).toHaveLength(REGIONS[0].animals.length * REGIONS[0].herd); // je Art eine Herde
       for (const a of region) {
         expect(spots.has(`${a.x},${a.y}`), a.id).toBe(true);
         expect(Math.max(Math.abs(a.x - LICHTUNG.bed[0]), Math.abs(a.y - LICHTUNG.bed[1]))).toBeGreaterThanOrEqual(8);
       }
     }
+  });
+
+  it('wechselnde Plätze je Welt: Eis-Tiere im Kessel, 6 Felder vom Schneebett und 4 voneinander', () => {
+    const [bx, by] = world.homes.eis.bed;
+    const spots = new Set(world.spotsOf('eis').map(([x, y]) => `${x},${y}`));
+    const before = where(initialState(world, {}, 1)).filter((w) => w.startsWith('eis:'));
+    for (const seed of [1, 2, 3]) {
+      const ice = initialState(world, {}, seed).animals.filter((a) => a.realm === 'eis');
+      expect(ice).toHaveLength(30); // zehn Arten, je drei
+      for (const a of ice) {
+        expect(spots.has(`${a.x},${a.y}`), a.id).toBe(true);
+        expect(Math.max(Math.abs(a.x - bx), Math.abs(a.y - by)), a.id).toBeGreaterThanOrEqual(SCATTER.eis.bed);
+        for (const o of ice)
+          if (o !== a)
+            expect(Math.max(Math.abs(a.x - o.x), Math.abs(a.y - o.y))).toBeGreaterThanOrEqual(SCATTER.eis.apart);
+      }
+      if (seed > 1) expect(ice.map((a) => `${a.id}@${a.x},${a.y}`).sort()).not.toEqual(before);
+    }
+    expect(SCATTER.lichtung).toEqual({ bed: 8, apart: 5 }); // auf der großen Lichtung wie bisher
   });
 
   it('an einem neuen Morgen sind die verlorenen Tiere woanders unterwegs, Tiere der Wiese bleiben', () => {
@@ -643,7 +680,8 @@ describe('Zuhause je Gegend', () => {
   it('Tiere gehören zu ihrer Gegend, Tiere der Landschaft zur Lichtung', () => {
     const world = createWorld(4);
     const s = initialState(world, { garden: [{ id: 'wild:0:2:0', species: 'fuchs' }] });
-    for (const a of s.animals) expect(a.realm, a.id).toBe('lichtung');
+    for (const a of s.animals) expect(a.realm, a.id).toBe(a.id.startsWith('eis:') ? 'eis' : 'lichtung');
+    expect(s.animals.filter((a) => a.realm === 'eis')).toHaveLength(30);
     expect(s.animals.find((a) => a.id === 'wild:0:2:0')!.realm).toBe('lichtung');
   });
 
@@ -768,7 +806,11 @@ describe('Invarianten bei wildem Drücken', () => {
           const pick = r % 10;
           const cmd: Cmd = pick < 6 ? { type: 'move', dir: DIRS[(r >>> 8) % 4]! } : pick < 8 ? ACT : TICK;
           s = step(s, world, cmd).state;
+          if (i === 0) expect(s.animals.filter((a) => a.realm === 'eis')).toHaveLength(30);
           if (i === 0) expect(world.realm(s.player.x, s.player.y)).toBe('eis'); // aufgewacht am Schneebett
+          // Eis-Tiere: frei umherlaufende bleiben im Kessel, zu Hause sind sie nur auf der Schneewiese
+          for (const a of s.animals.filter((t) => t.realm === 'eis' && t.mode !== 'follow'))
+            expect(world.realm(a.x, a.y), a.id).toBe('eis');
           if (!s.sleeping) expect(standHeight(world, s.openGates, s.player.x, s.player.y)).not.toBeNull();
           const spots = s.animals.map((a) => `${a.x},${a.y}`);
           if (!s.sleeping) spots.push(`${s.player.x},${s.player.y}`);

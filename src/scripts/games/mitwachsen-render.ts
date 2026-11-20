@@ -40,6 +40,7 @@ import {
   speciesOf,
   type GateId,
   type Look,
+  type RegionId,
   type SpeciesId,
 } from '../../data/games/mitwachsen';
 import { ICE_COLORS } from '../../data/games/mitwachsen-eis';
@@ -198,7 +199,7 @@ export class Renderer {
     }
 
     this.atmosphere(sc);
-    this.overlay(state, sc, P);
+    this.overlay(world, state, sc, P);
   }
 
   /**
@@ -206,7 +207,7 @@ export class Renderer {
    * Luft und die Leiste. Gleich für beide Ansichten; die 3D-Ansicht reicht ihre eigene Projektion herein und zeichnet
    * diese Ebene auf ein durchsichtiges Canvas über der 3D-Welt.
    */
-  overlay(state: State, sc: Scene, P: Projection) {
+  overlay(world: World, state: State, sc: Scene, P: Projection) {
     const { ctx } = this;
     const z = sc.zoom;
     const followers = new Set(state.followers);
@@ -235,14 +236,15 @@ export class Renderer {
     this.moodLife(sc);
     if (sc.night > 0) this.nightSky(sc);
     this.life(sc);
-    this.album(state, sc);
+    this.album(state, sc, world.realm(state.player.x, state.player.y));
   }
 
   /**
-   * Leiste unten: ein Platz je Tier, nach Gegenden gruppiert, dahinter Tiere der Landschaft, die im Garten wohnen.
-   * Umriss mit Fragezeichen = noch verloren, in Farbe = gefunden, grüner Grund = zu Hause im Garten, Herz = folgt gerade.
+   * Leiste unten: ein Platz je Art der Gegend, in der die Figur steht (`realm`), auf der Lichtung dahinter Tiere der
+   * Landschaft, die im Garten wohnen. Umriss mit Fragezeichen = noch verloren, in Farbe = gefunden, grüner Grund = zu
+   * Hause im Garten, Herz = folgt gerade.
    */
-  private album(state: State, sc: Scene) {
+  private album(state: State, sc: Scene, realm: RegionId) {
     const { ctx } = this;
     // Je Gegend ein Platz pro Art (es gibt mehrere Tiere je Art: eines gefunden heißt die Art gefunden),
     // dahinter Tiere der Landschaft im Garten einzeln
@@ -250,15 +252,16 @@ export class Renderer {
       ids.some((id) => id.startsWith(`${region}:`) && speciesOf(id) === species);
     const garden = state.garden.map((p) => p.id);
     type Slot = { species: SpeciesId; met: boolean; home: boolean; follows: boolean };
-    const groups: Slot[][] = REGIONS.map((r) =>
+    const groups: Slot[][] = REGIONS.filter((r) => r.id === realm).map((r) =>
       r.animals.map(({ species }) => ({
         species,
         met: of(state.met, r.id, species) || of(garden, r.id, species),
         home: of(garden, r.id, species),
         follows: of(state.followers, r.id, species),
       })),
-    ).filter((g) => g.length); // eine Gegend ohne Tiere (Eis-Welt noch leer) bekommt keine Lücke
-    const wild = state.garden.filter((p) => p.id.startsWith('wild:')).slice(0, 10);
+    );
+    // Tiere der Landschaft gehören zur Lichtung
+    const wild = realm === 'lichtung' ? state.garden.filter((p) => p.id.startsWith('wild:')).slice(0, 10) : [];
     if (wild.length)
       groups.push(
         wild.map((p) => ({ species: p.species, met: true, home: true, follows: state.followers.includes(p.id) })),

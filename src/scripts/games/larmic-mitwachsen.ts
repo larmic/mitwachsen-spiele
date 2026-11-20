@@ -31,6 +31,7 @@ import { Fog, REVEAL, START_REVEAL } from './mitwachsen-fog';
 import { initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
 import { createWorld, standHeight, type World } from './mitwachsen-world';
 import { platformLift } from './mitwachsen-portal';
+import { hopOf } from './mitwachsen-gait';
 import { weatherLook, windAt } from './mitwachsen-weather';
 import { idlePose, type Pose } from './mitwachsen-tired';
 import { advance, evening, freshDay, loadTired, saveTired, type Tired, type TiredEvent } from './mitwachsen-tired';
@@ -651,7 +652,7 @@ class LarmicMitwachsen extends HTMLElement {
       b.z += (z - b.z) * Math.min(1, dt * 14);
       const moving = Math.min(1, Math.hypot(t.x - b.x, t.y - b.y));
       const sung = now - (this.hops.get(id) ?? -1e9);
-      b.hop = snap ? 0 : Math.sin(moving * Math.PI) * 0.14 + (sung < 320 ? Math.sin((sung / 320) * Math.PI) * 0.3 : 0);
+      b.hop = snap ? 0 : hopOf(id, moving, sung); // je Gangart der Art (watscheln, robben, hüpfen …)
       this.bodies.set(id, b);
     }
   }
@@ -770,7 +771,7 @@ class LarmicMitwachsen extends HTMLElement {
       // 3D-Welt, darüber die durchsichtige 2D-Ebene mit Zeichen, Pfeil, Nacht und Leiste
       this.r3d.render(this.world, this.state, scene);
       this.ctx.clearRect(0, 0, w, h);
-      this.renderer.overlay(this.state, scene, this.r3d.project);
+      this.renderer.overlay(this.world, this.state, scene, this.r3d.project);
     } else this.renderer.draw(this.world, this.state, scene);
     // Karte etwa zehnmal pro Sekunde
     if (t - this.lastMap > 100) {
@@ -778,7 +779,6 @@ class LarmicMitwachsen extends HTMLElement {
       const m = this.map.clientWidth;
       this.mapCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       this.mapCtx.imageSmoothingEnabled = false;
-      const fog = this.fog;
       drawMap(
         this.mapCtx,
         this.world,
@@ -786,7 +786,7 @@ class LarmicMitwachsen extends HTMLElement {
         player.x,
         player.y,
         m,
-        (x, y) => fog.has(x, y),
+        (x, y) => this.fog.has(x, y),
         this.reduced.matches ? 0 : t,
       );
     }

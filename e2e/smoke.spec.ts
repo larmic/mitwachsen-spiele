@@ -128,7 +128,9 @@ test('Spiel: Portal-Plattform erwacht beim Herangehen, die Mitte bringt zum Bett
   expect(errors).toEqual([]);
 });
 
-test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offen), ohne Fehler', async ({ page }) => {
+test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offen), alle zehn Eis-Tiere, ohne Fehler', async ({
+  page,
+}) => {
   const errors = watchErrors(page);
   await page.goto('/spielen/');
   await page.getByRole('button', { name: /Verstanden/ }).click();
@@ -138,9 +140,18 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
   if (webgl) await expect(game).toHaveClass(/three/); // gezeichnet wird in 3D
   type Game = {
     world: { homes: { eis: { bed: [number, number]; wake: [number, number][] } }; realm(x: number, y: number): string };
-    state: { player: { x: number; y: number; dir: string }; openGates: string[]; sleeping: boolean; wokeAt: number };
+    state: {
+      player: { x: number; y: number; dir: string };
+      openGates: string[];
+      sleeping: boolean;
+      wokeAt: number;
+      animals: { id: string; species: string; realm: string; x: number; y: number; rest: number }[];
+    };
     apply(cmd: { type: 'move'; dir: string } | { type: 'tick' }): void;
     lift(): void;
+    bodies: Map<string, unknown>;
+    fog: { has(x: number, y: number): boolean };
+    r3d: { bodies: Map<string, unknown> } | null; // in 3D: Modelle in der Szene nach Kennung
   };
   /** Einige Bilder abwarten */
   const frames = (n: number) =>
@@ -163,6 +174,31 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
   });
   expect(realm).toBe('eis');
   await frames(30);
+  // Je Art ein Eis-Tier in einer Reihe hinter das Schneebett (im Erkundeten), dann zeichnen: alle zehn Modelle ohne Fehler
+  const shown = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const [bx, by] = el.world.homes.eis.bed;
+    const ice = el.state.animals.filter((a) => a.realm === 'eis');
+    const first = [...new Map(ice.map((a) => [a.species, a.id])).values()];
+    const animals = el.state.animals.map((a) => {
+      const i = first.indexOf(a.id);
+      return i < 0 ? a : { ...a, x: bx - 5 + i, y: by - 2, rest: 999 };
+    });
+    el.state = { ...el.state, animals };
+    return { ids: first, count: ice.length, at: first.map((_, i) => [bx - 5 + i, by - 2] as const) };
+  });
+  expect(shown.count).toBe(30);
+  expect(shown.ids).toHaveLength(10);
+  await frames(30);
+  expect(
+    await game.evaluate((node, { ids, at }) => {
+      const el = node as unknown as Game;
+      // In 3D steht für jedes gezeichnete Tier ein Modell in der Szene; in 2D zeichnet die Karte jedes Tier im Erkundeten
+      return ids.every((id, i) =>
+        el.r3d ? el.r3d.bodies.has(id) : el.bodies.has(id) && el.fog.has(at[i]![0], at[i]![1]),
+      );
+    }, shown),
+  ).toBe(true);
   // ein paar Schritte durch den Kessel, dann ins Schneebett (der Schläfer liegt jetzt dort)
   await game.evaluate((node) => {
     const el = node as unknown as Game;

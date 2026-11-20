@@ -3,7 +3,8 @@
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md
 
 import { eyes, type Part } from '../../lib/games/front';
-import { KESSEL } from './mitwachsen-eis';
+import { ICE_ANIMALS, ICE_SPECIES, KESSEL, type IceSpeciesId } from './mitwachsen-eis';
+import type { SpeciesOf } from './mitwachsen-species';
 
 export type RegionId = 'lichtung' | 'eis';
 export type SpeciesId =
@@ -18,7 +19,8 @@ export type SpeciesId =
   | 'fuchs'
   | 'eichhoernchen'
   | 'baer'
-  | 'ziege';
+  | 'ziege'
+  | IceSpeciesId; // die Tiere der Eis-Welt stehen in mitwachsen-eis.ts
 export type GateTheme = 'eis' | 'sand' | 'wasser' | 'lava' | 'hoehle' | 'wald' | 'wolken' | 'pilze';
 export type GateId = GateTheme; // je Welt genau ein Tor
 
@@ -79,7 +81,7 @@ export function regionAnimalList(region: Region): { id: string; species: Species
 /**
  * Am Anfang gibt es nur die Lichtung mit dem Bett. Ringsum Felsen mit acht großen Toren, die vorerst zu sind.
  * Dahinter liegen die Welten der Tore als endlose Landschaft. Hinter dem Eistor liegt die Eis-Welt, ein Gletscherkessel
- * mit eigenem Zuhause (noch unerreichbar, solange das Tor zu ist).
+ * mit eigenem Zuhause und zehn eigenen Tierarten (noch unerreichbar, solange das Tor zu ist).
  */
 export const REGIONS: readonly [Region, ...Region[]] = [
   {
@@ -106,8 +108,8 @@ export const REGIONS: readonly [Region, ...Region[]] = [
     id: 'eis',
     name: 'Eis-Welt',
     shape: KESSEL.shape, // Gletscherkessel fest hinter dem Eistor, ringsum Eisklippen (mitwachsen-eis.ts)
-    animals: [], // die Eis-Tiere ziehen später ein
-    herd: 3,
+    animals: ICE_ANIMALS, // Wohnorte relativ zum Schneebett (mitwachsen-eis.ts)
+    herd: 3, // der Kessel ist viel kleiner als die Lichtung: zehn Arten, je drei Tiere
     behind: 'eis',
   },
 ];
@@ -129,17 +131,8 @@ export const GATES: readonly Gate[] = [
 
 // ---------- Tiere ----------
 
-/** Ton eines Tiers: Folge von Tönen (Hz) mit Wellenform; alle aus der Pentatonik C–D–E–G–A, klingen also zusammen */
-export type Tone = {
-  notes: readonly number[];
-  wave: OscillatorType;
-  len: number;
-  gap: number;
-  slide?: number;
-  gain?: number;
-};
-
-export type Species = { id: SpeciesId; name: string; scale: number; parts: readonly Part[]; tone: Tone };
+export type { Gait, Tone } from './mitwachsen-species';
+export type Species = SpeciesOf<SpeciesId>;
 
 const DARK = '#3a3a44';
 const legs = (front: number, back: number, half: number, size: number, h: number, color = DARK): Part[] => [
@@ -255,7 +248,7 @@ export const SPECIES: Record<SpeciesId, Species> = {
     id: 'biene',
     name: 'Biene',
     scale: 1.4,
-    tone: { notes: [880, 987.77, 880], wave: 'square', len: 0.06, gap: 0.02, gain: 0.04 },
+    tone: { notes: [880, 783.99, 880], wave: 'square', len: 0.06, gap: 0.02, gain: 0.04 },
     parts: [
       [-0.12, -0.07, 0.34, 0.24, 0.14, 0.14, '#f2c94c'],
       [-0.04, -0.075, 0.34, 0.05, 0.15, 0.15, '#2a2018'],
@@ -423,6 +416,7 @@ export const SPECIES: Record<SpeciesId, Species> = {
       ...eyes(0.28, 0.1, 0.3, 0.05, 0.05, 0.02),
     ],
   },
+  ...ICE_SPECIES,
 };
 
 /** Arten, die frei in der endlosen Landschaft unterwegs sind */

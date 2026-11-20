@@ -183,16 +183,25 @@ function slidePath(gang: Gang, bed: Point, map: ReadonlyMap<string, Cell>): Poin
   return straight;
 }
 
-/** Wohnplätze der Eis-Tiere: vom Schneebett aus erreichbare Felder des Kessels außerhalb der Schneewiese */
+/**
+ * Wohnplätze der Eis-Tiere: vom Schneebett aus erreichbare Felder des Kessels außerhalb der Schneewiese, nicht in der
+ * Mündung (zwei Felder Abstand zum Gang, so versperrt kein Tier den Weg hinein)
+ */
 function spotsOf({ bed }: KesselPlace, map: ReadonlyMap<string, Cell>): Point[] {
   const out: Point[] = [];
+  const mouth = (x: number, y: number) => {
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++)
+        if (stand(map, x + dx, y + dy) && map.get(key(x + dx, y + dy))!.region !== 'eis') return true;
+    return false;
+  };
   const seen = new Set<string>();
   const queue = placeHome('eis', bed).wake.filter(([x, y]) => stand(map, x, y));
   for (const [x, y] of queue) seen.add(key(x, y));
   while (queue.length) {
     const [x, y] = queue.shift()!;
     const c = map.get(key(x, y))!; // nur Felder, auf denen man steht, kommen in die Liste
-    if (c.region === 'eis' && !c.garden) out.push([x, y]);
+    if (c.region === 'eis' && !c.garden && !mouth(x, y)) out.push([x, y]);
     for (const [dx, dy] of NEIGHBOURS) {
       const k = key(x + dx, y + dy);
       const n = map.get(k);

@@ -249,21 +249,29 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
   return s;
 }
 
+/** Wechselnde Plätze je Gegend: so weit mindestens vom Bett und voneinander (der Gletscherkessel ist klein) */
+export const SCATTER: Record<RegionId, { bed: number; apart: number }> = {
+  lichtung: { bed: 8, apart: 5 },
+  eis: { bed: 6, apart: 4 },
+};
+
 /**
  * Tiere der Gegenden, die frei umherlaufen, an neue Plätze verteilen (beim Öffnen und an jedem neuen Morgen):
- * zufällige erreichbare Felder ihrer Gegend, mit Abstand zu deren Bett und zueinander. Gleicher Zustand, gleiche Plätze.
+ * zufällige erreichbare Felder ihrer Gegend, mit Abstand zu deren Bett und zueinander (`SCATTER`). Gleicher Zustand,
+ * gleiche Plätze.
  */
 function scatter(s: State, world: World) {
-  const placed: [number, number][] = [];
+  const placed: [number, number][] = []; // die Gegenden liegen weit auseinander: eine Liste für alle genügt
   for (const a of s.animals) {
     if (a.mode !== 'wander' || a.home.kind !== 'region') continue;
     const spots = world.spotsOf(a.realm);
     const [bx, by] = world.homes[a.realm].bed;
+    const { bed, apart } = SCATTER[a.realm];
     if (!spots.length) continue;
     for (let tries = 0; tries < 80; tries++) {
       const [x, y] = pick(spots, random(s));
-      if (cheb(x, y, bx, by) < 8 || !atHome(world, a.home, x, y)) continue; // nicht an Toren
-      if (placed.some(([px, py]) => cheb(x, y, px, py) < 5) || occupied(s, x, y, a.id)) continue;
+      if (cheb(x, y, bx, by) < bed || !atHome(world, a.home, x, y)) continue; // nicht an Toren
+      if (placed.some(([px, py]) => cheb(x, y, px, py) < apart) || occupied(s, x, y, a.id)) continue;
       [a.x, a.y] = [x, y];
       a.spawn = [x, y];
       placed.push([x, y]);

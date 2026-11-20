@@ -76,14 +76,15 @@ describe('Start auf der Lichtung', () => {
     it(`Seed ${seed}: Alle Tiere wohnen erreichbar auf der Lichtung (vier je Art), die Landschaft bleibt draußen`, () => {
       const cells = reachable(w, [], START);
       const set = new Set(cells.map(([x, y]) => `${x},${y}`));
-      expect(w.spawns.size).toBe(lichtung.animals.length * lichtung.herd); // 40 Tiere, vier je Art
+      const own = [...w.spawns].filter(([id]) => id.startsWith('lichtung:'));
+      expect(own).toHaveLength(lichtung.animals.length * lichtung.herd); // 48 Tiere, vier je Art
       const spots = new Set<string>();
-      for (const [id, [x, y]] of w.spawns) {
+      for (const [id, [x, y]] of own) {
         expect(w.cell(x, y).region, id).toBe('lichtung');
         expect(set.has(`${x},${y}`), id).toBe(true);
         spots.add(`${x},${y}`);
       }
-      expect(spots.size).toBe(w.spawns.size); // jedes Tier hat seinen eigenen Platz
+      expect(spots.size).toBe(own.length); // jedes Tier hat seinen eigenen Platz
       expect(cells.some(([x, y]) => w.cell(x, y).region === 'wild')).toBe(false);
       expect(cells.length).toBeGreaterThan(9000); // groß genug zum Erkunden
     });
@@ -445,6 +446,32 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
       for (const p of gate.cells) expect(w.realm(...p)).toBe('lichtung');
       for (const [x, y] of kessel) expect(w.realm(x, y)).toBe('eis');
       expect(w.climate(...home.bed)).toEqual({ id: 'eis', strength: 1 }); // kühles Licht im Kessel
+    });
+
+    it(`Seed ${seed}: 30 Eis-Tiere wohnen erreichbar im Kessel, drei je Art, keins auf der Lichtung und keins auf der Schneewiese`, () => {
+      const ice = [...w.spawns].filter(([id]) => id.startsWith('eis:'));
+      expect(ice).toHaveLength(30);
+      const spots = new Set(w.spotsOf('eis').map(([x, y]) => `${x},${y}`));
+      const reach = new Set(fromSnowBed([]).map(([x, y]) => `${x},${y}`));
+      const perSpecies = new Map<string, number>();
+      for (const [id, [x, y]] of ice) {
+        const species = id.split(':')[1]!;
+        perSpecies.set(species, (perSpecies.get(species) ?? 0) + 1);
+        expect([w.realm(x, y), w.cell(x, y).region, w.cell(x, y).garden], id).toEqual(['eis', 'eis', undefined]);
+        expect(spots.has(`${x},${y}`) && reach.has(`${x},${y}`), id).toBe(true);
+        expect(Math.max(Math.abs(x - home.bed[0]), Math.abs(y - home.bed[1])), id).toBeGreaterThanOrEqual(6);
+      }
+      expect([...perSpecies.values()]).toEqual(Array(10).fill(3));
+      expect(new Set(ice.map(([, [x, y]]) => `${x},${y}`)).size).toBe(30); // jedes auf eigenem Platz
+      // nicht in der Mündung: zwei Felder Abstand zum Gang (begehbar, aber nicht Boden des Kessels)
+      const gangNear = ([x, y]: readonly [number, number]) =>
+        [-2, -1, 0, 1, 2].some((dy) =>
+          [-2, -1, 0, 1, 2].some((dx) => {
+            const c = w.cell(x + dx, y + dy);
+            return c.region !== 'eis' && standHeight(w, ['eis'], x + dx, y + dy) !== null;
+          }),
+        );
+      for (const [id, p] of ice) expect(gangNear(p), id).toBe(false);
     });
 
     it(`Seed ${seed}: Im Kessel und in der Eiswelt draußen wohnen keine Tiere der Landschaft`, () => {

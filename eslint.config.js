@@ -32,7 +32,7 @@ export default defineConfig(
   // Wer eine davon verkleinert, senkt hier die Zahl (oder streicht die Zeile).
   {
     files: ['src/data/games/mitwachsen.ts'],
-    rules: { 'max-lines': ['error', { max: 494, skipBlankLines: true, skipComments: true }] },
+    rules: { 'max-lines': ['error', { max: 487, skipBlankLines: true, skipComments: true }] },
   },
   {
     files: ['src/scripts/games/larmic-mitwachsen.ts'],
@@ -83,7 +83,7 @@ export default defineConfig(
     rules: {
       complexity: ['error', 79],
       'max-depth': ['error', 5],
-      'max-lines': ['error', { max: 599, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['error', { max: 572, skipBlankLines: true, skipComments: true }],
       'max-lines-per-function': ['error', { max: 139, skipBlankLines: true, skipComments: true }],
     },
   },

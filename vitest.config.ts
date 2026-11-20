@@ -15,7 +15,7 @@ export default defineConfig({
         'src/lib/**/*.ts',
         'src/data/games/*.ts',
         'src/scripts/games/{input-pace,pwa-update}.ts',
-        'src/scripts/games/mitwachsen-{fog,growth,home,kessel,portal,save,state,tired,weather,world}.ts',
+        'src/scripts/games/mitwachsen-{fog,gait,growth,home,kessel,portal,save,spawns,state,tired,weather,world}.ts',
         'scripts/{bundles,dist,pwa}.ts',
       ],
       reporter: [['text', { skipFull: true }], 'text-summary'],
