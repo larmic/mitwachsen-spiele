@@ -52,6 +52,7 @@ export type Deco =
   | 'shelterpilz' // Stiel des Riesenpilzes auf der Wiese (zeichnet auch den Hut)
   | 'igloo' // feste Rückwand des Iglus (die Mitte zeichnet die Kuppel)
   | 'icebowl' // Futterschale aus Eis auf der Schneewiese
+  | 'fishcrate' // Fischkiste im Gletscherkessel: Hineinlaufen fängt Fische ins Netz (fest wie ein Busch)
   | 'klangstein'; // Stein mit schwebender Note: Hineinlaufen spielt die Geschichte des Ortes
 export type TreeKind =
   'oak' | 'birch' | 'autumn' | 'red' | 'blossom' | 'winter' | 'pine' | 'snowpine' | 'palm' | 'dead';
@@ -62,7 +63,7 @@ export type Cell = {
   deco: Deco | null;
   color?: string; // Blumenfarbe
   region: RegionId | 'wild' | 'border'; // border: Fels, Zaun oder Wasser zwischen Gegenden
-  solid: boolean; // Deko versperrt das Feld (Baum, Busch, Fels, Zaun, Bett, Tafel)
+  solid: boolean; // Deko versperrt das Feld (Baum, Busch, Fischkiste, Fels, Zaun, Bett, Tafel)
   gate?: GateId; // Tor oder Brücke: begehbar, sobald offen
   sign?: GateId; // Tafel zu diesem Tor
   garden?: true; // Wiese ums Bett: Hier sind gefundene Tiere zu Hause

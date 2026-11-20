@@ -99,6 +99,11 @@ export class Sfx {
     this.note(880, 0.07, 'sine', 0.09, 1.3);
     this.note(1174.66, 0.09, 'sine', 0.08, 1.2, 0.09);
   }
+  /** Fische fangen: Platsch-Plopp, ein tiefer, kurzer Ton, dann ein hoher */
+  catch() {
+    this.note(196, 0.1, 'sine', 0.1, 0.6);
+    this.note(1046.5, 0.08, 'sine', 0.08, 1.3, 0.12);
+  }
   /** Futter im Trog: fröhliche, hüpfende Töne */
   feed() {
     [523.25, 659.25, 587.33, 783.99, 659.25, 1046.5].forEach((f, i) =>

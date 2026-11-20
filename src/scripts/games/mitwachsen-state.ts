@@ -3,7 +3,7 @@
 // Ereignisse, die zurückkommen (Töne, Herzen, Speichern). Zufall kommt aus einer Folge im Zustand.
 // Spezifikation: docs/specs/mitwachsen.md
 
-import { chunkOf, fromKey } from '../../lib/games/chunks';
+import { chunkOf } from '../../lib/games/chunks';
 import { DIRS, type Dir } from '../../lib/games/front';
 import { cycle, hash, nextRandom, pick } from '../../lib/games/rng';
 import {
@@ -17,13 +17,14 @@ import {
 } from '../../data/games/mitwachsen';
 import type { StoryId } from '../../data/games/mitwachsen-stories';
 import { canStep, standHeight, wildAnimals, type World } from './mitwachsen-world';
+import { chore, regrow, type ChoreEvent } from './mitwachsen-chores';
 import { homeAt, perRealm, startRealm } from './mitwachsen-home';
 import { platformArea, platformsToWake, stepOn, withNeighbours } from './mitwachsen-portal';
 import { raining } from './mitwachsen-weather';
 
 export const SLEEP_LOCK = 30; // Takte nach dem Einschlafen, in denen Tasten nicht wecken (3 s)
 export const WAKE_GRACE = 15; // Takte nach dem Aufwachen, in denen das Bett nur ein Hindernis ist (1,5 s)
-export const BERRY_REGROW = 300; // Takte, bis an einem Busch neue Beeren hängen (30 s)
+export { REGROW } from './mitwachsen-chores';
 export const WILD_RADIUS = 1; // Stücke um die Figur, in denen Tiere der Landschaft unterwegs sind
 export const WILD_KEEP = 2; // ab diesem Abstand verschwinden sie wieder (und tauchen später an ihrem Platz auf)
 
@@ -56,11 +57,12 @@ export type State = {
   openGates: GateId[];
   portals: GateId[]; // wache Portal-Plattformen (je Tor eine, mit Gegenstück am Bett)
   arrived: readonly [number, number] | null; // Mittelfeld, auf dem die Figur angekommen ist: erst runter, dann wieder rauf (nicht gespeichert)
-  picked: Record<string, number>; // Büsche ohne Beeren: "x,y" → Takt des Pflückens (nicht gespeichert)
+  picked: Record<string, number>; // Büsche ohne Beeren und leere Fischkisten: "x,y" → Takt des Leerens (nicht gespeichert)
   day: number; // Tage, die die Welt schon erlebt hat (jedes Schlafen zählt einen); Blumen wachsen damit
   dayStart: number; // Takt, an dem der heutige Tag begann (Aufwachen): Das Wetter zählt ab hier, jeder Tag beginnt mit Sonne
   basket: boolean; // Korb mit Beeren auf dem Rücken (nach dem Pflücken, bis zum Futtertrog)
   bucket: boolean; // Eimer mit Wasser in der Hand (nach dem Schöpfen, bis zum Wassertrog)
+  fish: boolean; // Netz mit Fischen in der linken Hand (nach dem Fangen an der Fischkiste, bis zur Eisschale)
   heard: StoryId[]; // Geschichten, deren Klangstein schon einmal erklungen ist
 };
 
@@ -92,11 +94,7 @@ export type GameEvent =
   | { type: 'portal'; id: GateId } // Plattform am Tor (und ihr Gegenstück am Bett) erwacht
   | { type: 'teleport'; id: GateId; to: 'gate' | 'home' }
   | { type: 'ready'; id: GateId } // nach der Ankunft von der Mitte gestiegen: Die Plattform ist wieder bereit
-  | { type: 'pick'; x: number; y: number } // Beeren gepflückt
-  | { type: 'regrow'; x: number; y: number } // neue Beeren am Busch
-  | { type: 'feed'; ids: string[] } // Beeren in den Futtertrog: diese Tiere der Wiese freuen sich
-  | { type: 'fill'; x: number; y: number } // Eimer am Wasser gefüllt
-  | { type: 'pour'; ids: string[] } // Wasser in den Wassertrog: diese Tiere der Wiese freuen sich
+  | ChoreEvent // Handgriffe: pflücken, fangen, nachwachsen, füttern, schöpfen, tränken (mitwachsen-chores.ts)
   | { type: 'call' }
   | { type: 'sleep' }
   | { type: 'wake' };
@@ -240,6 +238,7 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     picked: {},
     basket: false,
     bucket: false,
+    fish: false,
     day: saved.day ?? 0,
     dayStart: 0,
     heard: (saved.heard ?? []).filter((id) => world.stones.has(id)),
@@ -331,13 +330,7 @@ export function step(state: State, world: World, cmd: Cmd, explored: Explored = 
 
 function tick(s: State, world: World, events: GameEvent[]) {
   s.tick++;
-  // Beeren wachsen nach, auch nachts
-  for (const [k, at] of Object.entries(s.picked))
-    if (s.tick - at >= BERRY_REGROW) {
-      delete s.picked[k];
-      const [x, y] = fromKey(k);
-      events.push({ type: 'regrow', x, y });
-    }
+  regrow(s, events); // Beeren und Fische wachsen nach, auch nachts
   if (s.sleeping) return; // nachts ist es still
   syncWild(s, world);
   // Regnet es, gehen die Tiere der Wiese unter den Unterstand ihrer Gegend: jedes an einen eigenen Platz darunter oder
@@ -432,27 +425,6 @@ function listen(s: State, id: StoryId, events: GameEvent[]) {
   events.push({ type: 'story', id, first });
 }
 
-/**
- * Ans Wasser laufen: Die Figur schöpft einen Eimer voll. Mit vollem Eimer in den Wassertrog: Das Wasser kommt hinein,
- * alle Tiere der Wiese freuen sich (wie die Beeren am Futtertrog). Liefert true, wenn der Zug damit erledigt ist.
- */
-function water(s: State, world: World, tx: number, ty: number, events: GameEvent[]): boolean {
-  const c = world.cell(tx, ty);
-  if (!s.bucket && c.ground === 'water') {
-    s.bucket = true;
-    events.push({ type: 'fill', x: tx, y: ty });
-    return true;
-  }
-  if (!s.bucket || c.deco !== 'watertrough') return false;
-  s.bucket = false;
-  events.push({ type: 'pour', ids: meadowAnimals(s, world, tx, ty) });
-  return true;
-}
-
-/** Tiere der Wiese, auf der der Trog (x, y) steht: Nur sie freuen sich über Futter und Wasser */
-const meadowAnimals = (s: State, world: World, x: number, y: number) =>
-  s.animals.filter((a) => a.mode === 'home' && a.realm === world.realm(x, y)).map((a) => a.id);
-
 /** Freies Feld neben einem Tier der Wiese, auf das es ausweichen kann: lieber seitlich als weiter geradeaus */
 function asideCell(s: State, world: World, a: Animal, dir: Dir): [number, number] | null {
   const sides: Dir[] = dir === 'e' || dir === 'w' ? ['n', 's'] : ['e', 'w'];
@@ -481,20 +453,8 @@ function move(s: State, world: World, dir: Dir, events: GameEvent[]) {
   if (animal && meetAnimal(s, world, animal, dir, events)) return;
   const story = world.cell(tx, ty).story;
   if (story) return listen(s, story, events);
-  // In einen Busch laufen: Die Figur pflückt die Beeren (sie wachsen nach); ohne Beeren ist er nur ein Hindernis
-  if (world.cell(tx, ty).deco === 'bush' && !(`${tx},${ty}` in s.picked)) {
-    s.picked[`${tx},${ty}`] = s.tick;
-    s.basket = true;
-    events.push({ type: 'pick', x: tx, y: ty });
-    return;
-  }
-  // Mit vollem Korb in den Futtertrog laufen: Die Beeren kommen hinein, alle Tiere dieser Wiese freuen sich
-  if (s.basket && world.cell(tx, ty).deco === 'trough') {
-    s.basket = false;
-    events.push({ type: 'feed', ids: meadowAnimals(s, world, tx, ty) });
-    return;
-  }
-  if (water(s, world, tx, ty, events)) return;
+  // Handgriffe: Beeren pflücken, Fische fangen, Wasser schöpfen, in die Tröge der Wiese bringen (mitwachsen-chores.ts)
+  if (chore(s, world, tx, ty, events)) return;
   // Ins Bett laufen: Die Figur legt sich schlafen (nicht gleich nach dem Aufwachen, sonst schläft sie aus Versehen ein)
   if (world.cell(tx, ty).deco === 'bed' && s.tick - s.wokeAt >= WAKE_GRACE) return sleep(s, world, events);
   if (!canStep(world, s.openGates, p.x, p.y, tx, ty)) {

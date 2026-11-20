@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Dir } from '../../lib/games/front';
-import { ACTION_MS, HOLD_MS, InputPace, STEP_MS } from './input-pace';
+import { ACTION_MS, ENCOUNTERS, HOLD_MS, InputPace, STEP_MS } from './input-pace';
 
 /** Simuliert `ms` Millisekunden mit einem Bild alle 16 ms und zählt die Schritte */
 function steps(pace: InputPace, from: number, ms: number, taps: number[] = [], dir: Dir = 'e') {
@@ -74,6 +74,25 @@ describe('Ruhiger Takt der Eingabe', () => {
     pace.press('e', 0);
     pace.clear();
     expect(pace.poll(STEP_MS * 3)).toBeNull();
+  });
+
+  it('Begegnungen halten die Figur an: Tiere, Beeren, Fische, Futter, Wasser, Plattformen, Klangsteine', () => {
+    for (const type of [
+      'sing',
+      'follow',
+      'pick',
+      'catch',
+      'fill',
+      'feed',
+      'pour',
+      'portal',
+      'teleport',
+      'story',
+    ] as const)
+      expect(ENCOUNTERS.has(type), type).toBe(true);
+    // Laufen, Anstoßen, Platz machen, Heimkommen und Nachwachsen halten nicht an
+    for (const type of ['step', 'bump', 'swap', 'aside', 'home', 'regrow', 'ready'] as const)
+      expect(ENCOUNTERS.has(type), type).toBe(false);
   });
 
   it('Aktionen zählen höchstens im eigenen Takt', () => {

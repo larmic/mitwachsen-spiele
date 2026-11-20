@@ -3,7 +3,7 @@ import type { Dir } from '../../lib/games/front';
 import { GATES, REGIONS, animalId, type RegionId } from '../../data/games/mitwachsen';
 import {
   SLEEP_LOCK,
-  BERRY_REGROW,
+  REGROW,
   SCATTER,
   WAKE_GRACE,
   initialState,
@@ -336,7 +336,7 @@ describe('Beerenbüsche', () => {
     expect(types(r.events)).toEqual(['bump']);
     let s = r.s;
     const regrown: GameEvent[] = [];
-    for (let i = 0; i < BERRY_REGROW; i++) {
+    for (let i = 0; i < REGROW; i++) {
       const t = run(s, w, TICK);
       s = t.s;
       regrown.push(...t.events);
@@ -485,7 +485,7 @@ describe('Korb mit Beeren', () => {
     s = run(s, w, 'e').s;
     expect(s.basket).toBe(true);
     const r = run(s, w, 'w');
-    expect(r.events).toEqual([{ type: 'feed', ids: ['lichtung:hase'] }]);
+    expect(r.events).toEqual([{ type: 'feed', food: 'berries', ids: ['lichtung:hase'] }]);
     expect(r.s.basket).toBe(false);
     expect([r.s.player.x, r.s.player.y]).toEqual([0, 0]);
   });
@@ -520,6 +520,101 @@ describe('Eimer mit Wasser', () => {
     expect([s.basket, s.bucket]).toEqual([true, true]);
     s = run(s, w, 's').s;
     expect([s.basket, s.bucket]).toEqual([false, true]);
+  });
+});
+
+describe('Fischkisten und Eisschale (Eis-Welt)', () => {
+  it('Fischkiste: hineinlaufen gibt das Netz, die Kiste ist leer und nach 300 Takten wieder voll (auch nachts)', () => {
+    const w = fakeWorld({ '1,0': { deco: 'fishcrate', solid: true, biome: 'eis' } });
+    let r = run(awake(w, 0, 0), w, 'e');
+    expect(r.events).toEqual([{ type: 'catch', x: 1, y: 0 }]);
+    expect([r.s.fish, r.s.basket, r.s.bucket, r.s.player.x]).toEqual([true, false, false, 0]); // die Figur bleibt stehen
+    expect(types(run(r.s, w, 'e').events)).toEqual(['bump']); // leer ist die Kiste ein Hindernis wie ein abgeernteter Busch
+    let s: State = { ...r.s, sleeping: true }; // nachts wächst es auch nach
+    const regrown: GameEvent[] = [];
+    for (let i = 0; i < REGROW; i++) {
+      r = run(s, w, TICK);
+      s = r.s;
+      regrown.push(...r.events);
+      if (i === REGROW - 2) expect(regrown).toEqual([]);
+    }
+    expect(regrown).toEqual([{ type: 'regrow', x: 1, y: 0 }]);
+    expect(types(run({ ...s, sleeping: false }, w, 'e').events)).toEqual(['catch']);
+    expect(initialState(w).fish).toBe(false);
+    expect('fish' in progressOf(s)).toBe(false); // das Netz wird nicht gespeichert, wie Korb und Eimer
+  });
+
+  it('die Eisschale nimmt nur Fisch, der Futtertrog nur Beeren; ohne das Passende sind beide ein Hindernis', () => {
+    const w = fakeWorld({
+      '-1,0': { deco: 'icebowl', solid: true, garden: true },
+      '1,0': { deco: 'trough', solid: true, garden: true },
+      '0,2': { garden: true },
+    });
+    const home = [animal('lichtung:hase', 0, 2, { mode: 'home', home: { kind: 'garden' } })];
+    const s = awake(w, 0, 0, home);
+    expect(types(run(s, w, 'w', 'e').events)).toEqual(['bump', 'bump']); // leere Hände
+    let r = run({ ...s, basket: true }, w, 'w');
+    expect([types(r.events), r.s.basket]).toEqual([['bump'], true]); // Beeren gehören nicht in die Eisschale
+    r = run({ ...s, fish: true }, w, 'e');
+    expect([types(r.events), r.s.fish]).toEqual([['bump'], true]); // Fisch gehört nicht in den Futtertrog
+    r = run({ ...s, fish: true }, w, 'w');
+    expect(r.events).toEqual([{ type: 'feed', food: 'fish', ids: ['lichtung:hase'] }]);
+    expect([r.s.fish, r.s.player.x]).toEqual([false, 0]);
+  });
+
+  it('Netz, Eimer und Korb trägt die Figur gleichzeitig; jeder Trog nimmt nur das Seine', () => {
+    const w = fakeWorld({
+      '1,0': { ground: 'water', h: 0 },
+      '0,-1': { deco: 'bush', solid: true },
+      '-1,0': { deco: 'fishcrate', solid: true },
+      '0,1': { deco: 'icebowl', solid: true },
+      '1,1': { deco: 'watertrough', solid: true },
+      '-1,1': { deco: 'trough', solid: true },
+    });
+    let s = run(awake(w, 0, 0), w, 'e', 'n', 'w').s;
+    expect([s.basket, s.fish, s.bucket]).toEqual([true, true, true]);
+    let r = run(s, w, 's');
+    expect([types(r.events), r.s.basket, r.s.fish, r.s.bucket]).toEqual([['feed'], true, false, true]);
+    s = { ...r.s, player: { x: 1, y: 0, dir: 's' } };
+    r = run(s, w, 's');
+    expect([types(r.events), r.s.basket, r.s.fish, r.s.bucket]).toEqual([['pour'], true, false, false]);
+    s = { ...r.s, player: { x: -1, y: 0, dir: 's' } };
+    r = run(s, w, 's');
+    expect([types(r.events), r.s.basket, r.s.fish, r.s.bucket]).toEqual([['feed'], false, false, false]);
+  });
+
+  it('am Eisloch schöpft die Figur Wasser, im Wassertrog aus Eis leert sie es: Es freuen sich die Tiere der Schneewiese', () => {
+    const world = createWorld(1);
+    const home = world.homes.eis;
+    // ein Feld am Ufer des Eislochs (im Kessel um das Schneebett herum gesucht)
+    const shore = (() => {
+      for (let dy = -20; dy <= 20; dy++)
+        for (let dx = -25; dx <= 25; dx++) {
+          const [x, y] = [home.bed[0] + dx, home.bed[1] + dy];
+          if (world.cell(x, y).ground !== 'water') continue;
+          for (const [ex, ey, dir] of DIRS_TO_BED)
+            if (standHeight(world, [], x - ex, y - ey) !== null) return { at: [x - ex, y - ey] as const, dir };
+        }
+      throw new Error('kein Ufer');
+    })();
+    const pinguin = animal('eis:pinguin', home.bed[0] + 2, home.bed[1] + 2, {
+      species: 'pinguin',
+      mode: 'home',
+      home: { kind: 'garden' },
+      realm: 'eis',
+    });
+    const hase = animal('lichtung:hase', 2, 2, { mode: 'home', home: { kind: 'garden' } });
+    let s: State = { ...awake(world, ...shore.at, [pinguin, hase]), openGates: ['eis'] };
+    let r = run(s, world, shore.dir);
+    expect(types(r.events)).toEqual(['fill']);
+    expect(world.realm(...shore.at)).toBe('eis');
+    // vor den Wassertrog aus Eis (rechts vor dem Schneebett) und hinein
+    const [tx, ty] = home.water;
+    expect(world.cell(tx, ty).biome).toBe('eis');
+    s = { ...r.s, player: { x: tx, y: ty - 1, dir: 's' } };
+    r = run(s, world, 's');
+    expect(r.events).toEqual([{ type: 'pour', ids: ['eis:pinguin'] }]);
+    expect(r.s.bucket).toBe(false);
   });
 });
 
@@ -717,25 +812,32 @@ describe('Zuhause je Gegend', () => {
     expect(r.s.garden).toEqual([{ id: 'eis:hase', species: 'hase' }]);
   });
 
-  it('am Trog freuen sich nur die Tiere der Wiese, auf der er steht', () => {
+  it('am Trog freuen sich nur die Tiere der Wiese, auf der er steht (Futter, Fisch und Wasser)', () => {
     const w = twoRealms({
       '-1,0': { deco: 'trough', solid: true, garden: true },
       '1,0': { deco: 'watertrough', solid: true, garden: true },
+      '0,-1': { deco: 'icebowl', solid: true, garden: true },
       '28,0': { deco: 'trough', solid: true },
       '29,1': { deco: 'watertrough', solid: true },
+      '29,-1': { deco: 'icebowl', solid: true },
     });
     const resident = (id: string, x: number, realm: RegionId) =>
       animal(id, x, 2, { mode: 'home', home: { kind: 'garden' }, realm });
     const herd = [resident('lichtung:hase', 0, 'lichtung'), resident('eis:hase', 24, EIS)];
     const full = (x: number, y: number): State => ({ ...awake(w, x, y, herd), basket: true, bucket: true });
     expect(run(full(0, 0), w, 'w', 'e').events).toEqual([
-      { type: 'feed', ids: ['lichtung:hase'] },
+      { type: 'feed', food: 'berries', ids: ['lichtung:hase'] },
       { type: 'pour', ids: ['lichtung:hase'] },
     ]);
     expect(run(full(29, 0), w, 'w', 's').events).toEqual([
-      { type: 'feed', ids: ['eis:hase'] },
+      { type: 'feed', food: 'berries', ids: ['eis:hase'] },
       { type: 'pour', ids: ['eis:hase'] },
     ]);
+    // Fisch in die Eisschale: auf der Schneewiese freuen sich nur die Eis-Tiere, auf der Lichtung nur ihre
+    const pinguin = { ...resident('eis:pinguin', 25, EIS), species: 'pinguin' as const };
+    const fishy = (x: number): State => ({ ...awake(w, x, 0, [...herd, pinguin]), fish: true });
+    expect(run(fishy(29), w, 'n').events).toEqual([{ type: 'feed', food: 'fish', ids: ['eis:hase', 'eis:pinguin'] }]);
+    expect(run(fishy(0), w, 'n').events).toEqual([{ type: 'feed', food: 'fish', ids: ['lichtung:hase'] }]);
   });
 });
 

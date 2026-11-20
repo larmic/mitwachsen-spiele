@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DIRS } from '../../lib/games/front';
 import { GATES, REGIONS, type GateId } from '../../data/games/mitwachsen';
 import { HOMES } from '../../data/games/mitwachsen-homes';
-import { BED_STONE } from '../../data/games/mitwachsen-stories';
+import { BED_STONE, ICE_STONE } from '../../data/games/mitwachsen-stories';
 import { platformCells, platformLift } from './mitwachsen-portal';
 import {
   GATE_HALF,
@@ -415,6 +415,49 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
       ).toBe(true);
     });
 
+    it(`Seed ${seed}: drei Fischkisten 8 bis 14 Felder von der Schneewiese, einzeln, ringsum frei und erreichbar`, () => {
+      const crates = kessel.filter(([x, y]) => w.cell(x, y).deco === 'fishcrate');
+      expect(crates).toHaveLength(3);
+      const meadow = kessel.filter(([x, y]) => w.cell(x, y).garden);
+      const reach = new Set(fromSnowBed([]).map(([x, y]) => `${x},${y}`));
+      for (const [x, y] of crates) {
+        const c = w.cell(x, y);
+        expect([c.solid, c.region, c.biome, standHeight(w, ['eis'], x, y)]).toEqual([true, 'eis', 'eis', null]);
+        const fromMeadow = Math.min(...meadow.map(([mx, my]) => Math.hypot(x - mx, y - my)));
+        expect(fromMeadow, `${x},${y}`).toBeGreaterThanOrEqual(8);
+        expect(fromMeadow, `${x},${y}`).toBeLessThanOrEqual(14);
+        // ringsum frei: alle acht Nachbarn begehbar und vom Schneebett aus erreichbar, man kommt von jeder Seite heran
+        for (const [dx, dy] of RING_1)
+          if (dx || dy) expect(reach.has(`${x + dx},${y + dy}`), `${x + dx},${y + dy}`).toBe(true);
+      }
+      // weit auseinander: Das Kind läuft zu jeder einen kleinen Weg
+      for (const a of crates)
+        for (const b of crates) if (a !== b) expect(Math.hypot(a[0] - b[0], a[1] - b[1])).toBeGreaterThan(12);
+      // eine nahe dem Eisloch
+      const water = kessel.filter(([x, y]) => w.cell(x, y).ground === 'water');
+      expect(crates.some(([x, y]) => water.some(([wx, wy]) => Math.hypot(x - wx, y - wy) < 8))).toBe(true);
+    });
+
+    it(`Seed ${seed}: Moosfleck im Kessel (grünes Moos unter dem Schnee, begehbar, nur Kulisse)`, () => {
+      const moss = kessel.filter(([x, y]) => w.cell(x, y).ground === 'grass');
+      expect(moss.length).toBeGreaterThanOrEqual(5);
+      const reach = new Set(fromSnowBed([]).map(([x, y]) => `${x},${y}`));
+      for (const [x, y] of moss) {
+        expect([w.cell(x, y).region, w.cell(x, y).garden], `${x},${y}`).toEqual(['eis', undefined]);
+        expect(reach.has(`${x},${y}`), `${x},${y}`).toBe(true);
+      }
+    });
+
+    it(`Seed ${seed}: Klangstein am Schneebett, außerhalb des freien Platzes, im Kessel erreichbar`, () => {
+      const [sx, sy] = w.stones.get('eis-offen')!;
+      expect([sx - home.bed[0], sy - home.bed[1]]).toEqual([...ICE_STONE]);
+      expect(Math.max(Math.abs(ICE_STONE[0]), Math.abs(ICE_STONE[1]))).toBeGreaterThan(home.clear);
+      const c = w.cell(sx, sy);
+      expect([c.deco, c.story, c.solid, w.realm(sx, sy)]).toEqual(['klangstein', 'eis-offen', true, 'eis']);
+      const reach = new Set(fromSnowBed([]).map(([x, y]) => `${x},${y}`));
+      expect(Object.values(DIRS).some(([dx, dy]) => reach.has(`${sx + dx},${sy + dy}`))).toBe(true);
+    });
+
     it(`Seed ${seed}: Rutschspur vom Tor bis ans Schneebett, durchgehend begehbar`, () => {
       const start: [number, number] = [gate.mid[0] + gate.out[0], gate.mid[1] + gate.out[1]];
       expect(w.cell(...start).slide).toBe(true);
@@ -657,13 +700,16 @@ describe('Portal-Plattformen', () => {
 describe('Klangsteine', () => {
   for (const seed of [1, 42, 2026]) {
     const w = createWorld(seed);
-    it(`Seed ${seed}: einer am Bett, einer vor jedem Tor; fest, erreichbar, der Weg zum Tor bleibt frei`, () => {
-      expect([...w.stones.keys()].sort()).toEqual(['bett', ...GATES.map((g) => g.id)].sort());
-      const reach = new Set(reachable(w, [], START, 200000).map(([x, y]) => `${x},${y}`));
+    it(`Seed ${seed}: einer am Bett, einer vor jedem Tor, einer am Schneebett; fest, erreichbar, der Weg zum Tor bleibt frei`, () => {
+      expect([...w.stones.keys()].sort()).toEqual(['bett', ...GATES.map((g) => g.id), 'eis-offen'].sort());
+      // die der Lichtung bei geschlossenen Toren; der am Schneebett liegt im Gletscherkessel: erreichbar, sobald das Eistor offen ist
+      const keys = (open: GateId[]) => new Set(reachable(w, open, START, 200000).map(([x, y]) => `${x},${y}`));
+      const [lichtung, kessel] = [keys([]), keys(['eis'])];
       for (const [id, [x, y]] of w.stones) {
         const c = w.cell(x, y);
         expect([c.deco, c.story, c.solid], id).toEqual(['klangstein', id, true]);
         const sides = Object.values(DIRS).map(([dx, dy]) => `${x + dx},${y + dy}`);
+        const reach = id === 'eis-offen' ? kessel : lichtung;
         expect(
           sides.some((k) => reach.has(k)),
           `${id}: man kommt heran`,
@@ -674,7 +720,7 @@ describe('Klangsteine', () => {
         // nicht im Tor und nicht direkt davor; die Bucht vor der Tormitte bleibt frei
         for (const [x, y] of g.cells) expect(Math.abs(x - sx) + Math.abs(y - sy), g.id).toBeGreaterThan(1);
         for (let k = 1; k <= 3; k++)
-          expect(reach.has(`${g.mid[0] - g.out[0] * k},${g.mid[1] - g.out[1] * k}`)).toBe(true);
+          expect(lichtung.has(`${g.mid[0] - g.out[0] * k},${g.mid[1] - g.out[1] * k}`)).toBe(true);
       }
     });
   }

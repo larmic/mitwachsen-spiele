@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hopOf } from './mitwachsen-gait';
+import { SNAP_DELAY, hopOf, snaps } from './mitwachsen-gait';
 
 describe('Gangart beim Gleiten', () => {
   it('Figur, Tiere der Lichtung und der Landschaft hüpfen wie bisher: ein kleiner Hüpfer je Schritt', () => {
@@ -16,6 +16,15 @@ describe('Gangart beim Gleiten', () => {
     expect(peak('eis:schneeeule')).toBeGreaterThan(peak('player'));
     for (const id of ['eis:pinguin', 'eis:polarfuchs', 'eis:lemming'])
       expect([hopOf(id, 0, 1e9), hopOf(id, 1, 1e9)].map((h) => Math.abs(h) < 1e-9)).toEqual([true, true]); // am Feld landen
+  });
+
+  it('Fischfresser machen beim Füttern mit Fisch einen kurzen Schnapp-Hüpfer; Moosfresser und Tiere der Lichtung nicht', () => {
+    expect(['eis:pinguin', 'eis:robbe:2', 'eis:eisbaer', 'eis:polarfuchs'].every(snaps)).toBe(true);
+    expect(['eis:rentier', 'eis:moschusochse', 'eis:lemming', 'lichtung:hase', 'player'].some(snaps)).toBe(false);
+    expect(SNAP_DELAY).toBeGreaterThan(0);
+    expect(hopOf('eis:pinguin', 0, 1e9, 90)).toBeGreaterThan(0.1); // mitten im Schnapp-Hüpfer
+    expect(hopOf('eis:pinguin', 0, 1e9, -50)).toBe(0); // noch nicht dran
+    expect(hopOf('eis:pinguin', 0, 1e9, 400)).toBe(0); // vorbei
   });
 
   it('beim Singen hüpft jedes Wesen zusätzlich, 320 ms lang', () => {

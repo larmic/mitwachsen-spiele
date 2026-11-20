@@ -6,10 +6,29 @@
 // Spezifikation: docs/specs/mitwachsen.md (Eingabe)
 
 import type { Dir } from '../../lib/games/front';
+import type { GameEvent } from './mitwachsen-state';
 
 export const STEP_MS = 260; // gut 4 Schritte pro Sekunde
 export const HOLD_MS = 450; // so lange halten, bis die Figur weiterläuft (erster Spieltest am Tablet)
 export const ACTION_MS = 350; // Leertaste: höchstens knapp 3 Aktionen pro Sekunde
+
+/**
+ * Begegnungen: Tier gefunden oder angestoßen, Beeren gepflückt, Fische gefangen, Futter oder Wasser gebracht, Wasser
+ * geschöpft, Plattform erwacht, gereist, Klangstein. Danach bleibt die Figur stehen, bis der Pfeil neu gedrückt wird
+ * (`clear`); sonst liefe sie mit gehaltenem Pfeil gleich weiter und tauschte den Platz mit dem neuen Tier.
+ */
+export const ENCOUNTERS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['type']>([
+  'sing',
+  'follow',
+  'pick',
+  'catch',
+  'fill',
+  'feed',
+  'pour',
+  'portal',
+  'teleport',
+  'story',
+]);
 
 export class InputPace {
   private down: Dir[] = []; // gehaltene Pfeile, zuletzt gedrückter hinten

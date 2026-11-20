@@ -57,7 +57,7 @@ Die Lichtung ist das Zuhause mit dem Bett. Hinter jedem der acht großen Tore li
 | Welt | Stand | Thema (`GateTheme`) |
 | --- | --- | --- |
 | **Lichtung** | spielbar | – |
-| **Eiswelt** | Kessel und Tiere da, Tor zu | `eis` |
+| **Eiswelt** | Kessel, Tiere und Futter da, Tor zu | `eis` |
 | **Sandwelt** | Landschaft gebaut, Tor zu | `sand` |
 | **Wasserwelt** | Landschaft gebaut, Tor zu | `wasser` |
 | **Lavaberge** | Landschaft gebaut, Tor zu | `lava` |
@@ -81,7 +81,7 @@ Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzel
 
 ### Eiswelt
 
-- **Kessel und Tiere da, Tor zu:** Hinter dem Eistor führt der Gang in einen Gletscherkessel (etwa 44 × 38 Felder), fest am Ende des Gangs, ringsum hohe Eisklippen mit Schnee obenauf (sie antworten wie Felsen mit Wackeln und „boing“). Der Gang ist der einzige Weg hinein. In der Mitte das Schneebett, darum die Schneewiese mit einer Futterschale aus Eis (links vor dem Bett) und einem Wassertrog aus Eisblöcken (rechts), dahinter ein großes Iglu als Unterstand: vorn ein weiter Bogen, durch den man hineinsieht, hinten eine feste Wand; vor der Figur wird die Kuppel durchsichtig. Seitlich ein Eisloch zum Wasserschöpfen. Um das Bett bleibt viel Platz (später für Klangstein und Portal). Sanfte Schneehügel (nie mehr als eine Stufe) und glatte Eisflächen, kühles Licht. Vom Tor bis ans Bett liegt die Rutschspur des Pinguins schon bereit; sie glänzt erst, wenn das Tor offen ist. Solange das Tor zu ist, kommt man nicht hinein; vom Tor aus sieht man nur ein Stück des Gangs. Im Kessel wohnen die zehn Eis-Tiere (unten), je drei; im Kessel und im Land der Eiswelt draußen laufen keine Tiere der Lichtung herum. Die Leiste unten zeigt immer die Tiere der Gegend, in der die Figur steht: auf der Lichtung wie bisher, im Kessel die Eis-Tiere.
+- **Kessel, Tiere und Futter da, Tor zu:** Hinter dem Eistor führt der Gang in einen Gletscherkessel (etwa 44 × 38 Felder), fest am Ende des Gangs, ringsum hohe Eisklippen mit Schnee obenauf (sie antworten wie Felsen mit Wackeln und „boing“). Der Gang ist der einzige Weg hinein. In der Mitte das Schneebett, darum die Schneewiese mit einer Futterschale aus Eis (links vor dem Bett) und einem Wassertrog aus Eisblöcken (rechts), dahinter ein großes Iglu als Unterstand: vorn ein weiter Bogen, durch den man hineinsieht, hinten eine feste Wand; vor der Figur wird die Kuppel durchsichtig. Seitlich ein Eisloch zum Wasserschöpfen. Links vorn neben dem Schneebett steht ein Klangstein mit der zweiten Fassung der Eis-Geschichte; um das Bett bleibt Platz für das Portal. Sanfte Schneehügel (nie mehr als eine Stufe) und glatte Eisflächen, kühles Licht. Vom Tor bis ans Bett liegt die Rutschspur des Pinguins schon bereit; sie glänzt erst, wenn das Tor offen ist. Solange das Tor zu ist, kommt man nicht hinein; vom Tor aus sieht man nur ein Stück des Gangs. Im Kessel wohnen die zehn Eis-Tiere (unten), je drei; im Kessel und im Land der Eiswelt draußen laufen keine Tiere der Lichtung herum. Die Leiste unten zeigt immer die Tiere der Gegend, in der die Figur steht: auf der Lichtung wie bisher, im Kessel die Eis-Tiere.
 - **Aussehen:** Schneefelder, glitzernde Eisblöcke zum Klettern, zugefrorene Seen, verschneite Tannen, Iglus. Kühles, helles Licht, sanfter Schneefall (nicht bei reduzierter Bewegung).
 - **Besonderes:** Auf Eis rutscht die Figur nicht (das wäre für ein kleines Kind frustrierend), es knirscht nur beim Laufen.
 - **Tiere:** zehn Arten, je drei Tiere (der Kessel ist viel kleiner als die Lichtung). Alle Töne in der Pentatonik, von tief bis hoch, damit man jedes Tier am Ton erkennt. Der Schneehase fehlt mit Absicht: Er sähe aus wie der Hase der Lichtung.
@@ -98,6 +98,7 @@ Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzel
   | Moschusochse | dunkles Zottelfell bis fast zum Boden, heller Sattel, Hörner nach unten gebogen | tiefes Muhen (tiefes G) | normaler Hüpfer |
   | Papageitaucher | klein, schwarz-weiß, weißes Gesicht, großer bunter Schnabel | schnelles Schnarren (E–G–E, hoch) | huscht |
   | Lemming | winzig, rund und goldbraun, schwarze Kappe, rosa Näschen (etwas größer gezeichnet) | Piepsen in schneller Folge (A–C–A–C) | huscht |
+- **Futter der Eiswelt:** Statt der Beerenbüsche gibt es drei **Fischkisten** aus Treibholz mit verschneitem Rand, voll silberblauer Fische, deren Schwanzflossen über den Rand stehen (in 2D zuckt ab und zu eine, in 3D wiegen sie sich leicht im Wind). Sie stehen einzeln mit freiem Platz ringsum, jede 8 bis 14 Felder von der Schneewiese: eine am Ende der Rutschspur nahe dem Tor, eine am Fuß der Klippe gegenüber, eine nahe dem Eisloch. So läuft das Kind einen kleinen Weg wie zu den Büschen. Die Regel bleibt dieselbe: hineinlaufen, tragen, hineinlaufen. Läuft die Figur in eine volle Kiste, macht es Platsch-Plopp und silberblaue Funken steigen auf, sie hüpft und bleibt stehen und trägt nun ein kleines Netz mit zwei Fischen in der linken Hand; Korb auf dem Rücken und Eimer in der rechten Hand bleiben frei, sie kann alles zugleich tragen. Die Kiste ist dann leer (nur Holz und etwas Schnee) und ein Hindernis wie ein abgeernteter Busch; nach 30 Sekunden liegen wieder Fische darin, auch nachts. Mit dem Netz in die **Eisschale** auf der Schneewiese: Die Fische rutschen hinein, das Netz ist leer, eine fröhliche Tonfolge, silberne und goldgelbe Funken, und alle Tiere der Schneewiese freuen sich. Die Fischfresser (Pinguin, Eisbärkind, Robbe, Schneeeule, Walross, Polarfuchs, Papageitaucher) schnappen zusätzlich kurz nach. Für Rentier, Moschusochse und Lemming liegt ein Büschel Moos am Rand der Schale (nur Bild), und irgendwo im Kessel gibt es einen grünen **Moosfleck** unter dem Schnee (nur Kulisse). Jeder Trog nimmt nur das Seine: Beeren nicht in die Eisschale, Fisch nicht in den Futtertrog. Wasser wie auf der Lichtung: am Eisloch schöpfen, im Wassertrog aus Eisblöcken leeren. Es freuen sich immer nur die Tiere der Wiese, auf der der Trog steht. Gold gibt es an Kiste und Schale nicht (wie an Busch und Trog).
 - **Portal-Plattform:** Eisscholle mit Schneekante, Eisspitzen in den Ecken; Bild: Schneeflocke.
 
 ### Sandwelt
@@ -175,7 +176,7 @@ Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzel
 
 ## Klangsteine und Geschichten
 
-Das Kind kann noch nicht lesen, darum erzählen die Geschichten Klangsteine. Ein **Klangstein** ist ein kleiner Steinblock, über dem eine goldene Note schwebt (Gold heißt auf der ganzen Seite: hier kannst du etwas tun). Einer steht links vorn neben dem Bett, einer vor jedem großen Tor, gegenüber der Portal-Plattform vor dem anderen Turm.
+Das Kind kann noch nicht lesen, darum erzählen die Geschichten Klangsteine. Ein **Klangstein** ist ein kleiner Steinblock, über dem eine goldene Note schwebt (Gold heißt auf der ganzen Seite: hier kannst du etwas tun). Einer steht links vorn neben dem Bett, einer vor jedem großen Tor, gegenüber der Portal-Plattform vor dem anderen Turm, und einer im Gletscherkessel links vorn neben dem Schneebett.
 
 - **Hineinlaufen** spielt die Geschichte des Ortes, wie alles andere im Spiel ohne Leertaste. Noch einmal hineinlaufen hält sie an, ein anderer Stein löst den vorigen ab. Nichts spielt von selbst.
 - **Zuhören:** Solange die Figur stehen bleibt, sitzt sie am Stein, Noten steigen auf, und Tiere in der Nähe drehen sich zu ihr um und bleiben eine Weile stehen. Geht sie los, läuft die Geschichte weiter. Menü, Schlafen oder ein Wechsel des Tabs halten sie an.
@@ -191,6 +192,10 @@ Das Kind kann noch nicht lesen, darum erzählen die Geschichten Klangsteine. Ein
 **Tor zur Eiswelt** (`eis`)
 
 > Hinter diesem Tor ist es so kalt, dass sogar das Wasser zu Eis wird. Dort wohnt ein kleiner Pinguin, der den ganzen Tag auf dem Bauch übers Eis rutscht. Manchmal rutscht er bis ans Tor und schaut zu dir herüber. Noch ist das Tor zu. Aber wenn du ein bisschen größer bist, geht es auf, und dann rutscht ihr zusammen.
+
+**Am Schneebett** (`eis-offen`, Klangstein im Gletscherkessel links vorn neben dem Schneebett; die zweite Fassung der Eis-Geschichte, „Wenn das Tor offen ist“, mit derselben Melodie)
+
+> Hinter diesem Tor ist es so kalt, dass sogar das Wasser zu Eis wird. Jetzt ist das Tor offen, und der kleine Pinguin ist wieder zu Hause. Folge einfach seiner glänzenden Rutschspur, dann kommst du zum Iglu mit dem Schneebett. Dort warten das Eisbärkind, die Robbe und all die anderen Eis-Tiere schon auf dich. Und wenn der Pustewind kommt, kuscheln sich alle ins Iglu.
 
 **Tor zur Sandwelt** (`sand`)
 

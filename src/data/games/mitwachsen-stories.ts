@@ -1,11 +1,12 @@
-// Geschichten von Mitwachsen: Klangsteine am Bett und vor jedem großen Tor. Läuft die Figur hinein, erklingt die
+// Geschichten von Mitwachsen: Klangsteine am Bett, vor jedem großen Tor und am Schneebett im Gletscherkessel (die
+// zweite Fassung der Eis-Geschichte, „Wenn das Tor offen ist“). Läuft die Figur hinein, erklingt die
 // Melodie des Ortes, später danach die eingesprochene Geschichte. Die Texte stehen auch in docs/games/mitwachsen.md
 // (Abschnitt „Klangsteine und Geschichten“); ein Test hält beide gleich.
 // Aufnahmen: public/games/mitwachsen/stimme/<id>.m4a ablegen und hier bei `voice` eintragen (ein Test prüft die Datei).
 
 import type { GateId, Point } from './mitwachsen';
 
-export type StoryId = 'bett' | GateId;
+export type StoryId = 'bett' | GateId | 'eis-offen';
 
 /** Melodie: Töne [Hz, Länge in s, Lautstärke?] nacheinander, alle aus der Pentatonik C–D–E–G–A */
 export type Melody = {
@@ -23,6 +24,8 @@ export type Story = {
 
 /** Klangstein am Bett: links vorn, gleich außerhalb des freien Platzes ums Bett (`HOMES.lichtung.clear` in mitwachsen-homes.ts) */
 export const BED_STONE: Point = [-3, 1];
+/** Klangstein am Schneebett im Gletscherkessel: genauso links vorn, relativ zum Schneebett (`HOMES.eis`) */
+export const ICE_STONE: Point = [-3, 1];
 
 // Töne der Pentatonik
 const C3 = 130.81,
@@ -40,6 +43,22 @@ const C3 = 130.81,
   A5 = 880,
   C6 = 1046.5,
   E6 = 1318.51;
+
+/** Melodie der Eis-Geschichte: hell und klirrend wie Eiszapfen (beide Fassungen) */
+const ICE_MELODY: Melody = {
+  wave: 'triangle',
+  gap: 0.04,
+  notes: [
+    [C6, 0.14],
+    [A5, 0.14],
+    [G5, 0.14],
+    [E5, 0.14],
+    [G5, 0.14],
+    [A5, 0.14],
+    [C6, 0.2],
+    [E6, 0.5, 0.06],
+  ],
+};
 
 export const STORIES: Record<StoryId, Story> = {
   bett: {
@@ -64,21 +83,13 @@ export const STORIES: Record<StoryId, Story> = {
   eis: {
     title: 'Tor zur Eiswelt',
     text: 'Hinter diesem Tor ist es so kalt, dass sogar das Wasser zu Eis wird. Dort wohnt ein kleiner Pinguin, der den ganzen Tag auf dem Bauch übers Eis rutscht. Manchmal rutscht er bis ans Tor und schaut zu dir herüber. Noch ist das Tor zu. Aber wenn du ein bisschen größer bist, geht es auf, und dann rutscht ihr zusammen.',
-    // hell und klirrend wie Eiszapfen
-    melody: {
-      wave: 'triangle',
-      gap: 0.04,
-      notes: [
-        [C6, 0.14],
-        [A5, 0.14],
-        [G5, 0.14],
-        [E5, 0.14],
-        [G5, 0.14],
-        [A5, 0.14],
-        [C6, 0.2],
-        [E6, 0.5, 0.06],
-      ],
-    },
+    melody: ICE_MELODY,
+  },
+  // Zweite Fassung der Eis-Geschichte, am Schneebett im Gletscherkessel
+  'eis-offen': {
+    title: 'Am Schneebett',
+    text: 'Hinter diesem Tor ist es so kalt, dass sogar das Wasser zu Eis wird. Jetzt ist das Tor offen, und der kleine Pinguin ist wieder zu Hause. Folge einfach seiner glänzenden Rutschspur, dann kommst du zum Iglu mit dem Schneebett. Dort warten das Eisbärkind, die Robbe und all die anderen Eis-Tiere schon auf dich. Und wenn der Pustewind kommt, kuscheln sich alle ins Iglu.',
+    melody: ICE_MELODY,
   },
   sand: {
     title: 'Tor zur Sandwelt',

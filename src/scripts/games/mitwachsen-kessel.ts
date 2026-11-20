@@ -1,13 +1,15 @@
 // Gletscherkessel hinter dem Eistor (Gegend 'eis') – rein und deterministisch: Derselbe Seed ergibt denselben Kessel.
 // Er liegt fest am Ende des Gangs hinter dem Eistor, ganz hinter dem Felsring der Lichtung, im selben Koordinatenraum.
 // Ringsum feste Eisklippen, der Gang ist der einzige Zugang. In der Mitte das Schneebett mit Schneewiese, Eisschale,
-// Wassertrog aus Eis und Iglu, seitlich das Eisloch, vom Tor bis ans Bett die Rutschspur.
+// Wassertrog aus Eis, Iglu und Klangstein, seitlich das Eisloch, drei Fischkisten, ein Moosfleck, vom Tor bis ans Bett
+// die Rutschspur.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt“, Kessel)
 
 import { fromKey } from '../../lib/games/chunks';
 import { hash, valueNoise } from '../../lib/games/rng';
 import type { Point } from '../../data/games/mitwachsen';
 import { KESSEL } from '../../data/games/mitwachsen-eis';
+import { ICE_STONE } from '../../data/games/mitwachsen-stories';
 import type { Cell } from './mitwachsen-cell';
 import { placeHome } from './mitwachsen-home';
 
@@ -23,8 +25,8 @@ export type Gang = {
 /** Lage des Kessels: Mitte (dort steht das Schneebett) und alle Felder samt Klippen */
 export type KesselPlace = { bed: Point; centre: number; cells: readonly Point[] };
 
-/** Der gebaute Kessel: Bett, Felder der Eis-Welt (Kessel und Gang ab der Mitte) und Wohnplätze ihrer Tiere */
-export type Kessel = { bed: Point; realm: ReadonlySet<string>; spots: readonly Point[] };
+/** Der gebaute Kessel: Bett, Felder der Eis-Welt (Kessel und Gang ab der Mitte), Wohnplätze ihrer Tiere, Klangstein */
+export type Kessel = { bed: Point; realm: ReadonlySet<string>; spots: readonly Point[]; stone: Point };
 
 const key = (x: number, y: number) => `${x},${y}`;
 const { rx, ry } = KESSEL.shape;
@@ -97,6 +99,7 @@ export function buildKessel(
       set(x, y, mouth ? passage(x, y) : z === 'cliff' ? cliffCell(seed, u, v, x, y) : floorCell(seed, place.bed, x, y));
     }
   home(gang, place, set);
+  forage(gang, place, map);
   const slide = slidePath(gang, place.bed, map);
   for (const [x, y] of slide) {
     const c = map.get(key(x, y))!; // die Spur läuft nur über gebaute Felder
@@ -107,7 +110,8 @@ export function buildKessel(
   while (map.get(key(...gang.at(0, inner)))?.region !== 'eis' && inner < centre) inner++;
   for (let t = gang.depth + 1 + Math.floor((inner - gang.depth - 1) / 2); t < centre; t++)
     for (let u = -gang.half - gang.wall; u <= gang.half + gang.wall; u++) realm.add(key(...gang.at(u, t)));
-  return { bed: place.bed, realm, spots: spotsOf(place, map) };
+  const stone: Point = [place.bed[0] + ICE_STONE[0], place.bed[1] + ICE_STONE[1]];
+  return { bed: place.bed, realm, spots: spotsOf(place, map), stone };
 }
 
 /** Eisklippe in Terrassen: innen 3, dann 4, außen 5, hier und da ein Block höher */
@@ -134,6 +138,8 @@ function home(gang: Gang, { bed, centre }: KesselPlace, set: (x: number, y: numb
   set(...bed, { ...snow(1), deco: 'bed', solid: true });
   set(...h.food, fixed('icebowl'));
   set(...h.water, fixed('watertrough'));
+  const [sx, sy] = [bed[0] + ICE_STONE[0], bed[1] + ICE_STONE[1]]; // Klangstein mit der Eis-Geschichte, wenn das Tor offen ist
+  set(sx, sy, { ...fixed('klangstein'), story: 'eis-offen' });
   const { x0, y0, x1, y1 } = h.shelter;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, { ...snow(1), garden: true, roof: true });
   for (let x = x0; x <= x1; x++) set(x, y0 - 1, fixed('igloo')); // Rückwand, die Mitte ist `shelterStem`
@@ -146,6 +152,25 @@ function home(gang: Gang, { bed, centre }: KesselPlace, set: (x: number, y: numb
       if (d <= hr) set(hx + dx, hy + dy, { ...snow(0), ground: 'water' });
       else if (d <= hr + 2) set(hx + dx, hy + dy, snow(1));
     }
+}
+
+/**
+ * Futter im Kessel: drei Fischkisten (fest wie ein Busch; einzeln, ringsum ebener Schnee) und ein Moosfleck als
+ * Kulisse (grünes Moos unter dem Schnee, begehbar)
+ */
+function forage(gang: Gang, { centre }: KesselPlace, map: Map<string, Cell>) {
+  const { across, out, r } = KESSEL.moss;
+  for (let dv = -2; dv <= 2; dv++)
+    for (let du = -2; du <= 2; du++) {
+      const [x, y] = gang.at(across + du, centre + out + dv);
+      const c = map.get(key(x, y));
+      if (c?.region === 'eis' && !c.solid && Math.hypot(du, dv) <= r) map.set(key(x, y), { ...c, ground: 'grass' });
+    }
+  for (const [u, v] of KESSEL.crates) {
+    for (let dv = -1; dv <= 1; dv++)
+      for (let du = -1; du <= 1; du++) map.set(key(...gang.at(u + du, centre + v + dv)), snow(1));
+    map.set(key(...gang.at(u, centre + v)), { ...snow(1), deco: 'fishcrate', solid: true });
+  }
 }
 
 const stand = (map: ReadonlyMap<string, Cell>, x: number, y: number) => {

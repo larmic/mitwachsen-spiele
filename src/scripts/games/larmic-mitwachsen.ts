@@ -25,13 +25,15 @@ import {
   type SavedWorld,
   type Store,
 } from './mitwachsen-save';
-import { InputPace, STEP_MS } from './input-pace';
+import { ENCOUNTERS, InputPace, STEP_MS } from './input-pace';
 import { drawMap } from './mitwachsen-map';
 import { Fog, REVEAL, START_REVEAL } from './mitwachsen-fog';
 import { initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
+import type { ChoreEvent } from './mitwachsen-chores';
 import { createWorld, standHeight, type World } from './mitwachsen-world';
 import { platformLift } from './mitwachsen-portal';
-import { hopOf } from './mitwachsen-gait';
+import { SNAP_DELAY, hopOf, snaps } from './mitwachsen-gait';
+import { FISH_SPARKS } from '../../data/games/mitwachsen-eis';
 import { weatherLook, windAt } from './mitwachsen-weather';
 import { idlePose, type Pose } from './mitwachsen-tired';
 import { advance, evening, freshDay, loadTired, saveTired, type Tired, type TiredEvent } from './mitwachsen-tired';
@@ -57,6 +59,15 @@ const FREE_KEYS = new Set([
   'ContextMenu',
 ]);
 
+/** Funken der Handgriffe: an Busch, Fischkiste und Wasser, dann an Futtertrog, Eisschale und Wassertrog */
+const SPARKS = {
+  pick: ['#c8323a', '#ef5b5b', '#3f9a3c'],
+  catch: FISH_SPARKS.catch,
+  fill: ['#3f8fd8', '#7fc0f0', '#ffffff'],
+  berries: ['#c8323a', '#ef5b5b', '#ffd47e'],
+  fish: FISH_SPARKS.feed,
+  pour: ['#3f8fd8', '#7fc0f0', '#ffd47e'],
+} as const;
 const randomSeed = () => crypto.getRandomValues(new Uint32Array(1))[0]!;
 const randomId = () => randomSeed().toString(36) + Date.now().toString(36);
 
@@ -455,14 +466,9 @@ class LarmicMitwachsen extends HTMLElement {
   private react(events: GameEvent[]) {
     const now = performance.now();
     let persist = false;
-    // Begegnung (Tier gefunden oder getroffen, Beeren, Füttern, Portal): Die Figur bleibt stehen, bis der Pfeil neu
-    // gedrückt wird. Sonst liefe sie mit gehaltenem Pfeil gleich weiter und tauschte den Platz mit dem neuen Tier.
-    if (
-      events.some((e) =>
-        ['sing', 'follow', 'pick', 'fill', 'feed', 'pour', 'portal', 'teleport', 'story'].includes(e.type),
-      )
-    )
-      this.pace.clear();
+    // Begegnung (Tier gefunden oder getroffen, Beeren, Fische, Füttern, Portal): Die Figur bleibt stehen, bis der Pfeil
+    // neu gedrückt wird. Sonst liefe sie mit gehaltenem Pfeil gleich weiter und tauschte den Platz mit dem neuen Tier.
+    if (events.some((e) => ENCOUNTERS.has(e.type))) this.pace.clear();
     for (const e of events) {
       switch (e.type) {
         case 'step':
@@ -507,22 +513,6 @@ class LarmicMitwachsen extends HTMLElement {
           this.burst(e.id, ['#ffd47e', '#ffffff', '#6cc46f'], 14);
           persist = true;
           break;
-        case 'pick': {
-          // Beeren gepflückt: Die Figur hüpft vor Freude, ein paar Beeren springen heraus
-          this.sfx.pick();
-          this.hops.set('player', now);
-          this.burst('player', ['#c8323a', '#ef5b5b', '#3f9a3c'], 12);
-          this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]);
-          break;
-        }
-        case 'fill':
-        case 'feed':
-        case 'pour':
-          this.trough(e, now);
-          break;
-        case 'regrow':
-          this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]);
-          break;
         case 'portal': // Plattform erwacht bzw. gereist
         case 'teleport':
           this.sfx[e.type === 'portal' ? 'gate' : 'portal']();
@@ -551,6 +541,8 @@ class LarmicMitwachsen extends HTMLElement {
           this.dayAt = now;
           this.hops.set('player', now);
           break;
+        default: // Handgriffe: pflücken, fangen, nachwachsen, schöpfen, füttern, tränken
+          this.chore(e, now);
       }
     }
     if (persist) this.save();
@@ -573,7 +565,7 @@ class LarmicMitwachsen extends HTMLElement {
     this.floats.push({ kind, who, color, born, x: 0, y: 0, z: 0, age: 0 });
   }
 
-  private burst(who: string, colors: string[], n: number) {
+  private burst(who: string, colors: readonly string[], n: number) {
     if (this.reduced.matches) return;
     const b = this.bodies.get(who);
     if (!b) return;
@@ -652,26 +644,32 @@ class LarmicMitwachsen extends HTMLElement {
       b.z += (z - b.z) * Math.min(1, dt * 14);
       const moving = Math.min(1, Math.hypot(t.x - b.x, t.y - b.y));
       const sung = now - (this.hops.get(id) ?? -1e9);
-      b.hop = snap ? 0 : hopOf(id, moving, sung); // je Gangart der Art (watscheln, robben, hüpfen …)
+      const snapped = now - (this.hops.get(`snap:${id}`) ?? -1e9); // Schnapp-Hüpfer der Fischfresser beim Füttern
+      b.hop = snap ? 0 : hopOf(id, moving, sung, snapped); // je Gangart der Art (watscheln, robben, hüpfen …)
       this.bodies.set(id, b);
     }
   }
 
-  /** Eimer geschöpft, Beeren im Futtertrog oder Wasser im Wassertrog */
-  private trough(e: Extract<GameEvent, { type: 'fill' | 'feed' | 'pour' }>, now: number) {
-    if (e.type === 'fill') {
-      // Es gluckert, die Figur hüpft, ein paar Tropfen spritzen
-      this.sfx.fill();
+  /** Beeren gepflückt, Fische gefangen, nachgewachsen, Eimer geschöpft; Beeren, Fische oder Wasser in den Trog */
+  private chore(e: ChoreEvent, now: number) {
+    if (e.type === 'pick' || e.type === 'catch' || e.type === 'regrow')
+      this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]); // Busch oder Fischkiste ist jetzt leer bzw. wieder voll
+    if (e.type === 'regrow') return;
+    if (e.type === 'pick' || e.type === 'catch' || e.type === 'fill') {
+      // Die Figur hüpft vor Freude: Beeren springen heraus, Fische platschen, beim Schöpfen spritzen Tropfen
+      this.sfx[e.type]();
       this.hops.set('player', now);
-      this.burst('player', ['#3f8fd8', '#7fc0f0', '#ffffff'], 12);
+      this.burst('player', SPARKS[e.type], 12);
       return;
     }
     // Alle Tiere der Wiese hüpfen und bekommen ein Herz
     if (e.type === 'feed') this.sfx.feed();
     else this.sfx.pour();
-    this.burst('player', e.type === 'feed' ? ['#c8323a', '#ef5b5b', '#ffd47e'] : ['#3f8fd8', '#7fc0f0', '#ffd47e'], 16);
+    const fish = e.type === 'feed' && e.food === 'fish'; // silberne und goldgelbe Funken, Fischfresser schnappen zu
+    this.burst('player', SPARKS[e.type === 'feed' ? e.food : 'pour'], 16);
     e.ids.forEach((id, i) => {
       this.hops.set(id, now);
+      if (fish && snaps(id)) this.hops.set(`snap:${id}`, now + SNAP_DELAY);
       this.float('heart', id, GAME_COLORS.heart, now + 100 + i * 60);
     });
   }

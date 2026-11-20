@@ -43,9 +43,9 @@ import {
   type RegionId,
   type SpeciesId,
 } from '../../data/games/mitwachsen';
-import { ICE_COLORS } from '../../data/games/mitwachsen-eis';
+import { FISH_PARTS, ICE_COLORS } from '../../data/games/mitwachsen-eis';
 import { grown } from './mitwachsen-growth';
-import { iceBoxes, type IceBox } from './mitwachsen-ice-look';
+import { finTwitch, iceBoxes, type IceBox } from './mitwachsen-ice-look';
 import { drawStone } from './mitwachsen-story';
 import type { WeatherLook } from './mitwachsen-weather';
 import type { Pose } from './mitwachsen-tired';
@@ -96,11 +96,15 @@ const FLAT_GROUND: Partial<Record<Cell['ground'], readonly [string, string]>> = 
   moss: ['#6a4a3a', '#8a76cc'],
 };
 
-/** Die Figur, mit Korb auf dem Rücken und Eimer in der Hand, solange sie Beeren und Wasser trägt, und mit Buch, wenn niemand spielt */
+/**
+ * Die Figur, mit Korb auf dem Rücken, Eimer und Netz in den Händen, solange sie Beeren, Wasser und Fische trägt, und mit
+ * Buch, wenn niemand spielt
+ */
 const figure = (state: State, sc: Scene) => [
   ...figureParts(sc.look),
   ...(state.basket ? BASKET_PARTS : []),
   ...(state.bucket ? BUCKET_PARTS : []),
+  ...(state.fish ? FISH_PARTS : []),
   ...(sc.pose === 'stand' ? [] : BOOK_PARTS(sc.look, sc.pose === 'read' && !sc.reduced && sc.now % 5000 < 450)),
   ...(sc.pose === 'doze' ? SLEEPY_EYES(sc.look) : []),
 ];
@@ -720,7 +724,11 @@ export class Renderer {
     const { ctx } = this;
     const h = c.h;
     if (c.tufts) this.tufts(P, x, y, h, c.tufts);
-    const ice = c.biome === 'eis' ? iceBoxes(world, c, x, y) : null; // Iglu, Eisschale, Wassertrog aus Eis
+    const crate =
+      c.deco === 'fishcrate' // nur an einer Fischkiste: das hier läuft für jedes Feld in jedem Bild
+        ? { full: !(`${x},${y}` in state.picked), twitch: sc.reduced ? 0 : finTwitch(sc.now, x, y) }
+        : undefined;
+    const ice = c.biome === 'eis' ? iceBoxes(world, c, x, y, crate) : null; // Iglu, Eisschale, Wassertrog, Fischkiste
     // gezeichnet erst in der Reihe ihrer Vorderkante: sonst deckte der Boden der Reihen davor die Kuppel unten zu
     if (ice) return void this.later.push(...ice);
     switch (c.deco) {

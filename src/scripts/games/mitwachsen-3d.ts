@@ -45,7 +45,7 @@ import {
   SLEEPY_EYES,
   type Look,
 } from '../../data/games/mitwachsen';
-import { ICE_COLORS } from '../../data/games/mitwachsen-eis';
+import { FISH_PARTS, ICE_COLORS } from '../../data/games/mitwachsen-eis';
 import { Geo, atlas, snapToShadowTexel, type Tile, type V3 } from './mitwachsen-geo';
 import { grown } from './mitwachsen-growth';
 import { iceBoxes } from './mitwachsen-ice-look';
@@ -161,7 +161,7 @@ export class World3D {
   private platforms!: Platforms3D; // Portal-Plattformen
   private chunks = new Map<string, Chunk>();
   private stale = new Set<string>(); // Stücke, die neu gebaut werden müssen; bis dahin bleibt das alte stehen
-  private picked: Record<string, number> = {}; // Büsche ohne Beeren (aus den Regeln)
+  private picked: Record<string, number> = {}; // Büsche ohne Beeren und leere Fischkisten (aus den Regeln)
   private day = 0; // Tag der Welt: bestimmt, was nachgewachsen ist
   private slide = false; // Eistor offen: Die Rutschspur zum Schneebett glänzt
   private models = new Map<string, BufferGeometry>();
@@ -533,7 +533,7 @@ export class World3D {
       for (let x = cx * CHUNK; x < (cx + 1) * CHUNK; x++) {
         const c = grown(world.seed, this.day, x, y, world.cell(x, y)); // mit allem, was schon nachgewachsen ist
         this.terrain(solid, water, lava, world, c, x, y);
-        if (!this.ice(solid, canopy, c, x, y)) this.decoration(solid, leaves, canopy, bright, c, x, y);
+        if (!this.ice(solid, leaves, canopy, c, x, y)) this.decoration(solid, leaves, canopy, bright, c, x, y);
       }
     const meshes: Mesh[] = [];
     const add = (g: Geo, mat: MeshLambertMaterial | MeshBasicMaterial, shadows: boolean) => {
@@ -617,11 +617,15 @@ export class World3D {
     }
   }
 
-  /** Dinge im Gletscherkessel: Iglu (vor der Figur durchsichtig wie Laub), Eisschale, Wassertrog aus Eis */
-  private ice(g: Geo, canopy: Geo, c: Cell, x: number, y: number): boolean {
-    const ice = c.biome === 'eis' ? iceBoxes(this.world!, c, x, y) : null;
-    for (const [bx, by, bz, w, d, bh, side, top, see] of ice ?? [])
-      (see ? canopy : g).box(bx, bz, by, w, bh, d, side, top);
+  /**
+   * Dinge im Gletscherkessel: Iglu (vor der Figur durchsichtig wie Laub), Eisschale, Wassertrog aus Eis, Fischkiste
+   * (voll oder leer aus den Regeln; ihre Schwanzflossen wiegen sich im Wind wie die Grasbüschel)
+   */
+  private ice(g: Geo, blades: Geo, canopy: Geo, c: Cell, x: number, y: number): boolean {
+    const crate = c.deco === 'fishcrate' ? { full: !(`${x},${y}` in this.picked), twitch: 0 } : undefined;
+    const ice = c.biome === 'eis' ? iceBoxes(this.world!, c, x, y, crate) : null;
+    for (const [bx, by, bz, w, d, bh, side, top, kind] of ice ?? [])
+      (kind === 'see' ? canopy : kind === 'sway' ? blades : g).box(bx, bz, by, w, bh, d, side, top);
     return !!ice;
   }
 
@@ -937,15 +941,16 @@ export class World3D {
       m.rotation.y = YAW[dir];
     };
     if (!state.sleeping) {
-      // Korb auf dem Rücken, Eimer in der Hand, Buch beim Lesen; beim Lesen schaut die Figur zum Betrachter
+      // Korb auf dem Rücken, Eimer und Netz in den Händen, Buch beim Lesen; beim Lesen schaut die Figur zum Betrachter
       const book = sc.pose !== 'stand';
       const doze = sc.pose === 'doze';
       const turning = sc.pose === 'read' && !sc.reduced && sc.now % 5000 < 450; // alle paar Sekunden umblättern
-      const key = `player${state.basket ? '-basket' : ''}${state.bucket ? '-bucket' : ''}${book ? '-book' : ''}${turning ? '-turn' : ''}${doze ? '-doze' : ''}`;
+      const key = `player${state.basket ? '-basket' : ''}${state.bucket ? '-bucket' : ''}${state.fish ? '-fish' : ''}${book ? '-book' : ''}${turning ? '-turn' : ''}${doze ? '-doze' : ''}`;
       const parts = [
         ...figureParts(this.look),
         ...(state.basket ? BASKET_PARTS : []),
         ...(state.bucket ? BUCKET_PARTS : []),
+        ...(state.fish ? FISH_PARTS : []),
         ...(book ? BOOK_PARTS(this.look, turning) : []),
         ...(doze ? SLEEPY_EYES(this.look) : []),
       ];

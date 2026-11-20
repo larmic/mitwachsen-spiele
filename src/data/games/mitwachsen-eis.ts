@@ -1,5 +1,5 @@
-// Eis-Welt von Mitwachsen: Maße des Gletscherkessels hinter dem Eistor, Lage des Eislochs, Farben der Eis-Dinge und
-// die zehn Eis-Tiere (Wohnort, Modell, Ton, Gangart).
+// Eis-Welt von Mitwachsen: Maße des Gletscherkessels hinter dem Eistor, Lage von Eisloch, Fischkisten und Moosfleck,
+// Farben der Eis-Dinge, das Netz mit Fischen und die zehn Eis-Tiere (Wohnort, Modell, Ton, Gangart).
 // Die Gegend selbst steht in `REGIONS` (Gegend 'eis'), ihr Zuhause (Bett, Wiese, Tröge, Iglu) in `HOMES.eis`.
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md
 
@@ -18,6 +18,17 @@ export const KESSEL = {
   gap: 2,
   /** Eisloch: rundes Wasserloch (Radius in Feldern) seitlich hinter dem Bett, ringsum ebenes Ufer */
   hole: { across: 13, out: 5, r: 1.6 },
+  /**
+   * Fischkisten [quer, vom Tor weg]: am Ende der Rutschspur nahe dem Tor, am Fuß der Klippe gegenüber und nahe dem
+   * Eisloch; jede 8 bis 14 Felder von der Schneewiese, einzeln mit freiem Platz ringsum
+   */
+  crates: [
+    [-4, -15],
+    [0, 15],
+    [17, 1],
+  ],
+  /** Moosfleck: grünes Moos und Flechten unter dem Schnee (nur Kulisse, begehbar) */
+  moss: { across: -14, out: 3, r: 1.8 },
 } as const;
 
 /** Farben im Kessel (Spielgrafik): Seite und Oberseite */
@@ -29,6 +40,28 @@ export const ICE_COLORS = {
   bowl: ['#8fc6e9', '#cdeaf8'], // Futterschale aus Eis
   bowlIn: '#6fb3df',
   slide: ['#bfe6f5', '#e8f8ff'], // glänzende Rutschspur
+  crate: ['#7d6a55', '#9a8670'], // Fischkiste aus Treibholz
+  fish: ['#9fb4c8', '#dfe9f2'], // silberblaue Fische: Rücken, heller Bauch
+  fin: '#7f96ad', // Schwanzflossen
+  moss: ['#5f8f3a', '#7aa84a'], // Moosbüschel am Rand der Eisschale (nur Bild)
+} as const;
+
+/** Netz mit zwei silberblauen Fischen in der linken Hand (nach dem Fangen, bis zur Eisschale); gespiegelt zum Eimer */
+export const FISH_PARTS: Part[] = [
+  [-0.11, -0.47, 0.06, 0.22, 0.2, 0.19, '#d8cfb4', ICE_COLORS.fish[0]], // Netz, oben schauen die Fische heraus
+  [-0.115, -0.475, 0.13, 0.23, 0.21, 0.02, '#b9ae90'], // Maschen
+  [-0.115, -0.475, 0.25, 0.23, 0.21, 0.03, '#8a5f2a'], // Rand
+  [-0.01, -0.38, 0.28, 0.02, 0.02, 0.08, '#5d4a2f'], // Stiel bis zur Hand
+  [-0.07, -0.44, 0.22, 0.06, 0.05, 0.1, ...ICE_COLORS.fish], // zwei Fische, die Schwänze stehen über den Rand
+  [-0.09, -0.46, 0.31, 0.1, 0.09, 0.06, ICE_COLORS.fin],
+  [0.02, -0.37, 0.22, 0.06, 0.05, 0.08, ...ICE_COLORS.fish],
+  [0.0, -0.39, 0.29, 0.1, 0.09, 0.06, ICE_COLORS.fin],
+];
+
+/** Funken beim Fangen (Platsch) und beim Füttern mit Fisch (silbern und goldgelb) */
+export const FISH_SPARKS = {
+  catch: ['#9fb4c8', '#dfe9f2', '#3f8fd8'],
+  feed: ['#dfe9f2', '#c3ced8', '#ffd47e', '#f2d14b'],
 } as const;
 
 // ---------- Tiere der Eis-Welt ----------
@@ -62,6 +95,20 @@ export const ICE_ANIMALS: readonly { species: IceSpeciesId; at: readonly [number
   { species: 'papageitaucher', at: [3, -10] },
   { species: 'lemming', at: [-3, 10] },
 ];
+
+/**
+ * Fischfresser: Sie machen beim Füttern mit Fisch zusätzlich einen Schnapp-Hüpfer. Rentier, Moschusochse und Lemming
+ * scharren lieber am Moosfleck (am Rand der Eisschale liegt auch ein Büschel Moos für sie).
+ */
+export const FISH_EATERS: ReadonlySet<string> = new Set<IceSpeciesId>([
+  'pinguin',
+  'eisbaer',
+  'robbe',
+  'schneeeule',
+  'walross',
+  'polarfuchs',
+  'papageitaucher',
+]);
 
 const EYE = '#1d2233';
 /** Teil auf beiden Seiten: wie angegeben und an der Mitte gespiegelt (Flecken, Ohren, Gesicht an den Seiten) */

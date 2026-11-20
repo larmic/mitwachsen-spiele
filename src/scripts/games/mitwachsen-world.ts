@@ -47,7 +47,7 @@ export type World = Realms & {
   readonly portals: ReadonlyMap<GateId, Portal>;
   /** Die großen Tore: Lage und Reihenfolge würfelt der Seed */
   readonly gates: ReadonlyMap<GateId, GatePlace>;
-  /** Klangsteine: einer am Bett, einer vor jedem großen Tor */
+  /** Klangsteine: einer am Bett, einer vor jedem großen Tor, einer am Schneebett im Gletscherkessel */
   readonly stones: ReadonlyMap<StoryId, Point>;
   /** Stimmung an einem Ort: Richtung des nächsten Tors und wie stark (0 am Bett … 1 am Felsring) */
   climate(x: number, y: number): Climate;
@@ -646,7 +646,7 @@ export function createWorld(seed: number): World {
     spawns,
     spotsOf: (realm) => ({ lichtung: spots, eis: kessel.spots })[realm],
     portals: portalsOf(places),
-    stones: stonesOf(places),
+    stones: new Map<StoryId, Point>([...stonesOf(places), ['eis-offen', kessel.stone]]),
     // In der Eis-Welt überall kühles Licht (wie ganz nah am Eistor)
     climate: (x, y) => (kessel.realm.has(key(x, y)) ? { id: 'eis', strength: 1 } : climateOf(seed, places, x, y)),
   };

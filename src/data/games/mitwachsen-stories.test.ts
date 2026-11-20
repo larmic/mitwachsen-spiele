@@ -4,8 +4,15 @@ import { GATES } from './mitwachsen';
 import { STORIES, melodyLength } from './mitwachsen-stories';
 
 describe('Geschichten der Klangsteine', () => {
-  it('gibt es am Bett und für jedes große Tor', () => {
-    expect(Object.keys(STORIES).sort()).toEqual(['bett', ...GATES.map((g) => g.id)].sort());
+  it('gibt es am Bett, für jedes große Tor und am Schneebett (zweite Fassung der Eis-Geschichte)', () => {
+    expect(Object.keys(STORIES).sort()).toEqual(['bett', ...GATES.map((g) => g.id), 'eis-offen'].sort());
+    // beide Fassungen der Eis-Geschichte beginnen gleich und klingen gleich
+    const [first, open] = [STORIES.eis, STORIES['eis-offen']];
+    expect(open.text.startsWith('Hinter diesem Tor ist es so kalt, dass sogar das Wasser zu Eis wird. Jetzt ist')).toBe(
+      true,
+    );
+    expect(first.text.split('. ')[0]).toBe(open.text.split('. ')[0]);
+    expect(open.melody).toEqual(first.melody);
   });
 
   it('stehen wortgleich in der Doku (docs/games/mitwachsen.md), zum Vorlesen und Einsprechen', () => {
