@@ -128,6 +128,54 @@ test('Spiel: Portal-Plattform erwacht beim Herangehen, die Mitte bringt zum Bett
   expect(errors).toEqual([]);
 });
 
+test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offen), ohne Fehler', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/spielen/');
+  await page.getByRole('button', { name: /Verstanden/ }).click();
+  const game = page.locator('larmic-mitwachsen');
+  await expect(game).toHaveClass(/ready/);
+  const webgl = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
+  if (webgl) await expect(game).toHaveClass(/three/); // gezeichnet wird in 3D
+  type Game = {
+    world: { homes: { eis: { bed: [number, number]; wake: [number, number][] } }; realm(x: number, y: number): string };
+    state: { player: { x: number; y: number; dir: string }; openGates: string[]; sleeping: boolean; wokeAt: number };
+    apply(cmd: { type: 'move'; dir: string } | { type: 'tick' }): void;
+    lift(): void;
+  };
+  /** Einige Bilder abwarten */
+  const frames = (n: number) =>
+    page.evaluate(
+      (count) =>
+        new Promise<void>((done) => {
+          let left = count;
+          const next = () => (--left <= 0 ? done() : requestAnimationFrame(next));
+          requestAnimationFrame(next);
+        }),
+      n,
+    );
+  // Über die Komponente (wie die Regeln es sehen): Tor offen, die Figur steht wach neben dem Schneebett
+  const realm = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const [x, y] = el.world.homes.eis.wake[0]!;
+    el.state = { ...el.state, openGates: ['eis'], sleeping: false, wokeAt: -100, player: { x, y, dir: 'n' } };
+    el.lift();
+    return el.world.realm(x, y);
+  });
+  expect(realm).toBe('eis');
+  await frames(30);
+  // ein paar Schritte durch den Kessel, dann ins Schneebett (der Schläfer liegt jetzt dort)
+  await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    for (const dir of ['s', 's', 'e', 'n', 'n', 'w']) el.apply({ type: 'move', dir });
+    const [bx, by] = el.world.homes.eis.bed;
+    el.state = { ...el.state, player: { x: bx + 1, y: by, dir: 'w' }, wokeAt: -100 };
+    el.apply({ type: 'move', dir: 'w' });
+  });
+  await frames(30);
+  expect(await game.evaluate((el) => (el as unknown as Game).state.sleeping)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test.describe('ohne JavaScript', () => {
   test.use({ javaScriptEnabled: false });
   test('Inhalte bleiben lesbar, das Spiel erklärt sich Eltern', async ({ page }) => {

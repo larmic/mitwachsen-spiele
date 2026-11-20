@@ -8,9 +8,11 @@ import {
   GATE_HALF,
   HOUSE_DEPTH,
   TOWER,
+  beyondRing,
   canStep,
   createWorld,
   gatePlaces,
+  kesselPlace,
   portalPlaces,
   standHeight,
   wildAnimals,
@@ -39,6 +41,8 @@ const lichtung = REGIONS[0];
 const LICHTUNG = createWorld(1).homes.lichtung;
 const START = LICHTUNG.wake[0]!;
 const SEEDS = [1, 42, 2026, 7, 99, 123456, 15838, 23757, 55433, 95028];
+/** Die acht Nachbarfelder und das Feld selbst */
+const RING_1 = [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => [dx, dy] as const));
 
 describe('Welt aus dem Seed', () => {
   it('entsteht aus demselben Seed immer gleich, aus einem anderen anders', () => {
@@ -254,18 +258,202 @@ describe('Zuhause je Gegend', () => {
         expect(home.water).toEqual(at(plan.water));
         expect(home.shelterStem).toEqual(at(plan.shelterStem));
         expect(home.wake).toEqual(plan.wake.map(at));
-        expect(w.cell(...home.food).deco).toBe('trough');
+        // Lichtung: Futtertrog und Riesenpilz; Eis-Welt: Eisschale und Iglu (Mitte seiner Rückwand)
+        const [food, stem, many] = r.id === 'lichtung' ? ['trough', 'shelterpilz', 1000] : ['icebowl', 'igloo', 500];
+        expect(w.cell(...home.food).deco).toBe(food);
         expect(w.cell(...home.water).deco).toBe('watertrough');
-        expect(w.cell(...home.shelterStem).deco).toBe('shelterpilz');
+        expect(w.cell(...home.shelterStem).deco).toBe(stem);
         for (const [x, y] of home.wake) expect(standHeight(w, [], x, y)).not.toBeNull();
         for (const p of [home.bed, home.food, home.water, home.shelterStem, ...home.wake])
           expect(w.realm(...p), p.join(',')).toBe(r.id);
         expect(homeAt(w, ...home.bed)).toBe(home);
         const spots = w.spotsOf(r.id);
-        expect(spots.length).toBeGreaterThan(1000);
+        expect(spots.length).toBeGreaterThan(many);
         for (const [x, y] of spots) {
           expect(w.realm(x, y)).toBe(r.id);
           expect(w.cell(x, y).garden).toBeUndefined();
+        }
+      }
+    });
+  }
+});
+
+describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
+  const span = GATE_HALF + TOWER;
+  /** Felder eines Torhauses und seines Gangs: Reihe für Reihe nach außen, bis eine ganz hinter dem Felsring liegt */
+  function gangCells(mid: readonly [number, number], out: readonly [number, number]) {
+    const along = [out[1], -out[0]] as const;
+    const cells: [number, number][] = [];
+    for (let t = 0; t < 200; t++) {
+      const row = Array.from({ length: 2 * span + 1 }, (_, i): [number, number] => [
+        mid[0] + along[0] * (i - span) + out[0] * t,
+        mid[1] + along[1] * (i - span) + out[1] * t,
+      ]);
+      cells.push(...row);
+      if (t > 0 && row.every(([x, y]) => beyondRing(x, y))) break;
+    }
+    return cells;
+  }
+
+  it('liegt ganz hinter dem Felsring und berührt weder die Lichtung noch einen anderen Gang oder ein Torhaus (500 Seeds)', () => {
+    // Ein `expect` je Seed statt je Feld: sonst dauert der Lauf mit Abdeckung in der Pipeline zu lange
+    const key = (x: number, y: number) => x * 4096 + y;
+    for (let seed = 1; seed <= 500; seed++) {
+      const { cells, bed } = kesselPlace(seed);
+      const kessel = new Set(cells.map(([x, y]) => key(x, y)));
+      expect(kessel.has(key(...bed)), `Seed ${seed}`).toBe(true);
+      const wrong: string[] = cells.filter(([x, y]) => !beyondRing(x, y)).map(([x, y]) => `${x},${y} vor dem Felsring`);
+      for (const g of gatePlaces(seed).values()) {
+        // Den eigenen Gang berührt er an dessen Ende (dort geht es hinein), aber er liegt nicht darauf
+        const near: readonly (readonly [number, number])[] = g.id === 'eis' ? [[0, 0]] : RING_1;
+        for (const [x, y] of gangCells(g.mid, g.out))
+          if (near.some(([dx, dy]) => kessel.has(key(x + dx, y + dy)))) wrong.push(`Gang ${g.id} bei ${x},${y}`);
+      }
+      expect(wrong, `Seed ${seed}`).toEqual([]);
+    }
+  });
+
+  it('Jedes begehbare Kesselfeld ist vom Schneebett aus erreichbar (20 weitere Seeds)', () => {
+    // eine Welt zu bauen kostet etwa 0,1 s: darum nur 20 Seeds, über den Felsring prüfen die 500 oben
+    for (let seed = 101; seed <= 120; seed++) {
+      const w = createWorld(seed);
+      const { cells } = kesselPlace(seed);
+      const inKessel = new Set(cells.map(([x, y]) => `${x},${y}`));
+      // Suche nur über Felder des Kessels: der Boden hängt in sich zusammen, ohne Umweg über den Gang
+      const start = w.homes.eis.wake[0]!;
+      const seen = new Set([start.join(',')]);
+      const queue: (readonly [number, number])[] = [start];
+      for (let i = 0; i < queue.length; i++) {
+        const [x, y] = queue[i]!;
+        for (const [dx, dy] of Object.values(DIRS)) {
+          const k = `${x + dx},${y + dy}`;
+          if (seen.has(k) || !inKessel.has(k) || !canStep(w, ['eis'], x, y, x + dx, y + dy)) continue;
+          seen.add(k);
+          queue.push([x + dx, y + dy]);
+        }
+      }
+      const cut = cells.filter(
+        ([x, y]) => w.cell(x, y).region === 'eis' && standHeight(w, [], x, y) !== null && !seen.has(`${x},${y}`),
+      );
+      expect(cut, `Seed ${seed}`).toEqual([]);
+    }
+  });
+
+  for (const seed of [1, 42, 2026, 7]) {
+    const w = createWorld(seed);
+    const home = w.homes.eis;
+    const gate = w.gates.get('eis')!;
+    const LIMIT = 200000;
+    const fromLichtung = (open: GateId[]) => reachable(w, open, START, LIMIT);
+    const fromSnowBed = (open: GateId[]) => reachable(w, open, home.wake[0]!, LIMIT);
+    /** Felder des Kessels (Klippen, Boden, Mündung) */
+    const kessel = kesselPlace(seed).cells;
+    const floor = kessel.filter(([x, y]) => w.cell(x, y).region === 'eis' && standHeight(w, [], x, y) !== null);
+
+    it(`Seed ${seed}: Bei geschlossenem Tor kommt man weder hinein noch heraus, bei offenem ist jedes Kesselfeld erreichbar`, () => {
+      const closed = fromLichtung([]);
+      expect(closed.some(([x, y]) => w.realm(x, y) === 'eis')).toBe(false);
+      const inside = fromSnowBed([]);
+      expect(inside.length).toBeLessThan(LIMIT); // die Landschaft draußen bleibt draußen
+      expect(inside.some(([x, y]) => w.cell(x, y).region === 'lichtung')).toBe(false);
+      const open = new Set(fromLichtung(['eis']).map(([x, y]) => `${x},${y}`));
+      expect(open.size).toBeLessThan(LIMIT); // auch mit offenem Tor nur Lichtung und Kessel, keine Landschaft
+      for (const [x, y] of floor) expect(open.has(`${x},${y}`), `${x},${y}`).toBe(true);
+      expect(floor.length).toBeGreaterThan(1000); // etwa 44 × 38 Felder
+    });
+
+    it(`Seed ${seed}: Im Kessel ist keine Stufe höher als eins; ringsum feste Eisklippen`, () => {
+      for (const [x, y] of fromSnowBed([]))
+        for (const [dx, dy] of Object.values(DIRS)) {
+          const a = standHeight(w, [], x, y)!,
+            b = standHeight(w, [], x + dx, y + dy);
+          if (b !== null) expect(Math.abs(b - a), `${x},${y} → ${x + dx},${y + dy}`).toBeLessThanOrEqual(1);
+        }
+      const cliffs = kessel.filter(([x, y]) => w.cell(x, y).region === 'border');
+      expect(cliffs.length).toBeGreaterThan(500);
+      for (const [x, y] of cliffs) {
+        expect([w.cell(x, y).biome, w.cell(x, y).deco, standHeight(w, ['eis'], x, y)]).toEqual(['eis', 'rock', null]);
+        expect(w.cell(x, y).h).toBeGreaterThanOrEqual(3);
+      }
+    });
+
+    it(`Seed ${seed}: Schneebett ringsum frei, Schneewiese eben mit Eisschale, Wassertrog und Iglu`, () => {
+      const bed = w.cell(...home.bed);
+      expect([bed.deco, bed.biome, bed.solid]).toEqual(['bed', 'eis', true]);
+      for (let dy = -home.clear; dy <= home.clear; dy++)
+        for (let dx = -home.clear; dx <= home.clear; dx++)
+          if (dx || dy) expect(standHeight(w, [], home.bed[0] + dx, home.bed[1] + dy), `${dx},${dy}`).toBe(1);
+      for (let dy = -home.meadow; dy <= home.meadow; dy++)
+        for (let dx = -home.meadow; dx <= home.meadow; dx++) {
+          const [x, y] = [home.bed[0] + dx, home.bed[1] + dy];
+          if (Math.hypot(dx, dy) > home.meadow || (dx === 0 && dy === 0)) continue;
+          expect(w.cell(x, y).garden, `${dx},${dy}`).toBe(true);
+          expect(w.cell(x, y).h).toBe(1);
+        }
+      expect([w.cell(...home.food).deco, w.cell(...home.food).solid]).toEqual(['icebowl', true]);
+      expect([w.cell(...home.water).deco, w.cell(...home.water).biome]).toEqual(['watertrough', 'eis']);
+      const { x0, y0, x1, y1 } = home.shelter;
+      for (let x = x0; x <= x1; x++) {
+        for (let y = y0; y <= y1; y++) {
+          expect(w.cell(x, y).roof, `Iglu ${x},${y}`).toBe(true);
+          expect(standHeight(w, [], x, y)).toBe(1);
+        }
+        expect([w.cell(x, y0 - 1).deco, w.cell(x, y0 - 1).solid], 'feste Rückwand').toEqual(['igloo', true]);
+      }
+      expect(home.shelterStem).toEqual([(x0 + x1) / 2, y0 - 1]);
+    });
+
+    it(`Seed ${seed}: Eisloch mit Wasser und erreichbarem Ufer`, () => {
+      const water = kessel.filter(([x, y]) => w.cell(x, y).ground === 'water');
+      expect(water.length).toBeGreaterThanOrEqual(5);
+      const reach = new Set(fromSnowBed([]).map(([x, y]) => `${x},${y}`));
+      for (const [x, y] of water) expect(w.realm(x, y)).toBe('eis');
+      expect(
+        water.some(([x, y]) => Object.values(DIRS).some(([dx, dy]) => reach.has(`${x + dx},${y + dy}`))),
+        'Ufer',
+      ).toBe(true);
+    });
+
+    it(`Seed ${seed}: Rutschspur vom Tor bis ans Schneebett, durchgehend begehbar`, () => {
+      const start: [number, number] = [gate.mid[0] + gate.out[0], gate.mid[1] + gate.out[1]];
+      expect(w.cell(...start).slide).toBe(true);
+      // nur über Felder der Spur: vom ersten Feld hinter dem Tor bis neben das Bett
+      const seen = new Set([start.join(',')]);
+      const queue = [start];
+      while (queue.length) {
+        const [x, y] = queue.shift()!;
+        for (const [dx, dy] of Object.values(DIRS)) {
+          const k = `${x + dx},${y + dy}`;
+          if (seen.has(k) || !w.cell(x + dx, y + dy).slide || !canStep(w, ['eis'], x, y, x + dx, y + dy)) continue;
+          seen.add(k);
+          queue.push([x + dx, y + dy]);
+        }
+      }
+      const besideBed = Object.values(DIRS).map(([dx, dy]) => `${home.bed[0] + dx},${home.bed[1] + dy}`);
+      expect(besideBed.some((k) => seen.has(k))).toBe(true);
+      expect(seen.size).toBeGreaterThan(20);
+    });
+
+    it(`Seed ${seed}: Die Gegend wechselt genau in der Mitte des Gangs zur Eis-Welt`, () => {
+      const at = (t: number) => [gate.mid[0] + gate.out[0] * t, gate.mid[1] + gate.out[1] * t] as const;
+      let n = 1;
+      while (w.cell(...at(n)).region !== 'eis') n++; // Gang: vom Tor bis zum Boden des Kessels
+      const gang = Array.from({ length: n - 1 }, (_, i) => w.realm(...at(i + 1)));
+      const first = gang.indexOf('eis');
+      expect(first).toBe(Math.floor(gang.length / 2));
+      expect(gang.slice(first).every((r) => r === 'eis')).toBe(true);
+      for (const p of gate.cells) expect(w.realm(...p)).toBe('lichtung');
+      for (const [x, y] of kessel) expect(w.realm(x, y)).toBe('eis');
+      expect(w.climate(...home.bed)).toEqual({ id: 'eis', strength: 1 }); // kühles Licht im Kessel
+    });
+
+    it(`Seed ${seed}: Im Kessel und in der Eiswelt draußen wohnen keine Tiere der Landschaft`, () => {
+      const chunks = new Set(kessel.map(([x, y]) => `${Math.floor(x / 16)},${Math.floor(y / 16)}`));
+      for (const k of chunks) {
+        const [cx, cy] = k.split(',').map(Number) as [number, number];
+        for (const a of wildAnimals(w, cx, cy)) {
+          expect(w.realm(a.x, a.y)).toBe('lichtung');
+          expect(w.cell(a.x, a.y).biome).not.toBe('eis');
         }
       }
     });

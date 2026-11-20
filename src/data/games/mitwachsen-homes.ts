@@ -26,18 +26,21 @@ export type HomePlan = {
   food: Point; // Futtertrog
   water: Point; // Wassertrog
   shelter: Rect; // Unterstand: Bei Regen gehen die Tiere der Wiese hierher
-  shelterStem: Point; // fester Teil des Unterstands (in der Mitte, unter dem Dach zu sehen)
+  shelterStem: Point; // fester Teil des Unterstands: Pilzstiel in der Mitte, beim Iglu die Mitte der Rückwand
 };
+
+/** Plätze zum Aufwachen: rechts, vorn und links neben dem Bett */
+const WAKE: readonly Point[] = [
+  [1, 0],
+  [0, 1],
+  [1, 1],
+  [-1, 0],
+  [-1, 1],
+];
 
 export const HOMES: Record<RegionId, HomePlan> = {
   lichtung: {
-    wake: [
-      [1, 0],
-      [0, 1],
-      [1, 1],
-      [-1, 0],
-      [-1, 1],
-    ],
+    wake: WAKE,
     clear: 2,
     portalRing: 9, // Die Plattformen (3 × 3) berühren einander nicht und ragen nicht in die Wiese
     meadow: 6,
@@ -45,5 +48,16 @@ export const HOMES: Record<RegionId, HomePlan> = {
     water: [4, 3],
     shelter: { x0: -3, y0: -5, x1: 3, y1: -3 }, // unter dem Riesenpilz
     shelterStem: [0, -4], // Stiel des Riesenpilzes
+  },
+  // Gletscherkessel: Schneebett in der Mitte, Schneewiese, Eisschale und Wassertrog aus Eis, dahinter das Iglu
+  eis: {
+    wake: WAKE,
+    clear: 2,
+    portalRing: 9, // Platz für das Gegenstück des Eis-Portals bleibt frei
+    meadow: 6, // Schneewiese
+    food: [-4, 3], // Eisschale
+    water: [4, 3], // Wassertrog aus Eisblöcken
+    shelter: { x0: -3, y0: -5, x1: 3, y1: -3 }, // im Iglu, vorn ein weiter Bogen
+    shelterStem: [0, -6], // feste Rückwand des Iglus (x −3 … 3), ihre Mitte zeichnet die Kuppel
   },
 };

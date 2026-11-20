@@ -45,8 +45,10 @@ import {
   SLEEPY_EYES,
   type Look,
 } from '../../data/games/mitwachsen';
+import { ICE_COLORS } from '../../data/games/mitwachsen-eis';
 import { Geo, atlas, snapToShadowTexel, type Tile, type V3 } from './mitwachsen-geo';
 import { grown } from './mitwachsen-growth';
+import { iceBoxes } from './mitwachsen-ice-look';
 import { gatehouse, parts, type Parts } from './mitwachsen-gatehouse';
 import { Platforms3D } from './mitwachsen-platform-3d';
 import { StoneNotes, stoneInto } from './mitwachsen-story-3d';
@@ -109,6 +111,12 @@ const GROUND_TILES: Record<Exclude<Cell['ground'], 'water' | 'lava' | 'sky'>, [T
   cloud: ['cloud', 'cloud', 'cloud'],
   moss: ['mossTop', 'mossSide', 'dirt'],
 };
+/** Im Gletscherkessel (Boden und Klippen): Schnee obenauf, darunter Eis; die Rutschspur glänzt aus Eis */
+const KESSEL_TILES: [Tile, Tile, Tile] = ['snowTop', 'ice', 'ice'];
+/** Rahmen des Betts: aus Holz, in der Eis-Welt aus Schnee (Seite, oben, Kachel) */
+const WOOD_FRAME: readonly [string, string | null, Tile] = [GAME_COLORS.bed.frame, null, 'planks'];
+const SNOW_FRAME: readonly [string, string | null, Tile] = [...ICE_COLORS.snow, 'white'];
+const bedFrame = (c: Cell) => (c.biome === 'eis' ? SNOW_FRAME : WOOD_FRAME);
 const SKY = new Color('#9fd6f0');
 const NIGHT_SKY = new Color('#141a3a');
 const CLOUD_SKY = new Color('#a9b4bf'); // Himmel bei Wolken und Regen
@@ -155,6 +163,7 @@ export class World3D {
   private stale = new Set<string>(); // Stücke, die neu gebaut werden müssen; bis dahin bleibt das alte stehen
   private picked: Record<string, number> = {}; // Büsche ohne Beeren (aus den Regeln)
   private day = 0; // Tag der Welt: bestimmt, was nachgewachsen ist
+  private slide = false; // Eistor offen: Die Rutschspur zum Schneebett glänzt
   private models = new Map<string, BufferGeometry>();
   private bodies = new Map<string, Mesh>();
   private signs = new Group();
@@ -338,9 +347,11 @@ export class World3D {
     if (this.world !== world) this.reset(world);
     this.explored = sc.explored;
     this.picked = state.picked;
-    if (state.day !== this.day) {
-      // ein neuer Tag: Stücke neu bauen, denn es sind Blumen und Pilze nachgewachsen
+    const slide = state.openGates.includes('eis');
+    if (state.day !== this.day || slide !== this.slide) {
+      // ein neuer Tag: Stücke neu bauen, denn es sind Blumen und Pilze nachgewachsen (oder die Rutschspur glänzt)
       this.day = state.day;
+      this.slide = slide;
       for (const k of this.chunks.keys()) this.stale.add(k);
     }
     const cam = sc.cam;
@@ -522,7 +533,7 @@ export class World3D {
       for (let x = cx * CHUNK; x < (cx + 1) * CHUNK; x++) {
         const c = grown(world.seed, this.day, x, y, world.cell(x, y)); // mit allem, was schon nachgewachsen ist
         this.terrain(solid, water, lava, world, c, x, y);
-        this.decoration(solid, leaves, canopy, bright, c, x, y);
+        if (!this.ice(solid, canopy, c, x, y)) this.decoration(solid, leaves, canopy, bright, c, x, y);
       }
     const meshes: Mesh[] = [];
     const add = (g: Geo, mat: MeshLambertMaterial | MeshBasicMaterial, shadows: boolean) => {
@@ -578,11 +589,14 @@ export class World3D {
     }
     const h = c.h;
     const stone = c.ground === 'stone';
-    const [topTile, sideTop, below] = GROUND_TILES[c.ground];
+    const kessel = c.biome === 'eis' && c.region !== 'wild' && (c.region === 'border' || c.ground === 'snow');
+    const [topTile, sideTop, below] = kessel ? KESSEL_TILES : GROUND_TILES[c.ground];
     const shade = stone ? 0 : (c.shade ?? 0);
     const tint = new Color(1, 1, 1).multiplyScalar(0.93 + shade * 0.07);
     if (c.tint && c.ground === 'grass') tint.multiply(new Color(c.tint)); // Stimmung der Richtung
-    g.quad([x, h, y + 1], [x + 1, h, y + 1], [x + 1, h, y], [x, h, y], [0, 1, 0], topTile, tint);
+    const glossy = c.slide && this.slide; // Rutschspur aus glänzendem Eis
+    const top = glossy ? new Color(ICE_COLORS.slide[1]) : tint;
+    g.quad([x, h, y + 1], [x + 1, h, y + 1], [x + 1, h, y], [x, h, y], [0, 1, 0], glossy ? 'ice' : topTile, top);
     const sides: [number, number, V3][] = [
       [0, 1, [0, 0, 1]],
       [0, -1, [0, 0, -1]],
@@ -601,6 +615,14 @@ export class World3D {
         else g.quad([x, y0, y], [x, y0, y + 1], [x, y1, y + 1], [x, y1, y], n, tile, tint);
       }
     }
+  }
+
+  /** Dinge im Gletscherkessel: Iglu (vor der Figur durchsichtig wie Laub), Eisschale, Wassertrog aus Eis */
+  private ice(g: Geo, canopy: Geo, c: Cell, x: number, y: number): boolean {
+    const ice = c.biome === 'eis' ? iceBoxes(this.world!, c, x, y) : null;
+    for (const [bx, by, bz, w, d, bh, side, top, see] of ice ?? [])
+      (see ? canopy : g).box(bx, bz, by, w, bh, d, side, top);
+    return !!ice;
   }
 
   private decoration(g: Geo, blades: Geo, canopy: Geo, bright: Geo, c: Cell, x: number, y: number) {
@@ -728,7 +750,7 @@ export class World3D {
           g.box(x + 0.12 + i * 0.22, h + 1.5, y + 0.43, 0.1, 0.07, 0.1, i % 2 ? '#e77fb3' : '#ffffff');
         break;
       case 'bed':
-        g.box(x + 0.06, h, y + 0.05, 0.88, 0.28, 0.9, GAME_COLORS.bed.frame, null, 'planks');
+        g.box(x + 0.06, h, y + 0.05, 0.88, 0.28, 0.9, ...bedFrame(c));
         g.box(x + 0.1, h + 0.28, y + 0.08, 0.8, 0.12, 0.26, GAME_COLORS.bed.pillow);
         g.box(x + 0.08, h + 0.28, y + 0.34, 0.84, 0.1, 0.6, GAME_COLORS.bed.blanket);
         break;

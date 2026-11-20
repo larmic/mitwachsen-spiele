@@ -19,8 +19,8 @@ import { startRealm, type Homestead } from './mitwachsen-home';
 import { BLOCK, raining } from './mitwachsen-weather';
 import { platformArea } from './mitwachsen-portal';
 
-/** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich */
-const LICHTUNG = createWorld(1).homes.lichtung;
+/** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich; Zuhause der Eis-Welt (im Kessel von Seed 1) */
+const { lichtung: LICHTUNG, eis: EIS_HOME } = createWorld(1).homes;
 
 /** Kleine Testwelt: überall flaches Gras des Zuhauses, einzelne Felder überschreibbar */
 function fakeWorld(cells: Record<string, Partial<Cell>> = {}, home: Partial<Homestead> = {}): World {
@@ -28,7 +28,7 @@ function fakeWorld(cells: Record<string, Partial<Cell>> = {}, home: Partial<Home
     seed: 1,
     cell: (x, y) => ({ h: 1, ground: 'grass', deco: null, region: 'lichtung', solid: false, ...cells[`${x},${y}`] }),
     realm: () => 'lichtung',
-    homes: { lichtung: { ...LICHTUNG, ...home } },
+    homes: { lichtung: { ...LICHTUNG, ...home }, eis: EIS_HOME },
     gates: new Map(),
     spawns: new Map(),
     spotsOf: () => [],
@@ -619,6 +619,27 @@ describe('Zuhause je Gegend', () => {
     expect([s.player.x, s.player.y]).toEqual([5, 8]);
   });
 
+  it('schläft im Schneebett der Eis-Welt und wacht dort auf (Tor im Test offen)', () => {
+    const world = createWorld(1);
+    const { bed, wake } = world.homes.eis;
+    let s: State = { ...awake(world, bed[0] + 1, bed[1]), openGates: ['eis'] };
+    s = { ...s, player: { ...s.player, dir: 'w' } };
+    s = run(s, world, 'w').s; // ins Schneebett laufen
+    expect(s.sleeping).toBe(true);
+    expect([s.player.x, s.player.y]).toEqual([...bed]);
+    for (let i = 0; i < SLEEP_LOCK; i++) s = run(s, world, TICK).s;
+    s = run(s, world, 'n').s;
+    expect(s.sleeping).toBe(false);
+    expect([s.player.x, s.player.y]).toEqual([...wake[0]!]);
+    expect(world.realm(s.player.x, s.player.y)).toBe('eis');
+  });
+
+  it('im Gletscherkessel gespeichert, das Eistor ist aber zu: Start am Bett der Lichtung', () => {
+    const world = createWorld(1);
+    const s = initialState(world, { position: [...world.homes.eis.wake[0]!] as [number, number] });
+    expect([s.player.x, s.player.y]).toEqual([...world.homes.lichtung.bed]);
+  });
+
   it('Tiere gehören zu ihrer Gegend, Tiere der Landschaft zur Lichtung', () => {
     const world = createWorld(4);
     const s = initialState(world, { garden: [{ id: 'wild:0:2:0', species: 'fuchs' }] });
@@ -626,9 +647,9 @@ describe('Zuhause je Gegend', () => {
     expect(s.animals.find((a) => a.id === 'wild:0:2:0')!.realm).toBe('lichtung');
   });
 
-  // Zweite Gegend zum Ausprobieren (die Eis-Welt gibt es noch nicht): Alles östlich von x = 20 gehört zu ihr, ihr Bett
+  // Zweite Gegend zum Ausprobieren (die Eis-Welt, hier ganz nah): Alles östlich von x = 20 gehört zu ihr, ihr Bett
   // steht bei (24, 0), ihre Wiese reicht von x = 21 bis 27
-  const EIS = 'eis' as RegionId;
+  const EIS: RegionId = 'eis';
   const twoRealms = (cells: Record<string, Partial<Cell>> = {}): World => {
     for (let y = -3; y <= 3; y++) for (let x = 21; x <= 27; x++) cells[`${x},${y}`] ??= { garden: true };
     const w = fakeWorld(cells);
@@ -721,6 +742,33 @@ describe('Invarianten bei wildem Drücken', () => {
           const pick = r % 10;
           const cmd: Cmd = pick < 6 ? { type: 'move', dir: DIRS[(r >>> 8) % 4]! } : pick < 8 ? ACT : TICK;
           s = step(s, world, cmd).state;
+          if (!s.sleeping) expect(standHeight(world, s.openGates, s.player.x, s.player.y)).not.toBeNull();
+          const spots = s.animals.map((a) => `${a.x},${a.y}`);
+          if (!s.sleeping) spots.push(`${s.player.x},${s.player.y}`);
+          expect(new Set(spots).size).toBe(spots.length);
+          for (const a of s.animals) if (a.mode === 'home') expect(world.cell(a.x, a.y).garden).toBe(true);
+          expect(new Set(s.followers).size).toBe(s.followers.length);
+        }
+        return s;
+      };
+      expect(play()).toEqual(play());
+    });
+  }
+
+  // Ab dem Schneebett der Eis-Welt (das Eistor ist im Test offen, die Figur kann auch auf die Lichtung laufen)
+  for (const seed of [1, 2]) {
+    it(`Seed ${seed}: ab dem Schneebett: Figur steht immer begehbar, nie zwei auf einem Feld, alles wiederholbar`, () => {
+      const world = createWorld(seed);
+      const [bx, by] = world.homes.eis.bed;
+      const play = () => {
+        let s: State = { ...initialState(world, {}, seed), openGates: ['eis'], player: { x: bx, y: by, dir: 's' } };
+        let r = seed * 104729;
+        for (let i = 0; i < 4000; i++) {
+          r = (Math.imul(r, 1103515245) + 12345) >>> 0;
+          const pick = r % 10;
+          const cmd: Cmd = pick < 6 ? { type: 'move', dir: DIRS[(r >>> 8) % 4]! } : pick < 8 ? ACT : TICK;
+          s = step(s, world, cmd).state;
+          if (i === 0) expect(world.realm(s.player.x, s.player.y)).toBe('eis'); // aufgewacht am Schneebett
           if (!s.sleeping) expect(standHeight(world, s.openGates, s.player.x, s.player.y)).not.toBeNull();
           const spots = s.animals.map((a) => `${a.x},${a.y}`);
           if (!s.sleeping) spots.push(`${s.player.x},${s.player.y}`);

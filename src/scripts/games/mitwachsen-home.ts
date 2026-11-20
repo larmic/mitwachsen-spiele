@@ -18,7 +18,7 @@ export type Homestead = Omit<HomePlan, 'wake' | 'food' | 'water' | 'shelter' | '
 
 /** Was eine Welt über ihre Gegenden weiß (Teil von `World`) */
 export type Realms = {
-  /** Gegend, zu der ein Feld gehört (Lichtung, später weitere); die Landschaft draußen gehört zur Lichtung */
+  /** Gegend, zu der ein Feld gehört (Lichtung oder Eis-Welt); die Landschaft draußen gehört zur Lichtung */
   realm(x: number, y: number): RegionId;
   /** Zuhause je Gegend: jede hat ihr eigenes Bett, ihre Wiese, Tröge und ihren Unterstand */
   readonly homes: Readonly<Record<RegionId, Homestead>>;
@@ -44,8 +44,16 @@ export function placeHome(realm: RegionId, bed: Point): Homestead {
 /** Zuhause der Lichtung: Ihr Bett steht in ihrer Mitte */
 export const LICHTUNG_HOME = placeHome('lichtung', [0, 0]);
 
-/** Gegenden einer Welt: Vorerst gibt es nur die Lichtung, die Landschaft draußen gehört zu ihr */
-export const REALMS: Realms = { realm: () => 'lichtung', homes: { lichtung: LICHTUNG_HOME } };
+/**
+ * Gegenden einer Welt: die Lichtung (dazu die Landschaft draußen) und die Eis-Welt hinter dem Eistor, deren Felder
+ * (`realm`, als "x,y") und Bett die Welt kennt (Gletscherkessel und Gang ab seiner Mitte, mitwachsen-kessel.ts)
+ */
+export function realmsOf(eis: { bed: Point; realm: ReadonlySet<string> }): Realms {
+  return {
+    realm: (x, y) => (eis.realm.has(`${x},${y}`) ? 'eis' : 'lichtung'),
+    homes: { lichtung: LICHTUNG_HOME, eis: placeHome('eis', eis.bed) },
+  };
+}
 
 /** Zuhause der Gegend, in der ein Feld liegt (Bett, Wiese, Unterstand dort, wo die Figur gerade ist) */
 export const homeAt = (world: Realms, x: number, y: number): Homestead => world.homes[world.realm(x, y)];
@@ -58,7 +66,7 @@ export function startRealm(
   world: Realms,
   open: readonly GateId[],
   position?: readonly [number, number],
-  regions: readonly [Region, ...Region[]] = REGIONS, // für Tests: Gegenden hinter Toren gibt es noch keine
+  regions: readonly [Region, ...Region[]] = REGIONS, // für Tests mit eigenen Gegenden
 ): RegionId {
   const lichtung = regions[0].id;
   if (!position || !position.every(Number.isInteger)) return lichtung;

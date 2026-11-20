@@ -57,7 +57,7 @@ Die Lichtung ist das Zuhause mit dem Bett. Hinter jedem der acht großen Tore li
 | Welt | Stand | Thema (`GateTheme`) |
 | --- | --- | --- |
 | **Lichtung** | spielbar | – |
-| **Eiswelt** | Landschaft gebaut, Tor zu | `eis` |
+| **Eiswelt** | Kessel gebaut, Tor zu | `eis` |
 | **Sandwelt** | Landschaft gebaut, Tor zu | `sand` |
 | **Wasserwelt** | Landschaft gebaut, Tor zu | `wasser` |
 | **Lavaberge** | Landschaft gebaut, Tor zu | `lava` |
@@ -81,6 +81,7 @@ Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzel
 
 ### Eiswelt
 
+- **Kessel gebaut, Tor zu:** Hinter dem Eistor führt der Gang in einen Gletscherkessel (etwa 44 × 38 Felder), fest am Ende des Gangs, ringsum hohe Eisklippen mit Schnee obenauf (sie antworten wie Felsen mit Wackeln und „boing“). Der Gang ist der einzige Weg hinein. In der Mitte das Schneebett, darum die Schneewiese mit einer Futterschale aus Eis (links vor dem Bett) und einem Wassertrog aus Eisblöcken (rechts), dahinter ein großes Iglu als Unterstand: vorn ein weiter Bogen, durch den man hineinsieht, hinten eine feste Wand; vor der Figur wird die Kuppel durchsichtig. Seitlich ein Eisloch zum Wasserschöpfen. Um das Bett bleibt viel Platz (später für Klangstein und Portal). Sanfte Schneehügel (nie mehr als eine Stufe) und glatte Eisflächen, kühles Licht. Vom Tor bis ans Bett liegt die Rutschspur des Pinguins schon bereit; sie glänzt erst, wenn das Tor offen ist. Solange das Tor zu ist, kommt man nicht hinein; vom Tor aus sieht man nur ein Stück des Gangs. Im Kessel und im Land der Eiswelt draußen laufen keine Tiere der Lichtung herum.
 - **Aussehen:** Schneefelder, glitzernde Eisblöcke zum Klettern, zugefrorene Seen, verschneite Tannen, Iglus. Kühles, helles Licht, sanfter Schneefall (nicht bei reduzierter Bewegung).
 - **Besonderes:** Auf Eis rutscht die Figur nicht (das wäre für ein kleines Kind frustrierend), es knirscht nur beim Laufen.
 - **Tiere (Ideen):** Pinguin, Eisbär, Robbe, Schneehase, Schneeeule.

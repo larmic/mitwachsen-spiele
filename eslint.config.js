@@ -83,7 +83,7 @@ export default defineConfig(
     rules: {
       complexity: ['error', 79],
       'max-depth': ['error', 5],
-      'max-lines': ['error', { max: 651, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['error', { max: 599, skipBlankLines: true, skipComments: true }],
       'max-lines-per-function': ['error', { max: 139, skipBlankLines: true, skipComments: true }],
     },
   },

@@ -42,7 +42,9 @@ import {
   type Look,
   type SpeciesId,
 } from '../../data/games/mitwachsen';
+import { ICE_COLORS } from '../../data/games/mitwachsen-eis';
 import { grown } from './mitwachsen-growth';
+import { iceBoxes, type IceBox } from './mitwachsen-ice-look';
 import { drawStone } from './mitwachsen-story';
 import type { WeatherLook } from './mitwachsen-weather';
 import type { Pose } from './mitwachsen-tired';
@@ -81,8 +83,10 @@ export type Scene = {
   explored: (x: number, y: number) => boolean; // Nebel: nur Erkundetes wird gezeigt
 };
 
+/** Rahmen des Betts aus Holz (das Schneebett der Eis-Welt ist aus Schnee) */
+const BED_FRAME: readonly [string, string] = [GAME_COLORS.bed.frame, GAME_COLORS.bed.frame];
 /** Böden der Welten hinter den Toren in der 2D-Ansicht: Seite, Oberseite */
-const FLAT_GROUND: Partial<Record<Cell['ground'], [string, string]>> = {
+const FLAT_GROUND: Partial<Record<Cell['ground'], readonly [string, string]>> = {
   snow: ['#cfd8de', '#f4f8fb'],
   ice: ['#9fd6ef', '#d4f1ff'],
   basalt: ['#2a2b30', '#3a3b42'],
@@ -126,6 +130,8 @@ function sprite(ctx: CanvasRenderingContext2D, grid: string[], color: string, cx
 }
 
 export class Renderer {
+  /** Eis-Quader des Bilds (Iglu, Eisschale, Trog): jeder kommt in der Reihe seiner Vorderkante dran */
+  private later: IceBox[] = [];
   private blocks: Record<'grass' | 'dirt' | 'stone' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
 
   constructor(private readonly ctx: CanvasRenderingContext2D) {
@@ -161,9 +167,12 @@ export class Renderer {
     }
     const byId = new Map(state.animals.map((a) => [a.id, a]));
 
+    this.later = [];
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) this.ground(P, world, x, y, sc);
       for (let x = x0; x <= x1; x++) this.deco(P, world, state, sc, x, y);
+      for (const [bx, by, bz, w, d, bh, side, top] of this.later)
+        if (Math.ceil(by + d - 1e-6) - 1 === y) box(ctx, P, bx, by, bz, w, d, bh, side, top);
       const ids = (rows.get(y) ?? []).sort((a, b) => sc.bodies.get(a)!.x - sc.bodies.get(b)!.x);
       for (const id of ids) {
         const b = sc.bodies.get(id)!;
@@ -248,7 +257,7 @@ export class Renderer {
         home: of(garden, r.id, species),
         follows: of(state.followers, r.id, species),
       })),
-    );
+    ).filter((g) => g.length); // eine Gegend ohne Tiere (Eis-Welt noch leer) bekommt keine Lücke
     const wild = state.garden.filter((p) => p.id.startsWith('wild:')).slice(0, 10);
     if (wild.length)
       groups.push(
@@ -311,11 +320,13 @@ export class Renderer {
       box(this.ctx, P, x, y, 0, 1, 1, 0.6, '#b8380a', '#ff7a1a');
       return;
     }
-    const flat = FLAT_GROUND[c.ground];
+    const flat = c.region === 'border' && c.biome === 'eis' ? ICE_COLORS.cliff : FLAT_GROUND[c.ground]; // Eisklippen
     if (flat) {
       // Böden der Welten hinter den Toren: einfache Blöcke in ihren Farben
       const frontH = world.cell(x, y + 1).h;
       for (let k = Math.max(0, Math.min(c.h - 1, frontH)); k < c.h; k++) box(this.ctx, P, x, y, k, 1, 1, 1, ...flat);
+      // Rutschspur zum Schneebett: glänzt, sobald das Eistor offen ist
+      if (c.slide && sc.gates.has('eis')) box(this.ctx, P, x + 0.12, y, c.h, 0.76, 1, 0.02, ...ICE_COLORS.slide);
       this.edges(P, world, x, y, c.h);
       this.haze(P, x, y, c.h, sc);
       return;
@@ -706,6 +717,9 @@ export class Renderer {
     const { ctx } = this;
     const h = c.h;
     if (c.tufts) this.tufts(P, x, y, h, c.tufts);
+    const ice = c.biome === 'eis' ? iceBoxes(world, c, x, y) : null; // Iglu, Eisschale, Wassertrog aus Eis
+    // gezeichnet erst in der Reihe ihrer Vorderkante: sonst deckte der Boden der Reihen davor die Kuppel unten zu
+    if (ice) return void this.later.push(...ice);
     switch (c.deco) {
       case 'tree':
         this.tree(P, x, y, h, c.tree ?? 'oak');
@@ -845,7 +859,7 @@ export class Renderer {
         break;
       }
       case 'bed':
-        box(ctx, P, x + 0.06, y + 0.05, h, 0.88, 0.9, 0.28, GAME_COLORS.bed.frame);
+        box(ctx, P, x + 0.06, y + 0.05, h, 0.88, 0.9, 0.28, ...(c.biome === 'eis' ? ICE_COLORS.snow : BED_FRAME));
         box(ctx, P, x + 0.1, y + 0.08, h + 0.28, 0.8, 0.26, 0.12, GAME_COLORS.bed.pillow);
         if (state.sleeping) {
           box(ctx, P, x + 0.32, y + 0.1, h + 0.4, 0.36, 0.22, 0.3, sc.look.skin);

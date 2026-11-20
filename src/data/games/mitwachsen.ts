@@ -3,8 +3,9 @@
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md
 
 import { eyes, type Part } from '../../lib/games/front';
+import { KESSEL } from './mitwachsen-eis';
 
-export type RegionId = 'lichtung';
+export type RegionId = 'lichtung' | 'eis';
 export type SpeciesId =
   | 'hase'
   | 'igel'
@@ -27,7 +28,10 @@ export type Point = readonly [number, number];
 export type Region = {
   id: RegionId;
   name: string;
-  /** Ellipse um die Mitte (0, 0), deren Rand leicht unregelmäßig ist; darum liegen Felsen */
+  /**
+   * Ellipse um ihre Mitte, deren Rand leicht unregelmäßig ist; darum liegen Felsen. Die Lichtung liegt um (0, 0); eine
+   * Gegend hinter einem Tor liegt dort, wo die Welt sie hinlegt, mit `rx` quer zum Tor und `ry` vom Tor weg.
+   */
   shape: { rx: number; ry: number };
   /** Tiere mit ungefährem Wohnort; die Welt sucht das nächste Feld, das vom Bett aus erreichbar ist */
   animals: readonly { species: SpeciesId; at: Point }[];
@@ -74,7 +78,8 @@ export function regionAnimalList(region: Region): { id: string; species: Species
 
 /**
  * Am Anfang gibt es nur die Lichtung mit dem Bett. Ringsum Felsen mit acht großen Toren, die vorerst zu sind.
- * Dahinter liegen die Welten der Tore als endlose Landschaft.
+ * Dahinter liegen die Welten der Tore als endlose Landschaft. Hinter dem Eistor liegt die Eis-Welt, ein Gletscherkessel
+ * mit eigenem Zuhause (noch unerreichbar, solange das Tor zu ist).
  */
 export const REGIONS: readonly [Region, ...Region[]] = [
   {
@@ -96,6 +101,14 @@ export const REGIONS: readonly [Region, ...Region[]] = [
       { species: 'ziege', at: [14, -55] },
     ],
     herd: 4, // erster Spieltest: zu wenige Tiere auf der großen Lichtung
+  },
+  {
+    id: 'eis',
+    name: 'Eis-Welt',
+    shape: KESSEL.shape, // Gletscherkessel fest hinter dem Eistor, ringsum Eisklippen (mitwachsen-eis.ts)
+    animals: [], // die Eis-Tiere ziehen später ein
+    herd: 3,
+    behind: 'eis',
   },
 ];
 

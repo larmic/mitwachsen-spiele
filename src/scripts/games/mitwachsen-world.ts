@@ -1,6 +1,7 @@
 // Welt von Mitwachsen – rein und deterministisch: Derselbe Seed ergibt immer dieselbe Welt.
-// In der Mitte die Lichtung mit dem Bett, ringsum natürliche Felsen mit vier großen Toren (vorerst zu). Außen herum
+// In der Mitte die Lichtung mit dem Bett, ringsum natürliche Felsen mit acht großen Toren (vorerst zu). Außen herum
 // endlose Landschaft aus Rauschen, berechnet in Stücken. Ums Bett die Wiese, auf der gefundene Tiere zu Hause sind.
+// Hinter dem Eistor liegt die Eis-Welt, ein Gletscherkessel mit eigenem Zuhause (mitwachsen-kessel.ts).
 // Spezifikation: docs/specs/mitwachsen.md
 
 import { CHUNK, ChunkCache, fromKey } from '../../lib/games/chunks';
@@ -18,56 +19,12 @@ import {
   type SpeciesId,
 } from '../../data/games/mitwachsen';
 import { BED_STONE, type StoryId } from '../../data/games/mitwachsen-stories';
-import { LICHTUNG_HOME, REALMS, type Realms } from './mitwachsen-home';
-import { PLATFORM_HALF, platformCells, ringSpots, type PlatformSpot, type Portal } from './mitwachsen-portal';
+import type { Cell, Ground, TreeKind } from './mitwachsen-cell';
+import { LICHTUNG_HOME, realmsOf, type Realms } from './mitwachsen-home';
+import { buildKessel, placeKessel, type Gang, type Kessel } from './mitwachsen-kessel';
+import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from './mitwachsen-portal';
 
-export type Ground =
-  | 'grass'
-  | 'stone'
-  | 'water'
-  | 'path'
-  | 'sand'
-  // Welten hinter den Toren
-  | 'snow'
-  | 'ice'
-  | 'basalt'
-  | 'lava'
-  | 'cave'
-  | 'cloud'
-  | 'sky' // Leere zwischen den Wolken
-  | 'moss';
-export type Deco =
-  | 'tree'
-  | 'bush'
-  | 'flower'
-  | 'reed'
-  | 'lily'
-  | 'rock'
-  | 'fence'
-  | 'gate'
-  | 'bridge'
-  | 'bed'
-  | 'sign'
-  | 'hedge'
-  | 'arch'
-  | 'fern'
-  | 'boulder'
-  | 'mushroom'
-  | 'biggate'
-  | 'gatetower' // Turm eines großen Tors (fest; das Torhaus zeichnet die Ansicht)
-  | 'portal' // Mittelfeld einer Portal-Plattform: Wer es betritt, reist (wenn die Plattform wach ist)
-  | 'portalrim' // Rand einer Portal-Plattform (Seitenmitten und Ecken): begehbar, löst nichts aus
-  | 'cactus'
-  | 'crystal'
-  | 'stalagmite'
-  | 'bigshroom'
-  | 'cloudpuff'
-  | 'trough' // Futtertrog auf der Wiese
-  | 'watertrough' // Wassertrog
-  | 'shelterpilz' // Stiel des Riesenpilzes auf der Wiese (zeichnet auch den Hut)
-  | 'klangstein'; // Stein mit schwebender Note: Hineinlaufen spielt die Geschichte des Ortes
-export type TreeKind =
-  'oak' | 'birch' | 'autumn' | 'red' | 'blossom' | 'winter' | 'pine' | 'snowpine' | 'palm' | 'dead';
+export type { Cell, Deco, Ground, TreeKind } from './mitwachsen-cell';
 export type { Portal };
 /** Ein großes Tor: fünf Felder in einer Reihe, nach außen in eine Achsenrichtung, dahinter die Welt `id` */
 export type GatePlace = {
@@ -76,27 +33,6 @@ export type GatePlace = {
   mid: Point;
   out: Point; // nach außen (weg von der Lichtung)
   angle: number; // Winkel von der Mitte aus: In dieser Richtung liegt die Welt des Tors
-};
-
-export type Cell = {
-  h: number; // Oberkante in Ebenen: Wasser 0, Boden 1, Hügel bis 3
-  ground: Ground;
-  deco: Deco | null;
-  color?: string; // Blumenfarbe
-  region: RegionId | 'wild' | 'border'; // border: Fels, Zaun oder Wasser zwischen Gegenden
-  solid: boolean; // Deko versperrt das Feld (Baum, Busch, Fels, Zaun, Bett, Tafel)
-  gate?: GateId; // Tor oder Brücke: begehbar, sobald offen
-  sign?: GateId; // Tafel zu diesem Tor
-  garden?: true; // Wiese ums Bett: Hier sind gefundene Tiere zu Hause
-  roof?: true; // unter dem Unterstand auf der Wiese
-  tree?: TreeKind; // Baumart bei deco 'tree'
-  tufts?: number; // Grasbüschel auf dem Feld (nur Zierde, begehbar)
-  portal?: PlatformSpot; // Feld einer Portal-Plattform (am Tor oder am Bett)
-  biome?: GateId; // Welt hinter einem Tor
-  part?: { id: GateId }; // Turm eines Tors: gehört zu dieser Welt
-  shade?: number; // Farbfleck im Boden: −1 dunkler … +1 heller (große, weiche Flecken)
-  tint?: string; // Farbe, mit der Gras und Blätter auf der Lichtung getönt sind (Stimmung der Richtung)
-  story?: StoryId; // Klangstein dieser Geschichte
 };
 
 /** Eine Welt: Felder, Gegenden mit ihrem Zuhause (`Realms`), Wohnorte, Tore, Portale und Klangsteine */
@@ -168,6 +104,7 @@ const axis = (dx: number, dy: number): Point => (Math.abs(dx) >= Math.abs(dy) ? 
 /** Ein Torplatz: Tor, Türme, Platz davor und Gang dahinter in Koordinaten (u entlang des Tors, t nach außen) */
 type Layout = GatePlace & {
   depth: number; // t der Torreihe
+  end: number; // letzte Reihe des Gangs: die erste, die ganz hinter dem Felsring liegt
   at: (u: number, t: number) => Point;
   side: number; // Portal-Plattform links (−1) oder rechts (+1) vom Tor
 };
@@ -201,7 +138,14 @@ function layouts(seed: number): Layout[] {
     const cells: Point[] = [];
     for (let u = -GATE_HALF; u <= GATE_HALF; u++) cells.push(at(u, depth));
     const side = hash(seed, i, 92) % 2 ? 1 : -1;
-    return { id: g.id, cells, mid: at(0, depth), out, angle, depth, at, side };
+    const span = GATE_HALF + TOWER;
+    let end = depth + 1;
+    while (
+      end < depth + 199 &&
+      Array.from({ length: 2 * span + 1 }, (_, k) => at(k - span, end)).some(([x, y]) => !outside(x, y))
+    )
+      end++;
+    return { id: g.id, cells, mid: at(0, depth), out, angle, depth, end, at, side };
   });
 }
 
@@ -232,7 +176,7 @@ function stonesOf(places: readonly Layout[]): Map<StoryId, Point> {
 function buildStart(
   seed: number,
   places: readonly Layout[],
-): { map: Map<string, Cell>; spawns: Map<string, Point>; spots: Point[] } {
+): { map: Map<string, Cell>; spawns: Map<string, Point>; spots: Point[]; kessel: Kessel } {
   const map = new Map<string, Cell>();
   const set = (x: number, y: number, c: Cell) => map.set(key(x, y), c);
   const { rx, ry } = lichtung.shape;
@@ -302,19 +246,17 @@ function buildStart(
       if (Math.abs(u) <= GATE_HALF) set(x, y, { ...grass('border'), ground: 'stone', deco: 'biggate', gate: p.id });
       else set(x, y, { ...rock(1), deco: 'gatetower', part: { id: p.id } });
     }
-    for (let t = p.depth + 1; t < p.depth + 200; t++) {
-      let beyond = true;
+    for (let t = p.depth + 1; t <= p.end; t++)
       for (let u = -span; u <= span; u++) {
         const [x, y] = p.at(u, t);
         // Hinter den Türmen steckt das Torhaus im Fels (3D: 2,5 Felder tief). Dort bleibt der Fels flach wie das Turmfeld,
         // sonst stünden seine Wände genau in den Turmwänden und flackerten mit ihnen (Z-Fighting)
         if (Math.abs(u) > GATE_HALF) set(x, y, rock(t <= p.depth + HOUSE_DEPTH ? 1 : ringHeight(1.1)));
         else set(x, y, passage(seed, p.id, x, y));
-        if (!outside(x, y)) beyond = false;
       }
-      if (beyond) break;
-    }
   }
+  // Hinter dem Eistor: der Gletscherkessel am Ende des Gangs (Eis-Welt)
+  const kessel = buildKessel(seed, gangOf(places), outside, (x, y) => passage(seed, 'eis', x, y), map);
 
   placePlatforms(map, portalsOf(places));
 
@@ -369,7 +311,13 @@ function buildStart(
   for (const [k, c] of map)
     if (c.region === 'lichtung' && !c.solid && c.ground !== 'water' && !reached.has(k)) map.set(k, rock(3));
   const spots = reach.filter(([x, y]) => map.get(key(x, y))!.region === 'lichtung' && !map.get(key(x, y))!.garden);
-  return { map, spawns: findSpawns(seed, spots), spots };
+  return { map, spawns: findSpawns(seed, spots), spots, kessel };
+}
+
+/** Gang hinter dem Eistor: Er führt in den Gletscherkessel */
+function gangOf(places: readonly Layout[]): Gang {
+  const p = places.find((l) => l.id === 'eis') ?? places[0]!; // Tore gibt es immer, das Eistor auch
+  return { at: p.at, depth: p.depth, end: p.end, half: GATE_HALF, wall: TOWER };
 }
 
 /** Platz um eine Plattform: nah flach und frei, ein Feld weiter (`outer`) nur ohne Baum und Busch (Kronen verdeckten sie) */
@@ -694,6 +642,10 @@ function dress(seed: number, x: number, y: number, c: Cell): Cell {
   return out;
 }
 
+/** Lage des Gletscherkessels einer Welt; schnell, ohne die Welt zu bauen */
+export const kesselPlace = (seed: number) => placeKessel(seed, gangOf(layouts(seed)), outside);
+/** Liegt ein Feld ganz hinter dem Felsring der Lichtung (Landschaft, Gänge ins Freie, Kessel)? */
+export const beyondRing = outside;
 /** Die Portal-Plattformen einer Welt; schnell, ohne die Welt zu bauen */
 export const portalPlaces = (seed: number) => portalsOf(layouts(seed));
 /** Die großen Tore einer Welt; schnell, ohne die Welt zu bauen (Lage und Reihenfolge würfelt der Seed) */
@@ -703,7 +655,7 @@ const gatesOf = (places: readonly Layout[]) =>
 
 export function createWorld(seed: number): World {
   const places = layouts(seed);
-  const { map: regions, spawns, spots } = buildStart(seed, places);
+  const { map: regions, spawns, spots, kessel } = buildStart(seed, places);
   const cache = new ChunkCache<Cell>((cx, cy) => {
     const cells: Cell[] = [];
     for (let y = cy * CHUNK; y < (cy + 1) * CHUNK; y++)
@@ -722,13 +674,14 @@ export function createWorld(seed: number): World {
   return {
     seed,
     cell: (x, y) => cache.get(x, y),
-    ...REALMS,
+    ...realmsOf(kessel),
     gates: gatesOf(places),
     spawns,
-    spotsOf: (realm) => ({ lichtung: spots })[realm],
+    spotsOf: (realm) => ({ lichtung: spots, eis: kessel.spots })[realm],
     portals: portalsOf(places),
     stones: stonesOf(places),
-    climate: (x, y) => climateOf(seed, places, x, y),
+    // In der Eis-Welt überall kühles Licht (wie ganz nah am Eistor)
+    climate: (x, y) => (kessel.realm.has(key(x, y)) ? { id: 'eis', strength: 1 } : climateOf(seed, places, x, y)),
   };
 }
 
@@ -769,8 +722,9 @@ export function wildAnimals(world: World, cx: number, cy: number): WildSpawn[] {
       const x = cx * CHUNK + (h % CHUNK),
         y = cy * CHUNK + ((h >>> 8) % CHUNK);
       const c = world.cell(x, y);
-      if (c.region !== 'wild' || standHeight(world, [], x, y) === null || out.some((o) => o.x === x && o.y === y))
-        continue;
+      // Nicht in der Eis-Welt und ihrem Land: Dort wohnen nur Eis-Tiere
+      const taken = out.some((o) => o.x === x && o.y === y);
+      if (c.region !== 'wild' || c.biome === 'eis' || standHeight(world, [], x, y) === null || taken) continue;
       out.push({ id: `wild:${cx}:${cy}:${n}`, species: cycle(WILD_SPECIES, h >>> 16), x, y });
       break;
     }
