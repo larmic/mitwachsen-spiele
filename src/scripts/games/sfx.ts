@@ -206,10 +206,17 @@ export class Sfx {
     this.note(f, 1.1, 'sine', 0.09);
     this.note(f * 2, 0.6, 'sine', 0.03); // heller Oberton
   }
+  /** Eingeplante Töne spielen (das Eistor geht auf: `gateScore` in mitwachsen-guest-look.ts) */
+  score(notes: readonly Scored[]) {
+    for (const [freq, len, wave, gain, slide, delay] of notes) this.note(freq, len, wave, gain, slide, delay);
+  }
   lullaby() {
     [783.99, 659.25, 587.33, 523.25, 392].forEach((f, i) => this.note(f, 0.42, 'sine', 0.08, 1, i * 0.38));
   }
 }
+
+/** Ein eingeplanter Ton: Hz, Länge (s), Welle, Lautstärke, Gleiten, Beginn (s) */
+export type Scored = [freq: number, len: number, wave: OscillatorType, gain: number, slide: number, delay: number];
 
 /** Weißes Rauschen der Länge `seconds` (für Knirschen und Wind) */
 function noise(ctx: AudioContext, seconds: number): AudioBuffer {

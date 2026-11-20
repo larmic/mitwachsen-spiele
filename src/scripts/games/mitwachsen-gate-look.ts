@@ -13,6 +13,10 @@ import type { Cell, World } from './mitwachsen-world';
 const ARCH = 4.7; // Höhe der Tür bis zum Torbogen
 const HALF = 2.5; // halbe Breite der Tür: jeder Flügel ist so breit
 
+/** Umriss des Pinguins auf dieser Tür: solange er hierher führt und die Tür noch zu ist */
+const outlineOn = (guest: Guest | null, id: GateId, open: number) =>
+  guest?.gate === id && open === 0 ? guest.outline : null;
+
 /**
  * Großes Tor in 2D, ein Feld: Turm, oder Tür mit Eisenbändern, darüber der Torbogen in den Farben seiner Welt.
  * Die Öffnung je Tor (`gates`, 0 … 1) lässt die Flügel schmaler werden, jeder zu seiner Angel hin. In der Mitte der
@@ -38,7 +42,8 @@ export function bigGate(
   }
   const g = world.gates.get(c.gate!)!;
   const theme = THEME_COLORS[g.id];
-  const [open, outline] = [gates.get(g.id) ?? 0, guest?.gate === g.id ? guest.outline : null];
+  const open = gates.get(g.id) ?? 0;
+  const outline = outlineOn(guest, g.id, open);
   const [mx, my] = g.mid;
   const u = (x - mx) * Math.abs(g.out[1]) + (y - my) * Math.abs(g.out[0]); // Lage entlang des Tors (−2 … 2)
   const reach = HALF * Math.cos((open * Math.PI) / 2); // so weit reicht ein Flügel von seiner Angel aus
@@ -63,6 +68,6 @@ export function bigGate(
   if (open === 0 && !(outline && across) && x === mx && y === my)
     box(ctx, P, x + 0.3, y + 0.28, h + 2.2, 0.4, 0.04, 0.6, theme.portal); // Zeichen in der Mitte
   const last = g.cells.reduce((p, q) => (q[1] > p[1] || (q[1] === p[1] && q[0] > p[0]) ? q : p));
-  // Den Umriss gibt es in 2D nur auf einer Tür, die man von vorn sieht (in 3D an jedem Tor)
+  // Den Umriss gibt es in 2D nur auf einer Tür, die man von vorn sieht (in 3D an jedem Tor, auch auf offenen Flügeln)
   if (outline && across && x === last[0] && y === last[1]) outline(ctx, P, mx + 0.5, y + 0.7, h);
 }

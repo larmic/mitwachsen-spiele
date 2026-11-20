@@ -194,7 +194,7 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
     el.state = { ...el.state, animals };
     return { ids: first, count: ice.length, at: first.map((_, i) => [bx - 5 + i, by - 2] as const) };
   });
-  expect(shown.count).toBe(30);
+  expect(shown.count).toBe(29); // das Tor ist nur im Test offen: Der verlaufene Pinguin wohnt noch nicht im Kessel
   expect(shown.ids).toHaveLength(10);
   await frames(30);
   expect(
@@ -223,10 +223,18 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
       const at = free[i * 3];
       return i < 0 || !at ? a : { ...a, x: at[0], y: at[1], spawn: at, mode: 'home', home: { kind: 'garden' } };
     });
-    const garden = ice.map((a) => ({ id: a.id, species: a.species }));
-    const met = ice.map((a) => a.id);
+    // mit dem Pinguin, der heimgefunden hat: erst dann weht Pustewind (nicht am Tag seines Einzugs)
+    const garden = [...ice, { id: 'eis:pinguin', species: 'pinguin' }].map((a) => ({ id: a.id, species: a.species }));
+    const met = garden.map((a) => a.id);
     let b = 1;
-    const at = (k: number) => ({ ...el.state, animals, garden, met, tick: el.state.dayStart + k * 3000 + 400 });
+    const at = (k: number) => ({
+      ...el.state,
+      animals,
+      garden,
+      met,
+      calm: -1,
+      tick: el.state.dayStart + k * 3000 + 400,
+    });
     while (b < 80 && el.air.frame(el.world, at(b), true, false).weather.wind < 1) b++;
     el.state = at(b);
     for (let i = 0; i < 300; i++) el.apply({ type: 'tick' });
@@ -344,6 +352,148 @@ test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten
   expect([...back.followers].sort()).toEqual([...ids].sort());
   await frames(30);
   expect(await game.evaluate((el) => (el as unknown as Game).renderer.album.turn.shown)).toBe('lichtung');
+  expect(errors).toEqual([]);
+});
+
+test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kessel ein; nach dem Neuladen offen, ohne Fehler', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  await page.goto('/spielen/');
+  await page.getByRole('button', { name: /Verstanden/ }).click();
+  const game = page.locator('larmic-mitwachsen');
+  await expect(game).toHaveClass(/ready/);
+  type Animal = { id: string; species: string; realm: string; mode: string; x: number; y: number };
+  type Game = {
+    world: {
+      gates: Map<string, { mid: [number, number]; out: [number, number] }>;
+      homes: { eis: { bed: [number, number]; wake: [number, number][] } };
+      realm(x: number, y: number): string;
+    };
+    state: {
+      player: { x: number; y: number; dir: string };
+      openGates: string[];
+      portals: string[];
+      sleeping: boolean;
+      guideDue: number;
+      animals: (Animal & { home: { kind: string } })[];
+      garden: { id: string; species: string }[];
+    };
+    saved: { id: string };
+    apply(cmd: { type: 'move'; dir: string } | { type: 'tick' }): void;
+    lift(): void;
+    save(): void;
+    openWorld(id: string): void;
+    renderer: { album: { turn: { shown?: string } } };
+  };
+  const frames = (n: number) =>
+    page.evaluate(
+      (count) =>
+        new Promise<void>((done) => {
+          let left = count;
+          const next = () => (--left <= 0 ? done() : requestAnimationFrame(next));
+          requestAnimationFrame(next);
+        }),
+      n,
+    );
+  const penguin = () =>
+    game.evaluate((el) => (el as unknown as Game).state.animals.find((a) => a.id === 'eis:pinguin')?.mode ?? 'fehlt');
+  /** Takte der Regeln gleich hier abspielen (unabhängig davon, wie schnell der Takt der Seite unter Last läuft) */
+  const ticks = (n: number) =>
+    game.evaluate((node, count) => {
+      for (let i = 0; i < count; i++) (node as unknown as Game).apply({ type: 'tick' });
+    }, n);
+  // Alle Tiere der Lichtung wohnen auf der Wiese (gespeichert, wie nach vielen Abenden), die Welt öffnet neu
+  await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const lichtung = el.state.animals.filter((a) => a.realm === 'lichtung' && a.home.kind === 'region');
+    el.state = { ...el.state, garden: lichtung.map((a) => ({ id: a.id, species: a.species })) };
+    el.save();
+    el.openWorld(el.saved.id);
+  });
+  expect(await penguin()).toBe('fehlt'); // verlaufen: Er wohnt nicht im Kessel
+  // Aufwachen: Die Regeln des Pinguins kommen nach, gut 2 s später taucht er neben der Figur auf und führt
+  await page.keyboard.press('ArrowDown');
+  await expect
+    .poll(async () => {
+      await ticks(10);
+      return penguin();
+    })
+    .toBe('lead');
+  // Figur und Pinguin in die Bucht vor dem Eistor (über die Komponente): Im nächsten Takt geht das Tor auf
+  await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const { mid, out } = el.world.gates.get('eis')!;
+    const at = (k: number) => [mid[0] - out[0] * k, mid[1] - out[1] * k] as const;
+    const animals = el.state.animals.map((a) => (a.id === 'eis:pinguin' ? { ...a, x: at(1)[0], y: at(1)[1] } : a));
+    el.state = { ...el.state, animals, guideDue: -1, player: { x: at(2)[0], y: at(2)[1], dir: 'n' } };
+    el.lift();
+    el.apply({ type: 'tick' });
+  });
+  const open = () => game.evaluate((el) => (el as unknown as Game).state.openGates);
+  expect(await open()).toEqual(['eis']);
+  // sofort gespeichert
+  const stored = await page.evaluate(() =>
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('larmic.games.world.'))
+      .map((k) => (JSON.parse(localStorage.getItem(k)!) as { openGates: string[] }).openGates),
+  );
+  expect(stored).toEqual([['eis']]);
+  // Während des Rituals hüpft die Figur nur
+  const before = await game.evaluate((el) => ({ ...(el as unknown as Game).state.player }));
+  await page.keyboard.press('ArrowUp');
+  expect(await game.evaluate((el) => ({ ...(el as unknown as Game).state.player }))).toMatchObject({
+    x: before.x,
+    y: before.y,
+  });
+  await frames(30); // Türflügel, Eiszapfen, Umriss werden gezeichnet
+  // Nach 2,4 s rutscht er durch den Gang hinter die Mündung (in der Eis-Welt) und wartet dort; nach 3 s ist es vorbei
+  await ticks(30);
+  expect(
+    await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const g = el.state.animals.find((a) => a.id === 'eis:pinguin')!;
+      return el.world.realm(g.x, g.y);
+    }),
+  ).toBe('eis');
+  await frames(30);
+  // Durch den Gang in den Kessel: Er rutscht voraus zum Schneebett und zieht als erstes Tier ein
+  const realm = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const { out } = el.world.gates.get('eis')!;
+    const dir = out[0] > 0 ? 'e' : out[0] < 0 ? 'w' : out[1] > 0 ? 's' : 'n';
+    for (let i = 0; i < 80 && el.world.realm(el.state.player.x, el.state.player.y) !== 'eis'; i++)
+      el.apply({ type: 'move', dir });
+    return el.world.realm(el.state.player.x, el.state.player.y);
+  });
+  expect(realm).toBe('eis');
+  await ticks(200);
+  expect(await penguin()).toBe('home');
+  // Am Schneebett erwacht das Eis-Portal; die Leiste zeigt die Eis-Welt
+  await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const [x, y] = el.world.homes.eis.wake[0]!;
+    el.state = { ...el.state, player: { x, y, dir: 's' } };
+    el.lift();
+    el.apply({ type: 'tick' });
+  });
+  await expect.poll(() => game.evaluate((el) => (el as unknown as Game).state.portals)).toContain('eiskessel');
+  await frames(60);
+  expect(await game.evaluate((el) => (el as unknown as Game).renderer.album.turn.shown)).toBe('eis');
+  // Nach dem Neuladen ist das Tor offen, der Pinguin wohnt auf der Schneewiese, die Figur wacht am Schneebett auf
+  await page.reload();
+  await expect(game).toHaveClass(/ready/);
+  const after = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    return {
+      open: el.state.openGates,
+      home: el.state.garden.some((p) => p.id === 'eis:pinguin'),
+      realm: el.world.realm(el.state.player.x, el.state.player.y),
+    };
+  });
+  expect(after).toEqual({ open: ['eis'], home: true, realm: 'eis' });
+  await page.keyboard.press('ArrowDown');
+  await frames(30);
   expect(errors).toEqual([]);
 });
 

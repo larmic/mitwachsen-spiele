@@ -202,5 +202,9 @@ export const STORIES: Record<StoryId, Story> = {
   },
 };
 
+/** Was ein Klangstein erzählt: Ist das Eistor offen, erzählt der Stein davor die zweite Fassung der Eis-Geschichte */
+export const told = (id: StoryId, open: readonly GateId[]): StoryId =>
+  id === 'eis' && open.includes('eis') ? 'eis-offen' : id;
+
 /** Wie lange eine Melodie dauert (s) */
 export const melodyLength = (m: Melody) => m.notes.reduce((t, [, len]) => t + len + m.gap, 0);

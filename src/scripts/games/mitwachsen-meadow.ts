@@ -4,11 +4,12 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Wetter und Unterstand“)
 
 import { chunkOf } from '../../lib/games/chunks';
+import { DIRS, type Dir } from '../../lib/games/front';
 import { cycle, hash } from '../../lib/games/rng';
-import { REGIONS, animalId, type RegionId, type SpeciesId } from '../../data/games/mitwachsen';
+import { REGIONS, animalId, type GateId, type RegionId, type SpeciesId } from '../../data/games/mitwachsen';
 import { perRealm } from './mitwachsen-home';
 import { platformArea, withNeighbours } from './mitwachsen-portal';
-import { standHeight, type World } from './mitwachsen-world';
+import { canStep, standHeight, type World } from './mitwachsen-world';
 
 /** Zuhause eines Tiers: seine Gegend, ein Stück der Landschaft (Tiere der Landschaft) oder die Wiese am Bett */
 export type Home = { kind: 'region'; region: RegionId } | { kind: 'wild'; cx: number; cy: number } | { kind: 'garden' };
@@ -104,4 +105,28 @@ export function shelterPlaces(
     order.forEach((a, i) => out.set(a.id, cycle(shelterSpots(world, realm), i)));
   }
   return out;
+}
+
+type Walker = { id: string; x: number; y: number; dir: Dir; realm: RegionId };
+
+/**
+ * Pustewind (Unterstand mit `huddle`, das Iglu): Sitzt auf dem nächsten Feld zum eigenen Platz schon ein Tier auf
+ * seinem Platz, tauschen beide; das andere rückt gleich wieder an seinen Platz. Liefert true, wenn getauscht wurde.
+ */
+export function slipPast(
+  s: { openGates: readonly GateId[]; animals: Walker[] },
+  world: World,
+  a: Walker,
+  d: Dir,
+  places: Map<string, [number, number]>,
+): boolean {
+  if (!world.homes[a.realm].huddle) return false;
+  const [tx, ty] = [a.x + DIRS[d][0], a.y + DIRS[d][1]];
+  const other = s.animals.find((o) => o.x === tx && o.y === ty);
+  const its = other && places.get(other.id);
+  if (!other || its?.[0] !== tx || its[1] !== ty) return false;
+  if (!canStep(world, s.openGates, a.x, a.y, tx, ty) || !canStep(world, s.openGates, tx, ty, a.x, a.y)) return false;
+  [other.x, other.y, a.x, a.y] = [a.x, a.y, tx, ty];
+  a.dir = d;
+  return true;
 }

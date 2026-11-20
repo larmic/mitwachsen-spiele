@@ -116,10 +116,11 @@ export const REGIONS: readonly [Region, ...Region[]] = [
 
 /**
  * Die großen Tore: eines je Welt. Wo sie im Felsring stehen und in welcher Reihenfolge, würfelt der Seed jeder Welt.
- * Hinter jedem Tor liegt in seiner Richtung die passende Landschaft. Vorerst geht keines auf (`opens: 'never'`).
+ * Hinter jedem Tor liegt in seiner Richtung die passende Landschaft. Das Eistor öffnet der verlaufene Pinguin
+ * (`{ key: 'pinguin' }`, mitwachsen-ritual.ts), die anderen gehen vorerst nie auf (`opens: 'never'`).
  */
 export const GATES: readonly Gate[] = [
-  { id: 'eis', theme: 'eis', kind: 'grosstor', region: 'lichtung', leadsTo: 'Eiswelt', opens: 'never' },
+  { id: 'eis', theme: 'eis', kind: 'grosstor', region: 'lichtung', leadsTo: 'Eiswelt', opens: { key: 'pinguin' } },
   { id: 'sand', theme: 'sand', kind: 'grosstor', region: 'lichtung', leadsTo: 'Sandwelt', opens: 'never' },
   { id: 'wasser', theme: 'wasser', kind: 'grosstor', region: 'lichtung', leadsTo: 'Wasserwelt', opens: 'never' },
   { id: 'lava', theme: 'lava', kind: 'grosstor', region: 'lichtung', leadsTo: 'Lavaberge', opens: 'never' },

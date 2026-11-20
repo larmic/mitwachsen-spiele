@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { BufferGeometry } from 'three';
 import { GATES } from '../../data/games/mitwachsen';
-import { gatehouse, goldenBay, parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
+import { gatehouse, parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
+import { goldenBay } from './mitwachsen-guest-3d';
+import { GUEST_COLORS, GUEST_FILLED, GUEST_OUTLINE, guestPixel, ritualGlow } from './mitwachsen-guest-look';
+import { RITUAL } from './mitwachsen-guide';
 
 type Face = { axis: number; dir: number; at: number; min: [number, number]; max: [number, number]; part: string };
 
@@ -63,9 +66,9 @@ function fighting(p: Parts, extra: [string, BufferGeometry][] = []): string[] {
  * der Test jeden Flügel für sich (ungedreht) und das Haus ohne sie, denn schräge Flächen liegen nie in einer Ebene mit
  * achsenparallelen (und ihre Ränder taugen nicht für den Vergleich in `fighting`).
  */
-function house(theme: (typeof GATES)[number]['id'], open: number, outline: boolean) {
+function house(theme: (typeof GATES)[number]['id'], open: number, outline: boolean, lit = 0) {
   const p = parts();
-  const wings = gatehouse(p, theme, open, outline);
+  const wings = gatehouse(p, theme, open, outline, lit);
   if (outline) goldenBay(p);
   const placed = wings.flatMap((w, i) =>
     Object.entries(w.parts).flatMap(([name, geo]): [string, BufferGeometry][] =>
@@ -91,12 +94,13 @@ describe('Torhäuser und Portal-Plattformen flackern nicht', () => {
         for (const w of wings) expect(fighting(w.parts), `Flügel bei ${open}`).toEqual([]); // jeder Flügel für sich
       }
     });
-    it(`${g.id}: mit Umriss des Pinguins und goldener Bucht ebenso`, () => {
-      for (const open of [0, 0.5, 1]) {
-        const { p, wings, placed } = house(g.id, open, true);
-        expect(fighting(p, open === 0.5 ? [] : placed), `offen ${open}`).toEqual([]);
-        for (const w of wings) expect(fighting(w.parts), `Flügel bei ${open}`).toEqual([]);
-      }
+    it(`${g.id}: mit Umriss des Pinguins und goldener Bucht ebenso, auch wenn er sich füllt und die Eiszapfen leuchten`, () => {
+      for (const open of [0, 0.5, 1])
+        for (const lit of [0, 0.5, 1]) {
+          const { p, wings, placed } = house(g.id, open, true, lit);
+          expect(fighting(p, open === 0.5 ? [] : placed), `offen ${open}, leuchtet ${lit}`).toEqual([]);
+          for (const w of wings) expect(fighting(w.parts), `Flügel bei ${open}, leuchtet ${lit}`).toEqual([]);
+        }
     });
     it(`${g.id}: Portal-Plattform in jedem Zustand ebenso (am Tor und am Bett)`, () => {
       for (const side of ['gate', 'home'] as const) {
@@ -165,5 +169,26 @@ describe('Torhäuser und Portal-Plattformen flackern nicht', () => {
     // oben je Säule eine Fläche (gut 500), dazu Kanten und Zierde; mit allen Würfelflächen wären es über 5000
     expect(quads).toBeGreaterThan(500);
     expect(quads).toBeLessThan(1200);
+  });
+});
+
+describe('Das Eistor geht auf: Eiszapfen leuchten, der Umriss füllt sich', () => {
+  it('ab 0,3 s bis 1,2 s nacheinander (Takte nach dem Öffnen), sonst nicht', () => {
+    const at = (t: number) => ritualGlow({ tick: 100 + t, ritual: 100 });
+    expect([at(0), at(3), at(12), at(20), at(RITUAL)]).toEqual([0, 0, 1, 1, 0]);
+    expect(at(7)).toBeGreaterThan(0);
+    expect(at(7)).toBeLessThan(1);
+    expect(ritualGlow({ tick: 100, ritual: -1 })).toBe(0); // kein Ritual
+  });
+
+  it('der Umriss füllt sich von unten mit den Farben des Pinguins, der Goldrahmen bleibt', () => {
+    const rows = GUEST_OUTLINE.length;
+    const feet = rows - 2; // Füße: unten orange
+    expect(guestPixel(feet, 3, 0)).toEqual(GUEST_COLORS.o);
+    expect(guestPixel(feet, 3, 0.2)).toEqual(GUEST_COLORS.y);
+    expect(guestPixel(1, 4, 0.2)).toEqual(GUEST_COLORS.o); // oben noch Umriss
+    expect(guestPixel(1, 4, 1)).toEqual(GUEST_COLORS.k);
+    for (const lit of [0, 0.5, 1]) expect(guestPixel(0, 0, lit)).toEqual(GUEST_COLORS.g);
+    expect(GUEST_FILLED.map((r) => r.length)).toEqual(GUEST_OUTLINE.map((r) => r.length));
   });
 });

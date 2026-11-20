@@ -22,6 +22,7 @@ import { BLOCK, raining, windy } from './mitwachsen-weather';
 import { platformArea } from './mitwachsen-portal';
 import { SEATS, crossings } from './mitwachsen-border';
 import { dirTo, freeNear } from './mitwachsen-free';
+import { heardStone } from './mitwachsen-story';
 
 /** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich; Zuhause der Eis-Welt (im Kessel von Seed 1) */
 const { lichtung: LICHTUNG, eis: EIS_HOME } = createWorld(1).homes;
@@ -398,9 +399,10 @@ describe('Tiere an wechselnden Stellen', () => {
   it('wechselnde Plätze je Welt: Eis-Tiere im Kessel, 6 Felder vom Schneebett und 4 voneinander', () => {
     const [bx, by] = world.homes.eis.bed;
     const spots = new Set(world.spotsOf('eis').map(([x, y]) => `${x},${y}`));
-    const before = where(initialState(world, {}, 1)).filter((w) => w.startsWith('eis:'));
+    const open = { openGates: ['eis' as const] }; // bei offenem Eistor (sonst fehlt der verlaufene Pinguin)
+    const before = where(initialState(world, open, 1)).filter((w) => w.startsWith('eis:'));
     for (const seed of [1, 2, 3]) {
-      const ice = initialState(world, {}, seed).animals.filter((a) => a.realm === 'eis');
+      const ice = initialState(world, open, seed).animals.filter((a) => a.realm === 'eis');
       expect(ice).toHaveLength(30); // zehn Arten, je drei
       for (const a of ice) {
         expect(spots.has(`${a.x},${a.y}`), a.id).toBe(true);
@@ -468,7 +470,7 @@ describe('Iglu bei Pustewind (Eis-Welt)', () => {
     return b;
   };
   const start = (b: number, garden = everyone()): State => ({
-    ...initialState(world, { garden }),
+    ...initialState(world, { garden, openGates: ['eis'] }),
     sleeping: false,
     tick: b * BLOCK,
   });
@@ -787,8 +789,22 @@ describe('Wiese ums Bett', () => {
 describe('Große Tore', () => {
   const never = GATES.filter((g) => g.opens === 'never').map((g) => g.id);
 
-  it('alle acht stehen vorerst auf „never“', () => {
-    expect(never).toHaveLength(8);
+  it('die anderen sieben Tore öffnen nie (`never`); das Eistor öffnet nur der Pinguin, kein anderes Tier', () => {
+    expect(never).toHaveLength(7);
+    expect(never).not.toContain('eis');
+    expect(GATES.find((g) => g.id === 'eis')!.opens).toEqual({ key: 'pinguin' });
+    // alle Tiere der Lichtung und alle Eis-Tiere außer dem Pinguin zu Hause: Er ist nicht dabei, also bleibt alles zu
+    const world = createWorld(1);
+    const garden = REGIONS.flatMap((r) => regionAnimals(r.id))
+      .filter((id) => id !== 'eis:pinguin')
+      .map((id) => ({ id, species: id.split(':')[1] as 'hase' }));
+    const r = run(
+      { ...initialState(world, { garden }), sleeping: false },
+      world,
+      ...Array.from({ length: 300 }, () => TICK),
+    );
+    expect(r.s.openGates).toEqual([]);
+    expect(types(r.events)).not.toContain('gate');
   });
 
   it('Tore mit opens „never“ öffnen nie, auch wenn alle Tiere der Lichtung gefunden sind', () => {
@@ -804,17 +820,16 @@ describe('Große Tore', () => {
     expect(s.openGates.filter((id) => never.includes(id))).toEqual([]);
   });
 
-  it('ohne Schlüssel am Eistor (`never`) taucht der verlaufene Pinguin nie auf, auch wenn alle Tiere der Lichtung zu Hause sind', () => {
+  it('ohne die nachgeladenen Regeln des Pinguins taucht er nicht auf, und kein Tor geht auf', () => {
     const world = createWorld(1);
     const garden = regionAnimals('lichtung').map((id) => ({ id, species: id.split(':')[1] as 'hase' }));
     let s = initialState(world, { garden });
-    expect(s.animals.find((a) => a.id === 'eis:pinguin')!.realm).toBe('eis'); // er wohnt im (unerreichbaren) Kessel
-    expect(world.realm(...s.animals.find((a) => a.id === 'eis:pinguin')!.spawn)).toBe('eis');
+    expect(s.animals.some((a) => a.id === 'eis:pinguin')).toBe(false); // verlaufen: nicht im Kessel
     const r = run(s, world, 'n', ...Array.from({ length: 300 }, () => TICK));
     s = r.s;
     expect(types(r.events)).not.toContain('guide');
     expect(s.animals.some((a) => a.mode === 'lead')).toBe(false);
-    expect(s.guideDue).toBe(-1);
+    expect(s.openGates).toEqual([]);
   });
 
   it('das letzte gefundene Tier öffnet kein Tor (kein Ereignis)', () => {
@@ -890,7 +905,7 @@ describe('Zuhause je Gegend', () => {
 
   it('Tiere gehören zu ihrer Gegend, Tiere der Landschaft zur Lichtung', () => {
     const world = createWorld(4);
-    const s = initialState(world, { garden: [{ id: 'wild:0:2:0', species: 'fuchs' }] });
+    const s = initialState(world, { garden: [{ id: 'wild:0:2:0', species: 'fuchs' }], openGates: ['eis'] });
     for (const a of s.animals) expect(a.realm, a.id).toBe(a.id.startsWith('eis:') ? 'eis' : 'lichtung');
     expect(s.animals.filter((a) => a.realm === 'eis')).toHaveLength(30);
     expect(s.animals.find((a) => a.id === 'wild:0:2:0')!.realm).toBe('lichtung');
@@ -1017,7 +1032,7 @@ describe('Invarianten bei wildem Drücken', () => {
       const world = createWorld(seed);
       const [bx, by] = world.homes.eis.bed;
       const play = () => {
-        let s: State = { ...initialState(world, {}, seed), openGates: ['eis'], player: { x: bx, y: by, dir: 's' } };
+        let s: State = { ...initialState(world, { openGates: ['eis'] }, seed), player: { x: bx, y: by, dir: 's' } };
         let r = seed * 104729;
         for (let i = 0; i < 4000; i++) {
           r = (Math.imul(r, 1103515245) + 12345) >>> 0;
@@ -1370,6 +1385,22 @@ describe('Klangsteine', () => {
       ['n', true],
       ['s', false],
     ]);
+  });
+
+  it('der Stein vor dem Eistor erzählt die erste Fassung der Eis-Geschichte, ist das Tor offen, die zweite', () => {
+    const w = fakeWorld({ '1,0': { deco: 'klangstein', solid: true, story: 'eis' } });
+    expect(run(awake(w, 0, 0), w, 'e').events).toEqual([{ type: 'story', id: 'eis', first: true }]);
+    const open = { ...awake(w, 0, 0), openGates: ['eis' as const] };
+    const r = run(open, w, 'e');
+    expect(r.events).toEqual([{ type: 'story', id: 'eis-offen', first: true }]);
+    expect(r.s.heard).toEqual(['eis-offen']);
+  });
+
+  it('die Note am Stein vor dem Eistor gilt als gehört, wenn das Kind die Fassung kennt, die er jetzt erzählt', () => {
+    expect(heardStone({ heard: ['eis-offen'], openGates: ['eis'] }, 'eis')).toBe(true);
+    expect(heardStone({ heard: ['eis'], openGates: ['eis'] }, 'eis')).toBe(false); // neuer Text: Note wieder neu
+    expect(heardStone({ heard: ['eis'], openGates: [] }, 'eis')).toBe(true);
+    expect(heardStone({ heard: ['eis-offen'], openGates: [] }, 'bett')).toBe(false);
   });
 
   it('gehörte Geschichten kommen mit dem Spielstand wieder, unbekannte fallen weg', () => {

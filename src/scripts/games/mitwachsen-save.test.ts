@@ -208,6 +208,19 @@ describe('Eis-Portal im Spielstand', () => {
   });
 });
 
+describe('Offenes Eistor im Spielstand', () => {
+  it('das Eistor bleibt nach dem Laden offen (Format v4 wie bisher); die Position im Kessel kommt mit', () => {
+    const store = memoryStore();
+    const w = { ...newWorld('e', 7, 'X'), openGates: ['eis' as const], position: [40, -60] as [number, number] };
+    saveWorld(store, w);
+    const back = loadWorld(store, 'e')!;
+    expect(back.v).toBe(4);
+    expect(progressFrom(back)).toMatchObject({ openGates: ['eis'], position: [40, -60] });
+    // die anderen sieben bleiben auch aus einem Spielstand zu (das filtert `initialState`, hier nur Format und Umzug)
+    expect(migrate({ ...w, openGates: ['eis', 'sand', 'westtor'] })!.openGates).toEqual(['eis', 'sand']);
+  });
+});
+
 describe('Namen und Welt-Code', () => {
   it('säubert Namen und nimmt sonst den Ersatz', () => {
     expect(cleanName('  Bobo  ', 'X')).toBe('Bobo');

@@ -37,9 +37,9 @@ export default defineConfig(
   {
     files: ['src/scripts/games/larmic-mitwachsen.ts'],
     rules: {
-      complexity: ['error', 31],
-      'max-lines': ['error', { max: 832, skipBlankLines: true, skipComments: true }],
-      'max-lines-per-function': ['error', { max: 104, skipBlankLines: true, skipComments: true }],
+      complexity: ['error', 30],
+      'max-lines': ['error', { max: 801, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['error', { max: 91, skipBlankLines: true, skipComments: true }],
     },
   },
   {
@@ -74,8 +74,8 @@ export default defineConfig(
   {
     files: ['src/scripts/games/mitwachsen-state.ts'],
     rules: {
-      complexity: ['error', 25],
-      'max-lines': ['error', { max: 475, skipBlankLines: true, skipComments: true }],
+      complexity: ['error', 23],
+      'max-lines': ['error', { max: 467, skipBlankLines: true, skipComments: true }],
     },
   },
   {

@@ -16,14 +16,14 @@ import {
   type RegionId,
   type SpeciesId,
 } from '../../data/games/mitwachsen';
-import type { StoryId } from '../../data/games/mitwachsen-stories';
+import { told, type StoryId } from '../../data/games/mitwachsen-stories';
 import { canStep, standHeight, wildAnimals, type World } from './mitwachsen-world';
 import { chore, regrow, type ChoreEvent } from './mitwachsen-chores';
 import { homeAt, startRealm } from './mitwachsen-home';
 import { landed, wakePortals, type PortalEvent } from './mitwachsen-travel';
 import type { PortalId } from '../../data/games/mitwachsen-portals';
 import { sheltering } from './mitwachsen-weather';
-import { PENGUIN, atHome, meadowSpots, shelterPlaces, windOk, type Home } from './mitwachsen-meadow';
+import { PENGUIN, atHome, meadowSpots, shelterPlaces, slipPast, windOk, type Home } from './mitwachsen-meadow';
 import { dirTo, freeNear, occupied } from './mitwachsen-free';
 import { crossBorder, type BorderEvent, type Mode } from './mitwachsen-border';
 import { lost, type GuideEvent, type GuideRules } from './mitwachsen-guide';
@@ -72,6 +72,7 @@ export type State = {
   heard: StoryId[]; // Geschichten, deren Klangstein schon einmal erklungen ist
   calm: number; // Tag, an dem der Pinguin auf die Schneewiese gezogen ist: an ihm weht kein Pustewind (nicht gespeichert)
   guideDue: number; // verlaufener Pinguin: Takt, ab dem er auftaucht bzw. aufgetaucht ist (nicht gespeichert, mitwachsen-guide.ts)
+  ritual: number; // Takt, an dem das Eistor mit dem Pinguin aufging (-1: noch nicht; nicht gespeichert, mitwachsen-ritual.ts)
 };
 
 /** Was gespeichert wird */
@@ -185,6 +186,7 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     heard: (saved.heard ?? []).filter((id) => world.stones.has(id)),
     calm: -1,
     guideDue: -1,
+    ritual: -1,
   };
   scatter(s, world); // jeder Besuch: Die Tiere wohnen woanders
   syncWild(s, world);
@@ -259,7 +261,8 @@ export function step(state: State, world: World, cmd: Cmd, explored: Explored = 
   const events: GameEvent[] = [];
   if (cmd.type === 'tick') tick(s, world, events);
   else if (s.sleeping) wake(s, world, events);
-  else if (cmd.type === 'move') {
+  else if (cmd.type === 'move' && !guide?.hold(s, events)) {
+    // Ein Schritt (während das Eistor aufgeht, hüpft die Figur stattdessen nur: `hold` in mitwachsen-ritual.ts)
     const from: Point = [s.player.x, s.player.y];
     move(s, world, cmd.dir, events);
     guide?.meetGuide(s, world, events); // in den führenden Pinguin gelaufen: Er hüpft voraus oder tauscht den Platz
@@ -268,7 +271,7 @@ export function step(state: State, world: World, cmd: Cmd, explored: Explored = 
       landed(s, world, events);
       crossBorder(s, world, from, events);
     }
-  } else action(s, world, events);
+  } else if (cmd.type === 'action') action(s, world, events);
   wakePortals(s, world, explored, events); // Portal-Plattformen in der Nähe erwachen (mitwachsen-travel.ts)
   guide?.guide(s, world, cmd.type, events, explored); // der verlaufene Pinguin taucht auf und führt
   return { state: s, events };
@@ -330,22 +333,6 @@ function tick(s: State, world: World, events: GameEvent[]) {
 }
 
 /**
- * Pustewind (Unterstand mit `huddle`, das Iglu): Sitzt auf dem nächsten Feld zum eigenen Platz schon ein Tier auf
- * seinem Platz, tauschen beide; das andere rückt gleich wieder an seinen Platz. Liefert true, wenn getauscht wurde.
- */
-function slipPast(s: State, world: World, a: Animal, d: Dir, places: Map<string, [number, number]>): boolean {
-  if (!world.homes[a.realm].huddle) return false;
-  const [tx, ty] = [a.x + DIRS[d][0], a.y + DIRS[d][1]];
-  const other = s.animals.find((o) => o.x === tx && o.y === ty);
-  const its = other && places.get(other.id);
-  if (!other || its?.[0] !== tx || its[1] !== ty) return false;
-  if (!canStep(world, s.openGates, a.x, a.y, tx, ty) || !canStep(world, s.openGates, tx, ty, a.x, a.y)) return false;
-  [other.x, other.y, a.x, a.y] = [a.x, a.y, tx, ty];
-  a.dir = d;
-  return true;
-}
-
-/**
  * Die Figur läuft in ein Tier, das ihr folgt oder auf der Wiese wohnt. Ein folgendes Tier tauscht den Platz (umdrehen
  * geht immer). Eines auf der Wiese macht Platz: Es hüpft zur Seite und die Figur geht weiter – so kommt sie auch durch
  * eine volle Wiese. Ist seitlich nichts frei, tauschen beide. Liefert true, wenn der Zug damit erledigt ist.
@@ -378,7 +365,8 @@ function meetAnimal(s: State, world: World, animal: Animal, dir: Dir, events: Ga
  * Klangstein angelaufen: Die Geschichte des Ortes erklingt (abspielen und anhalten macht die Ansicht). Tiere in der Nähe
  * drehen sich zur Figur und bleiben eine Weile stehen, als hörten sie mit.
  */
-function listen(s: State, id: StoryId, events: GameEvent[]) {
+function listen(s: State, stone: StoryId, events: GameEvent[]) {
+  const id = told(stone, s.openGates); // offenes Eistor: Sein Stein erzählt die zweite Fassung der Eis-Geschichte
   const first = !s.heard.includes(id);
   if (first) s.heard = [...s.heard, id].sort();
   for (const a of s.animals)

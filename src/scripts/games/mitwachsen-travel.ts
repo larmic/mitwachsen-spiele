@@ -26,10 +26,16 @@ export type Traveller = Omit<Crowd, 'player' | 'animals'> & {
 };
 type Events = { push(e: PortalEvent): unknown };
 
-/** Plattformen, an die die wache Figur herangekommen ist, erwachen (nur, wo der Nebel schon weg ist: `explored`) */
+/**
+ * Plattformen, an die die wache Figur herangekommen ist, erwachen (nur, wo der Nebel schon weg ist: `explored`). Ein
+ * Portal am Bett (das Eis-Portal) erwacht erst, wenn der Pinguin nicht mehr unterwegs zum Schneebett ist (Modus `lead`):
+ * Er zieht zuerst ein, erst dann erwacht es.
+ */
 export function wakePortals(s: Traveller, world: World, explored: (x: number, y: number) => boolean, events: Events) {
   if (s.sleeping) return;
+  const guiding = s.animals.some((a) => a.mode === 'lead');
   for (const id of platformsToWake(world.portals, s.portals, s.player.x, s.player.y, explored)) {
+    if (guiding && world.portals.get(id)?.bed) continue;
     s.portals.push(id);
     events.push({ type: 'portal', id });
   }

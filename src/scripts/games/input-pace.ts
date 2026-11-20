@@ -29,7 +29,7 @@ export const FREE_KEYS = new Set([
 
 /**
  * Begegnungen: Tier gefunden oder angestoßen, Beeren gepflückt, Fische gefangen, Futter oder Wasser gebracht, Wasser
- * geschöpft, Plattform erwacht, gereist, Klangstein. Danach bleibt die Figur stehen, bis der Pfeil neu gedrückt wird
+ * geschöpft, Plattform erwacht, gereist, Klangstein, das Eistor geht auf (und jeder Hüpfer, solange es aufgeht). Danach bleibt die Figur stehen, bis der Pfeil neu gedrückt wird
  * (`clear`); sonst liefe sie mit gehaltenem Pfeil gleich weiter und tauschte den Platz mit dem neuen Tier.
  */
 export const ENCOUNTERS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['type']>([
@@ -43,6 +43,8 @@ export const ENCOUNTERS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['typ
   'portal',
   'teleport',
   'story',
+  'gate',
+  'hop',
 ]);
 
 export class InputPace {

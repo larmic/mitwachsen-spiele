@@ -1,8 +1,9 @@
 // Der verlaufene Pinguin führt die Figur zum Eistor – rein, ohne DOM: Er taucht neben ihr auf, watschelt zu ihr (Hüpfer,
 // Herz) und geht dann ein paar Felder voraus Richtung Bucht, dann wartet er und piept. Läuft sie weg, holt er sie ein
 // und stellt sich wieder vor sie; er blockiert nie. Nachts schläft er neben dem Bett, morgens führt er weiter. Wann er
-// fällig ist und wo die Bucht liegt, steht in mitwachsen-guide.ts. Die Ansicht lädt diese Regeln erst nach, wenn er
-// fällig ist, und reicht sie `step` herein (mitwachsen-state.ts); so bleibt die Spielseite schlank.
+// fällig ist und wo die Bucht liegt, steht in mitwachsen-guide.ts; was in der Bucht geschieht (das Eistor geht auf, er
+// rutscht heim), in mitwachsen-ritual.ts. Die Ansicht lädt diese Regeln erst nach, wenn er fällig ist, und reicht sie
+// `step` herein (mitwachsen-state.ts); so bleibt die Spielseite schlank.
 // Spezifikation: docs/specs/mitwachsen.md („Der Pinguin holt dich ab“)
 
 import { DIRS } from '../../lib/games/front';
@@ -24,6 +25,9 @@ import {
   type Guided,
 } from './mitwachsen-guide';
 import { homeAt } from './mitwachsen-home';
+import { homeward, opens, slideOn } from './mitwachsen-ritual';
+
+export { hold } from './mitwachsen-ritual';
 import { canStep, type World } from './mitwachsen-world';
 
 type Walker = Guided['animals'][number];
@@ -85,10 +89,14 @@ function spotNear(s: Guided, world: World, explored: Explored): Point | null {
 /**
  * Nach jedem Befehl: Ist er fällig, taucht er auf (gut 2 s nach dem Einzug des letzten Tiers der Lichtung, nach dem
  * Laden beim Aufwachen). Ist er da, führt er im Takt; beim Einschlafen setzt er sich neben das Bett, beim Aufwachen
- * piept er zur Begrüßung.
+ * piept er zur Begrüßung. Stehen beide in der Bucht, geht das Tor auf, und er rutscht heim (mitwachsen-ritual.ts).
  */
 export function guide(s: Guided, world: World, cmd: 'move' | 'action' | 'tick', events: Events, explored: Explored) {
   const g = s.animals.find((a) => a.id === GUIDE);
+  if (s.openGates.includes(GUIDE_GATE)) {
+    if (g && g.mode !== 'home') homeward(s, world, g, cmd, events);
+    return;
+  }
   const woke = events.some((e) => e.type === 'wake');
   if (!g) {
     if (s.sleeping || !wanted(s)) return;
@@ -99,6 +107,7 @@ export function guide(s: Guided, world: World, cmd: 'move' | 'action' | 'tick', 
   if (g.mode !== 'lead') return;
   if (events.some((e) => e.type === 'sleep')) return bedside(s, world, g);
   if (woke) return peep(s, g, events); // morgens: zur Begrüßung
+  if (opens(s, world, g, events)) return; // beide in der Bucht: Das Eistor geht auf
   if (cmd === 'tick' && !s.sleeping) lead(s, world, g, events, explored);
 }
 
@@ -272,14 +281,15 @@ function towards(s: Guided, world: World, g: Walker, goals: readonly Point[]): P
 
 /**
  * Die Figur ist in den führenden Pinguin hineingelaufen (er hat dabei gesungen): Er hüpft ein Feld voraus Richtung Tor
- * oder, wenn dort nichts frei ist, tauscht er mit ihr den Platz. So blockiert er nie.
+ * oder, wenn dort nichts frei ist, tauscht er mit ihr den Platz. So blockiert er nie. Ist das Tor offen, rutscht er
+ * statt zu hüpfen ein Feld weiter Richtung Schneebett.
  */
 export function meetGuide(s: Guided, world: World, events: Events) {
   const g = leader(s);
   const [dx, dy] = DIRS[s.player.dir];
   if (!g || g.x !== s.player.x + dx || g.y !== s.player.y + dy) return;
   if (!events.some((e) => e.type === 'sing' && e.id === g.id)) return;
-  if (forward(s, world, g, toGate(world))) return;
+  if (s.openGates.includes(GUIDE_GATE) ? slideOn(s, world, g, events) : forward(s, world, g, toGate(world))) return;
   const p = s.player;
   if (!canStep(world, s.openGates, p.x, p.y, g.x, g.y) || !canStep(world, s.openGates, g.x, g.y, p.x, p.y)) return;
   [g.x, g.y, p.x, p.y] = [p.x, p.y, g.x, g.y];

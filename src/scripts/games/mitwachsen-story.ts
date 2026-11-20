@@ -3,7 +3,8 @@
 // Spezifikation: docs/specs/mitwachsen.md
 
 import { box, type Projection } from '../../lib/games/front';
-import { STORIES, melodyLength, type StoryId } from '../../data/games/mitwachsen-stories';
+import { STORIES, melodyLength, told, type StoryId } from '../../data/games/mitwachsen-stories';
+import type { GateId } from '../../data/games/mitwachsen';
 import type { Sfx } from './sfx';
 
 /** Quader [x, y, z, Breite, Tiefe, Höhe] relativ zur Ecke des Feldes, z ab seiner Oberkante */
@@ -25,6 +26,13 @@ export const NOTE: readonly (readonly [number, number, number, number])[] = [
   [0.1, 0.74, 0.2, 0.1], // Fähnchen
   [0.21, 0.56, 0.09, 0.2],
 ];
+
+/**
+ * Hat das Kind gehört, was dieser Stein jetzt erzählt? Dieselbe Kennung wie die Regeln (`told`): Ist das Eistor offen,
+ * zählt am Stein davor die zweite Fassung der Eis-Geschichte.
+ */
+export const heardStone = (s: { heard: readonly StoryId[]; openGates: readonly GateId[] }, id: StoryId) =>
+  s.heard.includes(told(id, s.openGates));
 
 /**
  * Wie die Note über ihrem Stein schwebt: Höhe über der Oberkante und Größe. Eine noch nie gehörte Geschichte ist

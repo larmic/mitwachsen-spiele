@@ -3,7 +3,7 @@
 // Glitzerluft danach, der Wimpel auf dem Iglu und nachts im Schneebett das Polarlicht. Alles, was sich bewegt, nur
 // ohne reduzierte Bewegung. Die Ansicht lädt dieses Modul erst, wenn die Figur im Kessel, das Eistor offen oder der
 // verlaufene Pinguin da ist (`import()`); mit ihm kommen das Bild der Weltgrenze (Zeichen der Gegend, Umklappen der
-// Leiste, Pfeil zum Tor) und der Pinguin am Tor (Umriss auf der Tür, goldene Bucht).
+// Leiste, Pfeil zum Tor) und der Pinguin am Tor (Umriss auf der Tür, goldene Bucht, Töne beim Öffnen des Eistors).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Wetter und Unterstand“)
 
 import type { Projection } from '../../lib/games/front';
@@ -13,7 +13,7 @@ import { wrap, type SkyScene } from './mitwachsen-sky';
 import type { World } from './mitwachsen-world';
 
 export { realmSign, turnAlbum, waitArrow } from './mitwachsen-border-view';
-export { guestAt } from './mitwachsen-guest-look';
+export { gateScore, guestAt } from './mitwachsen-guest-look';
 
 const NEAR = 24; // Dinge in der Welt (Wirbel, Fahnen, Wimpel) nur so nah an der Kamera zeichnen
 const PENNANT = ['#e8504a', '#ffffff', '#3f8fd8', '#6dbd47']; // bunter Wimpel (kein Gold: das ist die Aktionsfarbe)

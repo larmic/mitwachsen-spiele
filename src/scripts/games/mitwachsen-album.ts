@@ -8,7 +8,7 @@ import { TILE_W, drawModel, projection } from '../../lib/games/front';
 import { GAME_COLORS, REGIONS, SPECIES, speciesOf, type RegionId, type SpeciesId } from '../../data/games/mitwachsen';
 import type { Turn } from './mitwachsen-border-view';
 import { ASK, HEART, sprite } from './mitwachsen-glyphs';
-import { leader } from './mitwachsen-guide';
+import { guideGate, leader } from './mitwachsen-guide';
 import type { State } from './mitwachsen-state';
 
 /** Was die Leiste vom Bild wissen muss */
@@ -81,8 +81,8 @@ function slots(state: State, realm: RegionId): Slot[][] {
     groups.push(
       wild.map((p) => ({ species: p.species, met: true, home: true, follows: state.followers.includes(p.id) })),
     );
-  // Gast: der verlaufene Pinguin, solange er die Figur zum Eistor führt (er gehört in die Eis-Welt)
-  const guest = realm === 'lichtung' ? leader(state) : undefined;
+  // Gast: der verlaufene Pinguin, solange er die Figur zum Eistor führt (er gehört in die Eis-Welt; nach dem Öffnen nicht)
+  const guest = realm === 'lichtung' && guideGate(state) ? leader(state) : undefined;
   if (guest)
     groups.push([
       { species: guest.species, met: state.met.includes(guest.id), home: false, follows: false, guest: true },

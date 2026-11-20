@@ -50,8 +50,10 @@ import { FISH_PARTS, ICE_COLORS } from '../../data/games/mitwachsen-eis';
 import { Geo, atlas, snapToShadowTexel, type Tile, type V3 } from './mitwachsen-geo';
 import { grown } from './mitwachsen-growth';
 import { iceBoxes } from './mitwachsen-ice-look';
-import { gatehouse, goldenBay, parts, type Parts } from './mitwachsen-gatehouse';
-import { guideGate } from './mitwachsen-guide';
+import { gatehouse, parts, type Parts } from './mitwachsen-gatehouse';
+import { goldenBay } from './mitwachsen-guest-3d';
+import { GUIDE_GATE, guideGate } from './mitwachsen-guide';
+import { ritualGlow } from './mitwachsen-guest-look';
 import { Platforms3D } from './mitwachsen-platform-3d';
 import { StoneNotes, stoneInto } from './mitwachsen-story-3d';
 import type { Scene } from './mitwachsen-render';
@@ -402,7 +404,7 @@ export class World3D {
     this.syncSigns(state);
     this.syncSleeper(state);
     this.platforms.sync(state, sc);
-    this.notes.update(state.heard, sc.now, sc.reduced);
+    this.notes.update(state, sc.now, sc.reduced);
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -470,22 +472,26 @@ export class World3D {
   /** Torhäuser neu bauen, wenn sich die Öffnung eines Tors ändert oder der Pinguin zu führen beginnt bzw. aufhört */
   private syncGates(world: World, state: State, sc: Scene) {
     const guest = guideGate(state);
-    const key = `${guest}|${[...sc.gates].map(([id, v]) => `${id}:${v.toFixed(2)}`).join()}`;
+    const lit = ritualGlow(state); // das Eistor geht auf: Eiszapfen und Umriss leuchten
+    // Öffnung in Zehnteln: Beim Aufschwingen werden die Torhäuser höchstens zehnmal neu gebaut, nicht in jedem Bild
+    const open = (id: GateId) => Math.round((sc.gates.get(id) ?? 0) * 10) / 10;
+    const key = `${guest}|${lit}|${[...sc.gates.keys()].map((id) => `${id}:${open(id)}`).join()}`;
     if (key === this.gatesKey) return;
     this.gatesKey = key;
-    this.buildGates(world, (id) => sc.gates.get(id) ?? 0, guest);
+    this.buildGates(world, open, guest, lit);
   }
 
   /**
    * Die großen Tore: mächtige Torhäuser im Felsring, je Welt geschmückt, zur Lichtung schauend. `open` sagt je Tor, wie
    * weit die Tür offen ist (die Flügel stehen an ihrer Angel und sind gedreht); am Tor `guest` (dorthin führt der
-   * verlaufene Pinguin) steht sein Umriss auf der Tür, und die Bucht davor ist golden markiert.
+   * verlaufene Pinguin) steht sein Umriss auf der Tür, und die Bucht davor ist golden markiert. Geht das Eistor mit ihm
+   * auf, leuchten bis `lit` seine Eiszapfen, und der Umriss füllt sich mit den Farben des Pinguins.
    */
-  private buildGates(world: World, open: (id: GateId) => number = () => 0, guest: GateId | null = null) {
+  private buildGates(world: World, open: (id: GateId) => number = () => 0, guest: GateId | null = null, lit = 0) {
     this.clear(this.gateGroup);
     for (const g of world.gates.values()) {
       const p = parts();
-      const wings = gatehouse(p, g.id, open(g.id), g.id === guest);
+      const wings = gatehouse(p, g.id, open(g.id), g.id === guest, g.id === GUIDE_GATE ? lit : 0);
       const [[mx, my], [fx, fy]] = [g.mid, [-g.out[0], -g.out[1]]];
       const h = world.cell(mx, my).h;
       // Goldrand der Bucht je Feld auf dessen Höhe: u entlang des Tors (die x-Achse des Torhauses), t Reihen davor

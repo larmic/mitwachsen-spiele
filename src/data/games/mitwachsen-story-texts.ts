@@ -11,7 +11,7 @@ export const STORY_TEXTS: Record<StoryId, { title: string; text: string }> = {
   },
   eis: {
     title: 'Tor zur Eiswelt',
-    text: 'Hinter diesem Tor ist es so kalt, dass sogar das Wasser zu Eis wird. Dort wohnt ein kleiner Pinguin, der den ganzen Tag auf dem Bauch übers Eis rutscht. Manchmal rutscht er bis ans Tor und schaut zu dir herüber. Noch ist das Tor zu. Aber wenn du ein bisschen größer bist, geht es auf, und dann rutscht ihr zusammen.',
+    text: 'Hinter diesem Tor ist es so kalt, dass sogar das Wasser zu Eis wird. Dort wohnt ein kleiner Pinguin, der den ganzen Tag auf dem Bauch übers Eis rutscht. Manchmal rutscht er bis ans Tor und schaut zu dir herüber. Noch ist das Tor zu. Aber wenn alle Tiere hier auf der Wiese zu Hause sind, kommt er vielleicht und zeigt dir den Weg.',
   },
   'eis-offen': {
     title: 'Am Schneebett',

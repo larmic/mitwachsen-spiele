@@ -3,7 +3,8 @@
 
 import { Group, Mesh, MeshBasicMaterial } from 'three';
 import { Geo } from './mitwachsen-geo';
-import { NOTE, NOTE_COLORS, STONE, STONE_COLORS, noteFloat } from './mitwachsen-story';
+import { NOTE, NOTE_COLORS, STONE, STONE_COLORS, heardStone, noteFloat } from './mitwachsen-story';
+import type { GateId } from '../../data/games/mitwachsen';
 import type { StoryId } from '../../data/games/mitwachsen-stories';
 import type { World } from './mitwachsen-world';
 
@@ -33,9 +34,9 @@ export class StoneNotes {
     });
   }
 
-  update(heard: readonly StoryId[], now: number, reduced: boolean) {
+  update(state: { heard: readonly StoryId[]; openGates: readonly GateId[] }, now: number, reduced: boolean) {
     for (const n of this.notes) {
-      const { z, scale } = noteFloat(now, n.x + n.y, heard.includes(n.id), reduced);
+      const { z, scale } = noteFloat(now, n.x + n.y, heardStone(state, n.id), reduced);
       n.mesh.position.set(n.x + 0.5, n.h + z, n.y + 0.5);
       n.mesh.scale.setScalar(scale);
       n.mesh.rotation.y = reduced ? 0 : Math.sin(now / 900 + n.x) * 0.35; // dreht sich ein wenig hin und her

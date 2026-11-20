@@ -13,7 +13,7 @@ export const ASK = ['.qqq.', 'q...q', '...q.', '..q..', '.....', '..q..']; // Fr
 
 /**
  * Farben der Funken: Handgriffe an Busch, Fischkiste und Wasser, dann an Futtertrog, Eisschale und Wassertrog; dazu die
- * kleine Schneewolke, mit der der verlaufene Pinguin auftaucht
+ * kleine Schneewolke, mit der der verlaufene Pinguin auftaucht, und der Einzug auf der Wiese je Gegend
  */
 export const SPARKS = {
   pick: ['#c8323a', '#ef5b5b', '#3f9a3c'],
@@ -23,6 +23,8 @@ export const SPARKS = {
   fish: FISH_SPARKS.feed,
   pour: ['#3f8fd8', '#7fc0f0', '#ffd47e'],
   snow: ['#ffffff', '#dfe9f2', '#bfe6f5'],
+  lichtung: ['#ffd47e', '#ffffff', '#6cc46f'], // ein Tier zieht auf der Wiese der Lichtung ein
+  eis: ['#7fd6ff', '#ffffff', '#3f8fd8'], // … auf der Schneewiese: eine Funkenwolke in Eisblau
 } as const;
 
 /** Pixel-Zeichen zeichnen: unten mittig bei (cx, bottom), jedes Pixel `px` groß */

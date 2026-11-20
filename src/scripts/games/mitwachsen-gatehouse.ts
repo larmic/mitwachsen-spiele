@@ -8,7 +8,7 @@
 
 import { THEME_COLORS, type GateTheme } from '../../data/games/mitwachsen';
 import { GOLD, SUB, platformLook, voxelSpan, type PlatformVoxel } from '../../data/games/mitwachsen-portals';
-import { GUEST_COLORS, GUEST_OUTLINE, GUEST_PX, GUEST_Y } from './mitwachsen-guest-look';
+import { GUEST_OUTLINE, GUEST_PX, GUEST_Y, guestPixel } from './mitwachsen-guest-look';
 import { Geo, col, type Tile, type V3 } from './mitwachsen-geo';
 
 /** Teile, die mit verschiedenen Materialien gezeichnet werden */
@@ -32,20 +32,21 @@ const WALL: Record<GateTheme, { tile: Tile; tint: string; top?: Tile }> = {
   pilze: { tile: 'cloud', tint: '#efe4d2' },
 };
 
-const W = 2.5; // halbe Torbreite
+export const W = 2.5; // halbe Torbreite
 const TOWER_W = 2; // Turmbreite
 const TOWER_H = 6.6;
 const ARCH_Y = 4.7; // Unterkante des Torbogens
 const DEPTH = 2.5; // so weit reicht das Torhaus nach hinten
 const HINGE_Z = -0.75; // die Türflügel drehen sich um ihre hintere Kante nach innen (weg von der Lichtung)
 const GAP = 0.2; // geöffnet: Spalt zwischen Flügel und Rahmen, damit sie beim Drehen nirgends anstoßen
+const ICE_GLOW = '#7fd6ff'; // eisblau leuchtende Eiszapfen, wenn das Eistor aufgeht
 const SEAM = 0.06; // Umriss: so weit bleibt er von der Mitte der Tür weg (dort treffen sich die Flügel)
 
 /** Ein Türflügel: eigene Teile, die um ihre Angel (x, z) um `angle` gedreht stehen (um die senkrechte Achse, Bogenmaß) */
 export type Wing = { parts: Parts; hinge: readonly [number, number]; angle: number };
 
 /** Quader mit Ecke (x0, y0, z0) und Gegenecke (x1, y1, z1) – im Torhaus leichter zu lesen als Ecke und Größe */
-function block(
+export function block(
   g: Geo,
   x0: number,
   y0: number,
@@ -64,10 +65,12 @@ function block(
 /**
  * Ein mächtiges Torhaus: zwei Türme, Torbogen, Doppeltür mit leuchtendem Zeichen, Schmuck der Welt. `open` sagt, wie
  * weit die Tür offen ist (0 zu … 1 ganz offen, die Flügel stehen dann quer im Gang); `outline` zeigt statt des Zeichens
- * den Umriss des verlaufenen Pinguins mit Goldrahmen (solange er die Figur zum Tor führt). Liefert die zwei Türflügel,
- * die die 3D-Ansicht an ihre Angel stellt und dreht; bei `open` 0 sieht alles aus wie die geschlossene Tür.
+ * den Umriss des verlaufenen Pinguins mit Goldrahmen (solange er die Figur zum Tor führt). Geht das Tor mit ihm auf,
+ * leuchten bis `lit` (0 … 1) die Eiszapfen nacheinander eisblau, und der Umriss füllt sich mit seinen Farben. Liefert
+ * die zwei Türflügel, die die 3D-Ansicht an ihre Angel stellt und dreht; bei `open` 0 sieht alles aus wie die
+ * geschlossene Tür.
  */
-export function gatehouse(p: Parts, theme: GateTheme, open = 0, outline = false): Wing[] {
+export function gatehouse(p: Parts, theme: GateTheme, open = 0, outline = false, lit = 0): Wing[] {
   const wall = WALL[theme];
   const glow = THEME_COLORS[theme].portal;
   const wallBlock = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) =>
@@ -131,8 +134,8 @@ export function gatehouse(p: Parts, theme: GateTheme, open = 0, outline = false)
     block(p.solid, -W - 0.2, ARCH_Y, -DEPTH + 0.4, W + 0.2, ARCH_Y + 0.9, 0.35, '#efe4d2', '#f7efe2', 'cloud');
   else wallBlock(-W, ARCH_Y, -DEPTH + 0.2, W, ARCH_Y + 1.2, 0.55);
 
-  const wings = door(glow, open, outline);
-  decorate(p, theme);
+  const wings = door(glow, open, outline, lit);
+  decorate(p, theme, lit);
   return wings;
 }
 
@@ -157,7 +160,7 @@ function onLeaf(
  * Bänder und Zeichen über beide Flügel (sie gehören zum linken, so bleibt die Tür, wie sie war); offen hat jeder Flügel
  * seine eigenen Bänder und Abstand zum Rahmen, ein Zeichen gibt es dann nicht mehr. Der Umriss sitzt vorn auf beiden.
  */
-function door(glow: string, open: number, outline: boolean): Wing[] {
+function door(glow: string, open: number, outline: boolean, lit: number): Wing[] {
   const wood = '#6b4423',
     woodTop = '#7d5232',
     iron = '#3a3a44';
@@ -188,20 +191,21 @@ function door(glow: string, open: number, outline: boolean): Wing[] {
       const [z0, z1] = z > -0.5 ? [z + 0.05, z + 0.09] : [z - 0.04, z];
       onLeaf(left, 'bright', [-0.3, 2.25, z0, 0.3, 2.85, z1], '#ffffff');
     }
-  if (outline) penguinOutline(left, right);
+  if (outline) penguinOutline(left, right, lit);
   return leaves.map(({ parts, hinge, angle }) => ({ parts, hinge, angle }));
 }
 
 /**
  * Umriss des verlaufenen Pinguins mit Goldrahmen auf der Tür, vorn und hinten wie das Zeichen (Pixel aus
  * `GUEST_OUTLINE`, je eine Lage auf dem Holz): Jedes Pixel gehört zum Flügel, auf dessen Seite es liegt, und hält
- * Abstand zur Mitte (`SEAM`). Gold ersetzt die Pixel darunter, es liegt nichts übereinander.
+ * Abstand zur Mitte (`SEAM`). Gold ersetzt die Pixel darunter, es liegt nichts übereinander. Bis `lit` füllt er sich
+ * von unten mit den Farben des Pinguins (`guestPixel`).
  */
-function penguinOutline(left: Leaf, right: Leaf) {
+function penguinOutline(left: Leaf, right: Leaf, lit: number) {
   const rows = GUEST_OUTLINE.length;
   GUEST_OUTLINE.forEach((row, r) => {
-    [...row].forEach((ch, c) => {
-      const color = GUEST_COLORS[ch as keyof typeof GUEST_COLORS];
+    [...row].forEach((_, c) => {
+      const color = guestPixel(r, c, lit);
       if (!color) return;
       const [x0, x1] = [(c - row.length / 2) * GUEST_PX, (c + 1 - row.length / 2) * GUEST_PX];
       const y = GUEST_Y + (rows - 1 - r) * GUEST_PX;
@@ -215,39 +219,11 @@ function penguinOutline(left: Leaf, right: Leaf) {
   });
 }
 
-/**
- * Goldene Bucht vor dem Tor, solange der verlaufene Pinguin die Figur dorthin führt: ein schmaler Goldrand um die drei
- * Reihen vor der Tür, so breit wie das Tor, vorn vor dem Sockel der Türme. Er liegt je Feld knapp über dessen Boden:
- * `rise(u, t)` ist die Höhe des Felds u (−2 … 2 entlang des Tors) in Reihe t (1 … 3) gegenüber der Tormitte. Felder
- * gleicher Höhe teilen sich ein Stück Rand, an einer Stufe setzt er ab.
- */
-export function goldenBay(p: Parts, rise: (u: number, t: number) => number = () => 0) {
-  const [w, depth] = [0.12, 3];
-  const strip = (x0: number, x1: number, z0: number, z1: number, y: number) =>
-    block(p.bright, x0, y + 0.02, z0, x1, y + 0.07, z1, GOLD.side, GOLD.top);
-  /** Felder `from` … `to` als Stücke gleicher Höhe: [erstes, letztes, Höhe] */
-  const runs = (from: number, to: number, h: (i: number) => number) => {
-    const out: [number, number, number][] = [];
-    for (let i = from; i <= to; i++) {
-      const last = out[out.length - 1];
-      if (last && last[2] === h(i)) last[1] = i;
-      else out.push([i, i, h(i)]);
-    }
-    return out;
-  };
-  const front = (t: number) => (t === 1 ? 0.85 : t - 0.5); // vordere Kante der Reihe t
-  for (const [a, b, y] of runs(-2, 2, (u) => rise(u, 1))) strip(a - 0.5, b + 0.5, 0.85, 0.85 + w, y);
-  for (const [a, b, y] of runs(-2, 2, (u) => rise(u, depth))) strip(a - 0.5, b + 0.5, depth + 0.5 - w, depth + 0.5, y);
-  for (const [u, x0] of [
-    [-2, -W],
-    [2, W - w],
-  ] as const)
-    for (const [a, b, y] of runs(1, depth, (t) => rise(u, t)))
-      strip(x0, x0 + w, a === 1 ? front(1) + w : front(a), b === depth ? depth + 0.5 - w : b + 0.5, y);
-}
+/** Farbe eines Eiszapfens am Bogen bei `x`: Geht das Eistor auf, leuchten sie bis `lit` von links nach rechts eisblau */
+const icicle = (x: number, lit: number) => ((x + W) / (2 * W) < lit ? ICE_GLOW : '#d4f1ff');
 
-/** Schmuck je Welt: Krone der Türme, Dinge am Torbogen */
-function decorate(p: Parts, theme: GateTheme) {
+/** Schmuck je Welt: Krone der Türme, Dinge am Torbogen (am Eistor leuchten bis `lit` die Eiszapfen eisblau) */
+function decorate(p: Parts, theme: GateTheme, lit: number) {
   const towerMid = [-W - TOWER_W / 2, W + TOWER_W / 2];
   switch (theme) {
     case 'eis':
@@ -272,7 +248,7 @@ function decorate(p: Parts, theme: GateTheme) {
       }
       for (let x = -W + 0.3; x < W; x += 0.55)
         // Eiszapfen am Bogen
-        block(p.bright, x, ARCH_Y - 0.25 - (((x * 7) % 3) + 3) * 0.08, 0.35, x + 0.14, ARCH_Y, 0.5, '#d4f1ff');
+        block(p.bright, x, ARCH_Y - 0.25 - (((x * 7) % 3) + 3) * 0.08, 0.35, x + 0.14, ARCH_Y, 0.5, icicle(x, lit));
       break;
     case 'sand':
       for (const cx of towerMid) {
