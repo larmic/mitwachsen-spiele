@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { REGIONS, SPECIES, WILD_SPECIES, speciesOf } from './mitwachsen';
 import { ICE_SPECIES } from './mitwachsen-eis';
-import { ICE_ANIMALS } from './worlds/eis/mitwachsen-kessel';
+import { ICE_ANIMALS, KESSEL } from './worlds/eis/mitwachsen-kessel';
 import { ICE_MODELS } from './worlds/eis/mitwachsen-ice-models';
 
 describe('Tiere der Eis-Welt', () => {
   const eis = REGIONS.find((r) => r.id === 'eis')!;
 
-  it('zehn Arten mit je drei Tieren wohnen in der Eis-Welt, keine davon in der Landschaft', () => {
+  it('zehn Arten mit je fünf Tieren wohnen in der Eis-Welt, keine davon in der Landschaft', () => {
     expect(eis.animals.map((a) => a.species)).toEqual(Object.keys(ICE_SPECIES));
     expect(eis.animals).toHaveLength(10);
-    expect(eis.herd).toBe(3);
+    expect(eis.herd).toBe(5);
     for (const id of Object.keys(ICE_SPECIES)) {
       expect(SPECIES[id as keyof typeof ICE_SPECIES]).toBe(ICE_SPECIES[id as keyof typeof ICE_SPECIES]);
       expect(
@@ -18,7 +18,7 @@ describe('Tiere der Eis-Welt', () => {
         id,
       ).toBe(false);
       expect(WILD_SPECIES, id).not.toContain(id);
-      expect(speciesOf(`eis:${id}:3`)).toBe(id);
+      expect(speciesOf(`eis:${id}:5`)).toBe(id);
     }
   });
 
@@ -32,14 +32,21 @@ describe('Tiere der Eis-Welt', () => {
       for (const a of r.animals) expect(a.at, `${r.id}:${a.species}`).toBeDefined();
   });
 
-  it('Wunschorte liegen im Kessel um die Schneewiese (relativ zum Schneebett), gut verteilt', () => {
+  it('Lieblingsorte über das ganze Tal (relativ zum Schneebett), jede Art an ihrem Thema', () => {
+    const { rx, ry } = KESSEL.shape;
+    // jede Art genau einmal, in der Reihenfolge der Leiste; jedes Thema hat mindestens ein Tier
+    expect(ICE_ANIMALS.map((a) => a.species)).toEqual(Object.keys(ICE_SPECIES));
+    expect(new Set(ICE_ANIMALS.map((a) => a.near))).toEqual(new Set(['lake', 'pines', 'blocks', 'fall', 'igloo']));
     for (const { species, at } of ICE_ANIMALS) {
-      const r = Math.hypot(...at);
-      expect(r, species).toBeGreaterThan(6); // nicht auf der Schneewiese
-      expect(r, species).toBeLessThan(15); // sicher im Kessel, wie auch immer er liegt
-      for (const o of ICE_ANIMALS)
-        if (o.species !== species) expect(Math.hypot(at[0] - o.at[0], at[1] - o.at[1])).toBeGreaterThanOrEqual(5);
+      // innerhalb des Tals: [quer, vom Tor weg] vom Bett, das `KESSEL.bed` hinter der Mündung liegt
+      const [u, v] = [at[0], at[1] - ry + KESSEL.bed];
+      expect((u / rx) ** 2 + (v / ry) ** 2, species).toBeLessThan(1);
     }
+    // über das Tal verteilt: vorn am Bett, in der Mitte und hinten am Eisfall
+    const outs = ICE_ANIMALS.map((a) => a.at[1]);
+    expect(Math.min(...outs)).toBeLessThan(10);
+    expect(Math.max(...outs)).toBeGreaterThan(110);
+    expect(outs.filter((o) => o > 40 && o < 90).length).toBeGreaterThanOrEqual(3);
   });
 
   it('jedes Modell (im Welt-Paket) hat Augen, die zur Kamera zeigen können (vorn und an beiden Seiten); der Lemming ist größer gezeichnet', () => {

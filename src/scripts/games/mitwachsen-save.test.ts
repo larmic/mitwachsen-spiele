@@ -20,6 +20,7 @@ import { packAt } from './mitwachsen-pack';
 import { initialState, progressOf, step } from './mitwachsen-state';
 import { beyondRing } from './mitwachsen-world';
 import { worldOf } from './test-worlds';
+import { REGIONS, animalId } from '../../data/games/mitwachsen';
 
 /** Speicher im Arbeitsspeicher wie localStorage */
 function memoryStore(): Store & { data: Map<string, string> } {
@@ -439,5 +440,44 @@ describe('Umzug ins Gletschertal (Version 5)', () => {
       expect([s.player.x, s.player.y], position.join()).toEqual([...world.homes.eis.bed]);
       expect(s.portals).toEqual(['eis', 'eiskessel']);
     }
+  });
+});
+
+describe('Fünf Eis-Tiere je Art (früher drei)', () => {
+  it('alter Stand mit allen 30 Eis-Tieren zu Hause lädt: Sie bleiben auf der Schneewiese, die neuen 20 laufen wild im Tal', () => {
+    const world = worldOf(2026);
+    const ice = (REGIONS.find((r) => r.id === 'eis')?.animals ?? []).map((a) => a.species);
+    expect(ice).toHaveLength(10);
+    // so, wie die Spielseite ihn mit drei Tieren je Art geschrieben hat: alle 30 gefunden und zu Hause
+    const homeAnimals = [1, 2, 3].flatMap((n) => ice.map((species) => ({ id: animalId('eis', species, n), species })));
+    const old = {
+      ...newWorld('fuenf', 2026, 'Bobos Welt'),
+      openGates: ['eis' as const],
+      metAnimals: homeAnimals.map((a) => a.id).sort(),
+      homeAnimals,
+      portals: ['eis' as const, 'eiskessel' as const],
+      position: [...world.homes.eis.bed] as [number, number],
+      visits: 20,
+      day: 14,
+    };
+    const store = memoryStore();
+    store.setItem(worldKey('fuenf'), JSON.stringify(old));
+    const w = loadWorld(store, 'fuenf')!;
+    expect(w).toEqual(old); // nichts umzuziehen: neue Tiere kommen von selbst dazu
+    const s = initialState(world, progressFrom(w), w.seed ^ w.visits);
+    const eis = s.animals.filter((a) => a.realm === 'eis');
+    expect(eis).toHaveLength(50);
+    const home = eis.filter((a) => a.mode === 'home');
+    expect(home.map((a) => a.id).sort()).toEqual(homeAnimals.map((a) => a.id).sort());
+    for (const a of home) expect(world.cell(a.x, a.y).garden, a.id).toBe(true);
+    const wild = eis.filter((a) => a.mode === 'wander');
+    expect(wild.map((a) => a.id).sort()).toEqual(
+      [4, 5].flatMap((n) => ice.map((species) => animalId('eis', species, n))).sort(),
+    );
+    const spots = new Set(world.spotsOf('eis').map(([x, y]) => `${x},${y}`));
+    for (const a of wild) expect(spots.has(`${a.x},${a.y}`), a.id).toBe(true); // im Tal, nicht auf der Wiese
+    // die Leiste zeigt weiter Arten: Jede Eis-Art ist gefunden
+    expect(new Set(progressOf(s).met.map((id) => id.split(':')[1])).size).toBe(10);
+    expect(withProgress(w, progressOf(s)).homeAnimals).toEqual(w.homeAnimals); // gespeichert wie zuvor
   });
 });

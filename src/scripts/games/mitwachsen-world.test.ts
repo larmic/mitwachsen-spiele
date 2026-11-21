@@ -5,9 +5,10 @@ import { GATES, REGIONS, type GateId } from '../../data/games/mitwachsen';
 import { HOMES } from '../../data/games/mitwachsen-homes';
 import { BED_STONE, ICE_STONE } from '../../data/games/mitwachsen-stories';
 import { PLATFORM_HALF, platformArea, platformCells, platformLift, withNeighbours } from './mitwachsen-portal';
-import { KESSEL, KESSEL_COLORS } from '../../data/games/worlds/eis/mitwachsen-kessel';
+import { ICE_ANIMALS, KESSEL, KESSEL_COLORS } from '../../data/games/worlds/eis/mitwachsen-kessel';
 import { KESSEL_WILDS } from './worlds/eis/mitwachsen-kessel';
 import { FROST } from './worlds/eis/mitwachsen-frost';
+import { HAUNTS } from './worlds/eis/mitwachsen-haunts';
 import { ICE_CRYSTALS } from '../../data/games/mitwachsen-eis';
 import { SEATS, crossings } from './mitwachsen-border';
 import {
@@ -932,21 +933,22 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
       expect(w.climate(...home.bed)).toEqual({ id: 'eis', strength: 1 }); // kühles Licht im Kessel
     });
 
-    it(`Seed ${seed}: 30 Eis-Tiere wohnen erreichbar im Kessel, drei je Art, keins auf der Lichtung und keins auf der Schneewiese`, () => {
+    it(`Seed ${seed}: 50 Eis-Tiere wohnen erreichbar im Tal, fünf je Art, keins auf der Lichtung, der Schneewiese oder einer Plattform`, () => {
       const ice = [...w.spawns].filter(([id]) => id.startsWith('eis:'));
-      expect(ice).toHaveLength(30);
+      expect(ice).toHaveLength(50);
       const spots = new Set(w.spotsOf('eis').map(([x, y]) => `${x},${y}`));
       const reach = new Set(fromSnowBed([]).map(([x, y]) => `${x},${y}`));
       const perSpecies = new Map<string, number>();
       for (const [id, [x, y]] of ice) {
         const species = id.split(':')[1]!;
         perSpecies.set(species, (perSpecies.get(species) ?? 0) + 1);
-        expect([w.realm(x, y), w.cell(x, y).region, w.cell(x, y).garden], id).toEqual(['eis', 'eis', undefined]);
+        const c = w.cell(x, y);
+        expect([w.realm(x, y), c.region, c.garden, c.portal], id).toEqual(['eis', 'eis', undefined, undefined]);
         expect(spots.has(`${x},${y}`) && reach.has(`${x},${y}`), id).toBe(true);
         expect(Math.max(Math.abs(x - home.bed[0]), Math.abs(y - home.bed[1])), id).toBeGreaterThanOrEqual(6);
       }
-      expect([...perSpecies.values()]).toEqual(Array(10).fill(3));
-      expect(new Set(ice.map(([, [x, y]]) => `${x},${y}`)).size).toBe(30); // jedes auf eigenem Platz
+      expect([...perSpecies.values()]).toEqual(Array(10).fill(5));
+      expect(new Set(ice.map(([, [x, y]]) => `${x},${y}`)).size).toBe(50); // jedes auf eigenem Platz
       // nicht in der Mündung: zwei Felder Abstand zum Gang (begehbar, aber nicht Boden des Kessels)
       const gangNear = ([x, y]: readonly [number, number]) =>
         [-2, -1, 0, 1, 2].some((dy) =>
@@ -956,6 +958,39 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
           }),
         );
       for (const [id, p] of ice) expect(gangNear(p), id).toBe(false);
+    });
+
+    it(`Seed ${seed}: Jede Eis-Art hat ihren Lieblingsort (Wohnort des ersten Tiers): näher an ihrem Thema als ein zufälliger Platz im Tal`, () => {
+      const spots = w.spotsOf('eis');
+      for (const { species, near } of ICE_ANIMALS) {
+        const theme = kessel.filter(([x, y]) => HAUNTS[near](w.cell(x, y)));
+        expect(theme.length, `${species}: ${near}`).toBeGreaterThan(0);
+        const dist = ([x, y]: readonly [number, number]) =>
+          Math.min(...theme.map(([tx, ty]) => Math.hypot(x - tx, y - ty)));
+        const chance = spots.reduce((sum, p) => sum + dist(p), 0) / spots.length; // ein zufälliger Platz im Mittel
+        const first = w.spawns.get(`eis:${species}`)!;
+        expect(dist(first), species).toBeLessThan(Math.min(4, chance / 2)); // gleich daneben
+      }
+      // Robbe, Walross und Papageitaucher an drei verschiedenen Seen: ihr nächstes Eisloch liegt je woanders
+      const water = kessel.filter(([x, y]) => HAUNTS.lake(w.cell(x, y)));
+      const hole = (species: string) => {
+        const [x, y] = w.spawns.get(`eis:${species}`)!;
+        return water.reduce((b, p) => (Math.hypot(p[0] - x, p[1] - y) < Math.hypot(b[0] - x, b[1] - y) ? p : b));
+      };
+      const holes = ['robbe', 'walross', 'papageitaucher'].map(hole);
+      for (const [i, a] of holes.entries())
+        for (const b of holes.slice(i + 1)) expect(Math.hypot(a[0] - b[0], a[1] - b[1])).toBeGreaterThan(15);
+      // der Papageitaucher am kleinen See gleich hinter dem Bett, Robbe und Walross an den großen weiter hinten
+      const bedTo = ([x, y]: readonly [number, number]) => Math.hypot(x - home.bed[0], y - home.bed[1]);
+      expect(bedTo(hole('papageitaucher'))).toBeLessThan(15);
+      expect(Math.min(bedTo(hole('robbe')), bedTo(hole('walross')))).toBeGreaterThan(30);
+      // über das Tal verteilt: vom Iglu am Bett bis an den Eisfall am Talende
+      const fromBed = ICE_ANIMALS.map(({ species }) => {
+        const [x, y] = w.spawns.get(`eis:${species}`)!;
+        return Math.hypot(x - home.bed[0], y - home.bed[1]);
+      });
+      expect(Math.min(...fromBed)).toBeLessThan(12);
+      expect(Math.max(...fromBed)).toBeGreaterThan(80);
     });
 
     it(`Seed ${seed}: Weltgrenze: erstes Feld je Seite; Warteplätze erreichbar, außerhalb der Durchgänge, nicht im Gang`, () => {

@@ -5,15 +5,16 @@
 // Eisschale, Wassertrog aus Eis, Iglu und Klangstein, daneben ein kleiner zugefrorener See und der Moosfleck; zwei große
 // Seen weiter hinten, in jedem See ein Eisloch mit Schollen; sechs Fischkisten über das Tal verteilt; die Plattform des
 // Eis-Portals ganz hinten am Talende (der Heimweg) vor dem Eisfall, ihr Gegenstück im Kreis um das Bett; vom Tor bis ans
-// Bett die Rutschspur. Lagen darin rechnen vom Schneebett aus. Ringsum Winterlandschaft wie draußen in der Eis-Welt
-// (`eisCell`): Hügel in drei Stufen, Tannenhaine, Eisblöcke, dazu Eiskristalle und Schneewehen (mitwachsen-frost.ts).
+// Bett die Rutschspur; je Art fünf Eis-Tiere, das erste an seinem Lieblingsort (mitwachsen-haunts.ts). Lagen darin
+// rechnen vom Schneebett aus. Ringsum Winterlandschaft wie draußen in der Eis-Welt (`eisCell`): Hügel in drei Stufen,
+// Tannenhaine, Eisblöcke, dazu Eiskristalle und Schneewehen (mitwachsen-frost.ts).
 // Teil des Welt-Pakets der Eis-Welt (index.ts), nachgeladen.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Welt-Pakete“ und „Gletscherkessel“)
 
 import { fromKey } from '../../../../lib/games/chunks';
 import { hash, rand01, valueNoise } from '../../../../lib/games/rng';
-import { REGIONS, type Point } from '../../../../data/games/mitwachsen';
-import { ICE_ANIMALS, KESSEL, KESSEL_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
+import type { Point } from '../../../../data/games/mitwachsen';
+import { KESSEL, KESSEL_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
 import { HOMES } from '../../../../data/games/mitwachsen-homes';
 import { ICE_PORTAL } from '../../../../data/games/mitwachsen-portals';
 import { ICE_STONE } from '../../../../data/games/mitwachsen-stories';
@@ -24,9 +25,9 @@ import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from '../../mitw
 import { findSpawns } from '../../mitwachsen-spawns';
 import { OBSTACLE_GAP, eisCell } from '../../mitwachsen-world';
 import { frost, type Wild } from './mitwachsen-frost';
+import { haunts } from './mitwachsen-haunts';
 
 const key = (x: number, y: number) => `${x},${y}`;
-const EIS = REGIONS.find((r) => r.id === 'eis')!; // die Eis-Welt steht fest in REGIONS
 const { rx, ry } = KESSEL.shape;
 const OUTER = { rx: rx + KESSEL.cliff, ry: ry + KESSEL.cliff }; // fester Außenrand der Klippen
 /** Reihe des Schneebetts, gemessen von der Mitte des Tals: `KESSEL.bed` Felder hinter dem inneren Rand an der Mündung */
@@ -134,7 +135,8 @@ export function buildKessel(
     for (let u = -gang.half - gang.wall; u <= gang.half + gang.wall; u++) realm.add(key(...gang.at(u, t)));
   const stone: Point = [place.bed[0] + ICE_STONE[0], place.bed[1] + ICE_STONE[1]];
   const spots = spotsOf(place, map);
-  const spawns = findSpawns(seed, { ...EIS, animals: ICE_ANIMALS }, spots, place.bed); // Wunschorte nur hier
+  const eis = haunts(place.cells, map, (p) => gang.at(...uv(centre, p)), place.bed); // Lieblingsorte nur hier
+  const spawns = findSpawns(seed, eis, spots, place.bed);
   return { bed: place.bed, realm, spots, spawns, stone, portal: [ICE_PORTAL, portal] };
 }
 

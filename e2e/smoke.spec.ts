@@ -217,7 +217,7 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
     el.state = { ...el.state, animals };
     return { ids: first, count: ice.length, at: first.map((_, i) => [bx - 5 + i, by - 2] as const) };
   });
-  expect(shown.count).toBe(29); // das Tor ist nur im Test offen: Der verlaufene Pinguin wohnt noch nicht im Kessel
+  expect(shown.count).toBe(49); // das Tor ist nur im Test offen: Der verlaufene Pinguin wohnt noch nicht im Kessel
   expect(shown.ids).toHaveLength(10);
   await frames(30);
   expect(
@@ -691,7 +691,7 @@ test.describe('Welt-Paket nur bei Bedarf', () => {
       el.state = { ...el.state, player: { x: mid[0] - out[0] * 12, y: mid[1] - out[1] * 12, dir: 'n' } };
       el.apply({ type: 'tick' });
     });
-    await expect.poll(ice).toEqual({ pack: true, kessel: true, portal: true, animals: 29 }); // der Pinguin ist verlaufen
+    await expect.poll(ice).toEqual({ pack: true, kessel: true, portal: true, animals: 49 }); // der Pinguin ist verlaufen
     expect(fetched).toHaveLength(1);
     await waitFrames(page, 30);
     // Spielstand mit offenem Eistor: Das Paket kommt gleich beim Start, die Welt entsteht mit ihm
@@ -704,7 +704,7 @@ test.describe('Welt-Paket nur bei Bedarf', () => {
     await page.reload();
     await expect(game).toHaveClass(/ready/);
     expect(fetched).toHaveLength(1);
-    expect(await ice()).toEqual({ pack: true, kessel: true, portal: true, animals: 30 });
+    expect(await ice()).toEqual({ pack: true, kessel: true, portal: true, animals: 50 });
     await waitFrames(page, 30);
     expect(errors).toEqual([]);
   });

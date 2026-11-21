@@ -1,5 +1,5 @@
 // Gletscherkessel (Gletschertal) der Eis-Welt: Maße, Lage von Seen und Eislöchern, Fischkisten, Moosfleck, Eisfall und
-// Eis-Portal, Wohnorte der zehn
+// Eis-Portal, Lieblingsorte der zehn
 // Eis-Tiere. Nur das Welt-Paket der Eis-Welt (src/scripts/games/worlds/eis/) liest diese Daten; es wird nachgeladen.
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md (Abschnitte „Welt-Pakete“ und Gletscherkessel)
 
@@ -71,18 +71,27 @@ export const KESSEL_COLORS = {
 } as const;
 
 /**
- * Wohnorte der Eis-Tiere, relativ zum Schneebett: im Kreis (Radius 11) um die Schneewiese, gut verteilt. Die Welt sucht
- * das nächste erreichbare Feld im Tal (wie der Kessel gedreht ist, würfelt der Seed mit dem Eistor).
+ * Lieblingsorte der Eis-Tiere: Seen (glattes Eis und Eislöcher), Tannen, Eisblöcke, der Eisfall am Talende, das Iglu
  */
-export const ICE_ANIMALS: readonly { species: IceSpeciesId; at: readonly [number, number] }[] = [
-  { species: 'pinguin', at: [3, 10] },
-  { species: 'eisbaer', at: [-9, -6] },
-  { species: 'robbe', at: [11, 0] },
-  { species: 'schneeeule', at: [-3, -10] },
-  { species: 'walross', at: [9, 6] },
-  { species: 'rentier', at: [-11, 0] },
-  { species: 'polarfuchs', at: [9, -6] },
-  { species: 'moschusochse', at: [-9, 6] },
-  { species: 'papageitaucher', at: [3, -10] },
-  { species: 'lemming', at: [-3, 10] },
+export type IceHaunt = 'lake' | 'pines' | 'blocks' | 'fall' | 'igloo';
+
+/**
+ * Lieblingsorte der Eis-Tiere über das ganze Tal, in der Reihenfolge der Leiste: `at` [quer, vom Tor weg] vom
+ * Schneebett aus sagt, wo im Tal; dort sucht die Welt das nächste Feld mit dem Thema `near` (Tannen und Eisblöcke
+ * würfelt der Seed) und darum das nächste erreichbare Feld. Das erste Tier jeder Art wohnt dort, die anderen vier
+ * verteilt der Seed über das Tal. Robben und Walrosse an den beiden großen Seen, Rentiere und Moschusochsen bei den
+ * Tannen vorn und hinten, Polarfuchs und Lemming zwischen Eisblöcken, der Eisbär hinten am Eisfall, der Pinguin nahe
+ * dem Iglu, die Schneeeule in den Tannen hinten, der Papageitaucher am kleinen See neben dem Bett.
+ */
+export const ICE_ANIMALS: readonly { species: IceSpeciesId; near: IceHaunt; at: readonly [number, number] }[] = [
+  { species: 'pinguin', near: 'igloo', at: [0, 0] },
+  { species: 'eisbaer', near: 'fall', at: [-9, 124] },
+  { species: 'robbe', near: 'lake', at: [16, 40] },
+  { species: 'schneeeule', near: 'pines', at: [-22, 100] },
+  { species: 'walross', near: 'lake', at: [-16, 76] },
+  { species: 'rentier', near: 'pines', at: [-26, 18] },
+  { species: 'polarfuchs', near: 'blocks', at: [20, 62] },
+  { species: 'moschusochse', near: 'pines', at: [26, 92] },
+  { species: 'papageitaucher', near: 'lake', at: [13, 9] },
+  { species: 'lemming', near: 'blocks', at: [-18, 50] },
 ];

@@ -7,11 +7,11 @@ import { regionAnimalList, type Point, type Region, type RegionId } from '../../
 
 /**
  * Abstände der weiteren Tiere zueinander, von groß nach klein (ist kein Platz mehr frei, rücken sie enger), und wie weit
- * sie mindestens vom Bett wohnen (in Feldern, nach Chebyshev). Der Gletscherkessel ist viel kleiner als die Lichtung.
+ * sie mindestens vom Bett wohnen (in Feldern, nach Chebyshev). Das Gletschertal ist fast so groß wie die Lichtung.
  */
 const SPREAD: Record<RegionId, { gaps: readonly number[]; bed: number; salt: number }> = {
   lichtung: { gaps: [9, 5, 1], bed: 6, salt: 77 },
-  eis: { gaps: [5, 3, 1], bed: 6, salt: 78 },
+  eis: { gaps: [9, 5, 1], bed: 6, salt: 78 },
 };
 
 /**

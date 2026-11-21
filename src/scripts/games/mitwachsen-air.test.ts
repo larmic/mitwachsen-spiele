@@ -57,7 +57,7 @@ describe('Haltungen beim Pustewind', () => {
     }
     // Pinguine rücken zur Mitte ihrer Gruppe
     const penguins = ice.filter((a) => a.species === 'pinguin');
-    const mx = penguins.reduce((n, a) => n + a.x, 0) / 3;
+    const mx = penguins.reduce((n, a) => n + a.x, 0) / penguins.length;
     for (const a of penguins) expect(Math.sign(poses.get(a.id)!.dx)).toBe(Math.sign(mx - a.x));
     for (const a of s.animals.filter((a) => a.realm === 'lichtung')) expect(poses.has(a.id)).toBe(false);
   });

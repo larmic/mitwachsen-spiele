@@ -100,7 +100,7 @@ describe('Der Pinguin holt dich ab: Auftauchen', () => {
     expect(lost(GUIDE, ['eis'])).toBe(false);
     expect(lost(animalId('eis', 'pinguin', 2), [])).toBe(false); // nur der eine verlaufene
     expect(initialState(world).animals.some((a) => a.id === GUIDE)).toBe(false);
-    expect(initialState(world).animals.filter((a) => a.realm === 'eis')).toHaveLength(29);
+    expect(initialState(world).animals.filter((a) => a.realm === 'eis')).toHaveLength(49);
     const open = initialState(world, { openGates: ['eis'] });
     expect(open.animals.find((a) => a.id === GUIDE)!.mode).toBe('wander'); // Tor offen: Er wohnt im Kessel
   });

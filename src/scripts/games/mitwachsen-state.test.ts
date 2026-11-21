@@ -15,7 +15,7 @@ import {
   type GameEvent,
   type State,
 } from './mitwachsen-state';
-import { windOk } from './mitwachsen-meadow';
+import { meadowSpots, windOk } from './mitwachsen-meadow';
 import { SCATTER } from './mitwachsen-scatter';
 import { beyondRing, canStep, createWorld, kesselPlace, standHeight, type Cell, type World } from './mitwachsen-world';
 import { startRealm, type Homestead } from './mitwachsen-home';
@@ -25,6 +25,8 @@ import { SEATS, crossings } from './mitwachsen-border';
 import { dirTo, freeNear } from './mitwachsen-free';
 import { heardStone } from './mitwachsen-story';
 import { EIS_PACK, PACKS, worldOf } from './test-worlds';
+import { ICE_ANIMALS } from '../../data/games/worlds/eis/mitwachsen-kessel';
+import { HAUNTS } from './worlds/eis/mitwachsen-haunts';
 import { migrate, newWorld, progressFrom, withProgress, type SavedWorld } from './mitwachsen-save';
 
 /** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich; Zuhause der Eis-Welt (im Kessel von Seed 1) */
@@ -401,17 +403,20 @@ describe('Tiere an wechselnden Stellen', () => {
     }
   });
 
-  it('wechselnde Plätze je Welt: Eis-Tiere im Kessel, 6 Felder vom Schneebett und 4 voneinander', () => {
+  it('wechselnde Plätze je Welt: Eis-Tiere im Tal, 8 Felder vom Schneebett (außer am Lieblingsort) und 5 voneinander wie auf der Lichtung', () => {
     const [bx, by] = world.homes.eis.bed;
     const spots = new Set(world.spotsOf('eis').map(([x, y]) => `${x},${y}`));
     const open = { openGates: ['eis' as const] }; // bei offenem Eistor (sonst fehlt der verlaufene Pinguin)
     const before = where(initialState(world, open, 1)).filter((w) => w.startsWith('eis:'));
+    const firstIce = new Set(ICE_ANIMALS.map(({ species }) => animalId('eis', species)));
     for (const seed of [1, 2, 3]) {
       const ice = initialState(world, open, seed).animals.filter((a) => a.realm === 'eis');
-      expect(ice).toHaveLength(30); // zehn Arten, je drei
+      expect(ice).toHaveLength(50); // zehn Arten, je fünf
       for (const a of ice) {
         expect(spots.has(`${a.x},${a.y}`), a.id).toBe(true);
-        expect(Math.max(Math.abs(a.x - bx), Math.abs(a.y - by)), a.id).toBeGreaterThanOrEqual(SCATTER.eis.bed);
+        if (!firstIce.has(a.id))
+          // das erste Tier jeder Art bleibt an seinem Lieblingsort, der Pinguin auch am Iglu
+          expect(Math.max(Math.abs(a.x - bx), Math.abs(a.y - by)), a.id).toBeGreaterThanOrEqual(SCATTER.eis.bed);
         for (const o of ice)
           if (o !== a)
             expect(Math.max(Math.abs(a.x - o.x), Math.abs(a.y - o.y))).toBeGreaterThanOrEqual(SCATTER.eis.apart);
@@ -419,6 +424,49 @@ describe('Tiere an wechselnden Stellen', () => {
       if (seed > 1) expect(ice.map((a) => `${a.id}@${a.x},${a.y}`).sort()).not.toEqual(before);
     }
     expect(SCATTER.lichtung).toEqual({ bed: 8, apart: 5 }); // auf der großen Lichtung wie bisher
+    expect({ ...SCATTER.eis, haunt: undefined }).toEqual(SCATTER.lichtung); // das Gletschertal ist fast so weit
+  });
+
+  /** Steht jedes erste Eis-Tier an seinem Lieblingsort: nah an seinem Wohnort und an einem Feld seines Themas? */
+  const atHaunts = (s: State, w: World) => {
+    const radius = SCATTER.eis.haunt!;
+    for (const { species, near } of ICE_ANIMALS) {
+      const id = animalId('eis', species);
+      const a = s.animals.find((x) => x.id === id);
+      expect(a, id).toBeDefined();
+      const home = w.spawns.get(id)!;
+      expect(Math.max(Math.abs(a!.x - home[0]), Math.abs(a!.y - home[1])), id).toBeLessThanOrEqual(radius);
+      expect(a!.spawn, id).toEqual([a!.x, a!.y]); // dorthin kehrt es zurück
+      const r = radius + 2; // der Wohnort liegt gleich neben dem Thema (world.test.ts)
+      let theme = false;
+      for (let dy = -r; dy <= r && !theme; dy++)
+        for (let dx = -r; dx <= r && !theme; dx++) theme = HAUNTS[near](w.cell(a!.x + dx, a!.y + dy));
+      expect(theme, `${id}: ${near}`).toBe(true);
+    }
+  };
+
+  it('das erste Tier jeder Eis-Art steht an seinem Lieblingsort: beim Öffnen, an jedem neuen Morgen, beim Einziehen', () => {
+    const open = { openGates: ['eis' as const] };
+    for (const seed of [1, 2]) {
+      const w = worldOf(seed);
+      for (const rng of [1, 2, 3]) atHaunts(initialState(w, open, rng), w);
+    }
+    // neuer Morgen im Schneebett: wieder an den Lieblingsorten, aber nicht auf demselben Feld wie gestern
+    const [bx, by] = world.homes.eis.bed;
+    let s = initialState(world, { ...open, position: [bx, by] }, 4);
+    s = run(s, world, 'e').s; // aufwachen
+    const before = where(s);
+    s = { ...s, player: { ...s.player, x: bx, y: by } };
+    s = run(s, world, ACT).s; // schlafen
+    for (let i = 0; i < SLEEP_LOCK; i++) s = run(s, world, TICK).s;
+    s = run(s, world, 'e').s; // neuer Morgen
+    expect(s.sleeping).toBe(false);
+    expect(where(s)).not.toEqual(before);
+    atHaunts(s, world);
+    // das Welt-Paket kommt mitten im Spiel an
+    const bare = createWorld(3, []);
+    const { world: full } = bare.attach(PACKS[0]);
+    atHaunts(attachPack(initialState(bare, open, 5), full), full);
   });
 
   it('an einem neuen Morgen sind die verlorenen Tiere woanders unterwegs, Tiere der Wiese bleiben', () => {
@@ -490,20 +538,28 @@ describe('Iglu bei Pustewind (Eis-Welt)', () => {
   it('weht der Pustewind, gehen die Tiere der Schneewiese ins Iglu, vorn zuerst, die übrigen dicht an die windgeschützte Seite; danach zurück', () => {
     let s = ticks(start(block(true, false)), 600);
     const ice = resting(s, 'eis');
-    expect(ice).toHaveLength(30);
+    expect(ice).toHaveLength(50);
     const inside = ice.filter(inIgloo);
     expect(inside).toHaveLength((igloo.x1 - igloo.x0 + 1) * (igloo.y1 - igloo.y0 + 1)); // das Iglu ist voll
-    for (const a of ice.filter((a) => !inIgloo(a))) {
-      expect(a.x, a.id).toBeGreaterThanOrEqual(igloo.x1); // rechts daneben: windgeschützt
-      expect(Math.hypot(a.x - lee[0], a.y - lee[1]), a.id).toBeLessThanOrEqual(3);
-    }
-    // Pinguine kuscheln vorn in der Mitte, die drei Moschusochsen stehen dicht beieinander
+    // Wer nicht hineinpasst, steht dicht an der windgeschützten Seite: auf den Feldern der Wiese, die ihr am nächsten
+    // liegen (bei fünf Tieren je Art sind das viele, darum etwas weiter als drei Felder)
+    const outside = ice.filter((a) => !inIgloo(a));
+    const toLee = ([x, y]: readonly [number, number]) => Math.hypot(x - lee[0], y - lee[1]);
+    const free = meadowSpots(world, 'eis').filter(([x, y]) => !world.cell(x, y).roof);
+    const reach = free.map(toLee).sort((a, b) => a - b)[outside.length - 1]!;
+    expect(reach).toBeLessThanOrEqual(6);
+    for (const a of outside) expect(toLee([a.x, a.y]), a.id).toBeLessThanOrEqual(reach + 0.5);
+    const leeward = outside.filter((a) => a.x >= igloo.x1); // rechts daneben: windgeschützt
+    expect(leeward.length).toBeGreaterThanOrEqual((outside.length * 2) / 3);
+    // Pinguine kuscheln vorn in der Mitte (fünf nebeneinander), die fünf Moschusochsen stehen dicht beieinander
     const of = (species: string) => ice.filter((a) => a.species === species);
     for (const p of of('pinguin')) expect([inIgloo(p), p.y], p.id).toEqual([true, igloo.y1]);
     for (const group of [of('pinguin'), of('moschusochse')]) {
-      expect(group).toHaveLength(3);
-      for (const a of group)
-        for (const b of group) expect(Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)), a.id).toBeLessThanOrEqual(2);
+      expect(group).toHaveLength(5);
+      const xs = group.map((a) => a.x),
+        ys = group.map((a) => a.y);
+      expect(Math.max(...xs) - Math.min(...xs), group[0]!.species).toBeLessThanOrEqual(4);
+      expect(Math.max(...ys) - Math.min(...ys), group[0]!.species).toBeLessThanOrEqual(2);
     }
     // Hört der Wind auf, gehen alle zurück an ihre Plätze auf der Schneewiese
     s = ticks({ ...s, tick: block(false, false) * BLOCK }, 900);
@@ -526,7 +582,7 @@ describe('Iglu bei Pustewind (Eis-Welt)', () => {
   it('bevor der Pinguin zu Hause ist, weht kein Pustewind: Die Tiere der Schneewiese bleiben draußen', () => {
     const s = ticks(start(block(true, false), everyone(false)), 400);
     const ice = resting(s, 'eis');
-    expect(ice).toHaveLength(29);
+    expect(ice).toHaveLength(49);
     for (const a of ice) expect(nearSpawn(a), a.id).toBe(true);
   });
 
@@ -1090,9 +1146,9 @@ describe('Zuhause je Gegend', () => {
     // Die Eis-Tiere stehen verteilt im Kessel wie beim Öffnen (eigener Zufall aus Seed und Tag, gleich bei gleichem
     // Stand); der verlaufene Pinguin nicht (Tor zu, er ist der Schlüssel)
     const ice = after.animals.filter((a) => a.id.startsWith('eis:'));
-    expect(ice).toHaveLength(29);
+    expect(ice).toHaveLength(49);
     const moved = ice.filter((a) => a.x !== world.spawns.get(a.id)![0] || a.y !== world.spawns.get(a.id)![1]);
-    expect(moved.length).toBeGreaterThan(20);
+    expect(moved.length).toBeGreaterThan(35);
     for (const a of ice) {
       expect(world.realm(a.x, a.y), a.id).toBe('eis');
       expect([a.x, a.y], a.id).toEqual([...a.spawn]);
@@ -1104,7 +1160,7 @@ describe('Zuhause je Gegend', () => {
     // Und es geht weiter wie in einer Welt, die gleich mit dem Paket entstand
     let t = after;
     for (let i = 0; i < 40; i++) t = step(t, world, i % 2 ? { type: 'tick' } : { type: 'move', dir: 'n' }).state;
-    expect(t.animals.filter((a) => a.id.startsWith('eis:'))).toHaveLength(29);
+    expect(t.animals.filter((a) => a.id.startsWith('eis:'))).toHaveLength(49);
   });
 
   it('nach dem Einbau mitten im Spiel speichern und neu laden: gleiches Format, gleicher Stand wie mit Paket gestartet', () => {
@@ -1126,7 +1182,7 @@ describe('Zuhause je Gegend', () => {
     const again = initialState(world, progressFrom(file), 7);
     expect({ ...progressOf(again), position: file.position }).toEqual(progressOf(s));
     expect([again.player.x, again.player.y]).toEqual([...world.homes.lichtung.bed]);
-    expect(again.animals.filter((a) => a.id.startsWith('eis:'))).toHaveLength(29);
+    expect(again.animals.filter((a) => a.id.startsWith('eis:'))).toHaveLength(49);
     // Gleich wie in einer Welt, die von Anfang an mit dem Paket gebaut wurde
     expect(initialState(worldOf(1), progressFrom(file), 7)).toEqual(again);
   });
@@ -1143,7 +1199,7 @@ describe('Zuhause je Gegend', () => {
     expect(t.held).toBeUndefined();
     expect([t.player.x, t.player.y]).toEqual([s.player.x, s.player.y]); // die Figur bleibt, wo sie ist (am Bett)
     expect(t.animals.find((a) => a.id === 'eis:robbe:2')).toMatchObject({ mode: 'home', realm: 'eis' });
-    expect(t.animals.filter((a) => a.realm === 'eis')).toHaveLength(30); // der Pinguin wohnt bei offenem Tor im Kessel
+    expect(t.animals.filter((a) => a.realm === 'eis')).toHaveLength(50); // der Pinguin wohnt bei offenem Tor im Kessel
     expect(progressOf(t).position).toEqual([t.player.x, t.player.y]);
   });
 
@@ -1151,7 +1207,7 @@ describe('Zuhause je Gegend', () => {
     const world = worldOf(4);
     const s = initialState(world, { garden: [{ id: 'wild:0:2:0', species: 'fuchs' }], openGates: ['eis'] });
     for (const a of s.animals) expect(a.realm, a.id).toBe(a.id.startsWith('eis:') ? 'eis' : 'lichtung');
-    expect(s.animals.filter((a) => a.realm === 'eis')).toHaveLength(30);
+    expect(s.animals.filter((a) => a.realm === 'eis')).toHaveLength(50);
     expect(s.animals.find((a) => a.id === 'wild:0:2:0')!.realm).toBe('lichtung');
   });
 
@@ -1298,7 +1354,7 @@ describe('Invarianten bei wildem Drücken', () => {
           const pick = r % 10;
           const cmd: Cmd = pick < 6 ? { type: 'move', dir: DIRS[(r >>> 8) % 4]! } : pick < 8 ? ACT : TICK;
           s = step(s, world, cmd).state;
-          if (i === 0) expect(s.animals.filter((a) => a.realm === 'eis')).toHaveLength(30);
+          if (i === 0) expect(s.animals.filter((a) => a.realm === 'eis')).toHaveLength(50);
           if (i === 0) expect(world.realm(s.player.x, s.player.y)).toBe('eis'); // aufgewacht am Schneebett
           // Eis-Tiere: frei umherlaufende bleiben im Kessel, zu Hause sind sie nur auf der Schneewiese
           for (const a of s.animals.filter((t) => t.realm === 'eis' && t.mode !== 'follow'))
