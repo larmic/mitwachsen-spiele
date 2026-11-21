@@ -94,7 +94,7 @@ export const wobble = (ms: number) =>
 const DITTY = [1046.5, 1174.66, 1318.51, 1567.98, 2093]; // C6 D6 E6 G6 C7 (Pentatonik wie die Tiere)
 
 /** Fröhliches Ploppen, je Kugel etwas höher; steht der Schneemann, dazu eine kleine Melodie */
-export function snowScore(e: PackEvent): Scored[] {
+export function snowScore(e: Extract<PackEvent, { type: 'snowman' }>): Scored[] {
   const out: Scored[] = [
     [240 + 80 * e.stage, 0.11, 'sine', 0.16, 2.4, 0],
     [480 + 160 * e.stage, 0.06, 'triangle', 0.04, 1, 0.05],

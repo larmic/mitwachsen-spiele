@@ -55,6 +55,7 @@ export type Deco =
   | 'floe' // Eisscholle auf einem Eisloch im Gletscherkessel (nur Bild; zeichnet nur das Welt-Paket, solange es lädt: Wasser)
   | 'fishcrate' // Fischkiste im Gletscherkessel: Hineinlaufen fängt Fische ins Netz (fest wie ein Busch)
   | 'snowheap' // Schneehaufen im Gletscherkessel: Hineinlaufen lässt eine Kugel wachsen, bis ein Schneemann steht (fest)
+  | 'icicle' // Eiszapfen des Glockenspiels am Klippenfuß im Gletschertal: Hinlaufen lässt ihn klingen (begehbar)
   | 'klangstein'; // Stein mit schwebender Note: Hineinlaufen spielt die Geschichte des Ortes
 export type TreeKind =
   'oak' | 'birch' | 'autumn' | 'red' | 'blossom' | 'winter' | 'pine' | 'snowpine' | 'palm' | 'dead';
@@ -78,5 +79,6 @@ export type Cell = {
   shade?: number; // Farbfleck im Boden: −1 dunkler … +1 heller (große, weiche Flecken)
   tint?: string; // Farbe, mit der Gras und Blätter auf der Lichtung getönt sind (Stimmung der Richtung)
   story?: StoryId; // Klangstein dieser Geschichte
+  note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz)
   slide?: true; // Rutschspur vom Eistor zum Schneebett (begehbar; glänzt, sobald das Tor offen ist)
 };

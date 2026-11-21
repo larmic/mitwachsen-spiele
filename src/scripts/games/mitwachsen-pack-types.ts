@@ -35,8 +35,12 @@ export type Kessel = {
   portal: [PortalId, Portal];
 };
 
-/** Ereignis aus den Regeln einer Welt (Eis-Welt: ein Schneehaufen wächst um eine Kugel, Stufe 1 bis 3) */
-export type PackEvent = { type: 'snowman'; x: number; y: number; stage: number };
+/**
+ * Ereignis aus den Regeln einer Welt (Eis-Welt: ein Schneehaufen wächst um eine Kugel, Stufe 1 bis 3; ein Eiszapfen
+ * des Glockenspiels klingt mit seiner Tonhöhe `note`, 0 tief)
+ */
+export type PackEvent =
+  { type: 'snowman'; x: number; y: number; stage: number } | { type: 'icicle'; x: number; y: number; note: number };
 
 /**
  * Was die Regeln einer Welt vom Zustand sehen und ändern dürfen: den gespeicherten Zustand der Welt-Pakete (`packs`, je
@@ -49,12 +53,20 @@ export type Ruled = {
 };
 
 /**
- * Regeln einer Welt aus ihrem Paket (Eis-Welt: Schneemänner bauen). `step` bekommt sie hereingereicht, sobald das Paket
- * da ist. `bump`: Die Figur läuft in das Feld (x, y) mit dem Inhalt `c`; true, wenn der Zug damit erledigt ist (sie
- * bleibt stehen, eine Begegnung), sonst geht es weiter wie immer.
+ * Regeln einer Welt aus ihrem Paket (Eis-Welt: Schneemänner bauen, Glockenspiel). `step` bekommt sie hereingereicht,
+ * sobald das Paket da ist. `bump`: Die Figur läuft in das Feld (x, y) mit dem Inhalt `c`; `move` sagt, auf welchem
+ * Feld sie steht (`here`) und ob der Schritt ginge (`walks`). true, wenn der Zug damit erledigt ist (sie bleibt stehen),
+ * sonst geht es weiter wie immer (auch nach einem Ereignis, etwa dem Ton eines Eiszapfens).
  */
 export type WorldRules = {
-  bump(s: Ruled, c: Cell, x: number, y: number, events: { push(e: PackEvent): unknown }): boolean;
+  bump(
+    s: Ruled,
+    c: Cell,
+    x: number,
+    y: number,
+    events: { push(e: PackEvent): unknown },
+    move: { here: Cell; walks: boolean },
+  ): boolean;
 };
 
 /** Liegt ein Feld ganz hinter dem Felsring der Lichtung? */

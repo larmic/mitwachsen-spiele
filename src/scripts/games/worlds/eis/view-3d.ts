@@ -3,7 +3,8 @@
 // Schnee und Eis als Boden und Klippen des Kessels, die glänzende Rutschspur bei offenem Eistor, das Bett aus Schnee,
 // Eiskristalle, die beim Polarlicht heller und grüntürkis leuchten (bei reduzierter Bewegung ruhig), Eisschollen auf den
 // Eislöchern, der Eisfall am Talende (Klippen aus gefrorenem Wasser), die Stufen des Eisbergs, Schneehaufen und
-// Schneemänner in ihrer Stufe (mitwachsen-snowman-look.ts, stehen still), die Fußspuren im Schnee
+// Schneemänner in ihrer Stufe (mitwachsen-snowman-look.ts, stehen still), die Eiszapfen des
+// Glockenspiels (mitwachsen-chime-look.ts, hängen still), die Fußspuren im Schnee
 // (view-3d-prints.ts) und am Eistor Tür, Eiszapfen und goldene Bucht (view-3d-gate.ts). Braucht Three.js (wie die
 // 3D-Ansicht, beide teilen es) und wird darum nicht mit dem Paket geladen, sondern erst, wenn die 3D-Ansicht es will (`pack.view3d`, index.ts):
 // im Build `_astro/welt-eis-3d.<hash>.js` mit eigener Grenze (scripts/verify-bundles.ts).
@@ -17,6 +18,7 @@ import { gateLook } from './view-3d-gate';
 import { layer } from './view-3d-prints';
 import { stageAt } from './mitwachsen-snowman';
 import { snowBoxes } from './mitwachsen-snowman-look';
+import { chimeBoxes } from './mitwachsen-chime-look';
 
 /** Im Gletscherkessel (Boden und Klippen): Schnee obenauf, darunter Eis */
 const KESSEL: Ground = { tiles: ['snowTop', 'ice', 'ice'] };
@@ -47,13 +49,16 @@ const crystal: DrawDeco = (_world, c, x, y) => (c.biome === 'eis' ? crystalBoxes
 /** Schneehaufen bzw. Schneemann in seiner Stufe; wächst er, baut die 3D-Ansicht sein Stück neu (in 3D wackelt nichts) */
 const heap: DrawDeco = (_world, c, x, y, { packs }) => snowBoxes(x, y, c.h, stageAt(packs, x, y));
 
+/** Eiszapfen des Glockenspiels: hängt still (in 3D schwingt nichts, es klingt nur und glitzert) */
+const icicle: DrawDeco = (world, c, x, y) => chimeBoxes(world, c, x, y);
+
 /** Eisscholle auf einem Eisloch, liegt still */
 const floe: DrawDeco = (_world, _c, x, y) => floeBoxes(x, y);
 
 export const view3d: View3D = {
   gate: 'eis',
   look: gateLook,
-  decos: { igloo: look, icebowl: look, watertrough: look, fishcrate: crate, crystal, floe, snowheap: heap },
+  decos: { igloo: look, icebowl: look, watertrough: look, fishcrate: crate, crystal, floe, snowheap: heap, icicle },
   ground(c, open) {
     if (c.biome !== 'eis' || c.region === 'wild') return null;
     if (c.slide && open.includes('eis')) return SLIDE;

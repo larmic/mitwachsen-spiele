@@ -35,7 +35,7 @@ export type ChoreEvent =
  */
 export const reshapes = (e: {
   type: string;
-}): e is Extract<ChoreEvent, { type: 'pick' | 'catch' | 'regrow' }> | PackEvent =>
+}): e is Extract<ChoreEvent | PackEvent, { type: 'pick' | 'catch' | 'regrow' | 'snowman' }> =>
   e.type === 'pick' || e.type === 'catch' || e.type === 'regrow' || e.type === 'snowman';
 
 /** Wohin die Ereignisse gehen (die Liste der Regeln, die auch andere Ereignisse enthält) */

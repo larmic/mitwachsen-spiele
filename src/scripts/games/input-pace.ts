@@ -32,7 +32,8 @@ export const FREE_KEYS = new Set([
  * geschöpft, Plattform erwacht, gereist, Klangstein, das Eistor geht auf (und jeder Hüpfer, solange es aufgeht), ein
  * Schneehaufen wächst um eine Kugel (Eis-Welt), ins Bett gegangen. Danach bleibt die Figur kurz stehen (`pause`, so
  * lange wie die Wartezeit am Anfang, damit man Herz und Noten sieht) und läuft mit gehaltenem Pfeil weiter. Nur aus dem
- * Bett muss der Pfeil neu gedrückt werden (`AGAIN`).
+ * Bett muss der Pfeil neu gedrückt werden (`AGAIN`). Kein Halt am Eiszapfen-Glockenspiel (`icicle`, Eis-Welt): Wer die
+ * Reihe entlangläuft, spielt eine Melodie im Takt der Schritte.
  */
 export const ENCOUNTERS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['type']>([
   'sing',

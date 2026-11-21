@@ -7,7 +7,8 @@
 // Fischkisten; die Plattform des Eis-Portals am Talende (der Heimweg) vor dem Eisfall, ihr Gegenstück im Kreis um das
 // Bett; vom Tor bis ans Bett die Rutschspur; je Art fünf Eis-Tiere, das erste an seinem Lieblingsort
 // (mitwachsen-haunts.ts). Lagen darin rechnen vom Schneebett aus. Ringsum Winterlandschaft wie draußen in der Eis-Welt
-// (`eisCell`): Hügel in drei Stufen, Tannenhaine, Eisblöcke, dazu Eiskristalle und Schneewehen (mitwachsen-frost.ts).
+// (`eisCell`): Hügel in drei Stufen, Tannenhaine, Eisblöcke, dazu Eiskristalle, Schneewehen und Schneehaufen
+// (mitwachsen-frost.ts) und am Fuß einer Klippe das Eiszapfen-Glockenspiel (mitwachsen-chime.ts).
 // Teil des Welt-Pakets der Eis-Welt (index.ts), nachgeladen.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Welt-Pakete“ und „Gletscherkessel“)
 
@@ -25,6 +26,7 @@ import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from '../../mitw
 import { findSpawns } from '../../mitwachsen-spawns';
 import { OBSTACLE_GAP, eisCell } from '../../mitwachsen-world';
 import { frost, type Wild } from './mitwachsen-frost';
+import { chimes } from './mitwachsen-chime';
 import { haunts } from './mitwachsen-haunts';
 import { iceberg, lakes, peaks, type Iceberg } from './mitwachsen-lakes';
 
@@ -130,7 +132,9 @@ export function buildKessel(
     set(x, y, { ...c, h: c.region === 'eis' ? 1 : c.h, slide: true }); // im Kessel eben
   }
   level(place.cells, map);
-  frost(seed, winter(seed, gang, place, free, map), map); // Kristalle und Schneewehen nach Tannen und Eisblöcken
+  const wild = winter(seed, gang, place, free, map);
+  frost(seed, wild, map); // Kristalle, Schneewehen und Schneehaufen nach Tannen und Eisblöcken
+  chimes(seed, wild, map); // zuletzt das Glockenspiel am Klippenfuß, nur auf blankem Schnee: sonst bleibt alles, wo es war
   // Eis-Welt: der ganze Kessel und der Gang ab seiner Mitte (dort wechselt auch die Tieranzeige)
   let inner = gang.depth + 1;
   while (map.get(key(...gang.at(0, inner)))?.region !== 'eis' && inner < centre) inner++;

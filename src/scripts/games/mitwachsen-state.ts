@@ -108,7 +108,7 @@ export type GameEvent =
   | ChoreEvent // Handgriffe: pflücken, fangen, nachwachsen, füttern, schöpfen, tränken (mitwachsen-chores.ts)
   | BorderEvent // Weltgrenze am Tor: warten, wieder einreihen, Gegend wechseln (mitwachsen-border.ts)
   | GuideEvent // der verlaufene Pinguin taucht auf und piept (mitwachsen-guide.ts)
-  | PackEvent // Regeln einer Welt aus ihrem Paket: ein Schneehaufen wächst (mitwachsen-pack-types.ts)
+  | PackEvent // Regeln einer Welt aus ihrem Paket: Schneehaufen wächst, Eiszapfen klingt (mitwachsen-pack-types.ts)
   | { type: 'call' }
   | { type: 'sleep' }
   | { type: 'wake' };
@@ -397,8 +397,7 @@ function move(s: State, world: World, dir: Dir, events: GameEvent[], packs: read
   const p = s.player;
   p.dir = dir;
   const [dx, dy] = DIRS[dir];
-  const tx = p.x + dx,
-    ty = p.y + dy;
+  const [tx, ty] = [p.x + dx, p.y + dy];
   const animal = s.animals.find((a) => a.x === tx && a.y === ty);
   if (animal?.mode === 'wander') {
     // Hineinlaufen reicht: Das Tier singt, freut sich und folgt (die Aktionstaste braucht es dafür nicht)
@@ -410,10 +409,11 @@ function move(s: State, world: World, dir: Dir, events: GameEvent[], packs: read
   // Handgriffe: Beeren pflücken, Fische fangen, Wasser schöpfen, in die Tröge der Wiese bringen (mitwachsen-chores.ts)
   if (chore(s, world, tx, ty, events)) return;
   // Regeln der Welten aus ihren Paketen: etwa ein Schneehaufen, der um eine Kugel wächst (worlds/eis/mitwachsen-snowman.ts)
-  if (packs.some((p) => p.rules?.bump(s, world.cell(tx, ty), tx, ty, events))) return;
+  const move = { here: world.cell(p.x, p.y), walks: canStep(world, s.openGates, p.x, p.y, tx, ty) };
+  if (packs.some((r) => r.rules?.bump(s, world.cell(tx, ty), tx, ty, events, move))) return;
   // Ins Bett laufen: Die Figur legt sich schlafen (nicht gleich nach dem Aufwachen, sonst schläft sie aus Versehen ein)
   if (world.cell(tx, ty).deco === 'bed' && s.tick - s.wokeAt >= WAKE_GRACE) return sleep(s, world, events);
-  if (!canStep(world, s.openGates, p.x, p.y, tx, ty)) {
+  if (!move.walks) {
     events.push({ type: 'bump' });
     return;
   }

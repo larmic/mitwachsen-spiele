@@ -30,8 +30,9 @@ const DIST = 'dist';
  * (mitwachsen-gate-<welt>.ts, gut 35 KiB im 3D-Teil). Das Schneiden in Kern, Three.js und Welt-Pakete kostete nur
  * knapp 2 KiB (Importe zwischen den Dateien), das Budget bleibt. Mit den Fußspuren im Schnee (gut 4 KiB im Paket der
  * Eis-Welt und seinem 3D-Teil) rund 1002 KiB: Das Budget reicht noch, es bleibt; gut 22 KiB Luft. Mit den
- * Schneemännern (knapp 2 KiB im Paket der Eis-Welt) knapp 1005 KiB, das Budget bleibt; gut 19 KiB Luft. Das Glockenspiel
- * (mit Zustimmung des Vaters, es gehört zur Eis-Welt) hebt es danach bewusst an, wenn die Luft fehlt.
+ * Schneemännern (knapp 2 KiB im Paket der Eis-Welt) knapp 1005 KiB, das Budget bleibt; gut 19 KiB Luft. Mit dem
+ * Eiszapfen-Glockenspiel (knapp 2 KiB im Paket der Eis-Welt) gut 1007 KiB: Das Budget reicht, es bleibt; gut 16 KiB
+ * Luft. Wächst es weiter, bewusst anheben.
  */
 const PRECACHE_BUDGET = 1024 * 1024;
 const OPTS: PwaOptions = { origin: SITE.url, manifest: '/manifest.webmanifest', sw: SERVICE_WORKER };

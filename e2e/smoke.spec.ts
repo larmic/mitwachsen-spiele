@@ -1,6 +1,7 @@
 // Smoke-Test der fertigen Seite: Startseite (Weg ins Spiel, Aufbau, Handy-Breite), Rechtliches, 404 und das Spiel.
 // Jede Seite muss ohne Fehler in der Konsole laden (pageerror und console.error).
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { SCALE } from '../src/scripts/games/worlds/eis/mitwachsen-chime-look';
 
 /** Sammelt Fehler der Seite; am Ende des Tests muss die Liste leer sein */
 function watchErrors(page: Page) {
@@ -432,6 +433,136 @@ test('Spiel: Schneemann bauen im Gletschertal (Tor im Test offen): dreimal hinei
   await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 'n' }));
   expect(await stage(next!)).toBe(1);
   await waitFrames(page, 20);
+  expect(errors).toEqual([]);
+});
+
+test('Spiel: Eiszapfen-Glockenspiel im Gletschertal (Tor im Test offen): die Reihe entlang klingt eine Tonleiter, ohne Fehler', async ({
+  page,
+}) => {
+  // Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte: Jedes Bild und jeder Aufruf in die Seite dauert dort lange
+  test.setTimeout(180_000);
+  const errors = watchErrors(page);
+  await page.goto('/spielen/');
+  await page.getByRole('button', { name: /Verstanden/ }).click();
+  const game = page.locator('larmic-mitwachsen');
+  await expect(game).toHaveClass(/ready/);
+  await withIce(game);
+  type Drawn = { decos: Record<string, ((...a: unknown[]) => unknown[][] | null) | undefined> } | null | undefined;
+  type Game = {
+    world: {
+      homes: { eis: { bed: [number, number] } };
+      cell(x: number, y: number): { deco: string | null; note?: number };
+    };
+    state: {
+      player: { x: number; y: number; dir: string };
+      openGates: string[];
+      sleeping: boolean;
+      wokeAt: number;
+      animals: { id: string; x: number; y: number }[];
+      followers: string[];
+    };
+    apply(cmd: { type: 'move'; dir: string }): void;
+    lift(): void;
+    sfx: { score(notes: [number, ...unknown[]][]): void };
+    gl3d: { views: { decos: Drawn }; at: unknown } | null;
+    renderer: { later: unknown[][] };
+    r3d: unknown;
+  };
+  // die Reihe der Eiszapfen (von West nach Ost), gesucht vom Schneebett aus
+  const row = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const [bx, by] = el.world.homes.eis.bed;
+    const icicle = (x: number, y: number) => el.world.cell(x, y).deco === 'icicle';
+    let hit: [number, number] | null = null;
+    for (let r = 1; r < 200 && !hit; r++)
+      for (let y = by - r; y <= by + r && !hit; y++)
+        for (let x = bx - r; x <= bx + r; x++) if (icicle(x, y)) hit = [x, y];
+    if (!hit) return [];
+    let [w] = hit;
+    const y = hit[1];
+    while (icicle(w - 1, y)) w--;
+    const out: [number, number][] = [];
+    while (icicle(w + out.length, y)) out.push([w + out.length, y]);
+    return out;
+  });
+  expect(row.length).toBeGreaterThanOrEqual(5);
+  /** Die Figur steht wach vor dem ersten Zapfen (südlich davon), das Tor ist offen; die Töne werden mitgeschrieben */
+  const stand = () =>
+    game.evaluate((node, [x, y]) => {
+      const el = node as unknown as Game & { heard?: number[] };
+      // kein Tier in der Nähe der Reihe, das im Weg stünde
+      const near = (a: { id: string; x: number; y: number }) =>
+        !el.state.followers.includes(a.id) && Math.abs(a.y - y) <= 4 && a.x >= x - 4 && a.x <= x + 12;
+      const animals = el.state.animals.filter((a) => !near(a));
+      el.state = {
+        ...el.state,
+        animals,
+        openGates: ['eis'],
+        sleeping: false,
+        wokeAt: -100,
+        player: { x, y: y + 1, dir: 'n' },
+      };
+      if (!el.heard) {
+        const score = el.sfx.score.bind(el.sfx);
+        el.sfx.score = (notes) => {
+          if (notes[0]) el.heard!.push(notes[0][0]);
+          score(notes);
+        };
+      }
+      el.heard = [];
+      el.lift();
+    }, row[0]);
+  /**
+   * Zum ersten Zapfen hin, dann die Reihe entlang nach Osten, Schritt für Schritt mit gezeichneten Bildern dazwischen;
+   * liefert die gehörten Töne
+   */
+  const walkRow = async () => {
+    for (const [i, [x, y]] of row.entries()) {
+      await game.evaluate((node, dir) => (node as unknown as Game).apply({ type: 'move', dir }), i ? 'e' : 'n');
+      expect(
+        await game.evaluate((node) => [
+          (node as unknown as Game).state.player.x,
+          (node as unknown as Game).state.player.y,
+        ]),
+      ).toEqual([x, y]);
+      await waitFrames(page, 8);
+    }
+    return game.evaluate((node) => (node as unknown as Game & { heard: number[] }).heard);
+  };
+  await stand();
+  await waitFrames(page, 30);
+  // Jeder Zapfen klingt beim Hinlaufen, die Figur läuft ohne Halt weiter: eine Tonleiter von tief nach hoch
+  expect(await walkRow()).toEqual(SCALE.slice(0, row.length)); // genau die Töne der Zapfen, kein anderer
+  // gegen die Wand gedrückt klingt der letzte Zapfen noch einmal, die Figur bleibt
+  await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 'n' }));
+  expect(await game.evaluate((node) => (node as unknown as Game & { heard: number[] }).heard.at(-1))).toBe(
+    SCALE[row.length - 1],
+  );
+  // In 3D baut das Stück des Felds den Zapfen (sobald der 3D-Teil des Pakets da ist)
+  const in3d = await game.evaluate((node) => !!(node as unknown as Game).gl3d);
+  if (in3d)
+    await expect
+      .poll(() =>
+        game.evaluate((node, [x, y]) => {
+          const el = node as unknown as Game;
+          const draw = el.gl3d!.views.decos?.decos.icicle; // Zeichnungen der geladenen 3D-Teile
+          return (draw?.(el.world, el.world.cell(x, y), x, y, el.gl3d!.at) ?? []).length;
+        }, row[0]),
+      )
+      .toBeGreaterThan(1);
+  // In 2D ebenso: Die Zapfen liegen im gezeichneten Bild, und sie schwingen beim Anschlagen
+  await game.evaluate((node) => {
+    (node as unknown as Game).r3d = null; // ohne 3D: so zeichnet die 2D-Ansicht von vorn
+  });
+  await stand();
+  await waitFrames(page, 20);
+  const drawn = await game.evaluate(
+    (node, [x, y]) => (node as unknown as Game).renderer.later.filter((b) => b[1] === y && b[0] === x).length,
+    row[0],
+  );
+  expect(drawn).toBeGreaterThan(0); // die Eiskante liegt genau im Feld
+  expect(await walkRow()).toEqual(SCALE.slice(0, row.length));
+  await waitFrames(page, 30);
   expect(errors).toEqual([]);
 });
 

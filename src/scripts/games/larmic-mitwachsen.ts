@@ -9,7 +9,7 @@ import { projection, type Dir } from '../../lib/games/front';
 import type { World3D as World3DType } from './mitwachsen-3d';
 import { GAME_COLORS, LOOK, SPECIES, TIRED_TALK, realmOfAnimal } from '../../data/games/mitwachsen';
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
-import { SPARKS, fly, sparks } from './mitwachsen-glyphs';
+import { SPARKS, fly, glints, sparks } from './mitwachsen-glyphs';
 import { Sfx } from './sfx';
 import { NOTE_COLORS, StoryPlayer } from './mitwachsen-story';
 import {
@@ -567,7 +567,7 @@ class LarmicMitwachsen extends HTMLElement {
           break;
         default:
           // Ein Tier ruft und hüpft (Wiese, Weltgrenze, der Pinguin), sonst Handgriffe: pflücken, fangen, nachwachsen,
-          // schöpfen, füttern, tränken
+          // schöpfen, füttern, tränken; und was die Regeln einer Welt melden (Schneemann, Eiszapfen)
           if ('species' in e) this.cheer(e, now);
           else this.chore(e, now);
       }
@@ -609,28 +609,29 @@ class LarmicMitwachsen extends HTMLElement {
     this.floats.push({ kind, who, color, born, x: 0, y: 0, z: 0, age: 0 });
   }
 
-  /** Funken am Wesen `who` (oder am Punkt `at`, wenn es noch nicht zu sehen ist) */
-  private burst(who: string, colors: readonly string[], n: number, at?: Omit<Body, 'hop'>) {
+  /**
+   * Funken am Wesen `who` (oder am Punkt `at`, wenn es noch nicht zu sehen ist); `glint`: nur ein kurzes Glitzern, das
+   * es auch bei reduzierter Bewegung gibt (dann blitzt es still auf)
+   */
+  private burst(who: string, colors: readonly string[], n: number, at?: Omit<Body, 'hop'>, glint = false) {
     const b = at ?? this.bodies.get(who);
-    if (this.reduced.matches || !b) return;
-    this.particles.push(...sparks(this.project(b.x + 0.5, b.y + 0.5, b.z + 0.8), colors, n, this.size.zoom));
+    if ((this.reduced.matches && !glint) || !b) return;
+    const [p, zoom] = [this.project(b.x + 0.5, b.y + 0.5, b.z + 0.8), this.size.zoom];
+    this.particles.push(...(glint ? glints(p, colors, zoom, this.reduced.matches) : sparks(p, colors, n, zoom)));
   }
 
   // ---------- Bild ----------
 
   private measure() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = this.canvas.clientWidth,
-      h = this.canvas.clientHeight;
+    const [w, h] = [this.canvas.clientWidth, this.canvas.clientHeight];
     if (!w || !h) return;
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
     // Etwa 18 Felder breit, auf großen Schirmen nicht riesig, auf kleinen nicht winzig
     this.size = { w, h, dpr, zoom: Math.min(1.25, Math.max(0.5, w / (18 * 64))) };
     this.gl3d?.resize(w, h, dpr);
-    const m = this.map.clientWidth;
-    this.map.width = Math.round(m * dpr);
-    this.map.height = Math.round(m * dpr);
+    this.map.width = this.map.height = Math.round(this.map.clientWidth * dpr); // die Karte ist quadratisch
   }
 
   /** Bildschirmpunkt eines Weltpunkts – aus der 3D-Kamera, sonst aus der Ansicht von vorn */
@@ -665,9 +666,8 @@ class LarmicMitwachsen extends HTMLElement {
       // Weite Wege gleiten bis zum Ziel: an der Weltgrenze zum Warteplatz und zurück, der Pinguin durch den Gang
       const far = this.hops.has(`seat:${id}`) ? 40 : 2.5;
       if (!b || snap || Math.abs(b.x - tx) + Math.abs(b.y - ty) > far) b = { x: tx, y: ty, z, hop: 0 };
-      const dx = tx - b.x,
-        dy = ty - b.y,
-        d = Math.hypot(dx, dy);
+      const [dx, dy] = [tx - b.x, ty - b.y];
+      const d = Math.hypot(dx, dy);
       const stepLen = SPEED * dt;
       if (d <= stepLen) {
         [b.x, b.y] = [tx, ty];
@@ -688,15 +688,18 @@ class LarmicMitwachsen extends HTMLElement {
 
   /**
    * Beeren gepflückt, Fische gefangen, nachgewachsen, Eimer geschöpft; Beeren, Fische oder Wasser in den Trog; ein
-   * Schneehaufen wächst um eine Kugel (es ploppt, Töne aus dem Welt-Paket, und gleich gespeichert: der Schneemann bleibt)
+   * Schneehaufen wächst um eine Kugel (es ploppt, Töne aus dem Welt-Paket, und gleich gespeichert: der Schneemann
+   * bleibt); ein Eiszapfen klingt (Ton aus dem Welt-Paket) und glitzert, die Figur läuft weiter
    */
-  private chore(e: ChoreEvent | Extract<GameEvent, { type: 'snowman' }>, now: number) {
+  private chore(e: ChoreEvent | Extract<GameEvent, { type: 'snowman' | 'icicle' }>, now: number) {
     if (reshapes(e)) this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]); // leer, wieder voll, gewachsen
+    if (e.type === 'snowman' || e.type === 'icicle') this.sfx.score(this.renderer.view?.score?.(e) ?? []);
+    if (e.type === 'icicle')
+      return this.burst('', SPARKS.eis, 6, { x: e.x, y: e.y - 0.35, z: this.world.cell(e.x, e.y).h }, true);
     if (e.type === 'regrow') return;
     if (e.type === 'pick' || e.type === 'catch' || e.type === 'fill' || e.type === 'snowman') {
       // Die Figur hüpft vor Freude: Beeren springen heraus, Fische platschen, beim Schöpfen spritzen Tropfen, Schnee stiebt
-      if (e.type === 'snowman') this.sfx.score(this.renderer.view?.score?.(e) ?? []);
-      else this.sfx[e.type]();
+      if (e.type !== 'snowman') this.sfx[e.type]();
       this.hops.set('player', now);
       this.burst('player', SPARKS[e.type === 'snowman' ? 'snow' : e.type], 12);
       if (e.type === 'snowman') this.save();

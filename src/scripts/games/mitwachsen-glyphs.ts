@@ -3,8 +3,17 @@
 
 import { FISH_SPARKS } from '../../data/games/mitwachsen-eis';
 
-/** Funke: Bildschirmpunkt, Geschwindigkeit, Lebensdauer in Bildern (bei 60 Hz), Farbe und Größe */
-export type Particle = { x: number; y: number; vx: number; vy: number; life: number; color: string; size: number };
+/** Funke: Bildschirmpunkt, Geschwindigkeit, Lebensdauer in Bildern (bei 60 Hz), Farbe, Größe; `still` fliegt nicht */
+export type Particle = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  color: string;
+  size: number;
+  still?: true;
+};
 
 export const HEART = ['.rr.rr.', 'rrrrrrr', 'rrrrrrr', '.rrrrr.', '..rrr..', '...r...'];
 export const NOTE = ['..kkkk', '..k..k', '..k..k', 'kkk.kk', 'kkk.kk'];
@@ -67,14 +76,35 @@ export function sparks([sx, sy]: readonly [number, number], colors: readonly str
   });
 }
 
+/**
+ * Kurzes Glitzern an einem Punkt (ein Eiszapfen klingt): wenige kleine Funken, die langsam auseinanderstieben; bei
+ * reduzierter Bewegung (`still`) blitzen sie nur kurz an ihrem Platz auf
+ */
+export function glints(at: readonly [number, number], colors: readonly string[], zoom: number, still: boolean) {
+  return sparks(at, colors, 6, zoom).map((p, i): Particle => {
+    if (!still) return { ...p, vx: p.vx * 0.5, vy: p.vy * 0.5, life: 22 };
+    const a = i * 2.4;
+    return {
+      ...p,
+      x: p.x + Math.cos(a) * 9 * zoom,
+      y: p.y + Math.sin(a) * 7 * zoom,
+      vx: 0,
+      vy: 0,
+      life: 18,
+      still: true,
+    };
+  });
+}
+
 /** Funken fliegen `dt` Sekunden weiter (in Zeit, nicht in Bildern: 120-Hz-Schirme) und fallen; verloschene fallen weg */
 export function fly(particles: Particle[], dt: number): Particle[] {
   const k = dt * 60;
   for (const p of particles) {
+    p.life -= k;
+    if (p.still) continue;
     p.x += p.vx * k;
     p.y += p.vy * k;
     p.vy += 0.22 * k;
-    p.life -= k;
   }
   return particles.filter((p) => p.life > 0);
 }

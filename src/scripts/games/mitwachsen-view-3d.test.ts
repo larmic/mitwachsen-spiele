@@ -40,6 +40,7 @@ describe('Haken der 3D-Ansicht für Welt-Pakete (Views3D)', () => {
       'fishcrate',
       'floe',
       'icebowl',
+      'icicle',
       'igloo',
       'snowheap',
       'watertrough',
