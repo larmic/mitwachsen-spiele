@@ -112,7 +112,7 @@ export const REGIONS: readonly [Region & { shape: { rx: number; ry: number } }, 
     name: 'Eis-Welt',
     // Gletscherkessel fest hinter dem Eistor; Form und Wohnorte kennt nur das Welt-Paket (mitwachsen-kessel.ts)
     animals: (Object.keys(ICE_SPECIES) as IceSpeciesId[]).map((species) => ({ species })),
-    herd: 3, // der Kessel ist viel kleiner als die Lichtung: zehn Arten, je drei Tiere
+    herd: 3, // zehn Arten, je drei Tiere
     behind: 'eis',
   },
 ];

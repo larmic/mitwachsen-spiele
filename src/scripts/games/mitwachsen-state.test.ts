@@ -17,7 +17,7 @@ import {
 } from './mitwachsen-state';
 import { windOk } from './mitwachsen-meadow';
 import { SCATTER } from './mitwachsen-scatter';
-import { canStep, createWorld, kesselPlace, standHeight, type Cell, type World } from './mitwachsen-world';
+import { beyondRing, canStep, createWorld, kesselPlace, standHeight, type Cell, type World } from './mitwachsen-world';
 import { startRealm, type Homestead } from './mitwachsen-home';
 import { BLOCK, raining, windy } from './mitwachsen-weather';
 import { platformArea } from './mitwachsen-portal';
@@ -531,20 +531,20 @@ describe('Iglu bei Pustewind (Eis-Welt)', () => {
   });
 
   it('zieht der Pinguin mitten im Pustewind-Abschnitt ein, bleibt es heute windstill; erst nach dem Schlafen weht es', () => {
-    const [x, y] = world.homes.eis.wake[0]!;
     const base = start(block(true, false), everyone(false));
-    const free = (dx: number, dy: number) => {
+    const free = ([x, y]: readonly [number, number], dx: number, dy: number) => {
       const c = world.cell(x + dx, y + dy);
       return c.garden === true && !c.solid && !base.animals.some((a) => a.x === x + dx && a.y === y + dy);
     };
-    const [dir, dx, dy] = (
-      [
-        ['e', 1, 0],
-        ['w', -1, 0],
-        ['s', 0, 1],
-        ['n', 0, -1],
-      ] as const
-    ).find(([, dx, dy]) => free(dx, dy) && free(-dx, -dy))!;
+    const DIR4 = [
+      ['e', 1, 0],
+      ['w', -1, 0],
+      ['s', 0, 1],
+      ['n', 0, -1],
+    ] as const;
+    // ein Platz am Bett, an dem vor und hinter der Figur die Wiese frei ist (wo die Tiere stehen, würfelt die Welt)
+    const [x, y] = world.homes.eis.wake.find((p) => DIR4.some(([, dx, dy]) => free(p, dx, dy) && free(p, -dx, -dy)))!;
+    const [dir, dx, dy] = DIR4.find(([, dx, dy]) => free([x, y], dx, dy) && free([x, y], -dx, -dy))!;
     const animals = base.animals.map((a) =>
       a.id === 'eis:pinguin' ? { ...a, mode: 'follow' as const, x: x - dx, y: y - dy } : a,
     );
@@ -967,6 +967,33 @@ describe('Zuhause je Gegend', () => {
       }
     }
     expect(tried).toBeGreaterThan(20);
+  });
+
+  it('alter Spielstand hinter dem Felsring, der heute zu keinem Feld des Gletschertals gehört (Umbau): Start im Schneebett', () => {
+    // Aus dem Gletscherkessel wurde das Gletschertal (Spielstand Version 5): Eine Position im alten Kessel kann heute
+    // neben dem Tal liegen. Sie gehört zum Land hinter dem Eistor, also wacht die Figur im Schneebett auf
+    const world = worldOf(1);
+    const { mid, out } = world.gates.get('eis')!;
+    const along = [out[1], -out[0]] as const;
+    const beside: [number, number][] = [];
+    for (let t = 10; t < 60; t++)
+      for (const u of [-12, 12]) {
+        const p: [number, number] = [mid[0] + out[0] * t + along[0] * u, mid[1] + out[1] * t + along[1] * u];
+        if (beyondRing(...p) && world.realm(...p) === 'lichtung') beside.push(p);
+      }
+    expect(beside.length).toBeGreaterThan(10);
+    for (const p of beside) {
+      const s = initialState(world, { position: p, openGates: ['eis'] });
+      expect([s.player.x, s.player.y], p.join()).toEqual([...world.homes.eis.bed]);
+      expect(progressOf(s).position).toEqual([...world.homes.eis.bed]); // gespeichert wird von nun an das Bett
+      // Tor zu: auf der Lichtung (wie immer); ohne Paket: Position wird gehalten (wie immer)
+      const closed = initialState(world, { position: p });
+      expect([closed.player.x, closed.player.y]).toEqual([...world.homes.lichtung.bed]);
+    }
+    const bare = createWorld(1, []);
+    const held = initialState(bare, { position: beside[0]!, openGates: ['eis'] });
+    expect([held.player.x, held.player.y]).toEqual([...bare.homes.lichtung.bed]);
+    expect(progressOf(held).position).toEqual(beside[0]);
   });
 
   it('alter Spielstand im Gletscherkessel nahe Spur, Fischkisten oder Plattformen: dort bleibt jedes Feld begehbar', () => {

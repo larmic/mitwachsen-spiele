@@ -207,9 +207,11 @@ class LarmicMitwachsen extends HTMLElement {
     this.seenAt = '';
     this.state = initialState(this.world, progressFrom(this.saved), this.saved.seed ^ this.saved.visits);
     this.live = this.saved.id;
-    // Nebel: Am Anfang ist nur ein kleines Stück um das Bett zu sehen (die Figur liegt darin)
+    // Nebel: Am Anfang ist nur ein kleines Stück um das Bett zu sehen (die Figur liegt darin), ebenso, wenn das Bett
+    // noch im Nebel liegt (etwa nach dem Umzug in das Gletschertal, Spielstand Version 5)
     this.fog = Fog.from(this.saved.explored);
-    if (this.fog.size === 0) this.fog.reveal(this.state.player.x, this.state.player.y, START_REVEAL);
+    const { x, y } = this.state.player;
+    if (!this.fog.has(x, y)) this.fog.reveal(x, y, START_REVEAL);
     this.bodies.clear();
     this.floats = [];
     this.particles = [];

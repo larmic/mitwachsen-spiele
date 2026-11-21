@@ -12,6 +12,16 @@ export function fromKey(key: string): [number, number] {
   return [x, y];
 }
 
+/** Gleiche Felder? (gleiches Objekt oder gleicher Inhalt) */
+const same = <T>(a: T | undefined, b: T | undefined) => a === b || JSON.stringify(a) === JSON.stringify(b);
+/** Stücke ("cx,cy"), in denen sich zwei Karten von Feldern ("x,y" → Feld) unterscheiden */
+export function changedChunks<T>(before: ReadonlyMap<string, T>, after: ReadonlyMap<string, T>): Set<string> {
+  const out = new Set<string>();
+  for (const k of new Set([...before.keys(), ...after.keys()]))
+    if (!same(before.get(k), after.get(k))) out.add(chunkOf(...fromKey(k)).join(','));
+  return out;
+}
+
 /** Zwischenspeicher für Stücke. `make` berechnet ein Stück als Liste von CHUNK × CHUNK Feldern (zeilenweise). */
 /**
  * Stücke samt ihren vier Nachbarn: Eine Ansicht, die Seitenflächen am Rand eines Stücks mit Blick auf das Nachbarfeld

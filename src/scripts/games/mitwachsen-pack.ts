@@ -4,9 +4,10 @@
 // Typen der Pakete: mitwachsen-pack-types.ts.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
-import { GATES, REGIONS, realmOfAnimal, type GateId, type Point } from '../../data/games/mitwachsen';
+import { GATES, REGIONS, realmOfAnimal, type GateId, type Point, type RegionId } from '../../data/games/mitwachsen';
 import { GUIDE_GATE, pending, type Guided } from './mitwachsen-guide';
 import type { Beyond } from './mitwachsen-pack-types';
+import { startRealm, type Realms } from './mitwachsen-home';
 
 /** So nah (in Feldern, auch schräg) muss die Figur dem Tor kommen, dann kommt das Paket seiner Welt schon einmal */
 export const NEAR_GATE = 40;
@@ -51,4 +52,28 @@ export function packAt(
   const far = (m: Point) => (x - m[0]) ** 2 + (y - m[1]) ** 2;
   const opening = GATES.filter((g) => g.opens !== 'never').map((g) => gates.get(g.id)?.mid);
   return beyond(x, y) && opening.every((m) => !m || far(mid) <= far(m));
+}
+
+/**
+ * Gegend, in deren Bett die Figur aufwacht (`startRealm`). Eine Position hinter dem Felsring, die heute zu keinem Feld
+ * einer Welt mehr gehört (die Welt wurde umgebaut: aus dem Gletscherkessel wurde das Gletschertal, Spielstand Version
+ * 5), gehört zur Welt hinter dem nächsten Tor (`packAt`), wenn es offen ist und ihr Paket da ist (sie hat Wohnplätze):
+ * Start in ihrem Bett.
+ */
+export function wakeRealm(
+  world: Realms & { gates: ReadonlyMap<GateId, { mid: Point }>; spotsOf(realm: RegionId): readonly Point[] },
+  open: readonly GateId[],
+  position: readonly [number, number] | undefined,
+  beyond: Beyond,
+): RegionId {
+  const realm = startRealm(world, open, position);
+  if (realm !== REGIONS[0].id || !position?.every(Number.isInteger) || !beyond(...position)) return realm;
+  const owner = REGIONS.find(
+    (r) =>
+      r.behind &&
+      open.includes(r.behind) &&
+      world.spotsOf(r.id).length &&
+      packAt(position, world.gates, beyond, r.behind),
+  );
+  return owner?.id ?? realm;
 }

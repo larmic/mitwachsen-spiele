@@ -18,11 +18,11 @@ import {
 } from '../../data/games/mitwachsen';
 import { STORIES, told, type StoryId } from '../../data/games/mitwachsen-stories';
 import { beyondRing, canStep, standHeight, type World } from './mitwachsen-world';
-import { packAt } from './mitwachsen-pack';
+import { packAt, wakeRealm } from './mitwachsen-pack';
 import { scatter, scatterArrivals } from './mitwachsen-scatter';
 import { canStay, wildAnimals } from './mitwachsen-wild';
 import { chore, regrow, type ChoreEvent } from './mitwachsen-chores';
-import { homeAt, startRealm } from './mitwachsen-home';
+import { homeAt } from './mitwachsen-home';
 import { landed, wakePortals, type PortalEvent } from './mitwachsen-travel';
 import { PORTAL_IDS, type PortalId } from '../../data/games/mitwachsen-portals';
 import { sheltering } from './mitwachsen-weather';
@@ -152,7 +152,7 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
   // Nur Tore, die überhaupt aufgehen können, bleiben aus dem Spielstand offen
   const open = (saved.openGates ?? []).filter((id) => GATES.some((g) => g.id === id && g.opens !== 'never'));
   const animals = placeAnimals(world, open, garden, new Set());
-  const [bx, by] = world.homes[startRealm(world, open, saved.position)].bed;
+  const [bx, by] = world.homes[wakeRealm(world, open, saved.position, beyondRing)].bed;
   const s: State = {
     tick: 0,
     rng: rngSeed >>> 0,

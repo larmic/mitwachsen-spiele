@@ -69,6 +69,20 @@ export class Fog {
     return [...changed];
   }
 
+  /**
+   * Erkundetes wieder in Nebel legen, wo `drop(x, y)` es sagt (Umzug eines Spielstands, wenn sich eine Welt ändert);
+   * Stücke ohne Erkundetes fallen weg
+   */
+  forget(drop: (x: number, y: number) => boolean): void {
+    for (const [key, bits] of this.chunks) {
+      const [cx, cy] = key.split(',').map(Number) as [number, number]; // Schlüssel sind geprüft ("cx,cy")
+      for (let i = 0; i < CHUNK * CHUNK; i++)
+        if (isSet(bits, i) && drop(cx * CHUNK + (i % CHUNK), cy * CHUNK + Math.floor(i / CHUNK)))
+          bits[i >> 3] = (bits[i >> 3] ?? 0) & ~(1 << (i & 7));
+      if (bits.every((b) => b === 0)) this.chunks.delete(key);
+    }
+  }
+
   /** Für den Spielstand: je Stück Base64 */
   serialize(): Record<string, string> {
     const out: Record<string, string> = {};

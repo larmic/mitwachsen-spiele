@@ -272,6 +272,48 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
       return { sheltered: sheltered > 5, loaded: typeof el.renderer.view?.sky.weather === 'function' };
     }),
   ).toEqual({ sheltered: true, loaded: true });
+  // Das Tal ist lang: Ganz hinten am Talende steht die Plattform des Eis-Portals (wach), dort gezeichnet ohne Fehler;
+  // auf ihrer Mitte geht es mit einem Glitzern zurück ans Schneebett
+  type PortalGame = {
+    world: {
+      homes: { eis: { bed: [number, number] } };
+      gates: Map<string, { out: [number, number] }>;
+      portals: Map<string, { gate: [number, number]; home: [number, number] }>;
+      realm(x: number, y: number): string;
+    };
+    state: { player: { x: number; y: number; dir: string }; portals: string[]; animals: unknown[] };
+    apply(cmd: { type: 'move'; dir: string } | { type: 'tick' }): void;
+    lift(): void;
+  };
+  await game.evaluate((node) => {
+    const el = node as unknown as PortalGame;
+    const [gx, gy] = el.world.portals.get('eiskessel')!.gate;
+    const out = el.world.gates.get('eis')!.out;
+    const dir = out[0] > 0 ? 'e' : out[0] < 0 ? 'w' : out[1] > 0 ? 's' : 'n';
+    // vor die Plattform am Talende (auf der Seite zum Bett), das Portal ist wach
+    el.state = {
+      ...el.state,
+      player: { x: gx - out[0] * 2, y: gy - out[1] * 2, dir },
+      portals: [...new Set([...el.state.portals, 'eiskessel'])],
+    };
+    el.lift();
+  });
+  await frames(30);
+  const trip = await game.evaluate((node) => {
+    const el = node as unknown as PortalGame;
+    const p = el.world.portals.get('eiskessel')!;
+    const out = el.world.gates.get('eis')!.out;
+    const dir = out[0] > 0 ? 'e' : out[0] < 0 ? 'w' : out[1] > 0 ? 's' : 'n';
+    const [bx, by] = el.world.homes.eis.bed;
+    const [gx, gy] = p.gate;
+    const far = Math.hypot(gx - bx, gy - by);
+    el.apply({ type: 'move', dir });
+    el.apply({ type: 'move', dir });
+    const [x, y] = [el.state.player.x, el.state.player.y];
+    return { far: far > 100, home: [x, y].join() === p.home.join(), realm: el.world.realm(x, y) };
+  });
+  expect(trip).toEqual({ far: true, home: true, realm: 'eis' });
+  await frames(30);
   // ein paar Schritte durch den Kessel, dann ins Schneebett (der Schläfer liegt jetzt dort, darüber das Polarlicht)
   await game.evaluate((node) => {
     const el = node as unknown as Game;
@@ -734,6 +776,54 @@ test.describe('Welt-Paket nur bei Bedarf', () => {
       expect(new Set(lifts)).toEqual(new Set([300]));
       await page.waitForTimeout(550);
     }
+    // Ganz hinten am Talende, gut 100 Felder hinter dem Schneebett, zeichnet auch die 2D-Ansicht die Plattform des
+    // Eis-Portals: schlafend ohne Gold, wach mit Gold-Rahmen (die Plattform im Ring am Bett ist weit außer Sicht)
+    await page.evaluate(() => {
+      const proto = CanvasRenderingContext2D.prototype;
+      const fill = Object.getOwnPropertyDescriptor(proto, 'fillStyle')!;
+      const seen = new Set<string>();
+      (window as unknown as { fills: Set<string> }).fills = seen;
+      Object.defineProperty(proto, 'fillStyle', {
+        ...fill,
+        set(v: string | CanvasGradient | CanvasPattern) {
+          if (typeof v === 'string') seen.add(v.toLowerCase());
+          fill.set!.call(this, v);
+        },
+      });
+    });
+    const valleyEnd = (awake: boolean) =>
+      game.evaluate((node, awake) => {
+        type EndGame = Game & {
+          world: {
+            gates: Map<string, { out: [number, number] }>;
+            portals: Map<string, { gate: [number, number] }>;
+          };
+          state: { portals: string[] };
+        };
+        const el = node as unknown as EndGame;
+        const [gx, gy] = el.world.portals.get('eiskessel')!.gate;
+        const [bx, by] = el.world.homes.eis.bed;
+        const out = el.world.gates.get('eis')!.out;
+        el.state = {
+          ...el.state,
+          player: { x: gx - out[0] * 3, y: gy - out[1] * 3, dir: 's' },
+          portals: awake ? ['eiskessel'] : [],
+        };
+        el.lift();
+        (window as unknown as { fills: Set<string> }).fills.clear();
+        return Math.hypot(gx - bx, gy - by);
+      }, awake);
+    const gold = () =>
+      page.evaluate(() => {
+        const seen = (window as unknown as { fills: Set<string> }).fills;
+        return seen.has('#f0a531') || seen.has('#b46a0c'); // GOLD.top, GOLD.side (mitwachsen-portals.ts)
+      });
+    expect(await valleyEnd(false)).toBeGreaterThan(100);
+    await waitFrames(page, 20);
+    expect(await gold()).toBe(false);
+    await valleyEnd(true);
+    await waitFrames(page, 20);
+    expect(await gold()).toBe(true);
     expect(errors).toEqual([]);
   });
 

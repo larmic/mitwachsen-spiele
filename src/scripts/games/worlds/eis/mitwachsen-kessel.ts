@@ -1,10 +1,12 @@
 // Gletscherkessel hinter dem Eistor (Gegend 'eis') – rein und deterministisch: Derselbe Seed ergibt denselben Kessel.
-// Er liegt fest am Ende des Gangs hinter dem Eistor, ganz hinter dem Felsring der Lichtung, im selben Koordinatenraum.
-// Ringsum feste Eisklippen, der Gang ist der einzige Zugang. In der Mitte das Schneebett mit Schneewiese, Eisschale,
-// Wassertrog aus Eis, Iglu und Klangstein, seitlich das Eisloch, drei Fischkisten, ein Moosfleck, die beiden
-// Plattformen des Eis-Portals (hinter der Mündung und im Kreis um das Bett), vom Tor bis ans Bett die Rutschspur.
-// Ringsum Winterlandschaft wie draußen in der Eis-Welt (`eisCell`): Hügel in drei Stufen, Tannenhaine, Eisblöcke,
-// dazu Eiskristalle und Schneewehen (mitwachsen-frost.ts).
+// Er ist ein langes Gletschertal (`KESSEL.shape`), das vom Ende des Gangs hinter dem Eistor weg nach außen läuft, ganz
+// hinter dem Felsring der Lichtung und fern der Ausgänge der anderen Gänge, im selben Koordinatenraum. Ringsum feste
+// Eisklippen, der Gang ist der einzige Zugang. Nah an der Mündung das Schneebett (`KESSEL.bed`) mit Schneewiese,
+// Eisschale, Wassertrog aus Eis, Iglu und Klangstein, daneben das Eisloch und der Moosfleck; sechs Fischkisten über das
+// Tal verteilt; die Plattform des Eis-Portals ganz hinten am Talende (der Heimweg), ihr Gegenstück im Kreis um das Bett;
+// vom Tor bis ans Bett die Rutschspur. Lagen darin rechnen vom Schneebett aus. Ringsum Winterlandschaft wie draußen in
+// der Eis-Welt (`eisCell`): Hügel in drei Stufen, Tannenhaine, Eisblöcke, dazu Eiskristalle und Schneewehen
+// (mitwachsen-frost.ts).
 // Teil des Welt-Pakets der Eis-Welt (index.ts), nachgeladen.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Welt-Pakete“ und „Gletscherkessel“)
 
@@ -27,6 +29,10 @@ const key = (x: number, y: number) => `${x},${y}`;
 const EIS = REGIONS.find((r) => r.id === 'eis')!; // die Eis-Welt steht fest in REGIONS
 const { rx, ry } = KESSEL.shape;
 const OUTER = { rx: rx + KESSEL.cliff, ry: ry + KESSEL.cliff }; // fester Außenrand der Klippen
+/** Reihe des Schneebetts, gemessen von der Mitte des Tals: `KESSEL.bed` Felder hinter dem inneren Rand an der Mündung */
+const BED_V = -ry + KESSEL.bed;
+/** Lage (u, v) von der Mitte des Tals für eine Lage [quer, vom Tor weg] vom Schneebett aus */
+const fromBed = ([across, out]: readonly [number, number]): Point => [across, BED_V + out];
 const NEIGHBOURS = [
   [1, 0],
   [-1, 0],
@@ -34,31 +40,52 @@ const NEIGHBOURS = [
   [0, -1],
 ] as const;
 
-/** Wozu gehört (u, v), gemessen von der Mitte des Kessels: Boden innen, Klippe ringsum (Rand leicht gewellt), sonst nichts */
+/**
+ * Wozu gehört (u, v), gemessen von der Mitte des Tals: Boden innen, Klippe ringsum, sonst nichts. Der Rand innen ist
+ * leicht gewellt, aber nur nach innen: So bleiben die Klippen auch an den Enden des langen Tals mindestens
+ * `KESSEL.cliff` Felder dick.
+ */
 function zone(seed: number, u: number, v: number): 'floor' | 'cliff' | null {
-  if ((u / OUTER.rx) ** 2 + (v / OUTER.ry) ** 2 >= 1) return null;
-  const wobble = 1 + (valueNoise(seed + 61, u, v, 5) - 0.5) * 0.2;
-  return (u / rx) ** 2 + (v / ry) ** 2 < wobble ? 'floor' : 'cliff';
+  if (!inside(u, v)) return null;
+  if (zones.seed !== seed) zones = { seed, grid: new Int8Array(ZONE_W * (2 * OUTER.ry + 1)) };
+  const i = (v + OUTER.ry) * ZONE_W + u + OUTER.rx;
+  zones.grid[i] ||= (u / rx) ** 2 + (v / ry) ** 2 < 1 - valueNoise(seed + 61, u, v, 5) * WOBBLE ? 1 : 2;
+  return zones.grid[i] === 1 ? 'floor' : 'cliff';
 }
+// Rand je Feld einmal rechnen (der Bau fragt jedes Feld vielfach): 0 offen, 1 Boden, 2 Klippe; für den letzten Seed
+const ZONE_W = 2 * (rx + KESSEL.cliff) + 1;
+let zones = { seed: NaN, grid: new Int8Array(0) };
+/** Liegt (u, v) innerhalb des festen Außenrands der Klippen? */
+const inside = (u: number, v: number) => (u / OUTER.rx) ** 2 + (v / OUTER.ry) ** 2 < 1;
+/** So weit (Anteil am Quadrat des Radius) wellt sich der Rand innen höchstens nach innen */
+const WOBBLE = 0.08;
 
 /**
- * Wo der Kessel liegt: so nah wie möglich hinter dem Gang, aber ganz hinter dem Felsring (`beyond`), mit `KESSEL.gap`
- * Feldern Abstand. Weiter nach außen bleibt man jenseits des Felsrings, darum genügt je Spalte das innerste Feld.
+ * Wo das Tal liegt: so nah wie möglich hinter dem Gang, aber ganz hinter dem Felsring (`beyond`), mit `KESSEL.gap`
+ * Feldern Abstand. Geprüft wird die ganze Hülle (Ellipse samt Abstand) an ihrem Rand: Die Lichtung samt Felsring ist
+ * eine Ellipse um die Mitte der Welt, die nie in der Hülle liegt; berührt sie die Hülle, dann auch ihren Rand (ebenso
+ * die Kreise um die Ausgänge der anderen Gänge, die `beyond` ausspart). Die Lage hängt nicht vom Seed ab, nur vom Gang.
  */
-export function placeKessel(seed: number, gang: Gang, beyond: Beyond): KesselPlace {
+export function placeKessel(_seed: number, gang: Gang, beyond: Beyond): KesselPlace {
   const A = OUTER.rx + KESSEL.gap,
     B = OUTER.ry + KESSEL.gap;
   let centre = gang.end + OUTER.ry;
   const clear = (c: number) => {
-    for (let u = -A; u <= A; u++)
-      if (!beyond(...gang.at(u, c - Math.ceil(B * Math.sqrt(1 - (u / A) ** 2))))) return false;
+    for (let u = -A; u <= A; u++) {
+      const h = Math.ceil(B * Math.sqrt(1 - (u / A) ** 2));
+      if (!beyond(...gang.at(u, c - h)) || !beyond(...gang.at(u, c + h))) return false;
+    }
+    for (let v = -B; v <= B; v++) {
+      const h = Math.ceil(A * Math.sqrt(1 - (v / B) ** 2));
+      if (!beyond(...gang.at(-h, c + v)) || !beyond(...gang.at(h, c + v))) return false;
+    }
     return true;
   };
   while (!clear(centre) && centre < gang.end + 400) centre++;
-  const cells: Point[] = [];
+  const cells: Point[] = []; // Boden und Klippen: alles innerhalb des festen Außenrands (wie `zone`, ohne Rauschen)
   for (let v = -OUTER.ry; v <= OUTER.ry; v++)
-    for (let u = -OUTER.rx; u <= OUTER.rx; u++) if (zone(seed, u, v)) cells.push(gang.at(u, centre + v));
-  return { bed: gang.at(0, centre), centre, cells };
+    for (let u = -OUTER.rx; u <= OUTER.rx; u++) if (inside(u, v)) cells.push(gang.at(u, centre + v));
+  return { bed: gang.at(0, centre + BED_V), centre, cells };
 }
 
 const snow = (h: number): Cell => ({ h, ground: 'snow', deco: null, region: 'eis', solid: false, biome: 'eis' });
@@ -158,25 +185,26 @@ function cliffCell(seed: number, u: number, v: number, x: number, y: number): Ce
 /** Höhe des Kessel-Bodens vor dem Ebnen: Hügel in drei Stufen */
 const hill = (seed: number, x: number, y: number) => {
   const n = valueNoise(seed + 63, x, y, 7);
-  return n < 0.37 ? 1 : n < 0.64 ? 2 : 3;
+  return n < 0.53 ? 1 : n < 0.74 ? 2 : 3;
 };
 /** Rauschen der Tannenhaine (Hain über `GROVE`) */
 const grove = (seed: number, x: number, y: number) => valueNoise(seed + 65, x, y, 9);
 const GROVE = 0.62;
 /**
- * So viele Schneetannen und Eisblöcke hat jeder Kessel mindestens. Draußen genügen 3 % im Hain, im Kessel bleibt nach
- * allem, was frei bleibt, zu wenig Fläche dafür: darum hier dichter (`OBSTACLE_GAP` dünnt aus) und notfalls nachgepflanzt.
+ * So viele Schneetannen und Eisblöcke hat jeder Kessel mindestens (fehlen welche, wachsen sie nach). Im Hain stehen die
+ * Tannen dichter als draußen (dort 3 %, `OBSTACLE_GAP` dünnt aus): So wird das weite Tal nicht leer, etwa 5 Dinge je
+ * 100 Felder.
  */
 export const KESSEL_WILDS = { pines: 4, blocks: 2, patches: 2, patchR: 2.2 } as const;
 
 /**
  * Boden im Kessel wie die Eis-Welt draußen (`eisCell`): Schnee mit Hügeln in drei Stufen, kleine Eisflächen (`wet` aus
- * `icePatches`), Tannenhaine (Schneetannen 12 % im Hain, sonst 1 %); um das Bett eben. Wo der Kessel frei bleibt
+ * `icePatches`), Tannenhaine (Schneetannen 10 % im Hain, sonst 0,8 %); um das Bett eben. Wo der Kessel frei bleibt
  * (`wet` null), wachsen keine Tannen; Tannen nur, wo Platz ist (`pine`). Eisblöcke setzt erst `winter`.
  */
 function floorCell(seed: number, bed: Point, x: number, y: number, wet: number | null, pine: boolean): Cell {
   if (Math.hypot(x - bed[0], y - bed[1]) <= KESSEL.flat) return snow(1);
-  const pines = wet === null || !pine ? 0 : grove(seed, x, y) > GROVE ? 0.12 : 0.01;
+  const pines = wet === null || !pine ? 0 : grove(seed, x, y) > GROVE ? 0.1 : 0.008;
   return eisCell(snow(hill(seed, x, y)), wet ?? 1, rand01(seed, x, y, 66), pines, 0);
 }
 
@@ -186,12 +214,18 @@ function floorCell(seed: number, bed: Point, x: number, y: number, wet: number |
  */
 function icePatches(seed: number, gang: Gang, place: KesselPlace, free: (u: number, v: number) => boolean) {
   const { patches, patchR } = KESSEL_WILDS;
-  /** Wie eben ist es um (u, v): so viele der 5 × 5 Felder sind Boden auf Höhe 1 (nur dort wird `eisCell` zu Eis) */
+  // je Feld einmal: Boden auf Höhe 1? (nur dort wird `eisCell` zu Eis; der Boden liegt ganz in rx × ry)
+  const W = 2 * rx + 5;
+  const low = new Uint8Array(W * (2 * ry + 5));
+  for (let v = -ry; v <= ry; v++)
+    for (let u = -rx; u <= rx; u++)
+      if (zone(seed, u, v) === 'floor' && hill(seed, ...gang.at(u, place.centre + v)) === 1)
+        low[(v + ry + 2) * W + u + rx + 2] = 1;
+  /** Wie eben ist es um (u, v): so viele der 5 × 5 Felder sind Boden auf Höhe 1 */
   const flat = (u: number, v: number) => {
     let n = 0;
     for (let dv = -2; dv <= 2; dv++)
-      for (let du = -2; du <= 2; du++)
-        if (zone(seed, u + du, v + dv) === 'floor' && hill(seed, ...gang.at(u + du, place.centre + v + dv)) === 1) n++;
+      for (let du = -2; du <= 2; du++) n += low[(v + dv + ry + 2) * W + u + du + rx + 2] ?? 0;
     return n;
   };
   const spots: { p: Point; n: number }[] = [];
@@ -284,12 +318,17 @@ function winter(
 }
 
 /**
- * Was im Kessel frei bleibt (keine Tannen, keine Eisblöcke), gemessen in (u, v) von der Mitte: die Mündung, das Bett
- * mit Schneewiese und Platz für das Gegenstück des Eis-Portals, das Ufer des Eislochs, das Umfeld der Fischkisten, der
- * Moosfleck und die Plattform hinter der Mündung. Die Rutschspur hält `buildKessel` frei.
+ * Was im Tal frei bleibt (keine Tannen, keine Eisblöcke), gemessen in (u, v) von der Mitte: die Mündung, das Bett
+ * mit Schneewiese, das Gegenstück des Eis-Portals im Kreis um das Bett, das Ufer des Eislochs, das Umfeld der
+ * Fischkisten, der Moosfleck und die Plattform am Talende. Die Rutschspur hält `buildKessel` frei.
  */
 function keepFree(seed: number, gang: Gang, { centre, bed }: KesselPlace) {
-  const { hole, moss, crates, portal } = KESSEL;
+  const { hole, moss } = KESSEL;
+  const [hu, hv] = fromBed([hole.across, hole.out]);
+  const [mu, mv] = fromBed([moss.across, moss.out]);
+  const portal = fromBed(KESSEL.portal);
+  const crates = KESSEL.crates.map(fromBed);
+  const ringPortal: Point = [0, BED_V - HOMES.eis.portalRing]; // Gegenstück im Kreis um das Bett, Richtung Tor
   // Die Mündung: sechs Reihen ab dem ersten Bodenfeld vor dem Gang (der Rand ist gewellt, darum gemessen)
   let mouth = -OUTER.ry;
   for (let u = -gang.half - 3; u <= gang.half + 3; u++) {
@@ -301,12 +340,18 @@ function keepFree(seed: number, gang: Gang, { centre, bed }: KesselPlace) {
     const [x, y] = gang.at(u, centre + v);
     if (Math.hypot(x - bed[0], y - bed[1]) <= KESSEL.flat + 2) return true;
     if (Math.abs(u) <= gang.half + 3 && v < mouth + 6) return true;
-    if (Math.hypot(u - hole.across, v - hole.out) <= hole.r + 4) return true;
-    if (Math.hypot(u - moss.across, v - moss.out) <= moss.r + 2) return true;
+    if (Math.hypot(u - hu, v - hv) <= hole.r + 4) return true;
+    if (Math.hypot(u - mu, v - mv) <= moss.r + 2) return true;
     const near = ([a, b]: readonly [number, number], r: number) => Math.max(Math.abs(u - a), Math.abs(v - b)) <= r;
-    return near(portal, PLATFORM_HALF + 3) || crates.some((p) => near(p, 3));
+    return near(portal, PLATFORM_HALF + 3) || near(ringPortal, PLATFORM_HALF + 3) || crates.some((p) => near(p, 3));
   };
 }
+
+/** Lage (u, t) im Gang-Raster für eine Lage [quer, vom Tor weg] vom Schneebett aus */
+const uv = (centre: number, p: readonly [number, number]): Point => {
+  const [u, v] = fromBed(p);
+  return [u, centre + v];
+};
 
 /** Eine Tanne weicht: Schnee auf derselben Höhe */
 const unpine = (c: Cell): Cell => ({ ...c, deco: null, solid: false, tree: undefined });
@@ -336,7 +381,7 @@ function level(cells: readonly Point[], map: Map<string, Cell>) {
   }
 }
 
-/** Zuhause im Kessel: Schneebett, Schneewiese mit Eisschale und Wassertrog, Iglu mit fester Rückwand, Eisloch */
+/** Zuhause im Tal: Schneebett, Schneewiese mit Eisschale und Wassertrog, Iglu mit fester Rückwand, Eisloch */
 function home(gang: Gang, { bed, centre }: KesselPlace, set: (x: number, y: number, c: Cell) => void) {
   const h = placeHome('eis', bed);
   const r = h.meadow;
@@ -354,7 +399,7 @@ function home(gang: Gang, { bed, centre }: KesselPlace, set: (x: number, y: numb
   for (let x = x0; x <= x1; x++) set(x, y0 - 1, fixed('igloo')); // Rückwand, die Mitte ist `shelterStem`
   // Eisloch: Wasser zum Schöpfen, ringsum ebenes Ufer
   const { across, out, r: hr } = KESSEL.hole;
-  const [hx, hy] = gang.at(across, centre + out);
+  const [hx, hy] = gang.at(...uv(centre, [across, out]));
   for (let dy = -4; dy <= 4; dy++)
     for (let dx = -4; dx <= 4; dx++) {
       const d = Math.hypot(dx, dy);
@@ -364,33 +409,34 @@ function home(gang: Gang, { bed, centre }: KesselPlace, set: (x: number, y: numb
 }
 
 /**
- * Futter im Kessel: drei Fischkisten (fest wie ein Busch; einzeln, ringsum ebener Schnee) und ein Moosfleck als
+ * Futter im Tal: sechs Fischkisten (fest wie ein Busch; einzeln, ringsum ebener Schnee) und ein Moosfleck als
  * Kulisse (grünes Moos unter dem Schnee, begehbar)
  */
 function forage(gang: Gang, { centre }: KesselPlace, map: Map<string, Cell>) {
   const { across, out, r } = KESSEL.moss;
+  const [mu, mv] = uv(centre, [across, out]);
   for (let dv = -2; dv <= 2; dv++)
     for (let du = -2; du <= 2; du++) {
-      const [x, y] = gang.at(across + du, centre + out + dv);
+      const [x, y] = gang.at(mu + du, mv + dv);
       const c = map.get(key(x, y));
       if (c?.region === 'eis' && !c.solid && Math.hypot(du, dv) <= r) map.set(key(x, y), { ...c, ground: 'grass' });
     }
-  for (const [u, v] of KESSEL.crates) {
-    for (let dv = -1; dv <= 1; dv++)
-      for (let du = -1; du <= 1; du++) map.set(key(...gang.at(u + du, centre + v + dv)), snow(1));
-    map.set(key(...gang.at(u, centre + v)), { ...snow(1), deco: 'fishcrate', solid: true });
+  for (const crate of KESSEL.crates) {
+    const [u, t] = uv(centre, crate);
+    for (let dv = -1; dv <= 1; dv++) for (let du = -1; du <= 1; du++) map.set(key(...gang.at(u + du, t + dv)), snow(1));
+    map.set(key(...gang.at(u, t)), { ...snow(1), deco: 'fishcrate', solid: true });
   }
 }
 
 /**
- * Die beiden Plattformen des Eis-Portals (3 × 3, flach, ringsum zwei Felder ebener Schnee): gleich hinter der
- * Gangmündung und im Kreis um das Schneebett (`HOMES.eis.portalRing`) in Richtung des Tors. Es erwacht, sobald die
+ * Die beiden Plattformen des Eis-Portals (3 × 3, flach, ringsum zwei Felder ebener Schnee): ganz hinten am Talende
+ * und im Kreis um das Schneebett (`HOMES.eis.portalRing`) in Richtung des Tors. Es erwacht, sobald die
  * Figur am Schneebett ankommt (`bed`).
  */
 function platforms(gang: Gang, { bed, centre }: KesselPlace, map: Map<string, Cell>): Portal {
   const [mx, my] = gang.at(0, gang.depth);
   const [home] = ringSpots([Math.atan2(my - bed[1], mx - bed[0])], HOMES.eis.portalRing, bed);
-  const portal: Portal = { gate: gang.at(KESSEL.portal[0], centre + KESSEL.portal[1]), home: home!, bed };
+  const portal: Portal = { gate: gang.at(...uv(centre, KESSEL.portal)), home: home!, bed };
   for (const side of ['gate', 'home'] as const) {
     const [cx, cy] = portal[side];
     const ring = PLATFORM_HALF + 1;
@@ -428,8 +474,8 @@ function slidePath(gang: Gang, bed: Point, map: ReadonlyMap<string, Cell>): Poin
   const from = new Map<string, string>([[key(...start), '']]);
   const queue: Point[] = [start];
   const toBed = (x: number, y: number) => Math.hypot(x - bed[0], y - bed[1]);
-  while (queue.length) {
-    const [x, y] = queue.shift()!;
+  for (let i = 0; i < queue.length; i++) {
+    const [x, y] = queue[i]!;
     if (goal.has(key(x, y))) {
       const path: Point[] = [];
       for (let k = key(x, y); k; k = from.get(k) ?? '') path.unshift(fromKey(k));
@@ -452,20 +498,12 @@ function slidePath(gang: Gang, bed: Point, map: ReadonlyMap<string, Cell>): Poin
  * Portal-Plattformen, nicht in der Mündung (zwei Felder Abstand zum Gang, so versperrt kein Tier den Weg hinein)
  */
 function spotsOf({ bed }: KesselPlace, map: ReadonlyMap<string, Cell>): Point[] {
-  const out: Point[] = [];
-  const mouth = (x: number, y: number) => {
-    for (let dy = -2; dy <= 2; dy++)
-      for (let dx = -2; dx <= 2; dx++)
-        if (stand(map, x + dx, y + dy) && map.get(key(x + dx, y + dy))!.region !== 'eis') return true;
-    return false;
-  };
   const seen = new Set<string>();
   const queue = placeHome('eis', bed).wake.filter(([x, y]) => stand(map, x, y));
   for (const [x, y] of queue) seen.add(key(x, y));
-  while (queue.length) {
-    const [x, y] = queue.shift()!;
+  for (let i = 0; i < queue.length; i++) {
+    const [x, y] = queue[i]!;
     const c = map.get(key(x, y))!; // nur Felder, auf denen man steht, kommen in die Liste
-    if (c.region === 'eis' && !c.garden && !c.portal && !mouth(x, y)) out.push([x, y]);
     for (const [dx, dy] of NEIGHBOURS) {
       const k = key(x + dx, y + dy);
       const n = map.get(k);
@@ -474,5 +512,12 @@ function spotsOf({ bed }: KesselPlace, map: ReadonlyMap<string, Cell>): Point[] 
       queue.push([x + dx, y + dy]);
     }
   }
-  return out;
+  // Mündung: bis zwei Felder um den Gang (begehbar außerhalb des Kessels; hinter den dicken Klippen liegt nichts nah)
+  const mouth = new Set<string>();
+  for (const [x, y] of queue)
+    if (map.get(key(x, y))!.region !== 'eis') for (const [dx, dy] of NEAR_2) mouth.add(key(x + dx, y + dy));
+  return queue.filter(([x, y]) => {
+    const c = map.get(key(x, y))!;
+    return c.region === 'eis' && !c.garden && !c.portal && !mouth.has(key(x, y));
+  });
 }

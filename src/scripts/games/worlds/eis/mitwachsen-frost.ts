@@ -16,7 +16,7 @@ const key = (x: number, y: number) => `${x},${y}`;
  * `size` Kristalle (zwei Felder auseinander, dazwischen eine Lücke); jeder Kessel hat mindestens `least` Kristalle.
  * Schneewehen: Jede Tanne hat eine direkt im Lee (wo Platz ist), Anteil `second` ein zweites Häufchen dahinter.
  */
-export const FROST = { groups: 4, spacing: 7, size: 4, least: 4, second: 0.4 } as const;
+export const FROST = { groups: 24, spacing: 9, size: 4, least: 12, second: 0.4 } as const;
 
 /** Ein Feld des Kessels, auf dem Tannen, Eisblöcke, Kristalle und Wehen wachsen dürfen (nicht dort, wo er frei bleibt) */
 export type Wild = { readonly x: number; readonly y: number };

@@ -47,4 +47,17 @@ describe('Nebel', () => {
     expect(Fog.from(null).size).toBe(0);
     expect(Fog.from([1, 2]).size).toBe(0);
   });
+
+  it('legt Erkundetes wieder in Nebel, wo es soll; leere Stücke fallen aus dem Spielstand', () => {
+    const fog = new Fog();
+    fog.reveal(0, 0, 5);
+    fog.reveal(40, -20, 4);
+    fog.forget((x) => x >= 20); // alles rechts davon wieder im Nebel
+    expect(fog.has(0, 0)).toBe(true);
+    expect(fog.has(-5, 0)).toBe(true);
+    expect(fog.has(40, -20)).toBe(false);
+    expect(Object.keys(fog.serialize()).sort()).toEqual(['-1,-1', '-1,0', '0,-1', '0,0']);
+    fog.forget((x, y) => x === 0 && y === 0); // nur ein Feld
+    expect([fog.has(0, 0), fog.has(1, 0)]).toEqual([false, true]);
+  });
 });

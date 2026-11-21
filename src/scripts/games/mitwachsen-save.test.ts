@@ -15,6 +15,11 @@ import {
   worldKey,
   type Store,
 } from './mitwachsen-save';
+import { Fog } from './mitwachsen-fog';
+import { packAt } from './mitwachsen-pack';
+import { initialState, progressOf, step } from './mitwachsen-state';
+import { beyondRing } from './mitwachsen-world';
+import { worldOf } from './test-worlds';
 
 /** Speicher im Arbeitsspeicher wie localStorage */
 function memoryStore(): Store & { data: Map<string, string> } {
@@ -46,7 +51,7 @@ describe('Welten speichern', () => {
     expect(saveWorld(store, w)).toBe(true);
     expect(loadWorld(store, 'a1')).toEqual(w);
     expect(loadIndex(store)).toEqual({
-      v: 4,
+      v: 5,
       worlds: [{ id: 'a1', worldName: 'Bobos Insel', figureName: 'Bobo' }],
       current: 'a1',
     });
@@ -82,7 +87,7 @@ describe('Welten speichern', () => {
   it('läuft ohne Fehler weiter, wenn der Browser nichts speichern lässt', () => {
     expect(saveWorld(brokenStore, newWorld('a', 1, 'X'))).toBe(false);
     expect(loadWorld(brokenStore, 'a')).toBeNull();
-    expect(loadIndex(brokenStore)).toEqual({ v: 4, worlds: [], current: null });
+    expect(loadIndex(brokenStore)).toEqual({ v: 5, worlds: [], current: null });
   });
 
   it('übersteht kaputte Daten: falsches JSON, fremder Index, unbekannte aktuelle Welt', () => {
@@ -91,7 +96,7 @@ describe('Welten speichern', () => {
     expect(loadWorld(store, 'x')).toBeNull();
     store.setItem(INDEX_KEY, JSON.stringify({ v: 4, worlds: [{ id: 'a' }, 42, { nope: true }], current: 'weg' }));
     expect(loadIndex(store)).toEqual({
-      v: 4,
+      v: 5,
       worlds: [{ id: 'a', worldName: 'Meine Welt', figureName: 'Bobo' }],
       current: 'a',
     });
@@ -115,11 +120,11 @@ describe('Welten löschen', () => {
     saveWorld(store, newWorld('a', 1, 'Erste'));
     saveWorld(store, newWorld('b', 2, 'Zweite'));
     expect(deleteWorld(store, 'a').current).toBe('b');
-    expect(deleteWorld(store, 'b')).toEqual({ v: 4, worlds: [], current: null });
+    expect(deleteWorld(store, 'b')).toEqual({ v: 5, worlds: [], current: null });
   });
 
   it('übersteht einen Speicher, der nichts zulässt', () => {
-    expect(deleteWorld(brokenStore, 'a')).toEqual({ v: 4, worlds: [], current: null });
+    expect(deleteWorld(brokenStore, 'a')).toEqual({ v: 5, worlds: [], current: null });
   });
 });
 
@@ -169,7 +174,7 @@ describe('Format und Umzug (migrate)', () => {
 });
 
 describe('Eis-Portal im Spielstand', () => {
-  it('Eis-Portal kommt mit dem Spielstand wieder (Format v4 wie bisher, Unbekanntes fällt weg)', () => {
+  it('Eis-Portal kommt mit dem Spielstand wieder (Unbekanntes fällt weg)', () => {
     const store = memoryStore();
     const w = { ...newWorld('a', 1, 'X'), portals: ['lava', 'eiskessel'] as ('lava' | 'eiskessel')[] };
     saveWorld(store, w);
@@ -181,7 +186,7 @@ describe('Eis-Portal im Spielstand', () => {
     expect(progressFrom(loadWorld(store, 'a')!).portals).toEqual(['lava', 'eiskessel']);
   });
 
-  it('alter v4-Stand (vor dem Eis-Portal gespeichert) lädt unverändert', () => {
+  it('alter v4-Stand (vor dem Eis-Portal gespeichert) lädt mit neuer Version, sonst unverändert', () => {
     // so, wie ihn die Spielseite bisher geschrieben hat: Portale nur an Toren
     const old = {
       v: 4,
@@ -198,23 +203,24 @@ describe('Eis-Portal im Spielstand', () => {
       position: [12, -3],
       visits: 7,
       day: 4,
-      explored: { '0,0': 'AAAA' },
+      explored: { '0,0': '//////////////////////////////////////////8=' }, // Lichtung um das Bett erkundet
       heard: ['bett', 'eis'],
     };
     const store = memoryStore();
     store.setItem(worldKey('k7'), JSON.stringify(old));
-    expect(loadWorld(store, 'k7')).toEqual(old);
-    expect(migrate(old)).toEqual(old);
+    // nur die Version ändert sich: Der Nebel liegt auf der Lichtung, nicht im Land der Eis-Welt
+    expect(loadWorld(store, 'k7')).toEqual({ ...old, v: 5 });
+    expect(migrate(old)).toEqual({ ...old, v: 5 });
   });
 });
 
 describe('Offenes Eistor im Spielstand', () => {
-  it('das Eistor bleibt nach dem Laden offen (Format v4 wie bisher); die Position im Kessel kommt mit', () => {
+  it('das Eistor bleibt nach dem Laden offen; die Position im Tal kommt mit', () => {
     const store = memoryStore();
     const w = { ...newWorld('e', 7, 'X'), openGates: ['eis' as const], position: [40, -60] as [number, number] };
     saveWorld(store, w);
     const back = loadWorld(store, 'e')!;
-    expect(back.v).toBe(4);
+    expect(back.v).toBe(5);
     expect(progressFrom(back)).toMatchObject({ openGates: ['eis'], position: [40, -60] });
     // die anderen sieben bleiben auch aus einem Spielstand zu (das filtert `initialState`, hier nur Format und Umzug)
     expect(migrate({ ...w, openGates: ['eis', 'sand', 'westtor'] })!.openGates).toEqual(['eis', 'sand']);
@@ -254,7 +260,7 @@ describe('Umzug vom Arbeitstitel threeyear (Version 1)', () => {
 
   it('macht aus einer threeyear-Welt eine Mitwachsen-Welt ab 3 auf der Lichtung', () => {
     const w = migrate(v1)!;
-    expect(w).toMatchObject({ v: 4, game: 'mitwachsen', age: 3, id: 'alt', seed: 4711, worldName: 'Bobos Insel' });
+    expect(w).toMatchObject({ v: 5, game: 'mitwachsen', age: 3, id: 'alt', seed: 4711, worldName: 'Bobos Insel' });
     expect(w.metAnimals).toEqual(['lichtung:hase', 'lichtung:igel']); // Hase und Igel gibt es auch auf der Lichtung
     expect(w.openGates).toEqual([]);
     expect(w.homeAnimals).toEqual([]);
@@ -273,12 +279,12 @@ describe('Umzug vom Arbeitstitel threeyear (Version 1)', () => {
     expect(w.metAnimals).toEqual(['lichtung:hase', 'lichtung:igel']);
     saveWorld(store, w);
     expect(JSON.parse(store.getItem(worldKey('alt'))!)).toMatchObject({
-      v: 4,
+      v: 5,
       game: 'mitwachsen',
       age: 3,
       homeAnimals: [],
     });
-    expect((JSON.parse(store.getItem(INDEX_KEY)!) as { v: number }).v).toBe(4);
+    expect((JSON.parse(store.getItem(INDEX_KEY)!) as { v: number }).v).toBe(5);
   });
 
   it('setzt ein unbekanntes Alter auf 3', () => {
@@ -296,7 +302,7 @@ describe('Umzug auf die Lichtung (Version 2 und 3)', () => {
     } as Record<string, unknown>;
     delete v2.homeAnimals;
     const w = migrate(v2)!;
-    expect(w.v).toBe(4);
+    expect(w.v).toBe(5);
     expect(w.metAnimals).toEqual(['lichtung:igel']);
     expect(w.homeAnimals).toEqual([]);
     expect('penAnimals' in w).toBe(false);
@@ -315,5 +321,123 @@ describe('Umzug auf die Lichtung (Version 2 und 3)', () => {
     expect(w.openGates).toEqual([]);
     expect(w.homeAnimals).toEqual([]);
     expect(w.position).toEqual([0, 0]);
+  });
+});
+
+describe('Umzug ins Gletschertal (Version 5)', () => {
+  /**
+   * Echter Spielstand aus dem kleinen Gletscherkessel (mit dem Spiel vor dem Gletschertal gespeichert, Seed 2026): Eistor
+   * offen, die Figur im Kessel, Pinguin, Robbe und Lemming zu Hause, Lichtung, Gang und Kessel erkundet, beide Portale
+   * wach. Leere Fischkisten speichert das Spiel nicht.
+   */
+  const OLD = {
+    v: 4,
+    game: 'mitwachsen',
+    age: 3,
+    id: 'kessel',
+    seed: 2026,
+    worldName: 'Bobos Welt',
+    figureName: 'Bobo',
+    openGates: ['eis'],
+    metAnimals: ['eis:lemming:1', 'eis:pinguin', 'eis:robbe:2', 'lichtung:hase:1'],
+    homeAnimals: [
+      { id: 'eis:pinguin', species: 'pinguin' },
+      { id: 'eis:robbe:2', species: 'robbe' },
+      { id: 'eis:lemming:1', species: 'lemming' },
+      { id: 'lichtung:hase:1', species: 'hase' },
+    ],
+    position: [114, 62],
+    visits: 12,
+    day: 9,
+    explored: {
+      '-1,-1': 'AAAAAAAAAAAAAAAAAOAA+AD8AP4A/4D/gP/A/8D/wP8=',
+      '0,-1': 'AAAAAAAAAAAAAAAADwA/AH8A/wD/Af8D/wP/B/8H/wc=',
+      '-1,0': 'wP/A/8D/wP+A/4D/AP8A/gD8APgA4AAAAAAAAAAAAAA=',
+      '0,0': '/wf/B/8H/wf/A/8D/wH/AH8APwAPAAAAAAAAAAAAAAA=',
+      '4,2': 'AAD///////////////////////////////////////8=',
+      '3,2': 'AAD///////////////////////////////////////8=',
+      '2,2': 'AADA//D/+P/8//z//v/+//7//v/+//z//P/4//D/wP8=',
+      '5,2': 'AAD///////////////////////////////////////8=',
+      '6,2': 'AAD///////////////////////////////////////8=',
+      '7,2': '/x//P/9///////////////////////////////9//z8=',
+      '7,1': 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPgD/g8=',
+      '8,2': 'AAAAAAAAAAAAAAEAAQABAAEAAQABAAEAAAAAAAAAAAA=',
+      '7,3': '/x/+D/gDAAAAAAAAAAAfAH8A/wD/Af8B/wP/A/8D/wM=',
+      '6,3': 'AAAAAAAAAAAAAAAAAAAAAADAAOAA8ADwAPgA+AD4APg=',
+      '6,4': 'APgA8ADwAOAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      '7,4': '/wP/Af8B/wB/AB8AAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+    },
+    portals: ['eis', 'eiskessel'],
+    heard: ['bett', 'eis-offen'],
+  };
+
+  it('lädt ohne Fehler: Nebel im Land der Eis-Welt einmal verworfen, Lichtung und Gang bleiben erkundet, sonst alles gleich', () => {
+    const store = memoryStore();
+    store.setItem(worldKey('kessel'), JSON.stringify(OLD));
+    const w = loadWorld(store, 'kessel')!;
+    const { explored, ...rest } = w;
+    const { explored: before, ...oldRest } = OLD;
+    expect(rest).toEqual({ ...oldRest, v: 5 });
+    const was = Fog.from(before),
+      now = Fog.from(explored);
+    const world = worldOf(OLD.seed);
+    let kept = 0,
+      dropped = 0;
+    for (let y = -150; y <= 150; y++)
+      for (let x = -150; x <= 200; x++) {
+        if (!was.has(x, y)) continue;
+        const ice = beyondRing(x, y) && packAt([x, y], world.gates, beyondRing);
+        expect(now.has(x, y), `${x},${y}`).toBe(!ice);
+        if (ice) dropped++;
+        else kept++;
+      }
+    expect(kept).toBeGreaterThan(300); // Lichtung und Weg zum Tor
+    expect(dropped).toBeGreaterThan(300); // der alte Kessel
+    expect(now.has(...world.homes.lichtung.bed)).toBe(true);
+    expect(now.has(...world.homes.eis.bed)).toBe(false); // das neue Schneebett liegt im Nebel (die Ansicht lichtet ihn)
+    expect(migrate(w)).toEqual(w); // nur einmal
+  });
+
+  it('startet im neuen Schneebett; Eis-Tiere zu Hause auf der gewanderten Schneewiese, Portale wach, spielt weiter', () => {
+    const world = worldOf(OLD.seed);
+    const w = migrate(OLD)!;
+    let s = initialState(world, progressFrom(w), w.seed ^ w.visits);
+    expect([s.player.x, s.player.y]).toEqual([...world.homes.eis.bed]);
+    expect(s.portals).toEqual(['eis', 'eiskessel']);
+    expect(s.openGates).toEqual(['eis']);
+    const home = s.animals.filter((a) => a.mode === 'home');
+    expect(home.map((a) => a.id).sort()).toEqual(OLD.homeAnimals.map((a) => a.id).sort());
+    for (const a of home.filter((a) => a.realm === 'eis')) {
+      expect(world.cell(a.x, a.y).garden, a.id).toBe(true);
+      expect(Math.hypot(a.x - world.homes.eis.bed[0], a.y - world.homes.eis.bed[1]), a.id).toBeLessThanOrEqual(7);
+    }
+    const dirs = ['n', 'e', 's', 'w'] as const;
+    for (let i = 0; i < 400; i++)
+      s = step(s, world, i % 3 ? { type: 'tick' } : { type: 'move', dir: dirs[(i >> 4) % 4]! }).state;
+    expect(s.sleeping).toBe(false);
+    expect(world.realm(s.player.x, s.player.y)).toBe('eis');
+    const back = withProgress(w, progressOf(s));
+    expect(migrate(JSON.parse(JSON.stringify(back)))).toEqual(back);
+  });
+
+  it('derselbe Stand mit der Figur hinter dem Felsring, aber heute neben dem Tal: auch im Schneebett', () => {
+    // Der alte Kessel lag anders als das neue Tal: Eine gespeicherte Stelle kann heute hinter dem Felsring neben Gang
+    // oder Tal liegen, auf keinem Feld des Tals (`wakeRealm`); die Figur wacht trotzdem im neuen Schneebett auf
+    const world = worldOf(OLD.seed);
+    const { mid, out } = world.gates.get('eis')!;
+    const beside: [number, number][] = [];
+    for (let t = 10; t < 60; t++)
+      for (const u of [-12, 12]) {
+        const p: [number, number] = [mid[0] + out[0] * t - out[1] * u, mid[1] + out[1] * t + out[0] * u];
+        if (beyondRing(...p) && world.realm(...p) === 'lichtung') beside.push(p);
+      }
+    expect(beside.length).toBeGreaterThan(10);
+    for (const position of beside) {
+      const w = migrate({ ...OLD, position })!;
+      expect(w.position, position.join()).toEqual(position); // der Umzug selbst lässt die Position stehen
+      const s = initialState(world, progressFrom(w), w.seed ^ w.visits);
+      expect([s.player.x, s.player.y], position.join()).toEqual([...world.homes.eis.bed]);
+      expect(s.portals).toEqual(['eis', 'eiskessel']);
+    }
   });
 });

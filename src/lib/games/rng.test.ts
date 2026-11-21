@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHUNK, ChunkCache, chunkOf, fromKey, withNeighbours } from './chunks';
+import { CHUNK, ChunkCache, changedChunks, chunkOf, fromKey, withNeighbours } from './chunks';
 import { cycle, hash, nextRandom, pick, rand01, valueNoise } from './rng';
 
 describe('Zufall aus dem Seed', () => {
@@ -80,6 +80,21 @@ describe('Stücke der Welt', () => {
     expect(two).toHaveLength(8); // die beiden liegen nebeneinander und sind Nachbarn voneinander
     expect(new Set(two)).toEqual(new Set(['-2,3', '-1,3', '-3,3', '0,3', '-2,2', '-2,4', '-1,2', '-1,4']));
     expect(withNeighbours([])).toEqual([]);
+  });
+
+  it('findet die Stücke, in denen sich zwei Karten unterscheiden: geändert, neu oder weg, gleicher Inhalt zählt nicht', () => {
+    const before = new Map([
+      ['0,0', { h: 1 }],
+      ['20,0', { h: 2 }],
+      ['-1,-1', { h: 3 }],
+    ]);
+    const after = new Map([
+      ['0,0', { h: 1 }], // gleicher Inhalt, anderes Objekt
+      ['20,0', { h: 5 }], // geändert
+      ['0,40', { h: 1 }], // neu
+    ]); // '-1,-1' ist weg
+    expect([...changedChunks(before, after)].sort()).toEqual(['-1,-1', '0,2', '1,0']);
+    expect(changedChunks(before, before).size).toBe(0);
   });
 });
 

@@ -2,7 +2,7 @@
 // wenn das Paket fehlt (Laden gescheitert), eine Eisklippe am Ende des Gangs. Teil von mitwachsen-world.ts.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
-import type { Point } from '../../data/games/mitwachsen';
+import type { GateId, Point } from '../../data/games/mitwachsen';
 import type { StoryId } from '../../data/games/mitwachsen-stories';
 import type { Cell } from './mitwachsen-cell';
 import type { Beyond, Gang, Kessel, WorldPack } from './mitwachsen-pack-types';
@@ -42,4 +42,24 @@ export function behind(
   });
   const bed = gang.at(0, gang.end + CLOSED.length);
   return { bed, realm: new Set(), spots: [], spawns: new Map(), portals: [], stones: [] };
+}
+
+/** So viele Felder bleibt die Welt hinter einem Tor (samt Klippen) mindestens von den Ausgängen der anderen Gänge weg */
+export const EXIT_GAP = 12;
+
+/**
+ * Wo die Welt hinter dem Tor `own` liegen darf (`Beyond` für ihr Paket): ganz hinter dem Felsring (`beyond`) und
+ * mindestens `EXIT_GAP` Felder von jedem Ausgang der anderen Gänge (`gangs` ohne `own`: ihre erste Reihe ganz hinter
+ * dem Felsring, `end`, in der Breite von Tor und Türmen, `span` Felder zu jeder Seite)
+ */
+export function roomBehind(
+  beyond: Beyond,
+  span: number,
+  gangs: readonly (Pick<Gang, 'at' | 'end'> & { id: GateId })[],
+  own: GateId,
+): Beyond {
+  const exits = gangs
+    .filter((g) => g.id !== own)
+    .flatMap((g) => Array.from({ length: 2 * span + 1 }, (_, k) => g.at(k - span, g.end)));
+  return (x, y) => beyond(x, y) && exits.every(([ex, ey]) => (x - ex) ** 2 + (y - ey) ** 2 >= EXIT_GAP ** 2);
 }

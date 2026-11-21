@@ -5,7 +5,7 @@
 // (worlds/eis/, nachgeladen und `createWorld` hereingereicht); ohne Paket endet der Gang an einer Eisklippe.
 // Spezifikation: docs/specs/mitwachsen.md
 
-import { CHUNK, ChunkCache, chunkOf, fromKey } from '../../lib/games/chunks';
+import { CHUNK, ChunkCache, changedChunks, fromKey } from '../../lib/games/chunks';
 import { cycle, hash, rand01, valueNoise } from '../../lib/games/rng';
 import {
   GAME_COLORS,
@@ -20,7 +20,7 @@ import { BED_STONE, type StoryId } from '../../data/games/mitwachsen-stories';
 import type { Cell, Ground, TreeKind } from './mitwachsen-cell';
 import { LICHTUNG_HOME, realmsOf, type Realms } from './mitwachsen-home';
 import type { Gang, WorldPack } from './mitwachsen-pack-types';
-import { behind, type Behind } from './mitwachsen-behind';
+import { behind, roomBehind, type Behind } from './mitwachsen-behind';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal, type PortalId } from './mitwachsen-portal';
 import { findSpawns } from './mitwachsen-spawns';
 import { GATE_FLOOR, forecourt } from './mitwachsen-apron';
@@ -263,7 +263,7 @@ function buildStart(
       }
   }
   // Hinter dem Eistor: der Gletscherkessel am Ende des Gangs (Eis-Welt), ohne ihr Paket eine Eisklippe
-  const kessel = behind(eisPack, seed, gangOf(places), outside, (x, y) => passage(seed, 'eis', x, y), map);
+  const kessel = behind(eisPack, seed, gangOf(places), roomOf(places), (x, y) => passage(seed, 'eis', x, y), map);
 
   placePlatforms(map, portalsOf(places));
 
@@ -321,6 +321,9 @@ function buildStart(
   const spawns = new Map([...findSpawns(seed, lichtung, spots, LICHTUNG_HOME.bed), ...kessel.spawns]);
   return { map, spawns, spots, kessel };
 }
+
+/** Wo die Welt hinter dem Eistor liegen darf: hinter dem Felsring, fern der Ausgänge der anderen Gänge (`roomBehind`) */
+const roomOf = (places: readonly Layout[]) => roomBehind(outside, GATE_HALF + TOWER, places, 'eis');
 
 /** Gang hinter dem Eistor: Er führt in den Gletscherkessel */
 function gangOf(places: readonly Layout[]): Gang {
@@ -392,8 +395,8 @@ function reachOf(map: Map<string, Cell>): Point[] {
   const seen = new Set<string>();
   const queue: Point[] = LICHTUNG_HOME.wake.filter(([x, y]) => stand(x, y) !== null);
   for (const p of queue) seen.add(key(p[0], p[1]));
-  while (queue.length) {
-    const [x, y] = queue.shift()!;
+  for (let i = 0; i < queue.length; i++) {
+    const [x, y] = queue[i]!;
     reach.push([x, y]);
     const h = stand(x, y)!;
     for (const [dx, dy] of NEIGHBOURS) {
@@ -616,7 +619,7 @@ function dress(seed: number, x: number, y: number, c: Cell): Cell {
 }
 
 /** Lage des Gletscherkessels einer Welt (mit dem Paket der Eis-Welt); schnell, ohne die Welt zu bauen */
-export const kesselPlace = (seed: number, pack: WorldPack) => pack.place(seed, gangOf(layouts(seed)), outside);
+export const kesselPlace = (seed: number, p: WorldPack) => p.place(seed, gangOf(layouts(seed)), roomOf(layouts(seed)));
 /** Liegt ein Feld ganz hinter dem Felsring der Lichtung (Landschaft, Gänge ins Freie, Kessel)? */
 export const beyondRing = outside;
 /** Die Portal-Plattformen der Lichtung (an den Toren); schnell, ohne die Welt zu bauen */
@@ -625,16 +628,6 @@ export const portalPlaces = (seed: number) => portalsOf(layouts(seed));
 export const gatePlaces = (seed: number) => gatesOf(layouts(seed));
 const gatesOf = (places: readonly Layout[]) =>
   new Map<GateId, GatePlace>(places.map(({ id, cells, mid, out, angle }) => [id, { id, cells, mid, out, angle }]));
-
-/** Gleiche Felder? (zum Vergleich der festen Karte vor und nach dem Einbau eines Pakets) */
-const same = (a: Cell | undefined, b: Cell | undefined) => a === b || JSON.stringify(a) === JSON.stringify(b);
-/** Stücke ("cx,cy"), in denen sich die feste Karte zwischen `before` und `after` unterscheidet */
-function changedChunks(before: ReadonlyMap<string, Cell>, after: ReadonlyMap<string, Cell>): Set<string> {
-  const out = new Set<string>();
-  for (const k of new Set([...before.keys(), ...after.keys()]))
-    if (!same(before.get(k), after.get(k))) out.add(chunkOf(...fromKey(k)).join(','));
-  return out;
-}
 
 /** Die Welt eines Seeds mit den geladenen Welt-Paketen (worlds/); die Lichtung ist mit und ohne sie dieselbe */
 export const createWorld = (seed: number, packs: readonly WorldPack[]): World => build(seed, packs).world;
@@ -663,7 +656,7 @@ function build(
         );
     return cells;
   });
-  const chunks = from ? changedChunks(from.regions, regions) : new Set<string>();
+  const chunks = from ? changedChunks(from.regions, regions) : new Set<string>(); // feste Karte vor und nach dem Einbau
   if (from) cache.adopt(from.cache, chunks);
   const world: World = {
     seed,

@@ -106,16 +106,22 @@ function flake(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h
   ctx.fillRect(px, py, w, h);
 }
 
-/** Kanten der Eisklippen rund um den Kessel: Von dort wehen beim Pustewind die Pulverfahnen (je Welt einmal gesucht) */
+/**
+ * Kanten der Eisklippen rund um das Tal: Von dort wehen beim Pustewind die Pulverfahnen (je Welt einmal gesucht). Strahlen
+ * vom Schneebett aus bis ans Talende (gut 130 Felder), so wehen sie an den Seitenwänden und hinten genauso wie an der
+ * Mündung; gezeichnet wird nur, was nah an der Figur liegt
+ */
+const RIM_RAYS = 48;
+const RIM_REACH = 160;
 const rimCache = new WeakMap<World, [number, number, number][]>();
-function rims(world: World): [number, number, number][] {
+export function rims(world: World): [number, number, number][] {
   let out = rimCache.get(world);
   if (out) return out;
   out = [];
   const [bx, by] = world.homes.eis.bed;
-  for (let k = 0; k < 16; k++) {
-    const [dx, dy] = [Math.cos((k / 16) * Math.PI * 2), Math.sin((k / 16) * Math.PI * 2)];
-    for (let r = 8; r < 40; r++) {
+  for (let k = 0; k < RIM_RAYS; k++) {
+    const [dx, dy] = [Math.cos((k / RIM_RAYS) * Math.PI * 2), Math.sin((k / RIM_RAYS) * Math.PI * 2)];
+    for (let r = 8; r < RIM_REACH; r++) {
       const [x, y] = [Math.round(bx + dx * r), Math.round(by + dy * r)];
       const c = world.cell(x, y);
       if (c.region !== 'border') continue;

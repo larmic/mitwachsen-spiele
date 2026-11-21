@@ -72,8 +72,13 @@ export const shelterSpots = perRealm((world: World, realm): [number, number][] =
   const { x0, y0, x1, y1 } = shelter;
   const [cx, cy] = [(x0 + x1) / 2, (y0 + y1) / 2];
   const [lx, ly] = lee ?? [cx, cy];
+  // Im Windschatten zählt die Seite: Bei gleichem Abstand zum `lee` geht ein Platz rechts neben dem Iglu vor einem
+  // Platz vor seiner Front (sonst entschiede der Zufall der Wiese, und ein Tier stünde vorn im Wind)
+  const exposed = (p: [number, number]) => (lee && p[0] < x1 ? 0.5 : 0);
   const near = (p: [number, number]) =>
-    world.cell(p[0], p[1]).roof ? (y1 - p[1]) * 10 + Math.abs(p[0] - cx) : 1000 + Math.hypot(p[0] - lx, p[1] - ly);
+    world.cell(p[0], p[1]).roof
+      ? (y1 - p[1]) * 10 + Math.abs(p[0] - cx)
+      : 1000 + Math.hypot(p[0] - lx, p[1] - ly) + exposed(p);
   return [...meadowSpots(world, realm)].sort((a, b) => near(a) - near(b));
 });
 
