@@ -2,6 +2,7 @@
 // Jede Plattform hat ihre Zustände als eigene Teile, die je nach Spiel sichtbar werden: schlafend (am Tor matt, am
 // Bett ein leerer grauer Sockel), wach mit leuchtendem Bild, Gold-Rahmen um die Mitte (bereit: hier drauf) oder goldene
 // Pfeile in den Seitenfeldern (nach der Ankunft: erst runter). Keine zwei Teile teilen einen Voxel, so flackert nichts.
+// Dazu die Torplatten vor den großen Toren (`plates`, mitwachsen-plate-3d.ts): Sie hängen in den Torhäusern.
 // Wird nur mit der 3D-Ansicht nachgeladen (Three.js).
 
 import { BoxGeometry, Group, type BufferGeometry, Mesh, MeshBasicMaterial, type Material } from 'three';
@@ -19,6 +20,7 @@ import { PLATFORM_HALF, PORTAL_WAKE, portalColor } from './mitwachsen-portal';
 import type { Scene } from './mitwachsen-render';
 import type { State } from './mitwachsen-state';
 import type { World } from './mitwachsen-world';
+import { Plates3D } from './mitwachsen-plate-3d';
 
 const RUNNER_H = 0.3; // die hellen Voxel des Lauflichts: etwas größer als die Gold-Voxel, die sie umschließen
 const RUNNER = 4; // so viele helle Voxel wandern hintereinander um die Mitte
@@ -49,6 +51,7 @@ export class Platforms3D {
   private sparkGeo = new BoxGeometry(0.1, 0.1, 0.1);
   private runnerGeo = new BoxGeometry(1 / SUB + 0.03, RUNNER_H, 1 / SUB + 0.03);
   private runnerMat = new MeshBasicMaterial({ color: GOLD.light });
+  readonly plates: Plates3D; // Torplatten: hängen in den Torhäusern und werden mit ihnen gebaut (Schmuck der Pakete)
 
   /**
    * `solid`: Material für Stein, Holz, Eis …; `bright`: leuchtet aus sich selbst; `glow()` legt ein eigenes
@@ -58,7 +61,9 @@ export class Platforms3D {
     private readonly solid: Material,
     private readonly bright: MeshBasicMaterial,
     private readonly glow: () => MeshBasicMaterial,
-  ) {}
+  ) {
+    this.plates = new Plates3D(solid, glow);
+  }
 
   /**
    * Gruppe aus Voxeln: leuchtende und goldene mit `bright` (eigenes Material, z. B. zum Pulsieren), andere mit
@@ -145,6 +150,7 @@ export class Platforms3D {
         this.wokeAt.set(id, sc.now);
       }
     for (const p of this.platforms) this.show(p, state, sc);
+    this.plates.sync(sc.plate, sc.now, sc.reduced);
   }
 
   private show(p: Platform3D, state: State, sc: Scene) {

@@ -11,6 +11,7 @@ import { GAME_COLORS, LOOK, SPECIES, TIRED_TALK, realmOfAnimal } from '../../dat
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
 import { SPARKS, fly, glints, sparks } from './mitwachsen-glyphs';
 import { Sfx } from './sfx';
+import { plateToy } from './mitwachsen-plate-toy';
 import { NOTE_COLORS, StoryPlayer } from './mitwachsen-story';
 import {
   DEFAULT_FIGURE,
@@ -104,6 +105,7 @@ class LarmicMitwachsen extends HTMLElement {
   private packs = new Packs((pack) => this.arrive(pack)); // Welt-Pakete (worlds/), geladen erst bei Bedarf
   private opening = ''; // Welt, die gerade öffnet (wartet vielleicht auf ein Paket)
   private live = ''; // Welt, zu der `state` gehört; solange sie nicht `opening` ist, ruhen Takt und Speichern
+  private plates = plateToy(this.sfx, (at, colors) => this.burst('', colors, 6, at, true)); // Torplatten
 
   connectedCallback() {
     this.canvas = this.querySelector('canvas.mw-canvas')!;
@@ -798,6 +800,8 @@ class LarmicMitwachsen extends HTMLElement {
       reduced: this.reduced.matches,
       bottomInset: this.touchUi.offsetParent ? this.touchUi.offsetHeight + 16 : 0,
       explored: this.seen,
+      // Torplatte unter den Füßen (wo der Körper gerade ist, nicht das Ziel des Schritts): Ton, einsinken
+      plate: this.plates(this.world, player, this.state.sleeping, this.packs.loaded, t),
     };
     if (this.r3d) {
       // 3D-Welt, darüber die durchsichtige 2D-Ebene mit Zeichen, Pfeil, Nacht und Leiste
@@ -837,8 +841,7 @@ class LarmicMitwachsen extends HTMLElement {
 
   /** Menü füllen, nachgeladen mit seinen seltenen Handgriffen (mitwachsen-menu.ts) */
   private async renderMenu() {
-    const m = await import('./mitwachsen-menu').catch(noop);
-    m?.renderMenu(this.menu, this.store, this.saved, this.sfx.muted);
+    (await import('./mitwachsen-menu').catch(noop))?.renderMenu(this.menu, this.store, this.saved, this.sfx.muted);
   }
 
   /** Welt löschen mit Rückfrage im Menü: erster Klick fragt, zweiter löscht (innerhalb von 4 Sekunden) */

@@ -3,10 +3,10 @@
 // `drawDeco` des Kerns gehängt), die Schneehaufen und Schneemänner (mitwachsen-snowman-look.ts, mit ihrem Ploppen), die
 // Eiszapfen des Glockenspiels (mitwachsen-chime-look.ts, mit ihrem Glockenton), die Rutschspur zum Schneebett, das
 // Wetter der Eis-Welt mit Polarlicht, das Bild der Weltgrenze (mitwachsen-ice-sky.ts) und die Fußspuren im Schnee
-// (mitwachsen-prints.ts).
+// (mitwachsen-prints.ts), dazu die Eisscholle vor dem Eistor (Torplatte) mit Schneeflocke und Klirren.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
-import { ICE_COLORS, ICE_CRYSTALS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
+import { ICE_COLORS, ICE_CRYSTALS, ICE_FLOE } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import { crystalBoxes, crystalGlint, finTwitch, floeBoxes, floeDrift, iceBoxes } from './mitwachsen-ice-look';
 import type { DrawDeco, View2D } from '../../mitwachsen-view';
 import { gateScore, guestAt } from '../../mitwachsen-guest-look';
@@ -75,4 +75,10 @@ export const view: View2D = {
   trail,
   // fröhliches Ploppen, wenn ein Schneemann wächst; heller Glockenton eines Eiszapfens (er schwingt ab jetzt)
   score: (e) => (e.type === 'icicle' ? (ring(e.x, e.y, performance.now()), chimeScore(e)) : snowScore(e)),
+  // Torplatte vor dem Eistor: Eisscholle mit Schneeflocke, Klirren statt Klonk (E7 und G7, Pentatonik)
+  plate: ICE_FLOE,
+  clink: [
+    [2637.02, 0.09, 'sine', 0.05, 1, 0],
+    [3135.96, 0.14, 'sine', 0.035, 1, 0.03],
+  ],
 };

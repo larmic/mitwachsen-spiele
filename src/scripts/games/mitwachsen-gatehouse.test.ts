@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { BufferGeometry } from 'three';
-import { GATES } from '../../data/games/mitwachsen';
+import { Color, type BufferGeometry } from 'three';
+import { GATES, THEME_COLORS } from '../../data/games/mitwachsen';
+import { col } from './mitwachsen-geo';
+import { DIP, plateParts } from './mitwachsen-plate-3d';
+import { PLATE_LEN, PLATE_STONE, PLATE_VOX, SINK, plateSink, plateVoxel } from './mitwachsen-plate';
 import { parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
 import { gate as gatehouse, motion, moves } from './mitwachsen-gates-3d';
 import { BEATS } from './mitwachsen-gate-kit';
@@ -225,5 +228,102 @@ describe('Das Eistor geht auf: Eiszapfen leuchten, der Umriss füllt sich', () =
     expect(guestPixel(1, 4, 1)).toEqual(GUEST_COLORS.k);
     for (const lit of [0, 0.5, 1]) expect(guestPixel(0, 0, lit)).toEqual(GUEST_COLORS.g);
     expect(GUEST_FILLED.map((r) => r.length)).toEqual(GUEST_OUTLINE.map((r) => r.length));
+  });
+});
+
+describe('Torplatte vor jedem Tor (3D)', () => {
+  /** Farben einer Geometrie als #rrggbb (wie `col` sie anlegt) */
+  const colors = (g: BufferGeometry) => {
+    const rgb = g.getAttribute('color').array;
+    const out = new Set<string>();
+    for (let i = 0; i < rgb.length; i += 3) out.add(col_(rgb[i]!, rgb[i + 1]!, rgb[i + 2]!));
+    return out;
+  };
+  const col_ = (r: number, g: number, b: number) => `#${new Color(r, g, b).getHexString()}`;
+  const hex = (c: string) => `#${col(c).getHexString()}`;
+
+  for (const g of GATES) {
+    const look = g.id === 'eis' ? gateLook.plate : undefined;
+    it(`${g.id}: flackert nicht, auch mit Torhaus und goldener Bucht; flach in Reihe 2 der Bucht, 3 × 1 Felder, einen Voxel dick`, () => {
+      const { p } = house(g.id, 0, g.id === 'eis');
+      plateParts(p, g.id, look);
+      expect(fighting(p)).toEqual([]);
+      const solo = parts();
+      plateParts(solo, g.id, look);
+      const [x, y, z] = bounds([solo.solid.build(), solo.bright.build()]);
+      for (const [[lo, hi], [a, b]] of [
+        [x, [-1.5, 1.5]],
+        [y, [0, 1 / 8]],
+        [z, [1.5, 2.5]], // Reihe 2 der Bucht (die Torreihe liegt bei z −0,5 … 0,5)
+      ] as const) {
+        expect(lo).toBeCloseTo(a, 2);
+        expect(hi).toBeCloseTo(b, 2);
+      }
+      // Rand in der Farbe der Welt, er leuchtet (eigenes Material, `bright`)
+      expect([...colors(solo.bright.build())]).toEqual([hex(THEME_COLORS[g.id].portal)]);
+    });
+  }
+
+  it('oval: an den Ecken fehlen Voxel, ein geschlossener Rand aus einem Voxel; das Zeichen liegt mittig in der Fläche', () => {
+    const mark = gateLook.plate!.mark;
+    expect([plateVoxel(0, 0), plateVoxel(2, 0), plateVoxel(0, 1), plateVoxel(23, 7)]).toEqual([null, null, null, null]);
+    expect([plateVoxel(3, 0), plateVoxel(1, 1), plateVoxel(0, 2), plateVoxel(12, 4)]).toEqual([
+      'rim',
+      'rim',
+      'rim',
+      'face',
+    ]);
+    let marks = 0;
+    for (let i = 0; i < PLATE_LEN; i++)
+      for (let k = 0; k < PLATE_VOX; k++) {
+        const kind = plateVoxel(i, k, mark);
+        if (kind !== 'mark') continue;
+        marks++;
+        expect(Math.abs(i + 0.5 - PLATE_LEN / 2), `${i},${k}`).toBeLessThan(4); // mittig
+      }
+    expect(marks).toBe(mark.join('').replace(/\./g, '').length); // ganz, nichts vom Rand verdeckt
+    // der Rand bleibt mit Zeichen derselbe; jedes Randvoxel hat einen Nachbarn außerhalb der Platte
+    for (let i = 0; i < PLATE_LEN; i++)
+      for (let k = 0; k < PLATE_VOX; k++) {
+        expect(plateVoxel(i, k, mark) === 'rim').toBe(plateVoxel(i, k) === 'rim');
+        if (plateVoxel(i, k) !== 'rim') continue;
+        const out = [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ].some(([di, dk]) => !plateVoxel(i + di!, k + dk!));
+        expect(out, `${i},${k}`).toBe(true);
+      }
+  });
+
+  it('Eis mit Schmuck: Scholle in Eisfarbe mit weißer Schneeflocke; ohne Paket schlicht: Stein ohne Zeichen', () => {
+    const [ice, plain] = [gateLook.plate, undefined].map((look) => {
+      const p = parts();
+      plateParts(p, 'eis', look);
+      return colors(p.solid.build());
+    });
+    expect(ice!.has(hex('#ffffff'))).toBe(true);
+    expect([...ice!].sort()).toEqual([...gateLook.plate!.face, '#ffffff'].map(hex).sort());
+    expect(ice!.has(hex(PLATE_STONE[1]))).toBe(false);
+    expect([...plain!].sort()).toEqual(PLATE_STONE.map(hex).sort());
+  });
+
+  it('sinkt einen Voxel ein (80 ms), springt in 120 ms hoch; bei reduzierter Bewegung ohne Übergang; andere Platten bleiben', () => {
+    const on = { id: 'eis' as const, since: 1000, on: true };
+    const off = { ...on, on: false };
+    expect([0, 40, 80, 500].map((t) => plateSink(on, 'eis', 1000 + t, false))).toEqual([0, SINK / 2, SINK, SINK]);
+    expect([0, 60, 120].map((t) => plateSink(off, 'eis', 1000 + t, false))).toEqual([SINK, SINK / 2, 0]);
+    expect([plateSink(on, 'eis', 1000, true), plateSink(off, 'eis', 1000, true)]).toEqual([SINK, 0]);
+    expect([plateSink(on, 'sand', 2000, false), plateSink(null, 'eis', 2000, false)]).toEqual([0, 0]);
+    expect(SINK).toBe(1 / 8);
+  });
+
+  it('3D: ganz eingesunken liegt ihre Oberseite noch über dem Boden und der goldenen Bucht (sonst flackert sie)', () => {
+    const p = parts();
+    plateParts(p, 'eis', gateLook.plate);
+    const [, [, top]] = bounds([p.solid.build(), p.bright.build()]);
+    expect(top - DIP).toBeGreaterThan(0.04); // der Boden liegt bei 0, die goldene Bucht bei 0,02: Abstand wie sie
+    expect(DIP).toBeGreaterThan(SINK / 2); // sichtbar eingesunken
   });
 });

@@ -1,5 +1,5 @@
 // Farben der Eis-Welt, die nur ihr Welt-Paket und dessen 3D-Teil brauchen (Iglu, Eisschale, Fischkiste, Rutschspur,
-// Schneebett in 3D, Eiskristalle). Der Kern kennt nur die Farben des Netzes mit Fischen (`FISH_COLORS` in
+// Schneebett in 3D, Eiskristalle, Eisscholle vor dem Eistor). Der Kern kennt nur die Farben des Netzes mit Fischen (`FISH_COLORS` in
 // mitwachsen-eis.ts) und zeichnet Eisklippen und Schneebett in 2D mit eigenen Kopien von `snow` und `ice`
 // (src/scripts/games/mitwachsen-ground-2d.ts, gleich gehalten durch dessen Test); so bleibt dieses Objekt aus der
 // Spielseite.
@@ -19,6 +19,12 @@ export const ICE_COLORS = {
   // silberblaue Fische und Schwanzflossen: liegen im Kern (mitwachsen-eis.ts, Netz der Figur), hier nur eingemischt
   ...FISH_COLORS,
   moss: ['#5f8f3a', '#7aa84a'], // Moosbüschel am Rand der Eisschale (nur Bild)
+} as const;
+
+/** Torplatte vor dem Eistor als Eisscholle (Seite, Oberseite) mit eingelegter Schneeflocke (Zeilen quer zur Platte) */
+export const ICE_FLOE = {
+  face: ICE_COLORS.ice,
+  mark: ['.x.x.x.', '..xxx..', 'xxx.xxx', '..xxx..', '.x.x.x.'],
 } as const;
 
 /**

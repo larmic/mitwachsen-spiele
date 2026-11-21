@@ -29,6 +29,8 @@ import {
 import { wildAnimals } from './mitwachsen-wild';
 import { homeAt } from './mitwachsen-home';
 import { APRON } from './mitwachsen-apron';
+import { PLATE_HALF, plateMid } from './mitwachsen-plate';
+import { bay } from './mitwachsen-guide';
 import { EIS_PACK, PACKS, worldOf } from './test-worlds';
 
 /** Alle Felder, die von `start` aus zu Fuß erreichbar sind (bis `limit` Felder) */
@@ -179,6 +181,51 @@ describe('Start auf der Lichtung', () => {
           expect(standHeight(w, [], x, y)).toBeNull();
         }
         expect(g.opens).toEqual(g.id === 'eis' ? { key: 'pinguin' } : 'never'); // das Eistor öffnet der Pinguin
+      }
+    });
+
+    it(`Seed ${seed}: Vor jedem Zugang liegt eine ebene, begehbare Torplatte (3 × 1, Reihe 2 der Bucht), nicht Portal-Plattform, nicht Warteplatz, keine Deko, kein Wasser`, () => {
+      const key = ([x, y]: readonly [number, number]) => `${x},${y}`;
+      const seats = new Set(crossings(w).flatMap((c) => [...c.seats.values()].flat().map(key)));
+      const reach = new Set(reachable(w, [], START).map(key));
+      for (const g of GATES) {
+        const place = w.gates.get(g.id)!;
+        const [mx, my] = plateMid(place);
+        const along = [Math.abs(place.out[1]), Math.abs(place.out[0])] as const;
+        const at = (u: number, t = 0) =>
+          [mx + along[0] * u - place.out[0] * t, my + along[1] * u - place.out[1] * t] as const;
+        expect(w.cell(...place.mid).h, `${g.id} Tormitte so hoch wie die Platte (3D hängt sie ins Torhaus)`).toBe(1);
+        const row2 = bay(place)
+          .slice(place.cells.length, 2 * place.cells.length)
+          .map(key); // Reihe 2 der Bucht
+        for (let u = -PLATE_HALF; u <= PLATE_HALF; u++) {
+          const c = w.cell(...at(u));
+          const where = `${g.id} ${key(at(u))}`;
+          expect(row2, where).toContain(key(at(u)));
+          expect([c.plate, c.h, c.deco, c.solid, c.ground === 'water', !!c.portal, !!c.tufts], where).toEqual([
+            g.id,
+            1,
+            null,
+            false,
+            false,
+            false,
+            false,
+          ]);
+          expect(standHeight(w, [], ...at(u)), where).toBe(1);
+          expect(reach.has(key(at(u))), where).toBe(true);
+          expect(seats.has(key(at(u))), where).toBe(false);
+        }
+        // davor (Reihe 3) eben und frei: Nichts Höheres verdeckt die Platte, geradeaus kommt man hin
+        for (let u = -PLATE_HALF; u <= PLATE_HALF; u++)
+          expect([w.cell(...at(u, 1)).h, w.cell(...at(u, 1)).solid], `${g.id} vor der Platte`).toEqual([1, false]);
+        // genau drei Felder: daneben, davor und dahinter keine Platte
+        for (const [u, t] of [
+          [-2, 0],
+          [2, 0],
+          [0, 1],
+          [0, -1],
+        ] as const)
+          expect(w.cell(...at(u, t)).plate, `${g.id} neben der Platte`).toBeUndefined();
       }
     });
 

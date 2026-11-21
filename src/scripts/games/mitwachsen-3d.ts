@@ -531,7 +531,7 @@ export class World3D {
       // Goldrand der Bucht je Feld auf dessen Höhe: u entlang des Tors (die x-Achse des Torhauses), t Reihen davor
       if (g.id === guest) look?.bay(p, (u, t) => world.cell(mx + u * fy + t * fx, my - u * fx + t * fy).h - h);
       const group = this.place(new Group(), mx, my, h, [fx, fy]);
-      group.add(...this.meshes(p));
+      group.add(...this.meshes(p), this.platforms.plates.of(g.id, look?.plate)); // Torhaus und Torplatte davor
       if (moves(g.id)) group.add(this.moving.add(g.id, [mx + 0.5, my + 0.5], open(g.id), [-fx || 0, fy || 0]));
       for (const w of wings) {
         const wing = new Group();

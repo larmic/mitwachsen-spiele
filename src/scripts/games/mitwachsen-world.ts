@@ -431,7 +431,8 @@ const CLIMATE_TINT: Partial<Record<GateId, string>> = {
   wald: '#f0cf7e',
   pilze: '#d7c6f2',
 };
-const mix = (a: string, b: string, t: number) => {
+/** Farbe `a` um `t` (0 … 1) zu `b` hin */
+export const mix = (a: string, b: string, t: number) => {
   const pa = parseInt(a.slice(1), 16),
     pb = parseInt(b.slice(1), 16);
   const ch = (sh: number) => Math.round(((pa >> sh) & 255) * (1 - t) + ((pb >> sh) & 255) * t);

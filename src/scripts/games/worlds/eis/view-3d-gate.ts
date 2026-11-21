@@ -1,11 +1,13 @@
 // Das Eistor in 3D, soweit es zur Eis-Welt gehört (im 3D-Teil ihres Welt-Pakets, mit ihm nachgeladen): Beschläge und
 // Zeichen der Doppeltür, der Umriss des verlaufenen Pinguins darauf, der sich beim Öffnen füllt, das Leuchten der
-// Eiszapfen im Ritual und die goldene Bucht vor dem Tor, solange er die Figur dorthin führt. Den Zugang selbst (Schlucht,
+// Eiszapfen im Ritual, die goldene Bucht vor dem Tor, solange er die Figur dorthin führt, und die Torplatte als
+// Eisscholle mit Schneeflocke. Den Zugang selbst (Schlucht,
 // Bogen, Orgel) und die schlichten Türbretter baut der Kern (mitwachsen-gate-eis.ts, mitwachsen-gatehouse.ts).
 // Spezifikation: docs/specs/mitwachsen.md („Der Pinguin holt dich ab“, Abschnitt „Welt-Pakete“)
 
 import { THEME_COLORS } from '../../../../data/games/mitwachsen';
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
+import { ICE_FLOE } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import type { GateLook } from '../../mitwachsen-gate-kit';
 import { W, block, leaves, onLeaf, wings, type Leaf, type Parts, type Wing } from '../../mitwachsen-gatehouse';
 import { GUEST_OUTLINE, GUEST_PX, GUEST_Y, guestPixel } from '../../mitwachsen-guest-look';
@@ -112,4 +114,5 @@ export const gateLook: GateLook = {
   door: (open, outline, lit) => door(THEME_COLORS.eis.portal, open, outline, lit),
   icicle,
   bay: goldenBay,
+  plate: ICE_FLOE, // Torplatte: Eisscholle mit eingelegter Schneeflocke (der Rand ist hellblau wie jedes Eis-Zeichen)
 };

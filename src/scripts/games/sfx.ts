@@ -3,7 +3,7 @@
 // Der Browser erlaubt Ton erst nach einer Geste: `unlock()` aus einem Tasten- oder Klick-Handler aufrufen.
 
 import { pick } from '../../lib/games/rng';
-import type { Tone } from '../../data/games/mitwachsen';
+import type { GateId, Tone } from '../../data/games/mitwachsen';
 import type { Melody } from '../../data/games/mitwachsen-stories';
 
 const MAX_VOICES = 6;
@@ -206,7 +206,7 @@ export class Sfx {
     this.note(f, 1.1, 'sine', 0.09);
     this.note(f * 2, 0.6, 'sine', 0.03); // heller Oberton
   }
-  /** Eingeplante Töne spielen (das Eistor geht auf: `gateScore` in mitwachsen-guest-look.ts) */
+  /** Eingeplante Töne spielen (das Eistor geht auf: `gateScore` in mitwachsen-guest-look.ts; Torplatte: `plateTones`) */
   score(notes: readonly Scored[]) {
     for (const [freq, len, wave, gain, slide, delay] of notes) this.note(freq, len, wave, gain, slide, delay);
   }
@@ -217,6 +217,31 @@ export class Sfx {
 
 /** Ein eingeplanter Ton: Hz, Länge (s), Welle, Lautstärke, Gleiten, Beginn (s) */
 export type Scored = [freq: number, len: number, wave: OscillatorType, gain: number, slide: number, delay: number];
+
+/** Tonart der Torplatte je Welt: Halbtöne über C (Eis in C wie die Eiszapfen); so klingt jede Platte anders */
+export const PLATE_KEY: Record<GateId, number> = {
+  eis: 0,
+  sand: 2,
+  wasser: 5,
+  lava: -3,
+  hoehle: -5,
+  wald: -1,
+  wolken: 4,
+  pilze: -2,
+};
+/** Motiv der Torplatte in Halbtönen über dem Grundton: E G A G C, alles aus der Pentatonik (kein falscher Ton) */
+export const PLATE_TUNE = [4, 7, 9, 7, 12];
+const plateHz = (id: GateId, semis: number) => 523.25 * 2 ** ((PLATE_KEY[id] + semis) / 12);
+/**
+ * Auf die Torplatte getreten (das `n`-te Mal): ein dumpfes Klonk in der Tonart der Welt (oder ihr Klang aus dem
+ * Welt-Paket, `clink`, Eis: Klirren) und der nächste Ton des Motivs; fünfmal ergibt die kleine Melodie
+ */
+export const plateTones = (id: GateId, n: number, clink?: readonly Scored[]): Scored[] => [
+  ...(clink ?? [[plateHz(id, -12), 0.18, 'sine', 0.2, 0.6, 0] as Scored]), // nicht tiefer: Tablets spielen es sonst kaum
+  [plateHz(id, PLATE_TUNE[n % PLATE_TUNE.length]!), 0.25, 'triangle', 0.08, 1, 0.06],
+];
+/** Von der Torplatte gegangen: ein leises Plopp in der Tonart der Welt */
+export const plopp = (id: GateId): Scored[] => [[plateHz(id, -5), 0.09, 'sine', 0.07, 1.8, 0]];
 
 /** Weißes Rauschen der Länge `seconds` (für Knirschen und Wind) */
 function noise(ctx: AudioContext, seconds: number): AudioBuffer {

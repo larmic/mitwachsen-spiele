@@ -50,7 +50,8 @@ import type { State } from './mitwachsen-state';
 import { cycle, hash } from '../../lib/games/rng';
 import type { Cell, TreeKind, World } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
-import { drawPlatform } from './mitwachsen-platform-2d';
+import { drawPlate, drawPlatform } from './mitwachsen-platform-2d';
+import type { PlateFx } from './mitwachsen-plate';
 import { BED_SNOW, flatColors } from './mitwachsen-ground-2d';
 import { bigGate } from './mitwachsen-gate-look';
 import type { Guest } from './mitwachsen-guest-look';
@@ -88,6 +89,7 @@ export type Scene = {
   reduced: boolean; // prefers-reduced-motion: nichts wippt, steigt oder funkelt
   bottomInset: number; // Platz unten für die Touch-Steuerung (die Leiste rückt darüber)
   explored: (x: number, y: number) => boolean; // Nebel: nur Erkundetes wird gezeigt
+  plate: PlateFx | null; // Torplatte, die die Figur zuletzt betreten oder verlassen hat (sinkt ein, springt hoch)
 };
 
 /** Rahmen des Betts aus Holz (das Schneebett der Eis-Welt ist aus Schnee: `BED_SNOW`) */
@@ -274,8 +276,8 @@ export class Renderer {
       // Rutschspur zum Schneebett (aus dem Welt-Paket): flach im Boden, unter Kanten und Nebelrand
       drawBox(this.ctx, P, this.view?.ground(c, x, y, sc.gates.has('eis')));
       this.edges(P, world, x, y, c.h);
-      this.haze(P, x, y, c.h, sc);
-      return;
+      this.plate(P, world, c, x, y, sc);
+      return this.haze(P, x, y, c.h, sc);
     }
     const front = world.cell(x, y + 1);
     const frontH = front.ground === 'water' ? 0 : front.h;
@@ -295,7 +297,6 @@ export class Renderer {
       this.img(P, image, x, y, k + 1);
     }
     this.edges(P, world, x, y, c.h);
-    this.haze(P, x, y, c.h, sc);
     if (c.tint && c.ground === 'grass') {
       // Stimmung der Richtung: Gras tönen (multiplizieren, damit die Körnung bleibt)
       const [ax, ay] = P(x, y, c.h);
@@ -313,6 +314,16 @@ export class Renderer {
           ? `rgba(255,240,170,${(0.05 * c.shade).toFixed(3)})`
           : `rgba(20,60,20,${(-0.14 * c.shade).toFixed(3)})`;
       this.ctx.fillRect(ax, ay, bx - ax, by - ay);
+    }
+    this.plate(P, world, c, x, y, sc);
+    this.haze(P, x, y, c.h, sc); // Nebelrand zuletzt: Er liegt auch über Tönung und Torplatte
+  }
+
+  /** Torplatte auf dem Feld (nach dem Boden, vor dem Nebelrand: Sinkt sie ein, verdeckt das Feld davor ihre Vorderkante) */
+  private plate(P: Projection, world: World, c: Cell, x: number, y: number, sc: Scene) {
+    if (c.plate) {
+      const look = c.plate === 'eis' ? this.view?.plate : undefined; // Schmuck aus dem Paket der Eis-Welt
+      drawPlate(this.ctx, P, world, c.plate, x, y, c.h, sc.plate, sc.now, sc.reduced, look);
     }
   }
 

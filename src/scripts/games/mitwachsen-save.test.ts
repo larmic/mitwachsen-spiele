@@ -20,6 +20,7 @@ import { packAt } from './mitwachsen-pack';
 import { initialState, progressOf, step } from './mitwachsen-state';
 import { beyondRing } from './mitwachsen-world';
 import { worldOf } from './test-worlds';
+import { plateMid } from './mitwachsen-plate';
 import { REGIONS, animalId } from '../../data/games/mitwachsen';
 
 /** Speicher im Arbeitsspeicher wie localStorage */
@@ -227,6 +228,26 @@ describe('Offenes Eistor im Spielstand', () => {
     expect(progressFrom(back)).toMatchObject({ openGates: ['eis'], position: [40, -60] });
     // die anderen sieben bleiben auch aus einem Spielstand zu (das filtert `initialState`, hier nur Format und Umzug)
     expect(migrate({ ...w, openGates: ['eis', 'sand', 'westtor'] })!.openGates).toEqual(['eis', 'sand']);
+  });
+});
+
+describe('Torplatte im Spielstand', () => {
+  it('ein Stand mit der Figur genau auf einer Plattenzelle (gespeichert vor der Platte) lädt: Bett der Lichtung, Platte begehbar', () => {
+    const store = memoryStore();
+    const w = worldOf(7);
+    for (const gate of ['eis', 'sand'] as const) {
+      const [x, y] = plateMid(w.gates.get(gate)!);
+      for (const openGates of [[], ['eis' as const]]) {
+        const saved = { ...newWorld('p', 7, 'X'), openGates, position: [x, y] as [number, number] };
+        saveWorld(store, saved);
+        const back = loadWorld(store, 'p')!;
+        expect(progressFrom(back)).toMatchObject({ openGates, position: [x, y] });
+        const s = initialState(w, progressFrom(back));
+        expect([s.player.x, s.player.y]).toEqual([...w.homes.lichtung.bed]); // aufgewacht im Bett der Lichtung
+        expect(w.cell(x, y).plate).toBe(gate); // die Platte gibt es nur in der Welt, nicht im Spielstand
+        expect(Object.keys(back)).not.toContain('plate');
+      }
+    }
   });
 });
 

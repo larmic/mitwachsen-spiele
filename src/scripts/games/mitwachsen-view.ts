@@ -14,6 +14,7 @@ import type { SkyScene } from './mitwachsen-sky';
 import type { State } from './mitwachsen-state';
 import type { Cell, World } from './mitwachsen-world';
 import type { Scored } from './sfx';
+import type { PlateLook } from './mitwachsen-plate';
 
 /**
  * Quader: x (rechts), y (nach vorn), z (Höhe), Breite, Tiefe, Höhe, Farbe der Seiten und oben, Art in 3D: `see` wird
@@ -92,6 +93,10 @@ export type View2D = {
   trail?: Trail;
   /** Töne zu Ereignissen der Regeln dieser Welt (Eis-Welt: Ploppen, wenn ein Schneemann wächst) */
   score?(e: PackEvent): Scored[];
+  /** Klang der Torplatte vor dem Tor dieser Welt statt des Klonks (Eis-Welt: Klirren; `plateTones` in sfx.ts) */
+  clink?: readonly Scored[];
+  /** Schmuck der Torplatte vor dem Tor dieser Welt (Eis-Welt: Scholle mit Schneeflocke; wie `GateLook.plate` in 3D) */
+  plate?: PlateLook;
 };
 
 /** Deko-Arten, die nur ein Welt-Paket zeichnet: Ohne seine Zeichnung steht dort ein einfacher Block */

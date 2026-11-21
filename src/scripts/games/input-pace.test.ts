@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { Dir } from '../../lib/games/front';
+import { DIRS, type Dir } from '../../lib/games/front';
 import { ACTION_MS, ENCOUNTERS, HOLD_MS, InputPace, STEP_MS, stops } from './input-pace';
+import { initialState, step, type State } from './mitwachsen-state';
+import { plateMid } from './mitwachsen-plate';
+import { worldOf } from './test-worlds';
 
 /** Simuliert `ms` Millisekunden mit einem Bild alle 16 ms und zählt die Schritte */
 function steps(pace: InputPace, from: number, ms: number, taps: number[] = [], dir: Dir = 'e') {
@@ -96,6 +99,36 @@ describe('Ruhiger Takt der Eingabe', () => {
     // Laufen, Anstoßen, Platz machen, Heimkommen und Nachwachsen halten nicht an
     for (const type of ['step', 'bump', 'swap', 'aside', 'home', 'regrow', 'ready'] as const)
       expect(ENCOUNTERS.has(type), type).toBe(false);
+  });
+
+  it('die Torplatte ist keine Begegnung: drauf, längs drüber und wieder runter läuft die Figur ohne Halt', () => {
+    const w = worldOf(1);
+    for (const id of ['eis', 'sand'] as const) {
+      const g = w.gates.get(id)!;
+      const [px, py] = plateMid(g);
+      const dir = (v: readonly [number, number]) =>
+        (Object.keys(DIRS) as Dir[]).find((d) => DIRS[d][0] === v[0] && DIRS[d][1] === v[1])!;
+      const along: [number, number] = [Math.abs(g.out[1]), Math.abs(g.out[0])];
+      // von Reihe 3 der Bucht auf die Platte, längs ein Feld hin, zwei zurück, eins hin, wieder herunter
+      const moves = [g.out, along, [-along[0], -along[1]], [-along[0], -along[1]], along, [-g.out[0], -g.out[1]]];
+      const start = initialState(w);
+      let s: State = {
+        ...start,
+        sleeping: false,
+        animals: [],
+        player: { x: px - g.out[0], y: py - g.out[1], dir: 's' },
+      };
+      for (const m of moves) {
+        const { state, events } = step(s, w, { type: 'move', dir: dir(m as [number, number]) });
+        expect(
+          events.map((e) => e.type),
+          id,
+        ).toContain('step');
+        expect(stops(events), id).toBeNull();
+        s = state;
+      }
+      expect([s.player.x, s.player.y]).toEqual([px - g.out[0], py - g.out[1]]);
+    }
   });
 
   it('der führende Pinguin hält nicht an, wenn die Figur in ihn läuft; jedes andere Tier schon', () => {

@@ -1,12 +1,24 @@
 // Portal-Plattformen in der 2D-Ansicht (Ersatz ohne WebGL): je Feld die Voxel, die darauf liegen, als kleine Quader.
 // Dieselben Zustände wie in 3D (schlafend, bereit mit Gold-Rahmen, nach der Ankunft goldene Pfeile), ohne Bewegung.
-// Von jeder Säule nur der oberste Voxel, darunter sieht man von schräg oben ohnehin nichts.
+// Von jeder Säule nur der oberste Voxel, darunter sieht man von schräg oben ohnehin nichts. Dazu die Torplatten vor den
+// großen Toren (mitwachsen-plate.ts).
 
 import { box, type Projection } from '../../lib/games/front';
 import { GOLD, PORTALS, SUB, platformLook, voxelSpan } from '../../data/games/mitwachsen-portals';
 import { PLATFORM_HALF, type PlatformSpot } from './mitwachsen-portal';
 import type { State } from './mitwachsen-state';
-import type { World } from './mitwachsen-world';
+import { mix, type World } from './mitwachsen-world';
+import { THEME_COLORS, type GateId } from '../../data/games/mitwachsen';
+import {
+  PLATE_HALF,
+  PLATE_STONE,
+  PLATE_VOX,
+  plateMid,
+  plateSink,
+  plateVoxel,
+  type PlateFx,
+  type PlateLook,
+} from './mitwachsen-plate';
 
 /** Ein Feld (x, y) einer Plattform auf Höhe h zeichnen */
 export function drawPlatform(
@@ -38,4 +50,38 @@ export function drawPlatform(
     const side = v.gold ? GOLD.side : v.color;
     box(ctx, P, x + (v.x - fx) * s, y + (v.z - fz) * s, h, s, s, y1, side, v.color); // die ganze Säule als ein Quader
   }
+}
+
+/**
+ * Ein Feld (x, y) der Torplatte vor dem Tor `id` auf Höhe h: Teil eines flachen, ovalen Steins aus Voxeln (einer dick),
+ * Rand in der Farbe der Welt; `look`: Schmuck aus dem Welt-Paket (Eis: Scholle mit Schneeflocke). Steht die Figur
+ * darauf (`fx`), ist er eingesunken (`plateSink`) und der Rand leuchtet heller.
+ */
+export function drawPlate(
+  ctx: CanvasRenderingContext2D,
+  P: Projection,
+  world: World,
+  id: GateId,
+  x: number,
+  y: number,
+  h: number,
+  fx: PlateFx | null,
+  now: number,
+  reduced: boolean,
+  look?: PlateLook,
+) {
+  const g = world.gates.get(id)!; // die Platte liegt vor ihrem Tor
+  const [mx, my] = plateMid(g);
+  const along = g.out[1] !== 0; // Tor im Norden oder Süden: Die Platte liegt entlang x, sonst entlang y
+  const i = ((along ? x - mx : y - my) + PLATE_HALF) * PLATE_VOX; // erstes Voxel dieses Felds entlang der Platte
+  const z = h - plateSink(fx, id, now, reduced);
+  const rim = mix(THEME_COLORS[id].portal, '#ffffff', fx?.id === id && fx.on ? 0.5 : 0);
+  const [side, top] = look?.face ?? PLATE_STONE;
+  const s = 1 / PLATE_VOX;
+  // von hinten nach vorn, je Voxel ein Quader
+  for (let b = 0; b < PLATE_VOX; b++)
+    for (let a = 0; a < PLATE_VOX; a++) {
+      const k = plateVoxel(i + (along ? a : b), along ? b : a, look?.mark);
+      if (k) box(ctx, P, x + a * s, y + b * s, z, s, s, s, side, k === 'rim' ? rim : k === 'mark' ? '#ffffff' : top);
+    }
 }
