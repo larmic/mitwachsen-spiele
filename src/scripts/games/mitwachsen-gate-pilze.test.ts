@@ -33,14 +33,19 @@ function maxZ(p: ReturnType<typeof parts>) {
 
 describe('Zugang zum Pilzwald: das verwachsene Pilztor', () => {
   it('nichts liegt in der Bucht (z > 0,5), weder fest noch bewegt, in keinem Zustand und keiner Lage', () => {
+    // Festes und bewegtes Raster einzeln: das feste nur einmal je Lage und Öffnung (sonst läuft der Test auf
+    // langsamen CI-Rechnern in die Zeitgrenze)
     for (const cam of CAMS)
-      for (const open of STEPS)
+      for (const open of STEPS) {
+        const p = parts();
+        build(p, { open, cam, outline: false, lit: 0 });
+        expect(maxZ(p), `offen ${open}, fest`).toBeLessThanOrEqual(0.505);
         for (const beat of [0, 5, 11]) {
-          const p = parts();
-          build(p, { open, cam, outline: false, lit: 0 });
-          motion(p, { open, cam, outline: false, lit: 0 }, beat);
-          expect(maxZ(p), `offen ${open}, Takt ${beat}`).toBeLessThanOrEqual(0.505);
+          const m = parts();
+          motion(m, { open, cam, outline: false, lit: 0 }, beat);
+          expect(maxZ(m), `offen ${open}, Takt ${beat}`).toBeLessThanOrEqual(0.505);
         }
+      }
   });
 
   it('zu ist der Durchgang dicht verwachsen, in drei Lagen hintereinander (auch von der Seite sieht man es)', () => {
