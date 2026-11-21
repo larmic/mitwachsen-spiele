@@ -39,7 +39,7 @@ const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) =>
 const ALL = Object.values(DIRS);
 const SIDE = Array.from({ length: 2 * NEAR + 1 }, (_, i) => i - NEAR);
 const AROUND = SIDE.flatMap((dx) => SIDE.map((dy): Point => [dx, dy])).filter(([dx, dy]) => dx || dy); // bis `NEAR` weit
-const COME = 40; // so viele Takte watschelt er höchstens zur Figur, dann freut er sich, wo er ist
+export const COME = 40; // so viele Takte watschelt er höchstens zur Figur, dann freut er sich, wo er ist
 const LOOK = 10; // so viele Takte schaut er nach dem Einholen zum Tor, bevor er sich zur Figur umdreht
 
 const fields = new WeakMap<World, Map<string, number>>();

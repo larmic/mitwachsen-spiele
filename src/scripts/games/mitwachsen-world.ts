@@ -97,7 +97,7 @@ const outside = (x: number, y: number) => (x / lichtung.shape.rx) ** 2 + (y / li
 /** Felsring in Terrassen (nur fürs Auge, betreten kann man ihn nicht): innen 3, dann 4, außen 5 */
 const ringHeight = (e: number) => (e < 1.08 ? 3 : e < 1.16 ? 4 : 5);
 /** Bäume und Büsche stehen einzeln: im Umkreis von so vielen Feldern kein weiteres Hindernis */
-const OBSTACLE_GAP = 2;
+export const OBSTACLE_GAP = 2;
 
 export const GATE_HALF = 2; // Tor: Mitte ± 2 Felder
 export const TOWER = 2; // Türme links und rechts, je zwei Felder breit
@@ -522,11 +522,7 @@ function biomeCell(seed: number, theme: GateId, x: number, y: number): Cell {
       else if (roll < 0.3) Object.assign(c, { deco: 'flower', color: flowerColor(seed, x, y) });
       return c;
     case 'eis':
-      c.ground = 'snow';
-      if (h === 1 && wet < 0.2) return { ...c, ground: 'ice' }; // zugefrorener See, begehbar
-      if (roll < 0.06) tree('snowpine');
-      else if (roll < 0.09) Object.assign(c, { ground: 'ice', h: h + 1 }); // Eisblock zum Klettern
-      return c;
+      return eisCell(c, wet, roll);
     case 'sand': {
       c.ground = 'sand';
       const dune = valueNoise(seed + 2, x, y, 9);
@@ -576,6 +572,13 @@ function biomeCell(seed: number, theme: GateId, x: number, y: number): Cell {
       else if (roll < 0.24) c.deco = 'fern';
       return c;
   }
+}
+
+/** Eis-Welt (draußen und im Kessel): Schnee, Eisflächen; Anteil `pine` Schneetannen, Anteil `block` Eisblöcke */
+export function eisCell(c: Cell, wet: number, roll: number, pine = 0.06, block = 0.03): Cell {
+  if (c.h === 1 && wet < 0.2) return { ...c, ground: 'ice' }; // zugefrorener See, begehbar
+  if (roll < pine) return { ...c, ground: 'snow', deco: 'tree', solid: true, tree: 'snowpine' };
+  return roll < pine + block ? { ...c, ground: 'ice', h: c.h + 1 } : { ...c, ground: 'snow' }; // Eisblock zum Klettern
 }
 
 /** Gang hinter einem Tor durch den Fels: schon in seiner Welt, aber eben und frei (Wasser, Lava, Himmel werden Weg) */

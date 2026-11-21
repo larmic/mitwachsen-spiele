@@ -17,7 +17,7 @@ import {
 } from './mitwachsen-state';
 import { windOk } from './mitwachsen-meadow';
 import { SCATTER } from './mitwachsen-scatter';
-import { canStep, createWorld, standHeight, type Cell, type World } from './mitwachsen-world';
+import { canStep, createWorld, kesselPlace, standHeight, type Cell, type World } from './mitwachsen-world';
 import { startRealm, type Homestead } from './mitwachsen-home';
 import { BLOCK, raining, windy } from './mitwachsen-weather';
 import { platformArea } from './mitwachsen-portal';
@@ -943,6 +943,50 @@ describe('Zuhause je Gegend', () => {
     const world = worldOf(1);
     const s = initialState(world, { position: [...world.homes.eis.wake[0]!] as [number, number] });
     expect([s.player.x, s.player.y]).toEqual([...world.homes.lichtung.bed]);
+  });
+
+  it('alter Spielstand im Gletscherkessel, wo heute eine Tanne oder ein Eisblock steht: Start im Schneebett', () => {
+    // Die Winterlandschaft kam nach: Eine gespeicherte Position kann jetzt auf einer Tanne liegen. Die Figur schläft
+    // trotzdem im Schneebett und wacht auf begehbarem Boden daneben auf
+    let tried = 0;
+    for (const seed of [1, 42, 2026, 7]) {
+      const world = worldOf(seed);
+      const snowy = kesselPlace(seed, EIS_PACK).cells.filter(([x, y]) => {
+        const c = world.cell(x, y);
+        return c.tree === 'snowpine' || (c.ground === 'ice' && c.h >= 2 && !c.slide); // Tanne oder Eisblock
+      });
+      for (const [x, y] of snowy) {
+        tried++;
+        expect(startRealm(world, ['eis'], [x, y]), `Seed ${seed}: ${x},${y}`).toBe('eis'); // bleibt im Kessel
+        let s = initialState(world, { position: [x, y], openGates: ['eis'] });
+        expect([s.player.x, s.player.y], `Seed ${seed}: ${x},${y}`).toEqual([...world.homes.eis.bed]);
+        s = run(s, world, ...Array<typeof TICK>(SLEEP_LOCK).fill(TICK), 'n').s;
+        expect(s.sleeping).toBe(false);
+        expect(world.realm(s.player.x, s.player.y)).toBe('eis');
+        expect(standHeight(world, s.openGates, s.player.x, s.player.y), `Seed ${seed}`).not.toBeNull();
+      }
+    }
+    expect(tried).toBeGreaterThan(3);
+  });
+
+  it('alter Spielstand im Gletscherkessel nahe Spur, Fischkisten oder Plattformen: dort bleibt jedes Feld begehbar', () => {
+    // Dort standen Kinder am häufigsten; die Winterlandschaft wächst nur weiter weg, die Felder bleiben, wie sie waren
+    const built = new Set(['fishcrate', 'bed', 'icebowl', 'watertrough', 'klangstein', 'igloo']);
+    for (const seed of [1, 42, 2026, 7]) {
+      const world = worldOf(seed);
+      const kessel = kesselPlace(seed, EIS_PACK).cells.filter(([x, y]) => world.cell(x, y).region === 'eis');
+      const marks = kessel.filter(([x, y]) => {
+        const c = world.cell(x, y);
+        return c.slide || c.portal || c.deco === 'fishcrate';
+      });
+      const near = kessel.filter(([x, y]) => marks.some(([a, b]) => Math.max(Math.abs(a - x), Math.abs(b - y)) <= 2));
+      const blocked = near.filter(([x, y]) => {
+        const c = world.cell(x, y);
+        return c.ground !== 'water' && !built.has(c.deco ?? '') && standHeight(world, ['eis'], x, y) === null;
+      });
+      expect(near.length, `Seed ${seed}`).toBeGreaterThan(50);
+      expect(blocked, `Seed ${seed}`).toEqual([]);
+    }
   });
 
   it('ohne Paket der Eis-Welt (Laden gescheitert): Ein Stand aus dem Kessel startet auf der Lichtung und verliert nichts', () => {

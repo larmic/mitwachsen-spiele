@@ -3,7 +3,9 @@ import { DIRS } from '../../lib/games/front';
 import { GATES, REGIONS, type GateId } from '../../data/games/mitwachsen';
 import { HOMES } from '../../data/games/mitwachsen-homes';
 import { BED_STONE, ICE_STONE } from '../../data/games/mitwachsen-stories';
-import { platformArea, platformCells, platformLift, withNeighbours } from './mitwachsen-portal';
+import { PLATFORM_HALF, platformArea, platformCells, platformLift, withNeighbours } from './mitwachsen-portal';
+import { KESSEL } from '../../data/games/worlds/eis/mitwachsen-kessel';
+import { KESSEL_WILDS } from './worlds/eis/mitwachsen-kessel';
 import { SEATS, crossings } from './mitwachsen-border';
 import {
   GATE_HALF,
@@ -401,6 +403,89 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
       );
       expect(cut, `Seed ${seed}`).toEqual([]);
     }
+  });
+
+  /** Eisblock im Kessel: Eis eine Stufe über dem Boden (Eisflächen liegen auf Höhe 1, die Spur ist eben) */
+  const isBlock = (c: Cell) => c.ground === 'ice' && c.h >= 2 && !c.slide && !c.solid;
+  /**
+   * Was an Tannen und Eisblöcken im Kessel falsch ist: zu nah an Bett, Spur, Kisten, Eisloch oder Plattformen; Tannen
+   * nicht einzeln, Eisblöcke nicht über allen Nachbarn
+   */
+  function wildFaults(w: World, kessel: readonly (readonly [number, number])[]) {
+    const bed = w.homes.eis.bed;
+    const pick = (f: (c: Cell) => boolean) => kessel.filter(([x, y]) => f(w.cell(x, y)));
+    const cheb = (a: readonly [number, number], b: readonly [number, number]) =>
+      Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
+    const near = (list: readonly (readonly [number, number])[], p: readonly [number, number], r: number) =>
+      list.some((q) => cheb(q, p) <= r);
+    const slide = pick((c) => !!c.slide);
+    const crates = pick((c) => c.deco === 'fishcrate');
+    const water = pick((c) => c.ground === 'water');
+    const portals = [...w.portals.values()].flatMap((p) => [p.gate, p.home]);
+    const wrong: string[] = [];
+    for (const p of pick((c) => c.tree === 'snowpine' || isBlock(c))) {
+      const pine = w.cell(...p).tree === 'snowpine';
+      const at = `${pine ? 'Tanne' : 'Eisblock'} ${p.join(',')}`;
+      if (Math.hypot(p[0] - bed[0], p[1] - bed[1]) <= KESSEL.flat + 2) wrong.push(`am Bett ${at}`);
+      if (near(slide, p, pine ? 2 : 1)) wrong.push(`an der Spur ${at}`);
+      if (near(crates, p, 3)) wrong.push(`an einer Kiste ${at}`);
+      if (near(water, p, 2)) wrong.push(`am Eisloch ${at}`);
+      if (near(portals, p, PLATFORM_HALF + 1)) wrong.push(`an einer Plattform ${at}`);
+      if (pine) {
+        const around = RING_2.map(([dx, dy]) => w.cell(p[0] + dx, p[1] + dy));
+        if (around.some((n) => n.deco === 'tree' || n.region !== 'eis')) wrong.push(`nicht einzeln ${at}`);
+      } else {
+        const h = w.cell(...p).h;
+        if (h > 3) wrong.push(`zu hoch ${at}`);
+        const sides = Object.values(DIRS).map(([dx, dy]) => w.cell(p[0] + dx, p[1] + dy));
+        if (sides.some((n) => n.h < h - 1)) wrong.push(`kein Block ${at}`); // abgesenkt, nur noch eine Eisfläche
+      }
+    }
+    return wrong;
+  }
+  /** Ring um ein Feld bis zwei Felder weit, ohne das Feld selbst */
+  const RING_2 = [-2, -1, 0, 1, 2]
+    .flatMap((dy) => [-2, -1, 0, 1, 2].map((dx) => [dx, dy] as const))
+    .filter(([dx, dy]) => dx || dy);
+
+  it('Winterlandschaft: Tannen, Eisblöcke, Eisflächen und Hügel in drei Stufen; Bett, Spur, Kisten, Plattformen und Eisloch bleiben frei (20 Seeds)', () => {
+    let high = 0,
+      ground = 0;
+    const seeds = Array.from({ length: 20 }, (_, i) => 121 + i);
+    for (const seed of seeds) {
+      const w = createWorld(seed, PACKS);
+      const kessel = kesselPlace(seed, EIS_PACK).cells.filter(([x, y]) => w.cell(x, y).region === 'eis');
+      const wrong = wildFaults(w, kessel);
+      // jeder Kessel, nicht nur im Mittel: ein paar Tannen, Eisblöcke zum Klettern, ein, zwei kleine Eisflächen
+      const count = (f: (c: Cell) => boolean) => kessel.filter(([x, y]) => f(w.cell(x, y))).length;
+      const pines = count((c) => c.tree === 'snowpine');
+      const blocks = count(isBlock);
+      const patch = count((c) => c.ground === 'ice' && c.h === 1 && !c.slide);
+      if (pines < KESSEL_WILDS.pines) wrong.push(`nur ${pines} Tannen`);
+      if (blocks < KESSEL_WILDS.blocks) wrong.push(`nur ${blocks} Eisblöcke`);
+      const most = KESSEL_WILDS.patches * Math.ceil(Math.PI * KESSEL_WILDS.patchR ** 2);
+      if (patch < 5 || patch > most) wrong.push(`${patch} Felder Eisfläche`);
+      for (const [x, y] of kessel) {
+        const h = standHeight(w, [], x, y);
+        if (h === null) continue;
+        ground++;
+        if (h >= 2) high++;
+        if (h > 3) wrong.push(`zu hoch ${x},${y}`);
+        const steps = Object.values(DIRS).map(([dx, dy]) => standHeight(w, [], x + dx, y + dy));
+        if (steps.some((to) => to !== null && Math.abs(to - h) > 1)) wrong.push(`Stufe ${x},${y}`);
+      }
+      // Wohnplätze nie auf Tannen
+      wrong.push(
+        ...w
+          .spotsOf('eis')
+          .filter(([x, y]) => standHeight(w, [], x, y) === null)
+          .map((p) => `Wohnplatz ${p.join(',')}`),
+      );
+      expect(wrong, `Seed ${seed}`).toEqual([]);
+    }
+    // gut 40 % des Bodens auf Höhe 2 oder 3
+    expect(high / ground).toBeGreaterThan(0.38);
+    expect(high / ground).toBeLessThan(0.52);
   });
 
   it('Eis-Portal: Plattform hinter der Mündung und im Ring um das Schneebett: 3 × 3, erreichbar, ringsum frei (24 Seeds)', () => {

@@ -30,7 +30,7 @@ import {
   wanted,
 } from './mitwachsen-guide';
 import * as rules from './worlds/eis/mitwachsen-lead';
-import { toGate } from './worlds/eis/mitwachsen-lead';
+import { COME, toGate } from './worlds/eis/mitwachsen-lead';
 import { BREATH, HOP_AGAIN, SLIDE_PACE, mouth, toMeadow } from './worlds/eis/mitwachsen-ritual';
 import { canStep, createWorld, standHeight, type World } from './mitwachsen-world';
 import { PACKS, worldOf } from './test-worlds';
@@ -166,7 +166,9 @@ describe('Der Pinguin holt dich ab: Auftauchen', () => {
       }
       expect(r.events).toContainEqual({ type: 'arrive', id: GUIDE, species: 'pinguin' });
       expect(cheb(g, r.s.player)).toBeLessThanOrEqual(NEAR); // bei ihr
-      expect(t).toBeLessThan(25); // wenige Sekunden nach dem Auftauchen
+      // wenige Sekunden nach dem Auftauchen; Tiere der Wiese können ihn kurz umleiten, aber angekommen ist er bei ihr
+      // vor `COME` Takten (sonst freute er sich nur dort, wo er gerade ist)
+      expect(t).toBeLessThan(COME);
       const later = run(r.s, world, ...ticks(40)).s;
       expect(dist(world, guideOf(later)!)).toBeLessThan(dist(world, later.player)); // jetzt führt er, vor ihr
       expect(run(later, world, ...ticks(40)).events.map((e) => e.type)).not.toContain('arrive'); // nur einmal
@@ -687,6 +689,11 @@ describe('Invarianten bei wildem Drücken bis durchs offene Eistor', () => {
           }
         };
         wild(800);
+        // Hat das wilde Drücken sie ins Bett geschickt, weckt sie eine Taste (nach der Sperre beim Einschlafen)
+        for (let i = 0; i < 100 && s.sleeping; i++) {
+          s = step(s, world, { type: 'move', dir: 'n' }, undefined, rules).state;
+          check(s);
+        }
         for (let k = 0; k < 6 && !s.openGates.length; k++) {
           go((x, y) => inBay.has(key([x, y])), 2); // zur Bucht, der Pinguin führt
           for (let t = 0; t < 30 && !s.openGates.length; t++) s = step(s, world, TICK, undefined, rules).state;
