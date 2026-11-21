@@ -101,6 +101,14 @@ module.exports = {
       to: { path: '^src/(scripts|data)/games/worlds/', pathNot: '^src/(scripts|data)/games/worlds/$1/' },
     },
     {
+      name: 'turn-lives-in-3d',
+      severity: 'error',
+      comment:
+        'Die Drehung zur Torfront (mitwachsen-turn.ts: Feder, Pendeln, Heranrücken) braucht nur die 3D-Ansicht und liegt in ihrem Chunk, nie im Kern. Kern und Welt-Pakete nutzen nur den winzigen Takt mitwachsen-turn-pace.ts.',
+      from: { pathNot: ['^src/scripts/games/mitwachsen-3d\\.ts$', '\\.test\\.ts$'] },
+      to: { path: '^src/scripts/games/mitwachsen-turn\\.ts$' },
+    },
+    {
       name: 'no-test-in-production',
       severity: 'error',
       comment: 'Tests und ihre Helfer werden nur von Tests importiert.',
