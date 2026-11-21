@@ -100,19 +100,28 @@ export class Fog {
 
 /**
  * Nebel um die Figur bei (x, y) lichten (`REVEAL`). Blick durchs Tor: Steht sie vor einem großen Tor (höchstens 8 Felder
- * von seiner Mitte), lichtet er sich auch im Gang dahinter. Liefert die Stücke, in denen sich etwas geändert hat.
+ * von seiner Mitte), lichtet er sich auch im Gang dahinter, bis 18 Felder hinter der Tür (4 Felder Rand um jeden
+ * Blickpunkt); zeigt das Tor „noch nicht“ (`peek`), bis zur Mündung des Gangs (`deep`, je Welt gemessen, 11 bis 25
+ * Felder), nie darüber hinaus in die Welt (ist der Gang kürzer als 18 Felder, nur so weit wie sonst). Liefert die
+ * Stücke, in denen sich etwas geändert hat.
  */
 export function lookAround(
   fog: Fog,
-  gates: Iterable<{ mid: readonly [number, number]; out: readonly [number, number] }>,
+  gates: Iterable<{ mid: readonly [number, number]; out: readonly [number, number]; deep: number }>,
   x: number,
   y: number,
+  peek?: boolean,
 ) {
   const changed = fog.reveal(x, y, REVEAL);
   for (const g of gates) {
     const [mx, my] = g.mid;
     if (Math.max(Math.abs(x - mx), Math.abs(y - my)) > 8) continue;
-    for (const k of [4, 9, 14]) changed.push(...fog.reveal(mx + g.out[0] * k, my + g.out[1] * k, 4));
+    // Blickpunkte alle 5 Felder, der letzte genau 4 Felder vor dem Ende (sein Rand reicht bis dorthin)
+    const end = (peek ? Math.max(g.deep, 18) : 18) - 4;
+    for (let k = 4; k < end + 5; k += 5) {
+      const t = Math.min(k, end);
+      changed.push(...fog.reveal(mx + g.out[0] * t, my + g.out[1] * t, 4));
+    }
   }
   return changed;
 }

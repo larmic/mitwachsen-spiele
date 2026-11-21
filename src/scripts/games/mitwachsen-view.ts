@@ -13,7 +13,8 @@ import { mapColor } from './mitwachsen-map';
 import type { SkyScene } from './mitwachsen-sky';
 import type { State } from './mitwachsen-state';
 import type { Cell, World } from './mitwachsen-world';
-import type { Scored } from './sfx';
+import type { Scored, Sfx } from './sfx';
+import type { Hint } from './mitwachsen-guide';
 import type { PlateLook } from './mitwachsen-plate';
 
 /**
@@ -97,6 +98,19 @@ export type View2D = {
   clink?: readonly Scored[];
   /** Schmuck der Torplatte vor dem Tor dieser Welt (Eis-Welt: Scholle mit Schneeflocke; wie `GateLook.plate` in 3D) */
   plate?: PlateLook;
+  /**
+   * „Noch nicht“ am Tor dieser Welt, je Bild gefragt (Eis-Welt: worlds/eis/mitwachsen-plate-hint.ts): Steht die Figur
+   * auf seiner Torplatte und fehlt noch etwas, zeigt es das in Bild und Ton (`now` ms, reduzierte Bewegung) und lichtet
+   * den Nebel im Gang bis zur Mündung (`lift(true)`); liefert, was das Bild zeigt
+   */
+  hint?(
+    state: State,
+    world: World,
+    now: number,
+    reduced: boolean,
+    sfx: Pick<Sfx, 'score'>,
+    lift: (peek: true) => void,
+  ): Hint;
 };
 
 /** Deko-Arten, die nur ein Welt-Paket zeichnet: Ohne seine Zeichnung steht dort ein einfacher Block */

@@ -400,7 +400,7 @@ export class World3D {
 
     this.updateFog(cam.x, cam.y);
     this.syncGates(world, state, sc);
-    this.moving.sync(sc, (p) => this.meshes(p));
+    this.moving.sync(sc, (p) => this.meshes(p)); // auch: Die Flügel eines Tors wackeln bei „noch nicht“
     this.syncChunks(world, cam.x, cam.y);
     this.syncBodies(state, sc);
     this.syncSigns(state);
@@ -536,6 +536,7 @@ export class World3D {
         wing.position.set(w.hinge[0], 0, w.hinge[1]);
         wing.rotation.y = w.angle;
         wing.add(...this.meshes(w.parts));
+        this.moving.wing(g.id, wing, w); // wackelt, wenn sein Tor „noch nicht“ zeigt
         group.add(wing);
       }
       this.gateGroup.add(group);

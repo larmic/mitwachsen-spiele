@@ -55,7 +55,7 @@ import type { PlateFx } from './mitwachsen-plate';
 import { BED_SNOW, flatColors } from './mitwachsen-ground-2d';
 import { bigGate } from './mitwachsen-gate-look';
 import type { Guest } from './mitwachsen-guest-look';
-import { guideGate } from './mitwachsen-guide';
+import { guideGate, type Hint } from './mitwachsen-guide';
 import { moodLife } from './mitwachsen-sky';
 import { turnHead } from './mitwachsen-air';
 import { Album } from './mitwachsen-album';
@@ -90,6 +90,7 @@ export type Scene = {
   bottomInset: number; // Platz unten für die Touch-Steuerung (die Leiste rückt darüber)
   explored: (x: number, y: number) => boolean; // Nebel: nur Erkundetes wird gezeigt
   plate: PlateFx | null; // Torplatte, die die Figur zuletzt betreten oder verlassen hat (sinkt ein, springt hoch)
+  hint: Hint | null; // „noch nicht“: was dem Eistor fehlt und seit wann es das zeigt (vergeht nach HINT_MS von selbst)
 };
 
 /** Rahmen des Betts aus Holz (das Schneebett der Eis-Welt ist aus Schnee: `BED_SNOW`) */
@@ -228,6 +229,7 @@ export class Renderer {
       }
     }
     this.effects(P, sc);
+    sc.hint?.draw?.(ctx, world, P, sc.now); // „noch nicht“: Umriss dessen, was fehlt (nachgeladen, vergeht von selbst)
     moodLife(ctx, sc);
     if (sc.night > 0) this.nightSky(sc);
     if (sc.aurora > 0) ice?.aurora(ctx, sc, P);
@@ -264,10 +266,7 @@ export class Renderer {
     if (!sc.explored(x, y)) return; // im Nebel: nichts, der Himmel scheint durch
     if (c.ground === 'water') return this.water(P, world, x, y, sc);
     if (c.ground === 'sky') return; // zwischen den Wolken: nur Himmel
-    if (c.ground === 'lava') {
-      box(this.ctx, P, x, y, 0, 1, 1, 0.6, '#b8380a', '#ff7a1a');
-      return;
-    }
+    if (c.ground === 'lava') return box(this.ctx, P, x, y, 0, 1, 1, 0.6, '#b8380a', '#ff7a1a');
     const flat = flatColors(c);
     if (flat) {
       // Böden der Welten hinter den Toren: einfache Blöcke in ihren Farben

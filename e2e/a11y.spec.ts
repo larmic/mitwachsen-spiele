@@ -35,3 +35,30 @@ test('Barrierefrei: Startseite auf dem Handy (320 px)', async ({ page }) => {
   await page.goto('/');
   expect(await violations(page)).toEqual([]);
 });
+
+test('Barrierefrei: „Noch nicht“ am Eistor sagt die Live-Region, was fehlt', async ({ page }) => {
+  type Game = {
+    world: { gates: Map<string, { mid: [number, number]; out: [number, number] }> };
+    state: { player: { x: number; y: number; dir: string }; sleeping: boolean; still: number; garden: unknown[] };
+    apply(cmd: { type: 'tick' }): void;
+    lift(): void;
+  };
+  await page.goto('/spielen/');
+  await page.getByRole('button', { name: /Verstanden/ }).click();
+  const game = page.locator('larmic-mitwachsen');
+  await expect(game).toHaveClass(/ready/);
+  const say = page.locator('.mw-say');
+  await expect(say).toHaveAttribute('role', 'status');
+  await expect(say).toHaveText('');
+  // Die Figur steht wach mitten auf der Torplatte des Eistors, auf der Wiese wohnt noch niemand: nach 1 s Stehen
+  await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const { mid, out } = el.world.gates.get('eis')!;
+    const player = { x: mid[0] - 2 * out[0], y: mid[1] - 2 * out[1], dir: 'n' };
+    el.state = { ...el.state, player, sleeping: false, still: 0, garden: [] };
+    el.lift();
+    for (let i = 0; i < 10; i++) el.apply({ type: 'tick' });
+  });
+  await expect(say).toHaveText('Noch nicht. Es fehlt noch: Hase');
+  expect(await violations(page)).toEqual([]);
+});

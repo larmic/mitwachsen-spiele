@@ -206,7 +206,7 @@ export class Sfx {
     this.note(f, 1.1, 'sine', 0.09);
     this.note(f * 2, 0.6, 'sine', 0.03); // heller Oberton
   }
-  /** Eingeplante Töne spielen (das Eistor geht auf: `gateScore` in mitwachsen-guest-look.ts; Torplatte: `plateTones`) */
+  /** Eingeplante Töne spielen (das Eistor geht auf: `gateScore` in mitwachsen-guest-look.ts; Torplatte: `plateTones`; „noch nicht“: `notYet` in mitwachsen-hint-look.ts) */
   score(notes: readonly Scored[]) {
     for (const [freq, len, wave, gain, slide, delay] of notes) this.note(freq, len, wave, gain, slide, delay);
   }
@@ -231,7 +231,8 @@ export const PLATE_KEY: Record<GateId, number> = {
 };
 /** Motiv der Torplatte in Halbtönen über dem Grundton: E G A G C, alles aus der Pentatonik (kein falscher Ton) */
 export const PLATE_TUNE = [4, 7, 9, 7, 12];
-const plateHz = (id: GateId, semis: number) => 523.25 * 2 ** ((PLATE_KEY[id] + semis) / 12);
+/** Ton in der Tonart der Torplatte `id`, `semis` Halbtöne über ihrem Grundton (um C5) */
+export const plateHz = (id: GateId, semis: number) => 523.25 * 2 ** ((PLATE_KEY[id] + semis) / 12);
 /**
  * Auf die Torplatte getreten (das `n`-te Mal): ein dumpfes Klonk in der Tonart der Welt (oder ihr Klang aus dem
  * Welt-Paket, `clink`, Eis: Klirren) und der nächste Ton des Motivs; fünfmal ergibt die kleine Melodie

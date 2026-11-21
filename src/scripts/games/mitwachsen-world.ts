@@ -34,6 +34,7 @@ export type GatePlace = {
   mid: Point;
   out: Point; // nach außen (weg von der Lichtung)
   angle: number; // Winkel von der Mitte aus: In dieser Richtung liegt die Welt des Tors
+  deep: number; // so viele Felder hinter der Tür liegt die Mündung des Gangs (seine letzte Reihe, `end`)
 };
 
 /** Eine Welt: Felder, Gegenden mit ihrem Zuhause (`Realms`), Wohnorte, Tore, Portale und Klangsteine */
@@ -155,7 +156,7 @@ function layouts(seed: number): Layout[] {
       Array.from({ length: 2 * span + 1 }, (_, k) => at(k - span, end)).some(([x, y]) => !outside(x, y))
     )
       end++;
-    return { id: g.id, cells, mid: at(0, depth), out, angle, depth, end, at, side };
+    return { id: g.id, cells, mid: at(0, depth), out, angle, depth, end, deep: end - depth, at, side };
   });
 }
 
@@ -628,7 +629,9 @@ export const portalPlaces = (seed: number) => portalsOf(layouts(seed));
 /** Die großen Tore einer Welt; schnell, ohne die Welt zu bauen (Lage und Reihenfolge würfelt der Seed) */
 export const gatePlaces = (seed: number) => gatesOf(layouts(seed));
 const gatesOf = (places: readonly Layout[]) =>
-  new Map<GateId, GatePlace>(places.map(({ id, cells, mid, out, angle }) => [id, { id, cells, mid, out, angle }]));
+  new Map<GateId, GatePlace>(
+    places.map(({ id, cells, mid, out, angle, deep }) => [id, { id, cells, mid, out, angle, deep }]),
+  );
 
 /** Die Welt eines Seeds mit den geladenen Welt-Paketen (worlds/); die Lichtung ist mit und ohne sie dieselbe */
 export const createWorld = (seed: number, packs: readonly WorldPack[]): World => build(seed, packs).world;

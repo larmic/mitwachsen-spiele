@@ -106,6 +106,9 @@ class LarmicMitwachsen extends HTMLElement {
   private opening = ''; // Welt, die gerade öffnet (wartet vielleicht auf ein Paket)
   private live = ''; // Welt, zu der `state` gehört; solange sie nicht `opening` ist, ruhen Takt und Speichern
   private plates = plateToy(this.sfx, (at, colors) => this.burst('', colors, 6, at, true)); // Torplatten
+  // „noch nicht“ am Eistor (Haken im Welt-Paket): Steht die Figur dort ohne Pinguin?
+  private hint = (now: number) =>
+    this.packs.get('eis')?.view?.hint?.(this.state, this.world, now, this.reduced.matches, this.sfx, this.lift) ?? null;
 
   connectedCallback() {
     this.canvas = this.querySelector('canvas.mw-canvas')!;
@@ -262,9 +265,7 @@ class LarmicMitwachsen extends HTMLElement {
   }
 
   /** Menü oder Hinweis offen: Das Spiel ruht */
-  private paused() {
-    return this.menu.open || this.info.open;
-  }
+  private paused = () => this.menu.open || this.info.open;
 
   // ---------- Takt und Eingabe ----------
 
@@ -331,15 +332,14 @@ class LarmicMitwachsen extends HTMLElement {
     this.info.showModal();
   }
 
-  /** Nebel um die Figur lichten; geänderte Stücke baut die 3D-Ansicht neu */
-  private lift() {
+  /** Nebel um die Figur lichten; geänderte Stücke baut die 3D-Ansicht neu. `peek`: bis zur Mündung („noch nicht“) */
+  private lift = (peek?: boolean) => {
     const { x, y } = this.state.player;
-    const at = `${x},${y}`;
-    if (at === this.seenAt) return;
-    this.seenAt = at;
-    const changed = lookAround(this.fog, this.world.gates.values(), x, y); // auch durchs Tor in den Gang
+    if (`${x},${y}` === this.seenAt && !peek) return;
+    this.seenAt = `${x},${y}`;
+    const changed = lookAround(this.fog, this.world.gates.values(), x, y, peek); // auch durchs Tor in den Gang
     if (changed.length) this.gl3d?.invalidate(changed);
-  }
+  };
 
   private listen() {
     this.globals = new AbortController();
@@ -802,6 +802,7 @@ class LarmicMitwachsen extends HTMLElement {
       explored: this.seen,
       // Torplatte unter den Füßen (wo der Körper gerade ist, nicht das Ziel des Schritts): Ton, einsinken
       plate: this.plates(this.world, player, this.state.sleeping, this.packs.loaded, t),
+      hint: this.hint(t), // „noch nicht“ am Eistor
     };
     if (this.r3d) {
       // 3D-Welt, darüber die durchsichtige 2D-Ebene mit Zeichen, Pfeil, Nacht und Leiste

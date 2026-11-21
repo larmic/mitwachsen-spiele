@@ -7,7 +7,7 @@
 // (mitwachsen-state.ts) und der Ansicht.
 // Spezifikation: docs/specs/mitwachsen.md („Der Pinguin holt dich ab“)
 
-import type { Dir } from '../../lib/games/front';
+import type { Dir, Projection } from '../../lib/games/front';
 import {
   GATES,
   REGIONS,
@@ -100,15 +100,50 @@ const keyed = (open: readonly GateId[]) =>
 export const lost = (id: string, open: readonly GateId[]) => id === GUIDE && keyed(open);
 
 const LICHTUNG = regionAnimalList(REGIONS[0]); // Tiere der Landschaft zählen nicht
+/** Die erste Art der Lichtung, von der noch kein Tier auf der Wiese wohnt (undefined: die Leiste ist voll) */
+const lacking = (s: Pick<Guided, 'garden'>) => {
+  const home = new Set(s.garden.map((p) => p.id));
+  return REGIONS[0].animals.find(({ species }) => !LICHTUNG.some((a) => a.species === species && home.has(a.id)))
+    ?.species;
+};
 /**
  * Soll er da sein? Schlüssel am Tor, Tor zu, und die Leiste der Lichtung ist voll: Von jeder Art der Lichtung wohnt
  * mindestens ein Tier auf der Wiese (wie viele es je Art sind, sieht das Kind nirgends)
  */
-export function wanted(s: Pick<Guided, 'openGates' | 'garden'>): boolean {
-  if (!keyed(s.openGates)) return false;
-  const home = new Set(s.garden.map((p) => p.id));
-  return REGIONS[0].animals.every(({ species }) => LICHTUNG.some((a) => a.species === species && home.has(a.id)));
-}
+export const wanted = (s: Pick<Guided, 'openGates' | 'garden'>): boolean => keyed(s.openGates) && !lacking(s);
+
+/**
+ * Was dem Eistor noch fehlt, als nächster Schritt für das Kind (nicht ein fernes Ziel): die erste Art der Lichtung, die
+ * noch nicht auf der Wiese wohnt (in der Reihe der Leiste), sonst der Pinguin
+ */
+export const missing = (s: Pick<Guided, 'garden'>): SpeciesId => lacking(s) ?? 'pinguin';
+
+/**
+ * „Noch nicht“ in der Ansicht: an welchem Tor (`id`), wann es zu zeigen begann, was fehlt (ms; Wackeln der Flügel; noch
+ * nie: fehlt), und, sobald nachgeladen, die Zeichnung des Umrisses (mitwachsen-hint-look.ts)
+ */
+export type Hint = { id?: GateId; at?: number; draw?: HintDraw };
+export type HintDraw = (ctx: CanvasRenderingContext2D, world: World, P: Projection, now: number) => void;
+export const HINT_AFTER = 10; // „noch nicht“: so lange (1 s) steht die Figur auf der Torplatte, dann zeigt das Tor, was fehlt …
+export const HINT_EVERY = 50; // … höchstens alle 5 s, und je Stehen einmal
+/**
+ * „Noch nicht“ am Eistor (rein, ändert nichts, öffnet nichts): Steht die Figur seit `HINT_AFTER` Takten auf seiner
+ * Torplatte (nur Stehen zählt, `still`; eine schlafende liegt im Bett), ist es zu und führt kein Pinguin (er ist auch
+ * nicht schon fällig oder auf dem Weg zur Figur, `guideDue`: dann kommt er ja gleich), zeigt das Tor freundlich, was
+ * fehlt (`missing`); `last`: Takt, an dem es das zuletzt tat. Je Stehen einmal (danach steht die Figur einfach da und schaut
+ * das Tor an) und höchstens alle `HINT_EVERY` Takte, auch beim Rauf und Runter; kam es eben erst, holt es das im selben
+ * Stehen nach, sobald 5 s um sind. Liefert die fehlende Art, sonst undefined. Bild und Ton macht die Ansicht.
+ */
+export const hint = (s: Guided, world: World, last: number): SpeciesId | undefined =>
+  s.still >= HINT_AFTER &&
+  s.tick - last >= HINT_EVERY &&
+  s.tick - s.still > last &&
+  keyed(s.openGates) &&
+  s.guideDue < 0 &&
+  !leader(s) &&
+  world.cell(s.player.x, s.player.y).plate === GUIDE_GATE
+    ? missing(s)
+    : undefined;
 
 /**
  * Braucht es die Regeln des Pinguins (worlds/eis/mitwachsen-lead.ts)? Solange er fällig ist und nach dem Öffnen, bis er auf der

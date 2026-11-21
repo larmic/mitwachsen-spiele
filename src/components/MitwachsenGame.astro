@@ -3,7 +3,8 @@
 // (mit dem Weg zurück zur Startseite), in der Mitte der Name der Figur, rechts die Karte. Auf Touch-Geräten unten ein
 // Steuerkreuz. Das Kind spielt sonst mit den Pfeiltasten; eine Aktionstaste gibt es ab 3 nicht. Ohne JavaScript bleibt ein Text für Eltern.
 // Wird die Figur müde, erscheint über ihr eine Sprechblase; der Hinweis für Eltern zur Bildschirmzeit kommt beim ersten
-// Öffnen und ist über Menü und Sprechblase wieder zu öffnen.
+// Öffnen und ist über Menü und Sprechblase wieder zu öffnen. Was das Spiel ohne Bild sagt („Noch nicht“ am Eistor),
+// meldet eine unsichtbare Live-Region (`mw-say`).
 // Logik: src/scripts/games/ · Konzept: docs/games/mitwachsen.md
 import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
 ---
@@ -25,6 +26,8 @@ import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
 
   <canvas class="mw-canvas3d" aria-hidden="true"></canvas>
   <canvas class="mw-canvas" role="img" aria-label="Spielwelt: eine Figur auf einer Voxel-Insel mit Tieren"></canvas>
+
+  <p class="mw-say sr-only" role="status"></p>
 
   <div class="mw-bubble pxbox paper" role="status" hidden>
     <div class="mw-bubble-pics" aria-hidden="true">

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Mesh, type Group } from 'three';
+import { Group, Mesh } from 'three';
 import { BEATS, BEAT_MS, Vox, type Parts } from './mitwachsen-gate-kit';
-import { MovingGates, beatAt } from './mitwachsen-gate-motion-3d';
+import { MovingGates, SHAKE, beatAt } from './mitwachsen-gate-motion-3d';
+import { leaves } from './mitwachsen-gatehouse';
 
 /** Macht aus Teilen ein Mesh je nicht leerem Teil und zählt, wie oft gebaut wurde */
 function counter() {
@@ -70,5 +71,38 @@ describe('Bewegte Teile der Zugänge', () => {
     const { calls, meshes } = counter();
     m.sync(at(0), meshes);
     expect(calls.n).toBe(0);
+  });
+
+  it('„noch nicht“: Die Flügel des Tors wackeln zweimal kurz nach innen (2 Voxel), nicht bei reduzierter Bewegung', () => {
+    const m = new MovingGates(draw);
+    const { meshes } = counter();
+    const ws = leaves(0).map((l) => {
+      const g = new Group();
+      g.rotation.y = l.angle;
+      m.wing('eis', g, l);
+      return [g, l] as const;
+    });
+    const other = new Group(); // ein Flügel eines anderen Tors: bleibt still
+    m.wing('sand', other, leaves(0)[0]);
+    const hint = { id: 'eis', at: 1000 } as const;
+    const angles = (now: number, reduced = false) => {
+      m.sync({ ...at(now, 0, 0, reduced), hint }, meshes);
+      return ws.map(([g]) => +g.rotation.y.toFixed(4));
+    };
+    expect(angles(0)).toEqual([0, 0]); // vorher zu
+    // nach innen: wie beim Öffnen (der linke Flügel dreht positiv, der rechte negativ), höchstens SHAKE
+    const peak = angles(1150);
+    expect(peak.map(Math.sign)).toEqual(ws.map(([, l]) => -Math.sign(l.hinge[0])));
+    expect(peak.map(Math.abs)).toEqual([+SHAKE.toFixed(4), +SHAKE.toFixed(4)]);
+    expect(SHAKE * 2.4).toBeCloseTo(2 / 8); // 2 Voxel an der freien Kante
+    expect(angles(1500)).toEqual([0, 0]); // dazwischen still
+    expect(other.rotation.y).toBe(0); // nur das Tor, das „noch nicht“ zeigt
+    expect(angles(1950).map(Math.abs)).toEqual([+SHAKE.toFixed(4), +SHAKE.toFixed(4)]); // zum zweiten Mal
+    expect(angles(2700)).toEqual([0, 0]); // vorbei
+    expect(angles(1150, true)).toEqual([0, 0]); // reduzierte Bewegung: kein Wackeln
+    m.clear();
+    ws[0]![0].rotation.y = 0.5;
+    angles(1150);
+    expect(ws[0]![0].rotation.y).toBe(0.5); // neu gebaut: die alten Flügel gehören nicht mehr dazu
   });
 });

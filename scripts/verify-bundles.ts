@@ -3,7 +3,8 @@
 // Die Spielseite lädt beim Start nur ihren eigenen Code (den Kern); Three.js darf nur nachträglich (import()) kommen.
 // Die 3D-Ansicht (samt Three.js, im Build _astro/three.<hash>.js) misst eine eigene Regel und enthält nichts, was nur
 // eine Welt hinter einem Tor braucht. Jedes Welt-Paket (src/scripts/games/worlds/, im Build _astro/welt-<welt>.<hash>.js)
-// und sein 3D-Teil (_astro/welt-<welt>-3d.<hash>.js) messen je eine eigene Regel.
+// und sein 3D-Teil (_astro/welt-<welt>-3d.<hash>.js) messen je eine eigene Regel, ebenso „noch nicht“ am Tor
+// (_astro/mitwachsen-hint-look.<hash>.js, nachgeladen).
 // Logik und Tests: scripts/bundles.ts, scripts/bundles.test.ts
 
 import { readFileSync, readdirSync } from 'node:fs';
@@ -38,8 +39,15 @@ export const RULES: Rule[] = [
     // stilles Hüpfen des Pinguins), die Bucht des Eistors aber mit dem Paket kommt (`bay`, nur der Pinguin braucht sie)
     // und Aufwachen und Einschlafen die Figur in einem Zug setzen: gemessen 129 020 Bytes, also nur 4 Bytes Luft. Die
     // vereinbarte, begründete Anhebung um höchstens 1 KB ist für die nächsten Schritte der Torplatte (Drehung) gedacht;
-    // was dort mehr kommt, braucht sie
-    budget: 126 * 1024,
+    // was dort mehr kommt, braucht sie. 126,5 KB mit „noch nicht“ am Eistor: bewusst um 0,5 KB angehoben, die erste
+    // Hälfte der vereinbarten Anhebung (gemessen 129 482 Bytes, 54 Bytes Luft). Im Kern steht nur, was der Auftrag dort
+    // will und jede Welt fragen kann: was fehlt (`missing`, `hint` neben `wanted` in mitwachsen-guide.ts, gegen den
+    // Spielstand), der Blick durch den Nebel bis zur Mündung des Gangs (`lookAround`, `GatePlace.deep`), der Haken
+    // `View2D.hint` und das Zeichnen des Umrisses (`Scene.hint`). Wann es zeigt und das Holen des Bilds liegen im Paket
+    // der Eis-Welt (worlds/eis/mitwachsen-plate-hint.ts), Bild, Ton und Live-Region in einer eigenen, nachgeladenen
+    // Datei (Regel unten), das Wackeln der Flügel in der 3D-Ansicht. Für die nächsten Schritte bleiben 0,5 KB der
+    // Anhebung
+    budget: 126.5 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {
@@ -70,8 +78,11 @@ export const RULES: Rule[] = [
     // Sicherheitsnetz, Stehzeit in `opens`, goldener Rand statt goldener Bucht), Platz gemacht ohne Anheben: Wege und
     // Feld-Schlüssel des Pakets je einmal (worlds/eis/mitwachsen-flood.ts), Regeln des Pinguins als schlichtes Objekt
     // statt Modul-Namensraum, gefüllter Umriss ohne doppelten Goldrahmen; gemessen 44 010 Bytes, also 22 Bytes Luft.
-    // Die nächsten Schritte der Torplatte brauchen hier Platz oder eine begründete, knappe Anhebung
-    budget: 43 * 1024,
+    // 43,5 KB mit „noch nicht“ am Eistor: bewusst um 0,5 KB angehoben, wie für diesen Schritt vereinbart. Wann das Tor
+    // zeigt, was fehlt, und das frühe Holen von Bild und Ton (worlds/eis/mitwachsen-plate-hint.ts, `View2D.hint`) gehört
+    // nur zur Eis-Welt und liegt darum hier statt im Kern (dort sparte es gut 0,3 KB); gemessen 44 453 Bytes, also
+    // 91 Bytes Luft. Die nächsten Schritte der Torplatte brauchen hier Platz oder eine begründete, knappe Anhebung
+    budget: 43.5 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {
@@ -83,10 +94,23 @@ export const RULES: Rule[] = [
     // Material für Quader, die so hell leuchten, wie ein Welt-Paket sagt (`View3D.glow`); 589,9 KB mit dem Haken der
     // Fußspuren im Schnee (`View3D.layer`, `Views3D.layers`); 596,2 KB mit den bewegten Teilen der Zugänge (fließende
     // Wasserwand, Glutkaskade, wiegende Pilzranken je Takt); 597,0 KB mit den Torplatten (mitwachsen-plate-3d.ts);
-    // 596,8 KB mit ihrem goldenen, pulsierenden Rand statt der goldenen Bucht; dazu gut 4 KB Luft
+    // 596,8 KB mit ihrem goldenen, pulsierenden Rand statt der goldenen Bucht; 597,1 KB, seit die Flügel eines Tors bei
+    // „noch nicht“ wackeln (`MovingGates.wing`, `hintShake`; bewusst für alle Tore gleich, kein Sonderfall einer Welt);
+    // dazu knapp 4 KB Luft
     budget: 601 * 1024,
     // Probe: Das Leuchten der Eiszapfen gibt es nur im 3D-Teil der Eis-Welt (ICE_GLOW in worlds/eis/view-3d-gate.ts)
     forbidden: /#7fd6ff/,
+  },
+  {
+    name: '„Noch nicht“ am Tor',
+    pages: /^spielen\/index\.html$/,
+    chunks: /\/mitwachsen-hint-look\.[\w-]+\.js$/,
+    // Bild, Ton und Live-Region, wenn ein Tor zeigt, was noch fehlt: leerer goldener Umriss aus dem Modell der Art
+    // gerastert, Puls, „hm-hm?“ mit Riegel und Klangstein. Kommt erst, wenn die Figur das erste Mal auf die Platte des
+    // Eistors tritt (`import()` aus dem Paket der Eis-Welt, worlds/eis/mitwachsen-plate-hint.ts), nie mit der
+    // Spielseite: gemessen 1,6 KB
+    budget: 2 * 1024,
+    forbidden: /WebGLRenderer|three\.module/,
   },
   {
     name: 'Welt-Paket Eis 3D',

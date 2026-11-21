@@ -1,7 +1,7 @@
 // Der verlaufene Pinguin holt die Figur ab und öffnet das Eistor (`opens: { key: 'pinguin' }`), gegen die echten Daten.
 import { describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../lib/games/front';
-import { GATES, animalId, type Point } from '../../data/games/mitwachsen';
+import { GATES, REGIONS, animalId, type Point } from '../../data/games/mitwachsen';
 import {
   initialState,
   progressOf,
@@ -20,11 +20,15 @@ import {
   LOST,
   NEAR,
   PEEP_EVERY,
+  HINT_AFTER,
+  HINT_EVERY,
   RITUAL,
   SLIDE,
   guideGate,
+  hint,
   leader,
   lost,
+  missing,
   pending,
   wanted,
 } from './mitwachsen-guide';
@@ -814,6 +818,102 @@ describe('Das Eistor geht mit dem Pinguin auf', () => {
     expect([snowy.player.x, snowy.player.y]).toEqual([...bed]);
     expect(guideOf(snowy)!.mode).toBe('home');
     expect(pending(snowy)).toBe(false);
+  });
+});
+
+describe('„Noch nicht“ am Eistor', () => {
+  const world = worldOf(1);
+  const door = world.gates.get('eis')!;
+  const along = (u: number, t: number): Point => [
+    door.mid[0] - door.out[0] * t - door.out[1] * u,
+    door.mid[1] - door.out[1] * t + door.out[0] * u,
+  ];
+  const toDoor = dirTo([0, 0], door.out);
+  const away = dirTo([0, 0], [-door.out[0], -door.out[1]]);
+  const without = (...species: string[]) => everyone().filter((p) => !species.includes(p.species));
+  /** Wache Figur auf `at`, ohne Pinguin und ohne andere Tiere; auf der Wiese wohnen `garden` */
+  const alone = (at: Point, garden = without('igel')): State => ({
+    ...initialState(world, { garden }),
+    sleeping: false,
+    wokeAt: -100,
+    player: { x: at[0], y: at[1], dir: 'n' },
+    animals: [],
+  });
+  /**
+   * Wie die Ansicht: nach jedem Befehl `hint` fragen und sich den Takt merken, an dem das Tor zuletzt zeigte, was fehlt.
+   * Liefert die Takte, an denen es das zeigte, und was
+   */
+  function shown(s: State, cmds: (Cmd | Dir)[], w = world) {
+    let last = -Infinity;
+    const out: [tick: number, species: string][] = [];
+    const events: GameEvent[] = [];
+    for (const c of cmds) {
+      const r = run(s, w, c);
+      s = r.s;
+      events.push(...r.events);
+      const sp = hint(s, w, last);
+      if (sp) {
+        last = s.tick;
+        out.push([s.tick, sp]);
+      }
+    }
+    return { s, out, events };
+  }
+
+  it('was fehlt: zuerst die Art der Lichtung, dann der Pinguin', () => {
+    const lichtung = REGIONS[0].animals.map((a) => a.species);
+    expect(missing({ garden: [] })).toBe(lichtung[0]); // in der Reihe der Leiste
+    expect(missing({ garden: without('igel') })).toBe('igel');
+    expect(missing({ garden: without('ziege', 'schaf') })).toBe('schaf'); // die erste fehlende, nicht die letzte
+    expect(missing({ garden: without('baer') })).toBe('baer');
+    expect(missing({ garden: everyone() })).toBe('pinguin'); // die Leiste ist voll: Er fehlt noch
+    // ein Hase der Landschaft auf der Wiese zählt nicht für die Lichtung
+    expect(missing({ garden: [{ id: animalId('lichtung', 'hase', 99), species: 'hase' }] })).toBe('hase');
+    // auf der Platte nach 1 s Stehen
+    const on = alone(along(0, 2));
+    expect(world.cell(on.player.x, on.player.y).plate).toBe('eis');
+    expect(shown(on, ticks(HINT_AFTER)).out).toEqual([[on.tick + HINT_AFTER, 'igel']]);
+    expect(shown(on, ticks(HINT_AFTER - 1)).out).toEqual([]);
+    expect(shown(alone(along(1, 2), everyone()), ticks(HINT_AFTER)).out.map(([, sp]) => sp)).toEqual(['pinguin']);
+  });
+
+  it('noch nicht höchstens alle 5 s, öffnet nichts', () => {
+    // 30 s stehen: einmal, dann schaut die Figur einfach das Tor an
+    const stand = shown(alone(along(0, 2)), ticks(300));
+    expect(stand.out).toHaveLength(1);
+    expect(stand.s.openGates).toEqual([]);
+    expect(stand.s.ritual).toBe(-1);
+    expect(types(stand.events)).not.toContain('gate');
+    expect(types(stand.events)).not.toContain('hop'); // nichts sperrt
+    // rauf und runter (je 1,2 s drauf): höchstens alle 5 s, aber immer wieder
+    const updown: (Cmd | Dir)[] = [];
+    for (let i = 0; i < 20; i++) updown.push(away, ...ticks(3), toDoor, ...ticks(12));
+    const r = shown(alone(along(0, 2)), updown);
+    expect(r.out.length).toBeGreaterThanOrEqual(5);
+    for (let i = 1; i < r.out.length; i++) expect(r.out[i]![0] - r.out[i - 1]![0]).toBeGreaterThanOrEqual(HINT_EVERY);
+    expect(r.s.openGates).toEqual([]);
+    expect(types(r.events)).not.toContain('gate');
+    // kam es eben erst, holt es das im selben Stehen nach, sobald 5 s um sind
+    const again = shown(alone(along(0, 2)), [...ticks(HINT_AFTER), away, TICK, toDoor, ...ticks(HINT_EVERY)]);
+    expect(again.out.map(([t]) => t - again.out[0]![0])).toEqual([0, HINT_EVERY]);
+  });
+
+  it('nichts, solange der Pinguin führt oder kommt, das Tor offen ist, die Figur schläft, nicht steht oder neben der Platte steht', () => {
+    const quiet = (s: State, cmds = ticks(3 * HINT_AFTER)) => expect(shown(s, cmds).out).toEqual([]);
+    quiet({ ...leading(world, along(0, 2), along(2, 6)), still: 0 }); // er führt (noch auf dem Weg in die Bucht)
+    quiet({ ...alone(along(0, 2)), openGates: ['eis'] });
+    // er ist fällig bzw. watschelt schon zur Figur: Er kommt ja gleich
+    const due = { ...alone(along(0, 2), everyone()), still: HINT_AFTER, tick: 50 };
+    expect([hint(due, world, -Infinity), hint({ ...due, guideDue: 40 }, world, -Infinity)]).toEqual([
+      'pinguin',
+      undefined,
+    ]);
+    quiet({ ...initialState(world, { garden: without('igel') }), animals: [] }); // schläft: liegt im Bett
+    quiet(alone(along(0, 2)), Array<Cmd>(3 * HINT_AFTER).fill(HELD)); // Pfeil gedrückt: Sie steht nicht
+    quiet(alone(along(-2, 2))); // neben der Platte
+    quiet(alone(along(0, 1))); // vor der Tür
+    const sand = world.gates.get('sand')!; // die Platte eines anderen Tors (ohne Schlüssel)
+    quiet(alone(plateMid(sand)));
   });
 });
 

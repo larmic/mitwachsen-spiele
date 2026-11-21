@@ -32,7 +32,10 @@ const DIST = 'dist';
  * Eis-Welt und seinem 3D-Teil) rund 1002 KiB: Das Budget reicht noch, es bleibt; gut 22 KiB Luft. Mit den
  * Schneemännern (knapp 2 KiB im Paket der Eis-Welt) knapp 1005 KiB, das Budget bleibt; gut 19 KiB Luft. Mit dem
  * Eiszapfen-Glockenspiel (knapp 2 KiB im Paket der Eis-Welt) gut 1007 KiB: Das Budget reicht, es bleibt; gut 16 KiB
- * Luft. Wächst es weiter, bewusst anheben.
+ * Luft. Mit der Torplatte bis „noch nicht“ am Eistor (Platten, Öffnen auf der Platte, die nachgeladene Datei
+ * mitwachsen-hint-look.<hash>.js) gut 1020 KiB: knapp 4 KiB Luft für die nächsten Schritte der Torplatte (Drehung,
+ * Blinzeln, Kamera vor den Flügeln, Elternschalter, Platten der anderen Welten). Reicht das nicht, bewusst und
+ * begründet anheben.
  */
 const PRECACHE_BUDGET = 1024 * 1024;
 const OPTS: PwaOptions = { origin: SITE.url, manifest: '/manifest.webmanifest', sw: SERVICE_WORKER };

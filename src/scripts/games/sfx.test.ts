@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { STORIES } from '../../data/games/mitwachsen-stories';
 import { gateScore } from './mitwachsen-guest-look';
 import { GATES } from '../../data/games/mitwachsen';
-import { PLATE_KEY, PLATE_TUNE, plateTones, plopp, type Scored } from './sfx';
+import { PLATE_KEY, PLATE_TUNE, Sfx, plateTones, plopp, type Scored } from './sfx';
+import { notYet } from './mitwachsen-hint-look';
 import { view } from './worlds/eis/view-2d';
 
 describe('Töne beim Öffnen des Eistors', () => {
@@ -83,6 +84,98 @@ describe('Töne der Torplatte', () => {
       expect(notes).toHaveLength(1);
       const [hz, len, , gain, slide] = notes[0]!;
       expect([hz > 200, len < 0.15, gain < 0.1, slide > 1]).toEqual([true, true, true, true]);
+    }
+  });
+});
+
+describe('„Noch nicht“ am Tor', () => {
+  const TAIL = 0.03;
+  /** Halbtöne zwischen zwei Tönen, ohne Oktaven (0 … 11) */
+  const interval = (a: number, b: number) => ((Math.round(12 * Math.log2(b / a)) % 12) + 12) % 12;
+  const sounding = (notes: readonly Scored[], at: number) =>
+    notes.filter(([, len, , , , from]) => from <= at + 1e-9 && at < from + len + TAIL);
+
+  it('hm-hm ohne Moll und ohne Dissonanz, höchstens 2 Stimmen, nie ein Ton aus der Fehler-Familie, unter 2,5 s', () => {
+    for (const { id } of GATES) {
+      const notes = notYet(id);
+      // „hm-hm?“: zwei weiche Töne, der zweite eine Quarte höher (fragend, kein Mollschritt)
+      const [hm, hm2] = notes;
+      expect([hm![2], hm2![2]], id).toEqual(['sine', 'sine']);
+      expect(hm2![0] / hm![0], id).toBeCloseTo(2 ** (5 / 12));
+      expect(hm2![5], id).toBeGreaterThan(hm![5] + hm![1]); // nacheinander
+      for (const [, , , , , at] of notes) {
+        const now = sounding(notes, at);
+        expect(now.length, `${id} bei ${at} s`).toBeLessThanOrEqual(2);
+        // was zugleich klingt, ist Einklang, Oktave, große Terz, Quarte oder Quinte: keine kleine Terz, keine Reibung
+        for (const a of now) for (const b of now) expect([0, 4, 5, 7]).toContain(interval(a[0], b[0]));
+      }
+      // alles in der Pentatonik der Welt
+      for (const [hz] of notes) expect([0, 2, 4, 7, 9], id).toContain(interval(261.63 * 2 ** (PLATE_KEY[id] / 12), hz));
+      // Fehler-Familie: Anstoßen (fällt tief ab) – hier fällt nichts, nichts ist laut, nichts tief und brummig
+      for (const [hz, , , gain, slide] of notes)
+        expect([slide >= 1, gain <= 0.1, hz > 150], id).toEqual([true, true, true]);
+      expect(Math.max(...notes.map(([, len, , , , at]) => at + len + TAIL)), id).toBeLessThan(2.5);
+    }
+  });
+
+  it('der Klangstein summt das Motiv der Torplatte, eine Oktave tiefer; der Riegel klappert mit jedem Wackeln', () => {
+    const notes = notYet('eis');
+    const hum = notes.slice(-PLATE_TUNE.length);
+    expect(hum.map(([hz]) => Math.round(12 * Math.log2(hz / 261.63)))).toEqual(PLATE_TUNE);
+    const latch = notes.filter(([, len]) => len < 0.05);
+    expect(latch.map(([, , , , , at]) => at)).toEqual([0, 0.8]);
+    // reduzierte Bewegung: Die Tür wackelt nicht, also klappert auch kein Riegel; sonst klingt alles gleich
+    expect(notYet('eis', true)).toEqual(notes.filter(([, len]) => len >= 0.05));
+  });
+
+  /** Was die echte Klangmaschine spielt (gegen ein aufzeichnendes WebAudio): je Ton Frequenz, Welle und Ziel des Gleitens */
+  function heard(play: (sfx: Sfx) => void) {
+    const notes: { hz: number; wave: string; to?: number }[] = [];
+    const node = () => ({ connect: <T>(d: T) => d });
+    const param = () => ({ value: 1, setValueAtTime() {}, exponentialRampToValueAtTime() {} });
+    class FakeAudio {
+      currentTime = 0;
+      state = 'running';
+      destination = {};
+      createDynamicsCompressor = node;
+      createGain = () => ({ ...node(), gain: param() });
+      createOscillator() {
+        const osc = {
+          ...node(),
+          type: '',
+          onended: null,
+          start() {},
+          stop() {},
+          frequency: {
+            setValueAtTime: (hz: number) => void notes.push({ hz, wave: osc.type }),
+            exponentialRampToValueAtTime: (to: number) => void (notes.at(-1)!.to = to),
+          },
+        };
+        return osc;
+      }
+    }
+    vi.stubGlobal('AudioContext', FakeAudio);
+    const sfx = new Sfx();
+    sfx.unlock();
+    play(sfx);
+    vi.unstubAllGlobals();
+    return notes;
+  }
+
+  it('klingt anders als der Ton beim Anstoßen (Fehler-Familie): nicht seine Töne, nichts gleitet hinab', () => {
+    const bump = heard((s) => s.bump());
+    expect(bump.length).toBeGreaterThan(0);
+    expect(bump.some((n) => n.to !== undefined && n.to < n.hz)).toBe(true); // das Anstoßen fällt
+    for (const { id } of GATES) {
+      const hm = heard((s) => s.score(notYet(id)));
+      expect(hm.length, id).toBe(notYet(id).length); // alles erklingt (höchstens 2 zugleich, unter dem Limit)
+      for (const n of hm)
+        expect(n.to === undefined || n.to >= n.hz, `${id}: ${n.hz} Hz gleitet nicht hinab`).toBe(true);
+      // keine Folge von Tönen des Anstoßens, nirgends (Frequenz, Welle und Gleiten)
+      const sig = (ns: typeof hm) =>
+        ns.map((n) => `${Math.round(n.hz)}/${n.wave}/${n.to ? Math.round(n.to) : '-'}`).join();
+      for (let i = 0; i + bump.length <= hm.length; i++)
+        expect(sig(hm.slice(i, i + bump.length)), id).not.toBe(sig(bump));
     }
   });
 });
