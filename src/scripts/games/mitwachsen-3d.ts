@@ -58,6 +58,8 @@ import { MovingGates } from './mitwachsen-gate-motion-3d';
 import { GUIDE_GATE, guideGate } from './mitwachsen-guide';
 import { ritualGlow } from './mitwachsen-guest-look';
 import { Platforms3D } from './mitwachsen-platform-3d';
+import { frontShot } from './mitwachsen-card-3d';
+import { fogMask } from './mitwachsen-fog-3d';
 import { StoneNotes, stoneInto } from './mitwachsen-story-3d';
 import type { LoadedPack } from './mitwachsen-packs';
 import type { Scene } from './mitwachsen-render';
@@ -290,28 +292,7 @@ export class World3D {
     if (!this.fogDirty && key === this.fogKey) return;
     this.fogDirty = false;
     this.fogKey = key;
-    let a = new Float32Array(FOG_N * FOG_N);
-    for (let j = 0; j < FOG_N; j++)
-      for (let i = 0; i < FOG_N; i++) a[j * FOG_N + i] = this.explored(ox + i, oy + j) ? 1 : 0;
-    for (let pass = 0; pass < 2; pass++) {
-      const b = new Float32Array(FOG_N * FOG_N);
-      for (let j = 0; j < FOG_N; j++)
-        for (let i = 0; i < FOG_N; i++) {
-          let sum = 0,
-            n = 0;
-          for (let dj = -1; dj <= 1; dj++)
-            for (let di = -1; di <= 1; di++) {
-              const ii = i + di,
-                jj = j + dj;
-              if (ii < 0 || jj < 0 || ii >= FOG_N || jj >= FOG_N) continue;
-              sum += a[jj * FOG_N + ii] ?? 0;
-              n++;
-            }
-          b[j * FOG_N + i] = sum / n;
-        }
-      a = b;
-    }
-    for (let k = 0; k < a.length; k++) this.fogData[k] = Math.round((a[k] ?? 0) * 255);
+    this.fogData.set(fogMask(this.explored, ox, oy, FOG_N));
     this.fogTex.needsUpdate = true;
     // Texel i liegt mittig auf Feld ox + i: Ursprung so, dass (x + 0,5 − ox) / N die Texelmitte trifft
     this.fogUniforms.mwFogOrigin.value.set(ox, oy);
@@ -410,6 +391,11 @@ export class World3D {
     this.glow.color.setRGB(...this.views.glow(sc.aurora, sc.reduced, sc.now));
     this.views.layers(world, this.scene); // was die Welt-Pakete je Bild nachführen (Fußspuren im Schnee)
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /** Postkarte: die Front des Tors `id` als Standbild in `out` (mitwachsen-card-3d.ts); vor `render` rufen */
+  postcard(world: World, id: GateId, out: HTMLCanvasElement) {
+    frontShot(this.renderer, this.scene, this.fogUniforms, world, id, out, this.size);
   }
 
   /** Der Nebel hat sich gelichtet: Maske im nächsten Bild neu berechnen (die Stücke selbst bleiben) */

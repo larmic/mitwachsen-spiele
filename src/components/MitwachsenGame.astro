@@ -4,7 +4,8 @@
 // Steuerkreuz. Das Kind spielt sonst mit den Pfeiltasten; eine Aktionstaste gibt es ab 3 nicht. Ohne JavaScript bleibt ein Text für Eltern.
 // Wird die Figur müde, erscheint über ihr eine Sprechblase; der Hinweis für Eltern zur Bildschirmzeit kommt beim ersten
 // Öffnen und ist über Menü und Sprechblase wieder zu öffnen. Was das Spiel ohne Bild sagt („Noch nicht“ am Eistor),
-// meldet eine unsichtbare Live-Region (`mw-say`).
+// meldet eine unsichtbare Live-Region (`mw-say`). Steht die Figur eine Sekunde auf einer Torplatte, blendet oben eine
+// Postkarte mit der Front des Tors ein (`mw-card`, nur Bild, unter Kopf, Menü und Steuerkreuz; nicht bei Toren im Norden).
 // Logik: src/scripts/games/ · Konzept: docs/games/mitwachsen.md
 import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
 ---
@@ -26,6 +27,7 @@ import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
 
   <canvas class="mw-canvas3d" aria-hidden="true"></canvas>
   <canvas class="mw-canvas" role="img" aria-label="Spielwelt: eine Figur auf einer Voxel-Insel mit Tieren"></canvas>
+  <canvas class="mw-card" aria-hidden="true"></canvas>
 
   <p class="mw-say sr-only" role="status"></p>
 
@@ -126,6 +128,9 @@ import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
       <button type="button" class="mw-link" data-act="sound" aria-pressed="true">
         Ton ist an
       </button>
+      <button type="button" class="mw-link" data-act="motion" aria-pressed="true">
+        Kamera bewegen: an
+      </button>
       <button type="button" class="mw-link" data-act="fullscreen">
         Vollbild
       </button>
@@ -187,6 +192,25 @@ import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
   }
   .mw.three .mw-canvas3d {
     visibility: visible;
+  }
+  /* Postkarte der Torfront: oben mittig unter dem Namen, klein (30 % der Breite, im Querformat flacher), weich ein und aus;
+     über der Spielfläche, unter Kopf, Steuerkreuz und Menü (`z-index: 1`) */
+  .mw-card {
+    position: absolute;
+    top: 60px;
+    left: 50%;
+    width: min(30%, 36vh);
+    aspect-ratio: 4 / 3;
+    transform: translateX(-50%);
+    background: linear-gradient(var(--sky-1), var(--sky-3));
+    border: 4px solid var(--paper);
+    box-shadow: var(--px-3);
+    opacity: 0;
+    transition: opacity 250ms linear;
+    pointer-events: none;
+  }
+  .mw-card.on {
+    opacity: 1;
   }
   .mw-top {
     position: absolute;
@@ -402,7 +426,8 @@ import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
   }
   .mw-row {
     flex-direction: row !important;
-    gap: 20px !important;
+    flex-wrap: wrap;
+    gap: 12px 20px !important;
     margin: 20px 0;
   }
   .mw-link {
@@ -516,6 +541,12 @@ import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
       width: 24px;
       height: 26px;
       font-size: 1rem;
+    }
+  }
+  /* Schmales Handy: Die Postkarte reichte unter die Karte oben rechts (12 + 120 px, Schatten 12 px), sie rückt darunter */
+  @media (max-width: 430px) {
+    .mw-card {
+      top: 156px;
     }
   }
 </style>

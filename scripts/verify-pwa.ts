@@ -35,7 +35,9 @@ const DIST = 'dist';
  * Luft. Mit der Torplatte bis „noch nicht“ am Eistor (Platten, Öffnen auf der Platte, die nachgeladene Datei
  * mitwachsen-hint-look.<hash>.js) gut 1020 KiB: knapp 4 KiB Luft für die nächsten Schritte der Torplatte (Drehung,
  * Blinzeln, Kamera vor den Flügeln, Elternschalter, Platten der anderen Welten). Reicht das nicht, bewusst und
- * begründet anheben.
+ * begründet anheben. Mit der Postkarte der Torfront (nachgeladene 2D-Zeichnung mitwachsen-postcard.<hash>.js,
+ * Standbild in der 3D-Ansicht) und dem Elternschalter 1023,6 KiB: Das Budget reicht noch, es bleibt; 0,4 KiB
+ * Luft. Die Drehung in 3D wird es bewusst und knapp anheben müssen.
  */
 const PRECACHE_BUDGET = 1024 * 1024;
 const OPTS: PwaOptions = { origin: SITE.url, manifest: '/manifest.webmanifest', sw: SERVICE_WORKER };

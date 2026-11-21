@@ -63,3 +63,15 @@ export function plateSink(fx: PlateFx | null, id: GateId, now: number, reduced: 
   const t = reduced ? 1 : Math.min(1, (now - fx.since) / (fx.on ? SINK_MS : RISE_MS)); // since liegt nie nach now
   return SINK * (fx.on ? t : 1 - t);
 }
+
+/** So lange steht (oder läuft) die Figur auf einer Platte, bis oben die Postkarte der Torfront einblendet */
+export const POSTCARD_MS = 1000;
+
+/**
+ * Tor, dessen Front die Postkarte gerade zeigt: seit `POSTCARD_MS` ist die Figur auf seiner Platte (`fx` aus
+ * mitwachsen-plate-toy.ts), sonst null. Nie bei Toren im Norden (`out` [0, −1]): Deren Front sieht die Kamera von
+ * Süden ohnehin, die Postkarte läge über dem echten Tor, gerade wenn dort „noch nicht“ oder das Öffnen zu sehen ist.
+ * Gleich in 2D, 3D und bei reduzierter Bewegung; Ein- und Ausblenden (250 ms) macht das CSS der Spielfläche
+ */
+export const postcard = (fx: PlateFx | null, now: number, gates: ReadonlyMap<GateId, { out: Point }>): GateId | null =>
+  fx?.on && now - fx.since >= POSTCARD_MS && gates.get(fx.id)?.out[1] !== -1 ? fx.id : null;

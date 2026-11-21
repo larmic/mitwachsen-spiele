@@ -30,6 +30,20 @@ test('Barrierefrei: Spiel mit Hinweis für Eltern und danach', async ({ page }) 
   expect(await violations(page)).toEqual([]);
 });
 
+test('Barrierefrei: Menü für Eltern mit den Schaltern für Ton und Kamera', async ({ page }) => {
+  await page.goto('/spielen/');
+  await page.getByRole('button', { name: /Verstanden/ }).click();
+  await expect(page.locator('larmic-mitwachsen')).toHaveClass(/ready/);
+  await page.getByRole('button', { name: 'Menü für Eltern' }).click();
+  const menu = page.locator('dialog.mw-settings');
+  await expect(menu).toHaveJSProperty('open', true);
+  await expect(menu.getByRole('button', { name: 'Kamera bewegen: an' })).toHaveAttribute('aria-pressed', 'true');
+  expect(await violations(page)).toEqual([]);
+  await menu.getByRole('button', { name: 'Kamera bewegen: an' }).click();
+  await expect(menu.getByRole('button', { name: 'Kamera bewegen: aus' })).toHaveAttribute('aria-pressed', 'false');
+  expect(await violations(page)).toEqual([]);
+});
+
 test('Barrierefrei: Startseite auf dem Handy (320 px)', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto('/');

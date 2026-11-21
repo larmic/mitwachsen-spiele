@@ -1,5 +1,5 @@
 // Menü für Eltern, nachgeladen: Inhalt (Liste der Welten mit je einem Knopf zum Wechseln mit Welt- und Figurname und
-// einem zum Löschen, Namen, Welt-Code, Ton) und die seltenen Handgriffe: Welt löschen mit Rückfrage im Menü selbst (kein
+// einem zum Löschen, Namen, Welt-Code, Ton, Kamera bewegen) und die seltenen Handgriffe: Welt löschen mit Rückfrage im Menü selbst (kein
 // Dialog des Browsers) und Welt-Code kopieren. Die Klicks fängt die Web Component (larmic-mitwachsen.ts) über
 // `data-world` und `data-delete`; sie lädt dieses Modul erst, wenn sie das Menü füllt oder ein Handgriff kommt.
 // Spezifikation: docs/specs/mitwachsen.md („Was angezeigt wird“: Menü)
@@ -7,6 +7,23 @@
 import { loadIndex, worldCode, type Index, type SavedWorld, type Store } from './mitwachsen-save';
 
 const ARMED_MS = 4000; // so lange wartet der Knopf auf den zweiten Klick
+/** Elternschalter „Kamera bewegen“: '1' heißt aus (Postkarte statt Drehung); fehlt der Eintrag, ist er an */
+export const CALM_KEY = 'larmic.games.calm';
+
+/** Ist der Elternschalter „Kamera bewegen“ aus? */
+export const calm = (store: Store) => store.getItem(CALM_KEY) === '1';
+
+/**
+ * Elternschalter „Kamera bewegen“ umlegen und merken (geht das nicht, bleibt er, wie er war). Noch ohne Wirkung im
+ * Spiel: Die Postkarte der Torfront kommt ohnehin überall, die Drehung kommt erst
+ */
+export function toggleCalm(store: Store) {
+  try {
+    store.setItem(CALM_KEY, calm(store) ? '0' : '1');
+  } catch {
+    /* Speicher voll oder gesperrt */
+  }
+}
 
 /**
  * Löschen-Knopf geklickt: Der erste Klick fragt („Wirklich löschen?“, auch im Etikett für Screenreader), der zweite
@@ -50,16 +67,27 @@ export async function copyCode(button: HTMLElement, written: Promise<void>, menu
   }
 }
 
-/** Menü füllen: Liste der Welten aus `store` (die gespielte markiert), Namen, Welt-Code und Knopf für den Ton */
-export function renderMenu(menu: HTMLElement, store: Store, saved: SavedWorld, muted: boolean) {
+/**
+ * Menü füllen: Liste der Welten aus `store` (die gespielte markiert), Namen, Welt-Code und die Schalter für den Ton und
+ * „Kamera bewegen“; `flip`: den Schalter „Kamera bewegen“ vorher umlegen (geklickt)
+ */
+export function renderMenu(menu: HTMLElement, store: Store, saved: SavedWorld, muted: boolean, flip = false) {
+  if (flip) toggleCalm(store);
   const index = loadIndex(store);
   menu.querySelector('.mw-worlds')!.replaceChildren(...index.worlds.map((w) => worldItem(w, w.id === saved.id)));
   (menu.querySelector('#mw-world-name') as HTMLInputElement).value = saved.worldName;
   (menu.querySelector('#mw-figure-name') as HTMLInputElement).value = saved.figureName;
   menu.querySelector('.mw-code')!.textContent = worldCode(saved.seed);
-  const sound = menu.querySelector('[data-act="sound"]')!;
-  sound.setAttribute('aria-pressed', String(!muted));
-  sound.textContent = muted ? 'Ton ist aus' : 'Ton ist an';
+  toggle(menu, 'sound', !muted, muted ? 'Ton ist aus' : 'Ton ist an');
+  const off = calm(store);
+  toggle(menu, 'motion', !off, `Kamera bewegen: ${off ? 'aus' : 'an'}`);
+}
+
+/** Schalter im Menü (`data-act`): gedrückt heißt an, das Etikett sagt es auch */
+function toggle(menu: HTMLElement, act: string, on: boolean, text: string) {
+  const b = menu.querySelector(`[data-act="${act}"]`)!;
+  b.setAttribute('aria-pressed', String(on));
+  b.textContent = text;
 }
 
 /** Ein Eintrag der Liste; die gespielte Welt (`current`) ist markiert */

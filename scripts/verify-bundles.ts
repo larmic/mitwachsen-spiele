@@ -46,8 +46,16 @@ export const RULES: Rule[] = [
     // `View2D.hint` und das Zeichnen des Umrisses (`Scene.hint`). Wann es zeigt und das Holen des Bilds liegen im Paket
     // der Eis-Welt (worlds/eis/mitwachsen-plate-hint.ts), Bild, Ton und Live-Region in einer eigenen, nachgeladenen
     // Datei (Regel unten), das Wackeln der Flügel in der 3D-Ansicht. Für die nächsten Schritte bleiben 0,5 KB der
-    // Anhebung
-    budget: 126.5 * 1024,
+    // Anhebung. 127,0 KB mit der Postkarte der Torfront und dem Elternschalter „Kamera bewegen“: bewusst um die zweite
+    // Hälfte angehoben, damit ist die vereinbarte Anhebung um 1 KB für die Torplatte (Platte, Stehzähler, Klänge,
+    // Postkarte, Schalter; vorher Eis-Teile ins Paket verschoben und das Menü nachgeladen) aufgebraucht. Im Kern steht
+    // nur, wann die Postkarte kommt und geht (`postcard` in mitwachsen-plate.ts, samt „nicht vor Toren im Norden“) und
+    // das Nachladen dessen, der sie zeichnet; alles andere lädt erst mit der ersten Postkarte (mitwachsen-card.ts samt
+    // 2D-Zeichnung mitwachsen-postcard.ts), das Standbild in 3D liegt in der 3D-Ansicht (mitwachsen-card-3d.ts),
+    // Schalter und Speichern im nachgeladenen Menü (mitwachsen-menu.ts); im Kern nur der Klick darauf. Gemessen
+    // 129 895 Bytes, also 153 Bytes Luft; was die nächsten Schritte der Torplatte im Kern brauchen (Blinzeln, Kamera
+    // vor den Flügeln, Wirkung des Schalters, „noch nicht“ an den anderen Toren), muss dort erst Platz machen
+    budget: 127 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

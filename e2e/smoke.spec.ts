@@ -1147,6 +1147,130 @@ test.describe('Welt-Paket nur bei Bedarf', () => {
   });
 });
 
+test('Menü für Eltern: Schalter „Kamera bewegen“ ist an, lässt sich umlegen und bleibt nach dem Neuladen', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  await page.goto('/spielen/');
+  await page.getByRole('button', { name: /Verstanden/ }).click();
+  const game = page.locator('larmic-mitwachsen');
+  await expect(game).toHaveClass(/ready/);
+  const menu = page.locator('dialog.mw-settings');
+  const motion = menu.getByRole('button', { name: /^Kamera bewegen/ });
+  const sound = menu.getByRole('button', { name: /^Ton ist/ });
+  await page.getByRole('button', { name: 'Menü für Eltern' }).click();
+  await expect(menu).toHaveJSProperty('open', true);
+  // Ohne Eintrag im Speicher ist er an, neben dem Ton
+  await expect(motion).toHaveText('Kamera bewegen: an');
+  await expect(motion).toHaveAttribute('aria-pressed', 'true');
+  await motion.click();
+  await expect(motion).toHaveText('Kamera bewegen: aus');
+  await expect(motion).toHaveAttribute('aria-pressed', 'false');
+  await expect(sound).toHaveAttribute('aria-pressed', 'true'); // der Ton bleibt, wie er war
+  expect(await page.evaluate(() => localStorage.getItem('larmic.games.calm'))).toBe('1');
+  // Kein neues Format des Spielstands: Die Welt speichert ihn nicht
+  const worlds = await page.evaluate(() =>
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('larmic.games.world.'))
+      .map((k) => localStorage.getItem(k) ?? ''),
+  );
+  expect(worlds.some((w) => w.includes('calm'))).toBe(false);
+  await page.reload();
+  await expect(game).toHaveClass(/ready/);
+  await page.getByRole('button', { name: 'Menü für Eltern' }).click();
+  await expect(menu).toHaveJSProperty('open', true);
+  await expect(motion).toHaveText('Kamera bewegen: aus');
+  await expect(motion).toHaveAttribute('aria-pressed', 'false');
+  await motion.click(); // wieder an
+  await expect(motion).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => localStorage.getItem('larmic.games.calm'))).toBe('0');
+  expect(errors).toEqual([]);
+});
+
+for (const mode of ['3D', '2D mit reduzierter Bewegung'] as const)
+  test(`Postkarte der Torfront (${mode}): nach 1 s auf der Torplatte oben die Front, herunter blendet sie aus`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    if (mode !== '3D') await page.emulateMedia({ reducedMotion: 'reduce' });
+    const errors = watchErrors(page);
+    await page.goto('/spielen/');
+    await page.getByRole('button', { name: /Verstanden/ }).click();
+    const game = page.locator('larmic-mitwachsen');
+    await expect(game).toHaveClass(/ready/);
+    type Game = {
+      world: { gates: Map<string, { mid: [number, number]; out: [number, number] }> };
+      state: { player: { x: number; y: number; dir: string }; sleeping: boolean; wokeAt: number };
+      r3d: unknown;
+      lift(): void;
+    };
+    const webgl = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
+    if (mode === '3D' && webgl) await expect(game).toHaveClass(/three/);
+    // Tore im Norden zeigt die Kamera von Süden ohnehin von vorn: dort keine Postkarte
+    const [front, north] = await game.evaluate((node) => {
+      const gates = [...(node as unknown as Game).world.gates.entries()];
+      return [gates.find(([, g]) => g.out[1] !== -1)![0], gates.find(([, g]) => g.out[1] === -1)?.[0]];
+    });
+    /** Die Figur wach vor das Tor `id`: `row` Reihen vor der Tür (2: mitten auf der Torplatte) */
+    const stand = (row: number, id = front) =>
+      game.evaluate(
+        (node, [r, flat, gate]) => {
+          const el = node as unknown as Game;
+          if (flat) el.r3d = null; // ohne 3D: Die 2D-Ansicht zeichnet, auch die Postkarte
+          const { mid, out } = el.world.gates.get(gate)!;
+          const player = { x: mid[0] - r * out[0], y: mid[1] - r * out[1], dir: 'n' };
+          el.state = { ...el.state, player, sleeping: false, wokeAt: -100 };
+          el.lift();
+        },
+        [row, mode !== '3D', id] as const,
+      );
+    const card = page.locator('canvas.mw-card');
+    await expect(card).toHaveAttribute('aria-hidden', 'true');
+    await stand(4);
+    await waitFrames(page, 10);
+    await expect(card).not.toHaveClass(/on/);
+    await stand(2);
+    await expect(card).toHaveClass(/on/, { timeout: 15_000 });
+    // Die Front ist gezeichnet: viele verschiedene Farben, nicht leer
+    await expect
+      .poll(() =>
+        card.evaluate((c) => {
+          const cv = c as HTMLCanvasElement;
+          const data = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
+          const colors = new Set<number>();
+          for (let i = 0; i < data.length; i += 16)
+            if (data[i + 3]! > 0) colors.add((data[i]! << 16) | (data[i + 1]! << 8) | data[i + 2]!);
+          return colors.size;
+        }),
+      )
+      .toBeGreaterThan(8);
+    // oben mittig, klein, nicht über dem Steuerkreuz
+    const box = (await card.boundingBox())!;
+    const view = page.viewportSize()!;
+    expect(Math.abs(box.x + box.width / 2 - view.width / 2)).toBeLessThan(2);
+    expect(box.width).toBeLessThanOrEqual(0.3 * view.width + 1);
+    expect(box.y + box.height).toBeLessThan(view.height / 2);
+    await expect(card).toHaveCSS('opacity', '1');
+    // Auf dem schmalen Handy rückt sie unter die Karte oben rechts, nie darunter versteckt
+    await page.setViewportSize({ width: 320, height: 640 });
+    await expect
+      .poll(async () => {
+        const [c, m] = [(await card.boundingBox())!, (await page.locator('canvas.mw-map').boundingBox())!];
+        return c.y >= m.y + m.height || c.x + c.width <= m.x;
+      })
+      .toBe(true);
+    await page.setViewportSize(view);
+    await stand(3); // eine Reihe herunter in die Bucht
+    await expect(card).not.toHaveClass(/on/, { timeout: 15_000 });
+    await expect(card).toHaveCSS('opacity', '0');
+    if (north) {
+      await stand(2, north); // auf der Platte eines Tors im Norden: keine Postkarte über dem echten Tor
+      await waitFrames(page, 120); // länger als die Sekunde, nach der sie sonst käme
+      await expect(card).not.toHaveClass(/on/);
+    }
+    expect(errors).toEqual([]);
+  });
+
 test.describe('ohne JavaScript', () => {
   test.use({ javaScriptEnabled: false });
   test('Inhalte bleiben lesbar, das Spiel erklärt sich Eltern', async ({ page }) => {

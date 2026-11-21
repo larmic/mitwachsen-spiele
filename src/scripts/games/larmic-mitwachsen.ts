@@ -5,13 +5,15 @@
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md
 
 import { chunkOf } from '../../lib/games/chunks';
-import { projection, type Dir } from '../../lib/games/front';
+import { projection } from '../../lib/games/front';
 import type { World3D as World3DType } from './mitwachsen-3d';
-import { GAME_COLORS, LOOK, SPECIES, TIRED_TALK, realmOfAnimal } from '../../data/games/mitwachsen';
+import type { postcardView } from './mitwachsen-card';
+import { GAME_COLORS, LOOK, SPECIES, TIRED_TALK, realmOfAnimal, type GateId } from '../../data/games/mitwachsen';
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
 import { SPARKS, fly, glints, sparks } from './mitwachsen-glyphs';
 import { Sfx } from './sfx';
 import { plateToy } from './mitwachsen-plate-toy';
+import { postcard } from './mitwachsen-plate';
 import { NOTE_COLORS, StoryPlayer } from './mitwachsen-story';
 import {
   DEFAULT_FIGURE,
@@ -27,6 +29,7 @@ import {
   type Store,
 } from './mitwachsen-save';
 import { FREE_KEYS, InputPace, KEYS, STEP_MS, stops } from './input-pace';
+import { listenTouch } from './mitwachsen-touch';
 import { drawMap } from './mitwachsen-map';
 import { Fog, START_REVEAL, lookAround } from './mitwachsen-fog';
 import { attachPack, initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
@@ -105,6 +108,7 @@ class LarmicMitwachsen extends HTMLElement {
   private packs = new Packs((pack) => this.arrive(pack)); // Welt-Pakete (worlds/), geladen erst bei Bedarf
   private opening = ''; // Welt, die gerade öffnet (wartet vielleicht auf ein Paket)
   private live = ''; // Welt, zu der `state` gehört; solange sie nicht `opening` ist, ruhen Takt und Speichern
+  private card?: ReturnType<typeof postcardView> | null; // Postkarte der Torfront, nachgeladen mit der ersten
   private plates = plateToy(this.sfx, (at, colors) => this.burst('', colors, 6, at, true)); // Torplatten
   // „noch nicht“ am Eistor (Haken im Welt-Paket): Steht die Figur dort ohne Pinguin?
   private hint = (now: number) =>
@@ -395,7 +399,7 @@ class LarmicMitwachsen extends HTMLElement {
     window.addEventListener('pagehide', () => this.save(), { signal });
 
     this.querySelector('.mw-gear')!.addEventListener('click', () => void this.openMenu(), { signal });
-    this.listenTouch(signal);
+    listenTouch(this, signal, this.pace, this.sfx, (dir) => this.apply({ type: 'move', dir }));
     // Beim Schließen gibt der Dialog den Fokus ans Zahnrad zurück; die Leertaste öffnete dann sofort wieder das Menü
     this.menu.addEventListener(
       'close',
@@ -434,49 +438,6 @@ class LarmicMitwachsen extends HTMLElement {
       { signal },
     );
     this.menu.addEventListener('change', (e) => this.menuChange(e), { signal });
-  }
-
-  /**
-   * Touch-Steuerung: Das Steuerkreuz läuft über denselben ruhigen Takt wie die Tastatur.
-   * Nach der ersten Berührung erscheint die Steuerung auch auf Geräten mit Maus (z. B. Laptop mit Touchscreen).
-   */
-  private listenTouch(signal: AbortSignal) {
-    document.addEventListener('touchstart', () => this.classList.add('touch'), { signal, passive: true, once: true });
-    // iPad/iPhone erlauben Ton erst bei einer aktivierenden Geste (Loslassen), nicht schon beim Antippen
-    const unlock = () => this.sfx.unlock();
-    document.addEventListener('pointerup', unlock, { signal });
-    document.addEventListener('touchend', unlock, { signal, passive: true });
-    // iPad/iPhone: Langes Drücken öffnet sonst Lupe, Textauswahl oder ein Menü. Pointer-Ereignisse kommen trotzdem an.
-    const quiet = (e: Event) => e.preventDefault();
-    for (const el of this.querySelectorAll<HTMLElement>('.mw-touch, .mw-canvas')) {
-      el.addEventListener('touchstart', quiet, { signal, passive: false });
-      el.addEventListener('contextmenu', quiet, { signal });
-    }
-    for (const key of this.querySelectorAll<HTMLElement>('.mw-key')) {
-      const dir = key.dataset.dir as Dir;
-      const held = new Set<number>(); // mehrere Finger auf derselben Taste: erst der letzte lässt los
-      const up = (e: Event) => {
-        held.delete((e as PointerEvent).pointerId);
-        if (held.size) return;
-        key.classList.remove('down');
-        this.pace.release(dir);
-      };
-      key.addEventListener(
-        'pointerdown',
-        (e) => {
-          e.preventDefault();
-          key.setPointerCapture(e.pointerId);
-          held.add(e.pointerId);
-          key.classList.add('down');
-          this.sfx.unlock();
-          const go = this.pace.press(dir, performance.now());
-          if (go) this.apply({ type: 'move', dir: go });
-        },
-        { signal },
-      );
-      for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'])
-        key.addEventListener(type, up, { signal });
-    }
   }
 
   /** Ereignisse der Regeln: Töne, Herzen, Noten, Tore, Nacht – und sofort speichern, was zählt */
@@ -804,6 +765,7 @@ class LarmicMitwachsen extends HTMLElement {
       plate: this.plates(this.world, player, this.state.sleeping, this.packs.loaded, t),
       hint: this.hint(t), // „noch nicht“ am Eistor
     };
+    this.postcard(postcard(scene.plate, t, this.world.gates), gates);
     if (this.r3d) {
       // 3D-Welt, darüber die durchsichtige 2D-Ebene mit Zeichen, Pfeil, Nacht und Leiste
       this.r3d.render(this.world, this.state, scene);
@@ -818,6 +780,18 @@ class LarmicMitwachsen extends HTMLElement {
       this.mapCtx.imageSmoothingEnabled = false;
       drawMap(this.mapCtx, this.world, this.state, player.x, player.y, m, this.seen, this.reduced.matches ? 0 : t);
     }
+  }
+
+  /**
+   * Postkarte der Torfront nach 1 s auf einer Platte (`id`), in 3D vor dem Bild, das die Ecke übermalt, die sie braucht;
+   * mitwachsen-card.ts lädt erst mit der ersten Postkarte nach
+   */
+  private postcard(id: GateId | null, open: Map<string, number>) {
+    if (id && this.card === undefined) {
+      this.card = null;
+      void import('./mitwachsen-card').then((m) => (this.card = m.postcardView(this.querySelector('.mw-card')!)), noop);
+    }
+    this.card?.(id, this.world, this.state, this.r3d, open, this.renderer.view);
   }
 
   // ---------- Kopf und Menü ----------
@@ -840,9 +814,15 @@ class LarmicMitwachsen extends HTMLElement {
     this.menu.showModal();
   }
 
-  /** Menü füllen, nachgeladen mit seinen seltenen Handgriffen (mitwachsen-menu.ts) */
-  private async renderMenu() {
-    (await import('./mitwachsen-menu').catch(noop))?.renderMenu(this.menu, this.store, this.saved, this.sfx.muted);
+  /** Menü füllen, nachgeladen mit seinen seltenen Handgriffen (mitwachsen-menu.ts); `flip`: Schalter „Kamera bewegen“ */
+  private async renderMenu(flip?: boolean) {
+    (await import('./mitwachsen-menu').catch(noop))?.renderMenu(
+      this.menu,
+      this.store,
+      this.saved,
+      this.sfx.muted,
+      flip,
+    );
   }
 
   /** Welt löschen mit Rückfrage im Menü: erster Klick fragt, zweiter löscht (innerhalb von 4 Sekunden) */
@@ -895,6 +875,9 @@ class LarmicMitwachsen extends HTMLElement {
         if (this.sfx.muted) this.sfx.suspend();
         else this.sfx.unlock();
         void this.renderMenu();
+        break;
+      case 'motion': // Elternschalter „Kamera bewegen“ (im Menü-Modul; noch ohne Wirkung, die Postkarte kommt überall)
+        void this.renderMenu(true);
         break;
       case 'fullscreen':
         this.menu.close();

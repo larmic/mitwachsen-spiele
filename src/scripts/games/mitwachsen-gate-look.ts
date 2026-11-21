@@ -2,13 +2,17 @@
 // Öffnen von vorn gesehen schmaler, jeder Flügel zu seiner Angel hin (bei Toren im Osten oder Westen, deren Tür man nur
 // von der Seite sieht, verschwindet sie Feld für Feld). Führt der verlaufene Pinguin die Figur zu einem Tor im Norden
 // oder Süden, steht statt des Zeichens sein Umriss auf der Tür (mitwachsen-guest-look.ts, nachgeladen). Die
-// 3D-Torhäuser baut mitwachsen-gatehouse.ts.
+// 3D-Torhäuser baut mitwachsen-gatehouse.ts. Die Postkarte der Torfront (mitwachsen-postcard.ts) zeichnet mit `bigGate`
+// jedes Tor wie eines im Norden, also von vorn.
 // Spezifikation: docs/specs/mitwachsen.md („Was angezeigt wird“: Große Tore)
 
 import { box, type Projection } from '../../lib/games/front';
 import { THEME_COLORS, type GateId } from '../../data/games/mitwachsen';
 import type { Guest } from './mitwachsen-guest-look';
-import type { Cell, World } from './mitwachsen-world';
+import type { Cell, GatePlace } from './mitwachsen-world';
+
+/** Was `bigGate` von der Welt braucht: die Tore (die Postkarte reicht ein einzelnes, gedachtes Tor im Norden) */
+export type GateRow = { gates: ReadonlyMap<GateId, Pick<GatePlace, 'id' | 'mid' | 'out' | 'cells'>> };
 
 const ARCH = 4.7; // Höhe der Tür bis zum Torbogen
 const HALF = 2.5; // halbe Breite der Tür: jeder Flügel ist so breit
@@ -26,8 +30,8 @@ const outlineOn = (guest: Guest | null, id: GateId, open: number) =>
 export function bigGate(
   ctx: CanvasRenderingContext2D,
   P: Projection,
-  world: World,
-  c: Cell,
+  world: GateRow,
+  c: Pick<Cell, 'deco' | 'part' | 'gate'>,
   x: number,
   y: number,
   h: number,

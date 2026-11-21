@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GateId } from '../../data/games/mitwachsen';
-import { plateMid } from './mitwachsen-plate';
+import { POSTCARD_MS, plateMid, postcard } from './mitwachsen-plate';
 import { plateToy } from './mitwachsen-plate-toy';
 import { PLATE_TUNE, plateTones, plopp, type Scored } from './sfx';
 import { view } from './worlds/eis/view-2d';
@@ -84,5 +84,36 @@ describe('Spielzeug der Torplatte', () => {
     const other = createWorld(1, []); // dieselbe Welt ohne Paket (wie vor dem Ankommen der Eis-Welt): neu, still
     expect(toy(other, at('sand', null), [], 5500)).toBeNull();
     expect(played).toHaveLength(1);
+  });
+
+  it('Postkarte der Torfront: nach 1 s auf der Platte (auch längs drüber), herunter sofort weg; gleich für jedes Tor außer im Norden', () => {
+    const { toy } = setup();
+    const south = [...w.gates.values()].find((g) => g.out[1] !== -1)!.id; // ein Tor, dessen Front man sonst nicht sieht
+    const card = (cell: ReturnType<typeof at>, now: number) => postcard(toy(w, cell, [], now), now, w.gates);
+    expect(card(at(south, null), 0)).toBeNull(); // eine neue Welt: nur merken
+    expect(card(at(south, 0), 100)).toBeNull(); // drauf: noch nicht
+    expect(card(at(south, 1), 100 + POSTCARD_MS - 1)).toBeNull(); // längs weiter, noch keine Sekunde
+    expect(card(at(south, 1), 100 + POSTCARD_MS)).toBe(south);
+    expect(card(at(south, 1), 9000)).toBe(south); // bleibt, solange die Figur auf der Platte ist
+    expect(card(at(south, null), 9010)).toBeNull(); // herunter: blendet aus
+    expect(card(at(south, 0), 9500)).toBeNull(); // wieder drauf: die Sekunde beginnt neu
+    expect(card(at(south, 0), 9500 + POSTCARD_MS)).toBe(south);
+    const lagen = new Set<string>();
+    for (const g of w.gates.values()) {
+      card(at(g.id, null), 20_000);
+      card(at(g.id, 0), 20_100);
+      // Tore im Norden zeigt die Kamera von Süden ohnehin von vorn: keine Postkarte über dem echten Tor
+      expect(card(at(g.id, 0), 20_100 + POSTCARD_MS), g.id).toBe(g.out[1] === -1 ? null : g.id);
+      lagen.add(g.out.join());
+    }
+    expect(lagen.has('0,-1') && lagen.size > 1).toBe(true); // beide Fälle kommen vor
+  });
+
+  it('Postkarte: öffnet die Welt mit der Figur auf der Platte, gleich da; schläft sie ein, weg', () => {
+    const { toy } = setup();
+    const id = [...w.gates.values()].find((g) => g.out[1] !== -1)!.id;
+    expect(postcard(toy(w, at(id, 0), [], 5000), 5000, w.gates)).toBe(id);
+    expect(postcard(toy(w, at(id, 0, true), [], 5100), 5100 + POSTCARD_MS, w.gates)).toBeNull();
+    expect(postcard(null, 0, w.gates)).toBeNull();
   });
 });
