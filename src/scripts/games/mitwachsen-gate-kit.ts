@@ -49,6 +49,17 @@ export type GateLook = {
 /** Bauplan eines Zugangs: legt Geometrie in `p` an und liefert Türflügel, falls er welche hat */
 export type GateBuild = (p: Parts, g: GateCtx) => Wing[];
 
+/** Bewegte Teile (fließende Wand, wiegende Ranken) zeichnen sich alle BEAT_MS neu und wiederholen sich nach BEATS Takten */
+export const BEAT_MS = 125;
+export const BEATS = 16;
+/**
+ * Bewegte Teile eines Zugangs im Takt `beat` (0 … BEATS − 1): ein eigenes, kleines Raster neben dem festen aus
+ * `GateBuild`. Seine Voxel liegen nie in einer Zelle, die das feste Raster belegt (sonst lägen Flächen deckungsgleich);
+ * Takt BEATS schließt nahtlos an Takt 0 an. Die 3D-Ansicht baut jeden Takt einmal und hebt ihn auf, bis sich die Öffnung
+ * ändert; wer weniger Bewegung wünscht, sieht nur Takt 0.
+ */
+export type GateMotion = (p: Parts, g: GateCtx, beat: number) => void;
+
 /** Teilstück 0 … 1 eines Ablaufs: wie weit `t` im Abschnitt [a, b] ist */
 export const seg = (t: number, a: number, b: number) => Math.min(1, Math.max(0, (t - a) / (b - a)));
 /** sanft an- und auslaufen */

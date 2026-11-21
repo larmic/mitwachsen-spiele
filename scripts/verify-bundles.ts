@@ -64,8 +64,9 @@ export const RULES: Rule[] = [
     // Three.js (517,7 KB in three.<hash>.js) und die 3D-Ansicht samt Zugängen, ohne die Teile der Eis-Welt: gemessen
     // 589,5 KB (vorher 591,9 KB in einer Datei mit Iglu, Fischkisten, Tür und Eiszapfen des Eistors); 589,8 KB mit dem
     // Material für Quader, die so hell leuchten, wie ein Welt-Paket sagt (`View3D.glow`); 589,9 KB mit dem Haken der
-    // Fußspuren im Schnee (`View3D.layer`, `Views3D.layers`); dazu gut 5 KB Luft
-    budget: 595 * 1024,
+    // Fußspuren im Schnee (`View3D.layer`, `Views3D.layers`); 596,2 KB mit den bewegten Teilen der Zugänge (fließende
+    // Wasserwand, Glutkaskade, wiegende Pilzranken je Takt); dazu knapp 5 KB Luft
+    budget: 601 * 1024,
     // Probe: Das Leuchten der Eiszapfen gibt es nur im 3D-Teil der Eis-Welt (ICE_GLOW in worlds/eis/view-3d-gate.ts)
     forbidden: /#7fd6ff/,
   },
