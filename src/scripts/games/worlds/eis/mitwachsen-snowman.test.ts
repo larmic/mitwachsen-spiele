@@ -9,7 +9,7 @@ import { EIS_PACK, PACKS, worldOf } from '../../test-worlds';
 import { SNOWMAN, snowOf, stageAt } from './mitwachsen-snowman';
 import { snowBoxes, snowScore, wobble } from './mitwachsen-snowman-look';
 import { SNOWMAN_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
-import { ICE_COLORS } from '../../../../data/games/mitwachsen-eis';
+import { ICE_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 
 const world = worldOf(1);
 /** Die Schneehaufen im Tal von Seed 1 */

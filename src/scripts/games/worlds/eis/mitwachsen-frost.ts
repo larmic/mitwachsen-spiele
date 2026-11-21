@@ -8,7 +8,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Gletscherkessel“ und „Wetter und Unterstand“)
 
 import { cycle, hash, rand01 } from '../../../../lib/games/rng';
-import { ICE_CRYSTALS } from '../../../../data/games/mitwachsen-eis';
+import { ICE_CRYSTALS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import type { Cell } from '../../mitwachsen-cell';
 
 const key = (x: number, y: number) => `${x},${y}`;

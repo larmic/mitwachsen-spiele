@@ -10,7 +10,7 @@ import { KESSEL_WILDS } from './worlds/eis/mitwachsen-kessel';
 import { FROST, HEAPS } from './worlds/eis/mitwachsen-frost';
 import { HAUNTS } from './worlds/eis/mitwachsen-haunts';
 import { bergPeak } from './worlds/eis/mitwachsen-ice-sky';
-import { ICE_CRYSTALS } from '../../data/games/mitwachsen-eis';
+import { ICE_CRYSTALS } from '../../data/games/worlds/eis/mitwachsen-ice-colors';
 import { SEATS, crossings } from './mitwachsen-border';
 import {
   GATE_HALF,

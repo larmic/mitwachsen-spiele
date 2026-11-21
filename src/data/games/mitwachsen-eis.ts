@@ -1,4 +1,4 @@
-// Eis-Welt von Mitwachsen, was alle brauchen (Leiste, Album, Arten, Ansicht): Farben der Eis-Dinge, das Netz mit
+// Eis-Welt von Mitwachsen, was alle brauchen (Leiste, Album, Arten, Ansicht): Farben der Fische, das Netz mit
 // Fischen und die zehn Eis-Tiere (Name, Ton, Gangart). Maße des Gletscherkessels, Wohnorte und Modelle der Tiere
 // braucht nur das Welt-Paket der Eis-Welt: worlds/eis/mitwachsen-kessel.ts und mitwachsen-ice-models.ts. Die Gegend steht in `REGIONS` (Gegend 'eis'), ihr Zuhause in `HOMES.eis`.
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md
@@ -6,38 +6,26 @@
 import type { Part } from '../../lib/games/front';
 import type { SpeciesOf } from './mitwachsen-species';
 
-/** Farben im Kessel (Spielgrafik): Seite und Oberseite */
-export const ICE_COLORS = {
-  snow: ['#d5e4f0', '#f6f9fc'],
-  block: ['#e8f0f7', '#ffffff'], // hellere Schneeblöcke des Iglus (im Wechsel mit `snow`)
-  ice: ['#9fd6ef', '#d4f1ff'],
-  cliff: ['#9fd6ef', '#f4f8fb'], // Eisklippen: Eis an der Seite, Schnee obenauf
-  bowl: ['#8fc6e9', '#cdeaf8'], // Futterschale aus Eis
-  bowlIn: '#6fb3df',
-  slide: ['#bfe6f5', '#e8f8ff'], // glänzende Rutschspur
-  crate: ['#7d6a55', '#9a8670'], // Fischkiste aus Treibholz
-  fish: ['#9fb4c8', '#dfe9f2'], // silberblaue Fische: Rücken, heller Bauch
-  fin: '#7f96ad', // Schwanzflossen
-  moss: ['#5f8f3a', '#7aa84a'], // Moosbüschel am Rand der Eisschale (nur Bild)
-} as const;
-
 /**
- * Eiskristalle im Gletscherkessel: Hellblau, Türkis und Kornblau, alle kräftig genug für Schnee und Karte (nicht die Farben der Kristalle in der Höhlenwelt, damit
- * man die Welten unterscheidet). Kern und Karte zeichnen sie mit `cell.color`, das Leuchten beim Polarlicht kommt mit
- * dem Welt-Paket der Eis-Welt.
+ * Silberblaue Fische (Rücken, heller Bauch) und ihre Schwanzflossen: am Netz der Figur und in der Fischkiste. Die übrigen
+ * Farben der Eis-Welt (`ICE_COLORS`) und der Eiskristalle (`ICE_CRYSTALS`) braucht nur ihr Welt-Paket:
+ * src/data/games/worlds/eis/mitwachsen-ice-colors.ts
  */
-export const ICE_CRYSTALS = ['#8ec5ff', '#3fd6b8', '#5b8def'] as const;
+export const FISH_COLORS = {
+  fish: ['#9fb4c8', '#dfe9f2'],
+  fin: '#7f96ad',
+} as const;
 
 /** Netz mit zwei silberblauen Fischen in der linken Hand (nach dem Fangen, bis zur Eisschale); gespiegelt zum Eimer */
 export const FISH_PARTS: Part[] = [
-  [-0.11, -0.47, 0.06, 0.22, 0.2, 0.19, '#d8cfb4', ICE_COLORS.fish[0]], // Netz, oben schauen die Fische heraus
+  [-0.11, -0.47, 0.06, 0.22, 0.2, 0.19, '#d8cfb4', FISH_COLORS.fish[0]], // Netz, oben schauen die Fische heraus
   [-0.115, -0.475, 0.13, 0.23, 0.21, 0.02, '#b9ae90'], // Maschen
   [-0.115, -0.475, 0.25, 0.23, 0.21, 0.03, '#8a5f2a'], // Rand
   [-0.01, -0.38, 0.28, 0.02, 0.02, 0.08, '#5d4a2f'], // Stiel bis zur Hand
-  [-0.07, -0.44, 0.22, 0.06, 0.05, 0.1, ...ICE_COLORS.fish], // zwei Fische, die Schwänze stehen über den Rand
-  [-0.09, -0.46, 0.31, 0.1, 0.09, 0.06, ICE_COLORS.fin],
-  [0.02, -0.37, 0.22, 0.06, 0.05, 0.08, ...ICE_COLORS.fish],
-  [0.0, -0.39, 0.29, 0.1, 0.09, 0.06, ICE_COLORS.fin],
+  [-0.07, -0.44, 0.22, 0.06, 0.05, 0.1, ...FISH_COLORS.fish], // zwei Fische, die Schwänze stehen über den Rand
+  [-0.09, -0.46, 0.31, 0.1, 0.09, 0.06, FISH_COLORS.fin],
+  [0.02, -0.37, 0.22, 0.06, 0.05, 0.08, ...FISH_COLORS.fish],
+  [0.0, -0.39, 0.29, 0.1, 0.09, 0.06, FISH_COLORS.fin],
 ];
 
 /** Funken beim Fangen (Platsch) und beim Füttern mit Fisch (silbern und goldgelb) */

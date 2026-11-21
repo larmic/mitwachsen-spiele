@@ -10,7 +10,7 @@
 // im Build `_astro/welt-eis-3d.<hash>.js` mit eigener Grenze (scripts/verify-bundles.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
-import { ICE_COLORS } from '../../../../data/games/mitwachsen-eis';
+import { ICE_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import { crystalBoxes, crystalGlow, floeBoxes, glowTint, iceBoxes } from './mitwachsen-ice-look';
 import type { Frame, Ground, View3D } from '../../mitwachsen-view-3d';
 import type { DrawDeco } from '../../mitwachsen-view';

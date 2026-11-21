@@ -6,7 +6,7 @@
 // Eis-Welt.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Gletscherkessel“ und „Was angezeigt wird“)
 
-import { ICE_COLORS } from '../../../../data/games/mitwachsen-eis';
+import { ICE_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import type { Cell } from '../../mitwachsen-cell';
 import type { PackEvent } from '../../mitwachsen-pack-types';
 import type { Box } from '../../mitwachsen-view';

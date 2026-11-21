@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ICE_COLORS } from '../../../../data/games/mitwachsen-eis';
+import { ICE_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import { KESSEL_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
 import { drawDeco, type DecoAt } from '../../mitwachsen-view';
 import type { Cell } from '../../mitwachsen-world';

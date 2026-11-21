@@ -6,7 +6,7 @@
 // (mitwachsen-prints.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
-import { ICE_COLORS, ICE_CRYSTALS } from '../../../../data/games/mitwachsen-eis';
+import { ICE_COLORS, ICE_CRYSTALS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import { crystalBoxes, crystalGlint, finTwitch, floeBoxes, floeDrift, iceBoxes } from './mitwachsen-ice-look';
 import type { DrawDeco, View2D } from '../../mitwachsen-view';
 import { gateScore, guestAt } from '../../mitwachsen-guest-look';

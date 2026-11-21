@@ -39,7 +39,7 @@ import {
   type GateId,
   type Look,
 } from '../../data/games/mitwachsen';
-import { FISH_PARTS, ICE_COLORS } from '../../data/games/mitwachsen-eis';
+import { FISH_PARTS } from '../../data/games/mitwachsen-eis';
 import { grown } from './mitwachsen-growth';
 import { drawBox, drawDeco, type Box, type DecoAt, type View2D } from './mitwachsen-view';
 import { drawStone, heardStone } from './mitwachsen-story';
@@ -51,6 +51,7 @@ import { cycle, hash } from '../../lib/games/rng';
 import type { Cell, TreeKind, World } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
 import { drawPlatform } from './mitwachsen-platform-2d';
+import { BED_SNOW, flatColors } from './mitwachsen-ground-2d';
 import { bigGate } from './mitwachsen-gate-look';
 import type { Guest } from './mitwachsen-guest-look';
 import { guideGate } from './mitwachsen-guide';
@@ -89,24 +90,8 @@ export type Scene = {
   explored: (x: number, y: number) => boolean; // Nebel: nur Erkundetes wird gezeigt
 };
 
-/** Rahmen des Betts aus Holz (das Schneebett der Eis-Welt ist aus Schnee) */
+/** Rahmen des Betts aus Holz (das Schneebett der Eis-Welt ist aus Schnee: `BED_SNOW`) */
 const BED_FRAME: readonly [string, string] = [GAME_COLORS.bed.frame, GAME_COLORS.bed.frame];
-/** Böden der Welten hinter den Toren in der 2D-Ansicht: Seite, Oberseite */
-const FLAT_GROUND: Partial<Record<Cell['ground'], readonly [string, string]>> = {
-  snow: ['#cfd8de', '#f4f8fb'],
-  ice: ['#9fd6ef', '#d4f1ff'],
-  basalt: ['#2a2b30', '#3a3b42'],
-  cave: ['#2a2c33', '#3c3f47'],
-  cloud: ['#e6eef7', '#ffffff'],
-  moss: ['#6a4a3a', '#8a76cc'],
-};
-/**
- * Eisklippe; eine gefärbte (`color`: der Eisfall am Talende, die Stufen des Eisbergs) mit Seiten in ihrer Farbe und
- * glattem Eis obenauf
- */
-const iceCliff = (c: Cell) => (c.color ? ([c.color, ICE_COLORS.ice[1]] as const) : ICE_COLORS.cliff);
-/** Gefärbtes Eis der Eis-Welt: Klippen und Eisfall, auf dem Boden die Stufen des Eisbergs (`color`) */
-const iceWall = (c: Cell) => c.biome === 'eis' && (c.region === 'border' || (c.ground === 'ice' && !!c.color));
 
 /**
  * Die Figur, mit Korb auf dem Rücken, Eimer und Netz in den Händen, solange sie Beeren, Wasser und Fische trägt, und mit
@@ -281,7 +266,7 @@ export class Renderer {
       box(this.ctx, P, x, y, 0, 1, 1, 0.6, '#b8380a', '#ff7a1a');
       return;
     }
-    const flat = iceWall(c) ? iceCliff(c) : FLAT_GROUND[c.ground];
+    const flat = flatColors(c);
     if (flat) {
       // Böden der Welten hinter den Toren: einfache Blöcke in ihren Farben
       const frontH = world.cell(x, y + 1).h;
@@ -731,7 +716,7 @@ export class Renderer {
         break;
       }
       case 'bed':
-        box(ctx, P, x + 0.06, y + 0.05, h, 0.88, 0.9, 0.28, ...(c.biome === 'eis' ? ICE_COLORS.snow : BED_FRAME));
+        box(ctx, P, x + 0.06, y + 0.05, h, 0.88, 0.9, 0.28, ...(c.biome === 'eis' ? BED_SNOW : BED_FRAME));
         box(ctx, P, x + 0.1, y + 0.08, h + 0.28, 0.8, 0.26, 0.12, GAME_COLORS.bed.pillow);
         if (state.sleeping) {
           box(ctx, P, x + 0.32, y + 0.1, h + 0.4, 0.36, 0.22, 0.3, sc.look.skin);

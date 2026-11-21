@@ -4,7 +4,8 @@
 // Eis-Welt (nicht im Kern, nicht in der 3D-Ansicht): 2D über view-2d.ts, 3D über den 3D-Teil view-3d.ts.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt“, Kessel)
 
-import { ICE_COLORS, ICE_CRYSTALS, IGLOO_H, IGLOO_LAYERS } from '../../../../data/games/mitwachsen-eis';
+import { ICE_COLORS, ICE_CRYSTALS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
+import { IGLOO_H, IGLOO_LAYERS } from '../../../../data/games/mitwachsen-eis';
 import { KESSEL_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
 import type { Cell } from '../../mitwachsen-cell';
 import { hash } from '../../../../lib/games/rng';

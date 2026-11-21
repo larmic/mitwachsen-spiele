@@ -28,7 +28,9 @@ export const RULES: Rule[] = [
     // Haken der Fußspuren im Schnee (`View2D.trail`, `View3D.layer`) unverändert 124,0 KB; 124,5 KB mit dem Haken für
     // die Regeln der Welten (`WorldPack.rules`, Eis-Welt: Schneemänner) und ihrem gespeicherten Zustand (`packs`);
     // 124,8 KB mit dem Eiszapfen-Glockenspiel (Ereignis `icicle` an den Ton aus dem Paket, Glitzern auch bei reduzierter
-    // Bewegung); dazu 1,2 KB Luft
+    // Bewegung); 124,9 KB nachgemessen; 124,7 KB, seit die Farben der Eis-Dinge und Eiskristalle (`ICE_COLORS`,
+    // `ICE_CRYSTALS`) mit dem Welt-Paket kommen und der Kern Eisklippen und Schneebett mit den Farben seiner Böden
+    // zeichnet: Platz für die Torplatte (nur 0,24 KB, die Eisklippe muss ohne Paket zeichnen); dazu 1,3 KB Luft
     budget: 126 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
@@ -53,7 +55,10 @@ export const RULES: Rule[] = [
     // (Schneehaufen im Generator, Regel samt Migration ihres Spielstands, Quader der vier Stufen, Wackeln und Ploppen):
     // bewusst angehoben, wie vereinbart; 42,1 KB mit dem Eiszapfen-Glockenspiel (Reihe am Klippenfuß im Generator,
     // Regel, Quader der Zapfen, Schwingen, Glockenton in der Pentatonik): bewusst angehoben, wie vereinbart (das letzte
-    // der drei); dazu knapp 0,9 KB Luft
+    // der drei); 42,5 KB nachgemessen; 42,7 KB, seit die Farben der Eis-Dinge und Eiskristalle (`ICE_COLORS`,
+    // `ICE_CRYSTALS`, src/data/games/worlds/eis/mitwachsen-ice-colors.ts) mit dem Paket kommen statt im Kern zu
+    // liegen; dazu knapp 0,3 KB Luft. Platte, Klang und Aussehen der Torplatte im Paket brauchen darum vorher Platz
+    // (etwa die 3D-Farben nach Eis-3D) oder eine begründete Grenze
     budget: 43 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
