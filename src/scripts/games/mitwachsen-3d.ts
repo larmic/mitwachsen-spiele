@@ -164,6 +164,7 @@ export class World3D {
   private gateGroup = new Group(); // Torhäuser
   private gateSolid!: MeshLambertMaterial; // Mauerwerk der Torhäuser und Portale: vor der Figur durchsichtig
   private bright!: MeshBasicMaterial; // leuchtet aus sich selbst: Kristalle, Zeichen, Wasserfälle
+  private glow!: MeshBasicMaterial; // leuchtet, so hell das Welt-Paket sagt: Eiskristalle beim Polarlicht (`View3D.glow`)
   private platforms!: Platforms3D; // Portal-Plattformen
   private chunks = new Map<string, Chunk>();
   private stale = new Set<string>(); // Stücke, die neu gebaut werden müssen; bis dahin bleibt das alte stehen
@@ -202,9 +203,10 @@ export class World3D {
     this.foliage = new MeshLambertMaterial({ vertexColors: true, side: DoubleSide });
     this.gateSolid = new MeshLambertMaterial({ map: tex, vertexColors: true });
     this.bright = new MeshBasicMaterial({ map: tex, vertexColors: true });
+    this.glow = new MeshBasicMaterial({ map: tex, vertexColors: true });
     this.fogTex.magFilter = LinearFilter;
     this.fogTex.minFilter = LinearFilter;
-    for (const m of [this.solid, this.water, this.lava, this.bright]) this.withFog(m, false);
+    for (const m of [this.solid, this.water, this.lava, this.bright, this.glow]) this.withFog(m, false);
     this.withFog(this.foliage, false, true);
     this.withFog(this.canopy, true);
     this.withFog(this.gateSolid, true);
@@ -219,12 +221,7 @@ export class World3D {
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera;
-    sc.left = -18;
-    sc.right = 18;
-    sc.top = 18;
-    sc.bottom = -18;
-    sc.near = 1;
-    sc.far = 60;
+    Object.assign(sc, { left: -18, right: 18, top: 18, bottom: -18, near: 1, far: 60 });
     this.sun.shadow.bias = -0.0008;
     this.sun.shadow.normalBias = 0.03; // gegen Streifen auf Wänden, die die Sonne schräg trifft (Shadow Acne)
     this.scene.add(this.sun, this.sun.target, this.hemi, this.signs, this.sleeper, this.gateGroup, this.notes.group);
@@ -408,6 +405,7 @@ export class World3D {
     this.syncSleeper(state);
     this.platforms.sync(state, sc);
     this.notes.update(state, sc.now, sc.reduced);
+    this.glow.color.setRGB(...this.views.glow(sc.aurora, sc.reduced, sc.now));
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -589,17 +587,14 @@ export class World3D {
   }
 
   private buildChunk(world: World, cx: number, cy: number): Chunk {
-    const solid = new Geo(),
-      leaves = new Geo(),
-      canopy = new Geo(),
-      water = new Geo(),
-      lava = new Geo(),
-      bright = new Geo();
+    const geo = () => new Geo();
+    const [solid, leaves, canopy, water, lava, bright, glow] = [geo(), geo(), geo(), geo(), geo(), geo(), geo()];
     for (let y = cy * CHUNK; y < (cy + 1) * CHUNK; y++)
       for (let x = cx * CHUNK; x < (cx + 1) * CHUNK; x++) {
         const c = grown(world.seed, this.day, x, y, world.cell(x, y)); // mit allem, was schon nachgewachsen ist
         this.terrain(solid, water, lava, world, c, x, y);
-        if (!this.packed(solid, leaves, canopy, c, x, y)) this.decoration(solid, leaves, canopy, bright, c, x, y);
+        if (!this.packed({ g: solid, blades: leaves, canopy, glow }, c, x, y))
+          this.decoration(solid, leaves, canopy, bright, c, x, y);
       }
     const meshes: Mesh[] = [];
     const add = (g: Geo, mat: MeshLambertMaterial | MeshBasicMaterial, shadows: boolean) => {
@@ -616,6 +611,7 @@ export class World3D {
     add(water, this.water, false);
     add(lava, this.lava, false);
     add(bright, this.bright, false);
+    add(glow, this.glow, false);
     return { meshes };
   }
 
@@ -685,12 +681,14 @@ export class World3D {
   /**
    * Dinge einer Welt hinter einem Tor aus dem 3D-Teil ihres Pakets (Eis-Welt: Iglu, vor der Figur durchsichtig wie
    * Laub, Eisschale, Wassertrog aus Eis, Fischkiste voll oder leer aus den Regeln, ihre Schwanzflossen wiegen sich im
-   * Wind wie die Grasbüschel); solange er lädt, ein einfacher Block. false: kein solches Ding, wie sonst bauen.
+   * Wind wie die Grasbüschel, Eiskristalle leuchten beim Polarlicht); solange er lädt, ein einfacher Block. false: kein
+   * solches Ding, wie sonst bauen.
    */
-  private packed(g: Geo, blades: Geo, canopy: Geo, c: Cell, x: number, y: number): boolean {
+  private packed(geo: Record<'g' | 'blades' | 'canopy' | 'glow', Geo>, c: Cell, x: number, y: number): boolean {
     const boxes = drawDeco(this.views.decos, this.world!, c, x, y, this.at);
+    const into = { see: geo.canopy, sway: geo.blades, glow: geo.glow } as const;
     for (const [bx, by, bz, w, d, bh, side, top, kind] of boxes ?? [])
-      (kind === 'see' ? canopy : kind === 'sway' ? blades : g).box(bx, bz, by, w, bh, d, side, top);
+      (kind ? into[kind] : geo.g).box(bx, bz, by, w, bh, d, side, top);
     return !!boxes;
   }
 

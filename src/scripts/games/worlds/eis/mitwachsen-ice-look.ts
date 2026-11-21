@@ -1,9 +1,10 @@
-// Aussehen der Dinge im Gletscherkessel, gleich für 2D und 3D: Iglu, Eisschale, Wassertrog aus Eisblöcken, Fischkiste.
+// Aussehen der Dinge im Gletscherkessel, gleich für 2D und 3D: Iglu, Eisschale, Wassertrog aus Eisblöcken, Fischkiste,
+// Eiskristalle und wie sie beim Polarlicht leuchten.
 // Rein (ohne DOM und Three.js): liefert Quader in Feldern, die beide Ansichten zeichnen. Teil des Welt-Pakets der
 // Eis-Welt (nicht im Kern, nicht in der 3D-Ansicht): 2D über view-2d.ts, 3D über den 3D-Teil view-3d.ts.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt“, Kessel)
 
-import { ICE_COLORS, IGLOO_H, IGLOO_LAYERS } from '../../../../data/games/mitwachsen-eis';
+import { ICE_COLORS, ICE_CRYSTALS, IGLOO_H, IGLOO_LAYERS } from '../../../../data/games/mitwachsen-eis';
 import type { Cell } from '../../mitwachsen-cell';
 import { hash } from '../../../../lib/games/rng';
 import { homeAt, type Realms } from '../../mitwachsen-home';
@@ -140,4 +141,52 @@ export function iceBoxes(
     default:
       return null;
   }
+}
+
+/** Spitzen eines Eiskristall-Büschels: Lage im Feld, Breite, Höhe (kleiner und spitzer als die Kristalle der Höhlenwelt) */
+const SPIKES = [
+  [0.38, 0.38, 0.24, 0.95],
+  [0.18, 0.54, 0.16, 0.6],
+  [0.62, 0.24, 0.14, 0.45],
+] as const;
+
+/**
+ * Eiskristall-Büschel in der Farbe des Felds. `glint` (0 … 1): am Tag blitzt oben ein weißer Funke (nur 2D, nicht bei
+ * reduzierter Bewegung). In 3D leuchten die Quader (`'glow'`) aus sich selbst, beim Polarlicht heller (`glowTint`).
+ */
+export function crystalBoxes(c: Cell, x: number, y: number, glint = 0, glow = false): IceBox[] {
+  const color = c.color ?? ICE_CRYSTALS[0];
+  const out: IceBox[] = SPIKES.map(([dx, dy, w, h]) =>
+    glow ? [x + dx, y + dy, c.h, w, w, h, color, color, 'glow'] : [x + dx, y + dy, c.h, w, w, h, color, color],
+  );
+  if (glint > 0) {
+    const s = 0.12 * glint;
+    out.push([x + 0.5 - s / 2, y + 0.5 - s / 2, c.h + 0.95, s, s, s, '#ffffff', '#ffffff']);
+  }
+  return out;
+}
+
+/**
+ * Ab und zu blitzt ein Kristall am Tag auf (je Feld zu eigenen Zeiten, etwa alle 4 bis 7 s); 0 … 1. Bei reduzierter
+ * Bewegung nie (das entscheidet die Ansicht).
+ */
+export function crystalGlint(now: number, x: number, y: number): number {
+  const every = 4000 + (hash(7, x, y) % 3000);
+  const t = (now + hash(8, x, y)) % every;
+  return t < 400 ? Math.sin((t / 400) * Math.PI) : 0;
+}
+
+/**
+ * Wie hell die Eiskristalle leuchten (0 … 1): ohne Polarlicht nicht, mit ihm sanft pulsierend (je Kristall versetzt,
+ * `phase`), bei reduzierter Bewegung ruhig ohne Pulsieren.
+ */
+export function crystalGlow(aurora: number, reduced: boolean, now: number, phase = 0): number {
+  const a = Math.max(0, Math.min(1, aurora));
+  if (!a) return 0;
+  return reduced ? 0.8 * a : a * (0.65 + 0.3 * Math.sin(now / 1100 + phase));
+}
+
+/** Farbe, mit der die 3D-Ansicht die leuchtenden Kristalle multipliziert: weiß ohne Leuchten, heller und grüntürkis mit ihm */
+export function glowTint(glow: number): readonly [number, number, number] {
+  return [1 + 0.25 * glow, 1 + 0.7 * glow, 1 + 0.55 * glow];
 }

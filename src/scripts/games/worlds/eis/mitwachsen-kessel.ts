@@ -3,7 +3,8 @@
 // Ringsum feste Eisklippen, der Gang ist der einzige Zugang. In der Mitte das Schneebett mit Schneewiese, Eisschale,
 // Wassertrog aus Eis, Iglu und Klangstein, seitlich das Eisloch, drei Fischkisten, ein Moosfleck, die beiden
 // Plattformen des Eis-Portals (hinter der Mündung und im Kreis um das Bett), vom Tor bis ans Bett die Rutschspur.
-// Ringsum Winterlandschaft wie draußen in der Eis-Welt (`eisCell`): Hügel in drei Stufen, Tannenhaine, Eisblöcke.
+// Ringsum Winterlandschaft wie draußen in der Eis-Welt (`eisCell`): Hügel in drei Stufen, Tannenhaine, Eisblöcke,
+// dazu Eiskristalle und Schneewehen (mitwachsen-frost.ts).
 // Teil des Welt-Pakets der Eis-Welt (index.ts), nachgeladen.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Welt-Pakete“ und „Gletscherkessel“)
 
@@ -20,6 +21,7 @@ import type { Beyond, Gang, Kessel, KesselPlace } from '../../mitwachsen-pack-ty
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from '../../mitwachsen-portal';
 import { findSpawns } from '../../mitwachsen-spawns';
 import { OBSTACLE_GAP, eisCell } from '../../mitwachsen-world';
+import { frost, type Wild } from './mitwachsen-frost';
 
 const key = (x: number, y: number) => `${x},${y}`;
 const EIS = REGIONS.find((r) => r.id === 'eis')!; // die Eis-Welt steht fest in REGIONS
@@ -96,7 +98,7 @@ export function buildKessel(
     set(x, y, { ...c, h: c.region === 'eis' ? 1 : c.h, slide: true }); // im Kessel eben
   }
   level(place.cells, map);
-  winter(seed, gang, place, free, map);
+  frost(seed, winter(seed, gang, place, free, map), map); // Kristalle und Schneewehen nach Tannen und Eisblöcken
   // Eis-Welt: der ganze Kessel und der Gang ab seiner Mitte (dort wechselt auch die Tieranzeige)
   let inner = gang.depth + 1;
   while (map.get(key(...gang.at(0, inner)))?.region !== 'eis' && inner < centre) inner++;
@@ -208,7 +210,8 @@ function icePatches(seed: number, gang: Gang, place: KesselPlace, free: (u: numb
 /**
  * Nach dem Ebnen: Eisblöcke zum Klettern (1 %, eine Stufe höher, nur wo alle vier Nachbarn mindestens so hoch sind, so
  * bleiben sie Blöcke und nie mehr als eine Stufe; nie auf Höhe 3, nicht an der Spur) und so viele Tannen und Eisblöcke
- * nachgepflanzt, dass jeder Kessel `KESSEL_WILDS` hat: Tannen dort, wo der Hain am dichtesten ist.
+ * nachgepflanzt, dass jeder Kessel `KESSEL_WILDS` hat: Tannen dort, wo der Hain am dichtesten ist. Liefert die Felder,
+ * auf denen so etwas wachsen darf (für Kristalle und Schneewehen).
  */
 function winter(
   seed: number,
@@ -216,7 +219,7 @@ function winter(
   place: KesselPlace,
   free: (u: number, v: number) => boolean,
   map: Map<string, Cell>,
-) {
+): Wild[] {
   const at = (x: number, y: number) => map.get(key(x, y));
   const wild: { x: number; y: number; u: number; v: number }[] = [];
   for (let v = -ry; v <= ry; v++)
@@ -277,6 +280,7 @@ function winter(
     map.set(key(w.x, w.y), { ...c, deco: 'tree', solid: true, tree: 'snowpine' });
     pines++;
   }
+  return wild;
 }
 
 /**

@@ -5,6 +5,7 @@ import type { Cell } from '../../mitwachsen-world';
 import { EIS_PACK, worldOf } from '../../test-worlds';
 import { view3d } from './view-3d';
 import { gateLook } from './view-3d-gate';
+import { crystalGlint, crystalGlow, glowTint } from './mitwachsen-ice-look';
 
 const at: DecoAt = { now: 1234, reduced: false, picked: {} };
 const world = worldOf(1);
@@ -55,6 +56,42 @@ describe('3D-Teil des Welt-Pakets der Eis-Welt (view-3d.ts)', () => {
     expect(view3d.ground(slide, ['eis'])).toEqual({ tiles: ['ice', 'ice', 'ice'], top: ICE_COLORS.slide[1] });
     expect(view3d.ground({ ...snow, region: 'wild' }, ['eis'])).toBeNull(); // Schnee draußen in der Landschaft
     expect(view3d.ground({ ...snow, biome: undefined, region: 'lichtung' }, ['eis'])).toBeNull();
+  });
+
+  it('Eiskristalle der Eis-Welt leuchten aus sich selbst (glow), Kristalle anderer Welten baut die 3D-Ansicht wie immer', () => {
+    const [x, y, crystal] = find('crystal');
+    const boxes = drawDeco(view3d, world, crystal, x, y, at)!;
+    expect(boxes.length).toBeGreaterThan(1);
+    expect(boxes.every((b) => b[8] === 'glow' && b[6] === crystal.color)).toBe(true);
+    const cave: Cell = { ...crystal, biome: 'hoehle', region: 'wild', color: '#b48cf0' };
+    expect(drawDeco(view3d, world, cave, x, y, at)).toBeNull();
+  });
+
+  it('Leuchtstärke der Kristalle: nur mit Polarlicht, sanft pulsierend, bei reduzierter Bewegung ruhig', () => {
+    const times = Array.from({ length: 60 }, (_, i) => i * 250);
+    expect(times.map((t) => crystalGlow(0, false, t))).toEqual(times.map(() => 0)); // ohne Polarlicht nichts
+    const pulse = times.map((t) => crystalGlow(1, false, t));
+    expect(Math.min(...pulse)).toBeGreaterThan(0.3);
+    expect(Math.max(...pulse)).toBeLessThanOrEqual(1);
+    expect(Math.max(...pulse) - Math.min(...pulse)).toBeGreaterThan(0.4); // es pulsiert
+    expect(new Set(times.map((t) => crystalGlow(1, true, t)))).toEqual(new Set([0.8])); // ruhig
+    expect(crystalGlow(0.5, true, 0)).toBeCloseTo(0.4); // mit dem Polarlicht ein- und ausblenden
+    expect(crystalGlow(2, true, 0)).toBe(0.8);
+    expect(crystalGlow(1, false, 0, 1)).not.toBe(crystalGlow(1, false, 0, 0)); // je Kristall versetzt
+    // in 3D: ohne Leuchten wie gebaut, mit ihm heller und grüntürkis; bei reduzierter Bewegung steht es still
+    expect(glowTint(0)).toEqual([1, 1, 1]);
+    const [r, g, b] = glowTint(1);
+    expect(g).toBeGreaterThan(b);
+    expect(b).toBeGreaterThan(r);
+    expect(r).toBeGreaterThan(1);
+    expect(view3d.glow!(0, false, 1000)).toEqual([1, 1, 1]);
+    expect(view3d.glow!(1, true, 1000)).toEqual(view3d.glow!(1, true, 9000));
+    expect(view3d.glow!(1, false, 1000)).not.toEqual(view3d.glow!(1, false, 2500));
+    // am Tag blitzt ein Kristall nur kurz auf
+    const glints = Array.from({ length: 200 }, (_, i) => crystalGlint(i * 50, 3, 4));
+    expect(glints.filter((v) => v > 0).length).toBeGreaterThan(0);
+    expect(glints.filter((v) => v > 0).length).toBeLessThan(40);
+    expect(Math.max(...glints)).toBeLessThanOrEqual(1);
   });
 
   it('das Bett im Kessel ist aus Schnee, sonst sagt das Paket nichts (Holz)', () => {

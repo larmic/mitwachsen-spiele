@@ -16,9 +16,10 @@ import type { Scored } from './sfx';
 
 /**
  * Quader: x (rechts), y (nach vorn), z (Höhe), Breite, Tiefe, Höhe, Farbe der Seiten und oben, Art in 3D: `see` wird
- * vor der Figur durchsichtig (wie Laub und der Hut des Riesenpilzes), `sway` wiegt sich im Wind (wie die Grasbüschel)
+ * vor der Figur durchsichtig (wie Laub und der Hut des Riesenpilzes), `sway` wiegt sich im Wind (wie die Grasbüschel),
+ * `glow` leuchtet aus sich selbst, so hell, wie das Paket sagt (`View3D.glow`; Eiskristalle beim Polarlicht)
  */
-export type Box = readonly [number, number, number, number, number, number, string, string, ('see' | 'sway')?];
+export type Box = readonly [number, number, number, number, number, number, string, string, ('see' | 'sway' | 'glow')?];
 
 /** Einen Quader von vorn zeichnen (nichts, wenn keiner da ist) */
 export function drawBox(ctx: CanvasRenderingContext2D, P: Projection, b: Box | null | undefined) {
@@ -41,8 +42,8 @@ export type Turn = { shown?: RegionId; from?: RegionId; at?: number };
 export type Sky = {
   /** Wetter in der Luft (die Ansicht ruft es, sobald die Welt Plätze hat) */
   weather(ctx: CanvasRenderingContext2D, world: World, sc: SkyScene, P: Projection): void;
-  /** Licht am Nachthimmel (Eis-Welt: Polarlicht über dem Schneebett) */
-  aurora(ctx: CanvasRenderingContext2D, sc: SkyScene): void;
+  /** Licht am Nachthimmel (Eis-Welt: Polarlicht über dem Schneebett, dazu leuchten in 2D die Eiskristalle) */
+  aurora(ctx: CanvasRenderingContext2D, sc: SkyScene, P: Projection): void;
   /** Pfeil zum Tor über einem wartenden Tier (bei hx, hy) */
   waitArrow(
     ctx: CanvasRenderingContext2D,

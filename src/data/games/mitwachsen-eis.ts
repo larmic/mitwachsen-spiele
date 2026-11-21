@@ -21,6 +21,13 @@ export const ICE_COLORS = {
   moss: ['#5f8f3a', '#7aa84a'], // Moosbüschel am Rand der Eisschale (nur Bild)
 } as const;
 
+/**
+ * Eiskristalle im Gletscherkessel: Hellblau, Türkis und Kornblau, alle kräftig genug für Schnee und Karte (nicht die Farben der Kristalle in der Höhlenwelt, damit
+ * man die Welten unterscheidet). Kern und Karte zeichnen sie mit `cell.color`, das Leuchten beim Polarlicht kommt mit
+ * dem Welt-Paket der Eis-Welt.
+ */
+export const ICE_CRYSTALS = ['#8ec5ff', '#3fd6b8', '#5b8def'] as const;
+
 /** Netz mit zwei silberblauen Fischen in der linken Hand (nach dem Fangen, bis zur Eisschale); gespiegelt zum Eimer */
 export const FISH_PARTS: Part[] = [
   [-0.11, -0.47, 0.06, 0.22, 0.2, 0.19, '#d8cfb4', ICE_COLORS.fish[0]], // Netz, oben schauen die Fische heraus

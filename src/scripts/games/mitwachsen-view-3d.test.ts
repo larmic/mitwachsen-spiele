@@ -14,6 +14,7 @@ describe('Haken der 3D-Ansicht für Welt-Pakete (Views3D)', () => {
     expect(v.bedFrame(snow, WOOD)).toBe(WOOD);
     expect(v.look('eis')).toBeUndefined();
     expect(v.decos.decos).toEqual({});
+    expect(v.glow(1, false, 500)).toEqual([1, 1, 1]); // Quader 'glow' leuchten wie gebaut
   });
 
   it('lädt den 3D-Teil eines Pakets einmal; danach baut er Boden, Bett, Dinge und Tor seiner Welt', async () => {
@@ -30,7 +31,10 @@ describe('Haken der 3D-Ansicht für Welt-Pakete (Views3D)', () => {
     expect(v.ground(grass, ['eis'])).toBeNull();
     expect(v.look('eis')).toBeDefined();
     expect(v.look('sand')).toBeUndefined();
-    expect(Object.keys(v.decos.decos).sort()).toEqual(['fishcrate', 'icebowl', 'igloo', 'watertrough']);
+    expect(Object.keys(v.decos.decos).sort()).toEqual(['crystal', 'fishcrate', 'icebowl', 'igloo', 'watertrough']);
+    // Leuchten: ohne Polarlicht wie gebaut, mit ihm heller (aus dem Paket)
+    expect(v.glow(0, false, 0)).toEqual([1, 1, 1]);
+    expect(v.glow(1, true, 0)[1]).toBeGreaterThan(1);
   });
 
   it('scheitert das Laden, bleibt es schlicht ohne Fehler und wird beim nächsten Aufruf wieder versucht', async () => {

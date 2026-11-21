@@ -41,12 +41,15 @@ const WORLD_GROUND: Partial<Record<Cell['ground'], string>> = {
   moss: '#8a76cc',
 };
 
+/** Aus Holz wie ein Zauntor: Tor, Tröge, Fischkiste */
+const BOARDS: ReadonlySet<Cell['deco']> = new Set<Cell['deco']>(['gate', 'trough', 'watertrough', 'fishcrate']);
+
 /** Farbe eines Felds auf der Karte (auch für Dinge, deren Zeichnung noch lädt: mitwachsen-view.ts) */
 export function mapColor(c: Cell): string {
   if (c.gate) return THEME_COLORS[c.gate].side;
   if (c.deco === 'gatetower') return THEME_COLORS[c.part!.id].side;
-  if (c.deco === 'gate' || c.deco === 'trough' || c.deco === 'watertrough' || c.deco === 'fishcrate')
-    return COLORS.gate;
+  if (BOARDS.has(c.deco)) return COLORS.gate;
+  if (c.biome === 'eis' && c.deco === 'crystal') return c.color ?? WORLD_GROUND.ice!; // Eiskristall in seiner Farbe (Schneewehen zeigt die Karte als Schnee)
   if (WORLD_GROUND[c.ground]) return WORLD_GROUND[c.ground]!;
   if (c.ground === 'water') return COLORS.water;
   if (c.deco === 'tree') return COLORS.tree;

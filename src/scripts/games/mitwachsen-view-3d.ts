@@ -15,6 +15,7 @@ import type { WorldPack } from './mitwachsen-pack-types';
 
 /** Nach so vielen ms wird ein gescheiterter 3D-Teil neu versucht (wie die Pakete, `RETRY_MS` in mitwachsen-packs.ts) */
 export const RETRY_3D_MS = 30_000;
+const WHITE = [1, 1, 1] as const;
 
 /** Boden eines Felds: Kacheln oben, oberste Seitenkachel, Seiten darunter; `top` färbt die Oberseite (Rutschspur) */
 export type Ground = { tiles: readonly [Tile, Tile, Tile]; top?: string };
@@ -34,6 +35,12 @@ export type View3D = {
   ground(c: Cell, open: readonly GateId[]): Ground | null;
   /** Rahmen des Betts dieser Welt, sonst null: Holz */
   bedFrame(c: Cell): Frame | null;
+  /**
+   * Farbe, mit der die Quader `'glow'` dieser Welt leuchten (multipliziert, 1 = wie gebaut), je nach Polarlicht (0 … 1),
+   * reduzierter Bewegung und Zeit; fehlt sie, leuchten sie wie gebaut. Es gibt ein Leuchtmaterial für alle Welten, darum
+   * darf nur ein Paket `glow` haben (bisher die Eis-Welt); leuchtet eine zweite Welt, das Material je Tor schlüsseln
+   */
+  glow?(aurora: number, reduced: boolean, now: number): readonly [number, number, number];
 };
 
 /** Die 3D-Teile der Welt-Pakete, die die 3D-Ansicht schon hat, und ihr Nachladen */
@@ -85,6 +92,12 @@ export class Views3D {
       if (own) return own;
     }
     return null;
+  }
+
+  /** Leuchten der Quader `'glow'` aus dem 3D-Teil des (einzigen) Pakets mit `glow` (multipliziert), sonst wie gebaut */
+  glow(aurora: number, reduced: boolean, now: number): readonly [number, number, number] {
+    for (const v of this.views) if (v.glow) return v.glow(aurora, reduced, now);
+    return WHITE;
   }
 
   /** Rahmen des Betts aus dem 3D-Teil eines Pakets, sonst `wood` */

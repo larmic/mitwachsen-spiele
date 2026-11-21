@@ -945,7 +945,7 @@ describe('Zuhause je Gegend', () => {
     expect([s.player.x, s.player.y]).toEqual([...world.homes.lichtung.bed]);
   });
 
-  it('alter Spielstand im Gletscherkessel, wo heute eine Tanne oder ein Eisblock steht: Start im Schneebett', () => {
+  it('alter Spielstand im Gletscherkessel, wo heute eine Tanne, ein Eisblock oder ein Eiskristall steht: Start im Schneebett', () => {
     // Die Winterlandschaft kam nach: Eine gespeicherte Position kann jetzt auf einer Tanne liegen. Die Figur schläft
     // trotzdem im Schneebett und wacht auf begehbarem Boden daneben auf
     let tried = 0;
@@ -953,7 +953,7 @@ describe('Zuhause je Gegend', () => {
       const world = worldOf(seed);
       const snowy = kesselPlace(seed, EIS_PACK).cells.filter(([x, y]) => {
         const c = world.cell(x, y);
-        return c.tree === 'snowpine' || (c.ground === 'ice' && c.h >= 2 && !c.slide); // Tanne oder Eisblock
+        return c.tree === 'snowpine' || c.deco === 'crystal' || (c.ground === 'ice' && c.h >= 2 && !c.slide); // Tanne, Kristall oder Eisblock
       });
       for (const [x, y] of snowy) {
         tried++;
@@ -966,7 +966,7 @@ describe('Zuhause je Gegend', () => {
         expect(standHeight(world, s.openGates, s.player.x, s.player.y), `Seed ${seed}`).not.toBeNull();
       }
     }
-    expect(tried).toBeGreaterThan(3);
+    expect(tried).toBeGreaterThan(20);
   });
 
   it('alter Spielstand im Gletscherkessel nahe Spur, Fischkisten oder Plattformen: dort bleibt jedes Feld begehbar', () => {

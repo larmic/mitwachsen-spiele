@@ -1,6 +1,7 @@
 // Wetter der Eis-Welt in der Luft, gleich für beide Ansichten (die 3D-Ansicht zeichnet die Ebene darüber mit ihrer
 // eigenen Projektion): leiser Schneefall, Pustewind mit Flockenwellen, Schneewirbeln und Pulverfahnen an den Klippen,
-// Glitzerluft danach, der Wimpel auf dem Iglu und nachts im Schneebett das Polarlicht. Alles, was sich bewegt, nur
+// Glitzerluft danach, der Wimpel auf dem Iglu und nachts im Schneebett das Polarlicht, zu dem die Eiskristalle sanft
+// leuchten (über der Nacht gezeichnet, damit man es sieht). Alles, was sich bewegt, nur
 // ohne reduzierte Bewegung. Teil des Welt-Pakets der Eis-Welt (über view-2d.ts); die Ansicht zeichnet es, wenn die
 // Figur im Kessel, das Eistor offen oder der verlaufene Pinguin da ist. view-2d.ts legt es mit dem Bild der Weltgrenze
 // und dem Pinguin am Tor in die Form `Sky` des Kerns (mitwachsen-view.ts).
@@ -9,6 +10,7 @@
 import type { Projection } from '../../../../lib/games/front';
 import { hash } from '../../../../lib/games/rng';
 import { IGLOO_H } from '../../../../data/games/mitwachsen-eis';
+import { crystalGlow } from './mitwachsen-ice-look';
 import { wrap, type SkyScene } from '../../mitwachsen-sky';
 import type { World } from '../../mitwachsen-world';
 
@@ -149,8 +151,11 @@ function pennant(ctx: CanvasRenderingContext2D, world: World, sc: SkyScene, P: P
   });
 }
 
-/** Polarlicht: grüne, türkise und violette Schleier oben am Nachthimmel (bei reduzierter Bewegung still) */
-export function aurora(ctx: CanvasRenderingContext2D, sc: SkyScene) {
+/**
+ * Polarlicht: grüne, türkise und violette Schleier oben am Nachthimmel (bei reduzierter Bewegung still); dazu leuchten
+ * die Eiskristalle, die die 2D-Ansicht gerade zeigt
+ */
+export function aurora(ctx: CanvasRenderingContext2D, sc: SkyScene, P: Projection) {
   const { width: W, height: H, zoom: z } = sc;
   const t = sc.reduced ? 0 : sc.now / 1000;
   const step = Math.max(4, Math.round(6 * z));
@@ -164,5 +169,41 @@ export function aurora(ctx: CanvasRenderingContext2D, sc: SkyScene) {
       ctx.fillRect(x, Math.round(y), step, Math.round(len));
     }
   });
+  ctx.globalAlpha = 1;
+  glows(ctx, sc, P);
+}
+
+/**
+ * Eiskristalle, die die 2D-Ansicht in diesem Bild gezeichnet hat (also sichtbar, ohne Nebel): Lage, Höhe, Farbe, Bild
+ * (`now`). Der Haken der 2D-Ansicht trägt sie ein (`shine`, view-2d.ts); die 3D-Ansicht nutzt ihn nicht, dort leuchtet
+ * das Material selbst (`View3D.glow`). Höchstens ein Eintrag je Kristall.
+ */
+const shown = new Map<string, readonly [number, number, number, string, number]>();
+
+/** Der Haken der 2D-Ansicht zeichnet gerade den Eiskristall bei (x, y) */
+export function shine(x: number, y: number, h: number, color: string, now: number) {
+  shown.set(`${x},${y}`, [x, y, h, color, now]);
+}
+
+/**
+ * Schein um die Eiskristalle beim Polarlicht (nur 2D, über der Nacht): ein kleiner Hof in ihrer Farbe, innen weiß,
+ * kaum breiter als der Kristall. Hell, so wie `crystalGlow` sagt (je Kristall versetzt pulsierend, bei reduzierter
+ * Bewegung ruhig).
+ */
+function glows(ctx: CanvasRenderingContext2D, sc: SkyScene, P: Projection) {
+  const z = sc.zoom;
+  for (const [x, y, h, color, now] of shown.values()) {
+    if (now !== sc.now) continue; // nicht in diesem Bild gezeichnet (außer Sicht, im Nebel oder in 3D)
+    const g = crystalGlow(sc.aurora, sc.reduced, now, (hash(48, x, y) % 628) / 100);
+    const [px, py] = P(x + 0.5, y + 0.5, h + 0.55);
+    for (const [r, a, c] of [
+      [6, 0.3, color],
+      [2.5, 0.6, '#ffffff'],
+    ] as const) {
+      ctx.globalAlpha = g * a;
+      ctx.fillStyle = c;
+      ctx.fillRect(Math.round(px - r * z), Math.round(py - r * z), Math.round(2 * r * z), Math.round(2 * r * z));
+    }
+  }
   ctx.globalAlpha = 1;
 }

@@ -234,7 +234,7 @@ export class Renderer {
     this.effects(P, sc);
     moodLife(ctx, sc);
     if (sc.night > 0) this.nightSky(sc);
-    if (sc.aurora > 0) ice?.aurora(ctx, sc);
+    if (sc.aurora > 0) ice?.aurora(ctx, sc, P);
     this.life(sc);
     this.album.draw(ctx, state, sc, world.realm(state.player.x, state.player.y), ice);
   }

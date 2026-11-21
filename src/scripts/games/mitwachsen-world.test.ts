@@ -6,6 +6,8 @@ import { BED_STONE, ICE_STONE } from '../../data/games/mitwachsen-stories';
 import { PLATFORM_HALF, platformArea, platformCells, platformLift, withNeighbours } from './mitwachsen-portal';
 import { KESSEL } from '../../data/games/worlds/eis/mitwachsen-kessel';
 import { KESSEL_WILDS } from './worlds/eis/mitwachsen-kessel';
+import { FROST } from './worlds/eis/mitwachsen-frost';
+import { ICE_CRYSTALS } from '../../data/games/mitwachsen-eis';
 import { SEATS, crossings } from './mitwachsen-border';
 import {
   GATE_HALF,
@@ -486,6 +488,72 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
     // gut 40 % des Bodens auf Höhe 2 oder 3
     expect(high / ground).toBeGreaterThan(0.38);
     expect(high / ground).toBeLessThan(0.52);
+  });
+
+  /** Was an Eiskristallen und Schneewehen im Kessel falsch ist */
+  function frostFaults(w: World, kessel: readonly (readonly [number, number])[]) {
+    const bed = w.homes.eis.bed;
+    const pick = (f: (c: Cell) => boolean) => kessel.filter(([x, y]) => f(w.cell(x, y)));
+    const near = (list: readonly (readonly [number, number])[], p: readonly [number, number], r: number) =>
+      list.some((q) => chebOf(q, p) <= r);
+    const slide = pick((c) => !!c.slide);
+    const crates = pick((c) => c.deco === 'fishcrate');
+    const water = pick((c) => c.ground === 'water');
+    const portals = [...w.portals.values()].flatMap((p) => [p.gate, p.home]);
+    const wrong: string[] = [];
+    for (const p of pick((c) => c.deco === 'crystal')) {
+      const c = w.cell(...p);
+      const at = `Kristall ${p.join(',')}`;
+      if (!c.solid || c.region !== 'eis' || c.biome !== 'eis') wrong.push(`nicht fest im Kessel ${at}`);
+      if (!ICE_CRYSTALS.includes(c.color as (typeof ICE_CRYSTALS)[number])) wrong.push(`Farbe ${c.color} ${at}`);
+      if (Math.hypot(p[0] - bed[0], p[1] - bed[1]) <= KESSEL.flat + 2) wrong.push(`am Bett ${at}`);
+      if (near(slide, p, 2)) wrong.push(`an der Spur ${at}`);
+      if (near(crates, p, 3) || near(water, p, 2)) wrong.push(`an Kiste oder Eisloch ${at}`);
+      if (near(portals, p, PLATFORM_HALF + 2)) wrong.push(`am Plattform-Ring ${at}`);
+      // nie an der Mündung: kein Feld des Gangs bis drei Felder weit
+      const mouth = RING_3.some(([dx, dy]) => {
+        const n = w.cell(p[0] + dx, p[1] + dy);
+        return n.region !== 'eis' && n.region !== 'border';
+      });
+      if (mouth) wrong.push(`an der Mündung ${at}`);
+      // mit Lücke: alle acht Nachbarn begehbar und gleich hoch, so geht man immer um ihn herum
+      const ring = RING_1.filter(([dx, dy]) => dx || dy).map(([dx, dy]) => [p[0] + dx, p[1] + dy] as const);
+      if (ring.some(([x, y]) => standHeight(w, ['eis'], x, y) !== c.h)) wrong.push(`ohne Lücke ${at}`);
+    }
+    for (const p of pick((c) => c.deco === 'cloudpuff')) {
+      const at = `Schneewehe ${p.join(',')}`;
+      if (standHeight(w, ['eis'], ...p) === null) wrong.push(`nicht begehbar ${at}`);
+      if (w.cell(...p).ground !== 'snow' || w.cell(...p).slide) wrong.push(`nicht auf Schnee ${at}`);
+      // im Lee einer Tanne: Der Pustewind weht nach rechts (+x)
+      if (![1, 2].some((d) => w.cell(p[0] - d, p[1]).tree === 'snowpine')) wrong.push(`nicht im Lee ${at}`);
+    }
+    return wrong;
+  }
+  const RING_3 = [-3, -2, -1, 0, 1, 2, 3].flatMap((dy) => [-3, -2, -1, 0, 1, 2, 3].map((dx) => [dx, dy] as const));
+
+  it('Eiskristalle in kleinen Gruppen an Klippenfuß und Kuppen, mit Lücke; Schneewehen im Lee der Tannen (20 Seeds)', () => {
+    let special = 0,
+      all = 0;
+    for (let seed = 121; seed <= 140; seed++) {
+      const w = worldOf(seed);
+      const kessel = kesselPlace(seed, EIS_PACK).cells.filter(([x, y]) => w.cell(x, y).region === 'eis');
+      const wrong = frostFaults(w, kessel);
+      const crystals = kessel.filter(([x, y]) => w.cell(x, y).deco === 'crystal');
+      const drifts = kessel.filter(([x, y]) => w.cell(x, y).deco === 'cloudpuff');
+      if (crystals.length < FROST.least) wrong.push(`nur ${crystals.length} Kristalle`);
+      if (crystals.length > FROST.groups * FROST.size + FROST.least) wrong.push(`${crystals.length} Kristalle`);
+      if (!drifts.length) wrong.push('keine Schneewehe');
+      // in Gruppen: jeder Kristall hat einen zweiten höchstens zwei Felder weit
+      for (const p of crystals)
+        if (!crystals.some((q) => q !== p && chebOf(p, q) <= 2)) wrong.push(`allein ${p.join(',')}`);
+      for (const p of crystals) {
+        all++;
+        const cliff = RING_3.some(([dx, dy]) => w.cell(p[0] + dx, p[1] + dy).region === 'border');
+        if (cliff || w.cell(...p).h === 3) special++;
+      }
+      expect(wrong, `Seed ${seed}`).toEqual([]);
+    }
+    expect(special / all).toBeGreaterThan(0.6); // meist am Klippenfuß oder auf einer Kuppe
   });
 
   it('Eis-Portal: Plattform hinter der Mündung und im Ring um das Schneebett: 3 × 3, erreichbar, ringsum frei (24 Seeds)', () => {
