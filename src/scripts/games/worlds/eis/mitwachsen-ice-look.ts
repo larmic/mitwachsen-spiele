@@ -1,10 +1,11 @@
 // Aussehen der Dinge im Gletscherkessel, gleich für 2D und 3D: Iglu, Eisschale, Wassertrog aus Eisblöcken, Fischkiste,
-// Eiskristalle und wie sie beim Polarlicht leuchten.
+// Eisschollen auf den Eislöchern, Eiskristalle und wie sie beim Polarlicht leuchten.
 // Rein (ohne DOM und Three.js): liefert Quader in Feldern, die beide Ansichten zeichnen. Teil des Welt-Pakets der
 // Eis-Welt (nicht im Kern, nicht in der 3D-Ansicht): 2D über view-2d.ts, 3D über den 3D-Teil view-3d.ts.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt“, Kessel)
 
 import { ICE_COLORS, ICE_CRYSTALS, IGLOO_H, IGLOO_LAYERS } from '../../../../data/games/mitwachsen-eis';
+import { KESSEL_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
 import type { Cell } from '../../mitwachsen-cell';
 import { hash } from '../../../../lib/games/rng';
 import { homeAt, type Realms } from '../../mitwachsen-home';
@@ -190,3 +191,18 @@ export function crystalGlow(aurora: number, reduced: boolean, now: number, phase
 export function glowTint(glow: number): readonly [number, number, number] {
   return [1 + 0.25 * glow, 1 + 0.7 * glow, 1 + 0.55 * glow];
 }
+
+/**
+ * Eisscholle auf einem Eisloch: zwei flache weiße Platten auf dem Wasser (in 2D treiben sie sanft hin und her,
+ * `drift` −1 … 1; in 3D und bei reduzierter Bewegung liegen sie still)
+ */
+export function floeBoxes(x: number, y: number, drift = 0): IceBox[] {
+  const d = drift * 0.06;
+  return [
+    [x + 0.16 + d, y + 0.2, 0.8, 0.5, 0.42, 0.06, ...KESSEL_COLORS.floe],
+    [x + 0.6 - d, y + 0.62, 0.8, 0.24, 0.2, 0.05, ...KESSEL_COLORS.floe],
+  ];
+}
+
+/** Wie weit eine Scholle gerade treibt (−1 … 1): langsam, jede zu ihrer eigenen Zeit */
+export const floeDrift = (now: number, x: number, y: number) => Math.sin(now / 1600 + (hash(7, x, y) % 628) / 100);

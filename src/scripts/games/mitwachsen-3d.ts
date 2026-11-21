@@ -654,7 +654,8 @@ export class World3D {
     const own = this.views.ground(c, this.opened); // Boden einer Welt hinter einem Tor (Eis-Welt: Schnee und Eis, Rutschspur)
     const [topTile, sideTop, below] = own?.tiles ?? GROUND_TILES[c.ground];
     const shade = stone ? 0 : (c.shade ?? 0);
-    const tint = new Color(1, 1, 1).multiplyScalar(0.93 + shade * 0.07);
+    // Seiten eines Bodens einer Welt getönt (`side`, Eisfall), sonst Farbflecken im Boden
+    const tint = own?.side ? new Color(own.side) : new Color(1, 1, 1).multiplyScalar(0.93 + shade * 0.07);
     if (c.tint && c.ground === 'grass') tint.multiply(new Color(c.tint)); // Stimmung der Richtung
     const top = own?.top ? new Color(own.top) : tint;
     g.quad([x, h, y + 1], [x + 1, h, y + 1], [x + 1, h, y], [x, h, y], [0, 1, 0], topTile, top);

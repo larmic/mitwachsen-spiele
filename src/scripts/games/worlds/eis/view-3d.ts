@@ -1,20 +1,30 @@
 // 3D-Teil des Welt-Pakets der Eis-Welt: Was die 3D-Ansicht nur für die Eis-Welt baut. Iglu, Eisschale, Eistrog und
 // Fischkiste (Quader aus mitwachsen-ice-look.ts, wie in 2D; die Schwanzflossen wiegen sich im Wind statt zu zucken),
 // Schnee und Eis als Boden und Klippen des Kessels, die glänzende Rutschspur bei offenem Eistor, das Bett aus Schnee,
-// Eiskristalle, die beim Polarlicht heller und grüntürkis leuchten (bei reduzierter Bewegung ruhig), und am Eistor Tür,
+// Eiskristalle, die beim Polarlicht heller und grüntürkis leuchten (bei reduzierter Bewegung ruhig), Eisschollen auf den
+// Eislöchern, der Eisfall am Talende (Klippen aus gefrorenem Wasser) und am Eistor Tür,
 // Eiszapfen und goldene Bucht (view-3d-gate.ts). Braucht Three.js (wie die 3D-Ansicht, beide teilen
 // es) und wird darum nicht mit dem Paket geladen, sondern erst, wenn die 3D-Ansicht es will (`pack.view3d`, index.ts):
 // im Build `_astro/welt-eis-3d.<hash>.js` mit eigener Grenze (scripts/verify-bundles.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
 import { ICE_COLORS } from '../../../../data/games/mitwachsen-eis';
-import { crystalBoxes, crystalGlow, glowTint, iceBoxes } from './mitwachsen-ice-look';
+import { crystalBoxes, crystalGlow, floeBoxes, glowTint, iceBoxes } from './mitwachsen-ice-look';
 import type { Frame, Ground, View3D } from '../../mitwachsen-view-3d';
 import type { DrawDeco } from '../../mitwachsen-view';
 import { gateLook } from './view-3d-gate';
 
 /** Im Gletscherkessel (Boden und Klippen): Schnee obenauf, darunter Eis */
 const KESSEL: Ground = { tiles: ['snowTop', 'ice', 'ice'] };
+/**
+ * Eisfall am Talende: Seiten in der Farbe des Felds (`color`, wie in 2D), glattes Eis obenauf. Die Kacheln sind fast
+ * weißer Schnee, so bleibt die Tönung so hell wie in 2D (auf der blauen Eis-Kachel würde sie doppelt dunkel)
+ */
+const fall = (color: string): Ground => ({
+  tiles: ['snowTop', 'snowTop', 'snowTop'],
+  top: ICE_COLORS.ice[1],
+  side: color,
+});
 /** Die Rutschspur glänzt bei offenem Eistor aus Eis */
 const SLIDE: Ground = { tiles: ['ice', 'ice', 'ice'], top: ICE_COLORS.slide[1] };
 /** Rahmen des Betts aus Schnee */
@@ -29,13 +39,17 @@ const crate: DrawDeco = (world, c, x, y, { picked }) =>
 /** Eiskristall der Eis-Welt: leuchtet aus sich selbst (`'glow'`); Kristalle anderer Welten baut die 3D-Ansicht wie immer */
 const crystal: DrawDeco = (_world, c, x, y) => (c.biome === 'eis' ? crystalBoxes(c, x, y, 0, true) : null);
 
+/** Eisscholle auf einem Eisloch, liegt still */
+const floe: DrawDeco = (_world, _c, x, y) => floeBoxes(x, y);
+
 export const view3d: View3D = {
   gate: 'eis',
   look: gateLook,
-  decos: { igloo: look, icebowl: look, watertrough: look, fishcrate: crate, crystal },
+  decos: { igloo: look, icebowl: look, watertrough: look, fishcrate: crate, crystal, floe },
   ground(c, open) {
     if (c.biome !== 'eis' || c.region === 'wild') return null;
     if (c.slide && open.includes('eis')) return SLIDE;
+    if (c.region === 'border' && c.color) return fall(c.color);
     return c.region === 'border' || c.ground === 'snow' ? KESSEL : null;
   },
   bedFrame: (c) => (c.biome === 'eis' ? SNOW_FRAME : null),

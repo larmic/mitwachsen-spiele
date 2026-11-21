@@ -17,8 +17,11 @@ import type { WorldPack } from './mitwachsen-pack-types';
 export const RETRY_3D_MS = 30_000;
 const WHITE = [1, 1, 1] as const;
 
-/** Boden eines Felds: Kacheln oben, oberste Seitenkachel, Seiten darunter; `top` färbt die Oberseite (Rutschspur) */
-export type Ground = { tiles: readonly [Tile, Tile, Tile]; top?: string };
+/**
+ * Boden eines Felds: Kacheln oben, oberste Seitenkachel, Seiten darunter; `top` färbt die Oberseite (Rutschspur),
+ * `side` die Seiten (Eisfall)
+ */
+export type Ground = { tiles: readonly [Tile, Tile, Tile]; top?: string; side?: string };
 
 /** Rahmen des Betts: Farbe der Seiten, oben (null: wie die Seiten), Kachel */
 export type Frame = readonly [string, string | null, Tile];

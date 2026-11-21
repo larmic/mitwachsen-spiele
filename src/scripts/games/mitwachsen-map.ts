@@ -49,7 +49,7 @@ export function mapColor(c: Cell): string {
   if (c.gate) return THEME_COLORS[c.gate].side;
   if (c.deco === 'gatetower') return THEME_COLORS[c.part!.id].side;
   if (BOARDS.has(c.deco)) return COLORS.gate;
-  if (c.biome === 'eis' && c.deco === 'crystal') return c.color ?? WORLD_GROUND.ice!; // Eiskristall in seiner Farbe (Schneewehen zeigt die Karte als Schnee)
+  if (c.biome === 'eis' && c.color) return c.color; // Eiskristall, Eisfall und Scholle in ihrer Farbe (Schneewehen zeigt die Karte als Schnee)
   if (WORLD_GROUND[c.ground]) return WORLD_GROUND[c.ground]!;
   if (c.ground === 'water') return COLORS.water;
   if (c.deco === 'tree') return COLORS.tree;

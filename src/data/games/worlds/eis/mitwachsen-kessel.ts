@@ -1,4 +1,5 @@
-// Gletscherkessel (Gletschertal) der Eis-Welt: Maße, Lage von Eisloch, Fischkisten, Moosfleck und Eis-Portal, Wohnorte der zehn
+// Gletscherkessel (Gletschertal) der Eis-Welt: Maße, Lage von Seen und Eislöchern, Fischkisten, Moosfleck, Eisfall und
+// Eis-Portal, Wohnorte der zehn
 // Eis-Tiere. Nur das Welt-Paket der Eis-Welt (src/scripts/games/worlds/eis/) liest diese Daten; es wird nachgeladen.
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md (Abschnitte „Welt-Pakete“ und Gletscherkessel)
 
@@ -19,8 +20,25 @@ export const KESSEL = {
   flat: 6,
   /** so viele Felder Abstand hält das Tal mindestens vom Felsring der Lichtung */
   gap: 2,
-  /** Eisloch: rundes Wasserloch (Radius in Feldern) seitlich hinter dem Bett, ringsum ebenes Ufer */
-  hole: { across: 13, out: 5, r: 1.6 },
+  /**
+   * Drei zugefrorene Seen [quer, vom Tor weg, Radius]: ein kleiner seitlich hinter dem Bett, zwei große weiter hinten
+   * im Tal (ihre Mitte würfelt der Seed bis `lakeJitter` Felder weit, den Rand wellt ein Rauschen). Glattes Eis auf
+   * Höhe 1, begehbar; in der Mitte jedes Sees ein Eisloch
+   */
+  lakes: [
+    [13, 5, 4],
+    [20, 42, 10],
+    [-19, 76, 8],
+  ],
+  lakeJitter: 3,
+  /** Eisloch in der Mitte jedes Sees: rundes Wasserloch (Radius in Feldern), ringsum `shore` Felder ebenes Ufer aus Eis */
+  hole: { r: 1.6, shore: 2 },
+  /**
+   * Eisfall am Talende: `half` Felder links und rechts der Mitte werden die Klippen zu einer glatten Wand aus gefrorenem
+   * Wasser, alle `h` hoch (so hoch wie die höchsten Klippen, eine Wand statt Stufen); davor liegt `foot` Felder breit
+   * ein gefrorenes Becken aus Eis auf dem Boden (von oben sichtbar, gleich wie das Tal gedreht ist)
+   */
+  fall: { half: 7, h: 6, foot: 2 },
   /**
    * Sechs Fischkisten [quer, vom Tor weg]: drei nah am Zuhause (am Ende der Rutschspur nahe dem Tor, hinter dem Bett
    * und nahe dem Eisloch, jede 8 bis 14 Felder von der Schneewiese), drei weiter hinten im Tal (links, rechts, ganz
@@ -41,6 +59,15 @@ export const KESSEL = {
    * Ihr Gegenstück steht im Kreis um das Schneebett in Richtung des Tors.
    */
   portal: [0, 114],
+} as const;
+
+/**
+ * Farben, die nur das Tal kennt (der Kern liest sie als `color` des Felds): Seite des Eisfalls, Eisscholle (Seite, oben;
+ * oben auch auf der Karte)
+ */
+export const KESSEL_COLORS = {
+  fall: '#6fbde6',
+  floe: ['#d9e6f0', '#ffffff'],
 } as const;
 
 /**

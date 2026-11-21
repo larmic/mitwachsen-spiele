@@ -31,7 +31,14 @@ describe('Haken der 3D-Ansicht für Welt-Pakete (Views3D)', () => {
     expect(v.ground(grass, ['eis'])).toBeNull();
     expect(v.look('eis')).toBeDefined();
     expect(v.look('sand')).toBeUndefined();
-    expect(Object.keys(v.decos.decos).sort()).toEqual(['crystal', 'fishcrate', 'icebowl', 'igloo', 'watertrough']);
+    expect(Object.keys(v.decos.decos).sort()).toEqual([
+      'crystal',
+      'fishcrate',
+      'floe',
+      'icebowl',
+      'igloo',
+      'watertrough',
+    ]);
     // Leuchten: ohne Polarlicht wie gebaut, mit ihm heller (aus dem Paket)
     expect(v.glow(0, false, 0)).toEqual([1, 1, 1]);
     expect(v.glow(1, true, 0)[1]).toBeGreaterThan(1);

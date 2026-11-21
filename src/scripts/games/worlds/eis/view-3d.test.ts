@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ICE_COLORS } from '../../../../data/games/mitwachsen-eis';
+import { KESSEL_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
 import { drawDeco, type DecoAt } from '../../mitwachsen-view';
 import type { Cell } from '../../mitwachsen-world';
 import { EIS_PACK, worldOf } from '../../test-worlds';
@@ -92,6 +93,29 @@ describe('3D-Teil des Welt-Pakets der Eis-Welt (view-3d.ts)', () => {
     expect(glints.filter((v) => v > 0).length).toBeGreaterThan(0);
     expect(glints.filter((v) => v > 0).length).toBeLessThan(40);
     expect(Math.max(...glints)).toBeLessThanOrEqual(1);
+  });
+
+  it('Eisschollen auf den Eislöchern liegen in 3D still wie in 2D bei reduzierter Bewegung; Seerosen baut die 3D-Ansicht wie immer', () => {
+    const [x, y, floe] = find('floe');
+    expect([floe.biome, floe.ground]).toEqual(['eis', 'water']);
+    const boxes = drawDeco(view3d, world, floe, x, y, at)!;
+    expect(boxes.length).toBeGreaterThan(0);
+    expect(boxes.every((b) => b[7] === KESSEL_COLORS.floe[1])).toBe(true); // weiß obenauf
+    expect(boxes).toEqual(drawDeco(EIS_PACK.view!, world, floe, x, y, at0));
+    const lily: Cell = { ...floe, deco: 'lily', region: 'lichtung', biome: undefined, color: undefined };
+    expect(drawDeco(view3d, world, lily, x, y, at)).toBeNull();
+    expect(drawDeco(view3d, world, { ...lily, region: 'wild', biome: 'eis' }, x, y, at)).toBeNull();
+    expect(drawDeco(null, world, floe, x, y, at)).toBeNull(); // solange der 3D-Teil lädt: offenes Wasser
+  });
+
+  it('Eisfall am Talende: Seiten in der Farbe des Felds auf fast weißen Kacheln (so hell wie in 2D), glattes Eis obenauf; andere Klippen bleiben verschneit', () => {
+    const cliff: Cell = { ...snow, h: 6, ground: 'ice', deco: 'rock', region: 'border', solid: true };
+    expect(view3d.ground({ ...cliff, color: KESSEL_COLORS.fall }, [])).toEqual({
+      tiles: ['snowTop', 'snowTop', 'snowTop'],
+      top: ICE_COLORS.ice[1],
+      side: KESSEL_COLORS.fall,
+    });
+    expect(view3d.ground(cliff, ['eis'])).toEqual({ tiles: ['snowTop', 'ice', 'ice'] });
   });
 
   it('das Bett im Kessel ist aus Schnee, sonst sagt das Paket nichts (Holz)', () => {

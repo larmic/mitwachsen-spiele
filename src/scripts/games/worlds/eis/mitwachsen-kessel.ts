@@ -2,18 +2,18 @@
 // Er ist ein langes Gletschertal (`KESSEL.shape`), das vom Ende des Gangs hinter dem Eistor weg nach außen läuft, ganz
 // hinter dem Felsring der Lichtung und fern der Ausgänge der anderen Gänge, im selben Koordinatenraum. Ringsum feste
 // Eisklippen, der Gang ist der einzige Zugang. Nah an der Mündung das Schneebett (`KESSEL.bed`) mit Schneewiese,
-// Eisschale, Wassertrog aus Eis, Iglu und Klangstein, daneben das Eisloch und der Moosfleck; sechs Fischkisten über das
-// Tal verteilt; die Plattform des Eis-Portals ganz hinten am Talende (der Heimweg), ihr Gegenstück im Kreis um das Bett;
-// vom Tor bis ans Bett die Rutschspur. Lagen darin rechnen vom Schneebett aus. Ringsum Winterlandschaft wie draußen in
-// der Eis-Welt (`eisCell`): Hügel in drei Stufen, Tannenhaine, Eisblöcke, dazu Eiskristalle und Schneewehen
-// (mitwachsen-frost.ts).
+// Eisschale, Wassertrog aus Eis, Iglu und Klangstein, daneben ein kleiner zugefrorener See und der Moosfleck; zwei große
+// Seen weiter hinten, in jedem See ein Eisloch mit Schollen; sechs Fischkisten über das Tal verteilt; die Plattform des
+// Eis-Portals ganz hinten am Talende (der Heimweg) vor dem Eisfall, ihr Gegenstück im Kreis um das Bett; vom Tor bis ans
+// Bett die Rutschspur. Lagen darin rechnen vom Schneebett aus. Ringsum Winterlandschaft wie draußen in der Eis-Welt
+// (`eisCell`): Hügel in drei Stufen, Tannenhaine, Eisblöcke, dazu Eiskristalle und Schneewehen (mitwachsen-frost.ts).
 // Teil des Welt-Pakets der Eis-Welt (index.ts), nachgeladen.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Welt-Pakete“ und „Gletscherkessel“)
 
 import { fromKey } from '../../../../lib/games/chunks';
 import { hash, rand01, valueNoise } from '../../../../lib/games/rng';
 import { REGIONS, type Point } from '../../../../data/games/mitwachsen';
-import { ICE_ANIMALS, KESSEL } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
+import { ICE_ANIMALS, KESSEL, KESSEL_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
 import { HOMES } from '../../../../data/games/mitwachsen-homes';
 import { ICE_PORTAL } from '../../../../data/games/mitwachsen-portals';
 import { ICE_STONE } from '../../../../data/games/mitwachsen-stories';
@@ -110,9 +110,10 @@ export function buildKessel(
   for (let t = gang.end + 1; t <= centre - OUTER.ry; t++)
     for (let u = -gang.half - gang.wall; u <= gang.half + gang.wall; u++)
       set(...gang.at(u, t), Math.abs(u) <= gang.half ? passage(...gang.at(u, t)) : cliff(3));
-  const free = keepFree(seed, gang, place);
-  const realm = land(seed, gang, place, free, passage, set);
-  home(gang, place, set);
+  const lake = lakes(seed);
+  const free = keepFree(seed, gang, place, lake.holes);
+  const realm = land(seed, gang, place, free, lake.at, passage, set);
+  home(place, set);
   forage(gang, place, map);
   const portal = platforms(gang, place, map);
   for (const [x, y] of slidePath(gang, place.bed, map)) {
@@ -138,7 +139,7 @@ export function buildKessel(
 }
 
 /**
- * Klippen und Boden des Kessels setzen; durch die Klippen auf der Seite des Tors führt der Gang (die Mündung).
+ * Klippen, Seen und Boden des Kessels setzen; durch die Klippen auf der Seite des Tors führt der Gang (die Mündung).
  * Liefert alle Felder des Kessels (für `realm`).
  */
 function land(
@@ -146,11 +147,11 @@ function land(
   gang: Gang,
   place: KesselPlace,
   free: (u: number, v: number) => boolean,
+  lake: (u: number, v: number) => Cell | null,
   passage: (x: number, y: number) => Cell,
   set: (x: number, y: number, c: Cell) => void,
 ): Set<string> {
   const realm = new Set<string>();
-  const wet = icePatches(seed, gang, place, free);
   const pines = new Set<string>(); // Tannen (als u,v), sie stehen einzeln wie die Bäume der Lichtung
   /** Darf bei (u, v) eine Tanne stehen? Ringsum zwei Felder Boden (keine Nischen an der Klippe), keine Tanne nah */
   const pineFits = (u: number, v: number) => {
@@ -169,17 +170,38 @@ function land(
         set(x, y, v < 0 && Math.abs(u) <= gang.half ? passage(x, y) : cliffCell(seed, u, v, x, y));
         continue;
       }
-      const c = floorCell(seed, place.bed, x, y, free(u, v) ? null : wet(u, v), pineFits(u, v));
+      const c = lake(u, v) ?? foot(seed, u, v) ?? floorCell(seed, place.bed, x, y, !free(u, v) && pineFits(u, v));
       if (c.deco === 'tree') pines.add(key(u, v));
       set(x, y, c);
     }
   return realm;
 }
 
-/** Eisklippe in Terrassen: innen 3, dann 4, außen 5, hier und da ein Block höher */
+/**
+ * Eisklippe in Terrassen: innen 3, dann 4, außen 5, hier und da ein Block höher. Am Talende hängt in der Mitte der
+ * Eisfall (`KESSEL.fall`): eine glatte Wand aus gefrorenem Wasser (`color`), überall so hoch wie die höchsten Klippen
+ */
 function cliffCell(seed: number, u: number, v: number, x: number, y: number): Cell {
+  if (isFall(u, v)) return { ...cliff(KESSEL.fall.h), color: KESSEL_COLORS.fall };
   const o = (u / OUTER.rx) ** 2 + (v / OUTER.ry) ** 2;
   return cliff((o < 0.75 ? 3 : o < 0.87 ? 4 : 5) + (hash(seed, x, y, 62) % 6 === 0 ? 1 : 0));
+}
+
+/** Gehört die Klippe bei (u, v) zum Eisfall? In der Mitte des hinteren Endes */
+const isFall = (u: number, v: number) => v > 0 && Math.abs(u) <= KESSEL.fall.half;
+
+/**
+ * Gefrorenes Becken bis `KESSEL.fall.foot` Felder vor dem Eisfall: glattes Eis auf Höhe 1 wie die Seen (so sieht man
+ * den Fall auch von oben, gleich wie das Tal gedreht ist); sonst null
+ */
+function foot(seed: number, u: number, v: number): Cell | null {
+  const r = KESSEL.fall.foot;
+  if (v <= 0 || Math.abs(u) > KESSEL.fall.half + r) return null;
+  for (let dv = -r; dv <= r; dv++)
+    for (let du = -r; du <= r; du++)
+      if (Math.hypot(du, dv) <= r + 0.5 && isFall(u + du, v + dv) && zone(seed, u + du, v + dv) === 'cliff')
+        return { ...snow(1), ground: 'ice' };
+  return null;
 }
 
 /** Höhe des Kessel-Bodens vor dem Ebnen: Hügel in drei Stufen */
@@ -195,50 +217,48 @@ const GROVE = 0.62;
  * Tannen dichter als draußen (dort 3 %, `OBSTACLE_GAP` dünnt aus): So wird das weite Tal nicht leer, etwa 5 Dinge je
  * 100 Felder.
  */
-export const KESSEL_WILDS = { pines: 4, blocks: 2, patches: 2, patchR: 2.2 } as const;
+export const KESSEL_WILDS = { pines: 4, blocks: 2 } as const;
 
 /**
- * Boden im Kessel wie die Eis-Welt draußen (`eisCell`): Schnee mit Hügeln in drei Stufen, kleine Eisflächen (`wet` aus
- * `icePatches`), Tannenhaine (Schneetannen 10 % im Hain, sonst 0,8 %); um das Bett eben. Wo der Kessel frei bleibt
- * (`wet` null), wachsen keine Tannen; Tannen nur, wo Platz ist (`pine`). Eisblöcke setzt erst `winter`.
+ * Boden im Kessel wie die Eis-Welt draußen (`eisCell`): Schnee mit Hügeln in drei Stufen, Tannenhaine (Schneetannen 10 %
+ * im Hain, sonst 0,8 %); um das Bett eben. Tannen nur, wo der Kessel nicht frei bleibt und Platz ist (`pine`). Glattes
+ * Eis liegt auf den Seen (`lakes`), Eisblöcke setzt erst `winter`.
  */
-function floorCell(seed: number, bed: Point, x: number, y: number, wet: number | null, pine: boolean): Cell {
+function floorCell(seed: number, bed: Point, x: number, y: number, pine: boolean): Cell {
   if (Math.hypot(x - bed[0], y - bed[1]) <= KESSEL.flat) return snow(1);
-  const pines = wet === null || !pine ? 0 : grove(seed, x, y) > GROVE ? 0.1 : 0.008;
-  return eisCell(snow(hill(seed, x, y)), wet ?? 1, rand01(seed, x, y, 66), pines, 0);
+  const pines = pine ? (grove(seed, x, y) > GROVE ? 0.1 : 0.008) : 0;
+  return eisCell(snow(hill(seed, x, y)), 1, rand01(seed, x, y, 66), pines, 0);
 }
 
 /**
- * Ein, zwei kleine Eisflächen (Radius `patchR`) auf ebenem Grund (Höhe 1) außerhalb dessen, was frei bleibt, mindestens
- * zehn Felder voneinander. Liefert das `wet` für `eisCell`: unter 0,2 genau auf einer Eisfläche.
+ * Zugefrorene Seen (`KESSEL.lakes`): glattes Eis auf Höhe 1, begehbar. Ihre Mitte rechnet vom Schneebett aus, die
+ * großen hinten verschiebt der Seed bis `lakeJitter` Felder weit; den Rand wellt ein Rauschen (drei Viertel bis ganz
+ * des Radius, mindestens bis zum Ufer des Eislochs). In der Mitte jedes Sees das Eisloch: dunkles Wasser (Höhe 0) mit
+ * weißen Schollen (`'floe'`, `color` für die Karte; jedes Loch hat eine fest neben der Mitte, sonst trägt etwa jedes
+ * fünfte Wasserfeld eine), ringsum `KESSEL.hole.shore` Felder ebenes Ufer aus Eis. Liefert das Feld eines Sees bei
+ * (u, v), sonst null, und die Mitten der Eislöcher.
  */
-function icePatches(seed: number, gang: Gang, place: KesselPlace, free: (u: number, v: number) => boolean) {
-  const { patches, patchR } = KESSEL_WILDS;
-  // je Feld einmal: Boden auf Höhe 1? (nur dort wird `eisCell` zu Eis; der Boden liegt ganz in rx × ry)
-  const W = 2 * rx + 5;
-  const low = new Uint8Array(W * (2 * ry + 5));
-  for (let v = -ry; v <= ry; v++)
-    for (let u = -rx; u <= rx; u++)
-      if (zone(seed, u, v) === 'floor' && hill(seed, ...gang.at(u, place.centre + v)) === 1)
-        low[(v + ry + 2) * W + u + rx + 2] = 1;
-  /** Wie eben ist es um (u, v): so viele der 5 × 5 Felder sind Boden auf Höhe 1 */
-  const flat = (u: number, v: number) => {
-    let n = 0;
-    for (let dv = -2; dv <= 2; dv++)
-      for (let du = -2; du <= 2; du++) n += low[(v + dv + ry + 2) * W + u + du + rx + 2] ?? 0;
-    return n;
+function lakes(seed: number) {
+  const { r: hr, shore } = KESSEL.hole;
+  const j = KESSEL.lakeJitter;
+  const shift = (i: number, k: number) => (i ? (hash(seed, i, k, 75) % (2 * j + 1)) - j : 0);
+  const all = KESSEL.lakes.map(([a, o, r], i) => ({ hole: fromBed([a + shift(i, 0), o + shift(i, 1)]), r }));
+  const at = (u: number, v: number): Cell | null => {
+    for (const {
+      hole: [a, b],
+      r,
+    } of all) {
+      const d = Math.hypot(u - a, v - b);
+      if (d <= hr) {
+        const floe = rand01(seed, u, v, 77) < 0.2 || (u === a + 1 && v === b);
+        return { ...snow(0), ground: 'water', ...(floe && { deco: 'floe', color: KESSEL_COLORS.floe[1] }) };
+      }
+      if (d <= hr + shore + 0.5 || d < r * (0.75 + 0.25 * valueNoise(seed + 76, u, v, 4)))
+        return { ...snow(1), ground: 'ice' };
+    }
+    return null;
   };
-  const spots: { p: Point; n: number }[] = [];
-  for (let v = -ry; v <= ry; v++)
-    for (let u = -rx; u <= rx; u++)
-      if (!free(u, v) && zone(seed, u, v) === 'floor') spots.push({ p: [u, v], n: flat(u, v) });
-  // die ebensten Stellen zuerst (ganz ebene unter sich gewürfelt), mindestens halb eben
-  spots.sort((a, b) => b.n - a.n || hash(seed, ...a.p, 67) - hash(seed, ...b.p, 67));
-  const centres: Point[] = [];
-  for (const { p, n } of spots)
-    if (n >= 13 && centres.length < patches && centres.every((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) >= 10))
-      centres.push(p);
-  return (u: number, v: number) => Math.min(1, ...centres.map(([a, b]) => (Math.hypot(u - a, v - b) / patchR) * 0.2));
+  return { at, holes: all.map(({ hole }) => hole) };
 }
 
 /**
@@ -319,12 +339,11 @@ function winter(
 
 /**
  * Was im Tal frei bleibt (keine Tannen, keine Eisblöcke), gemessen in (u, v) von der Mitte: die Mündung, das Bett
- * mit Schneewiese, das Gegenstück des Eis-Portals im Kreis um das Bett, das Ufer des Eislochs, das Umfeld der
+ * mit Schneewiese, das Gegenstück des Eis-Portals im Kreis um das Bett, das Ufer der Eislöcher (`holes`), das Umfeld der
  * Fischkisten, der Moosfleck und die Plattform am Talende. Die Rutschspur hält `buildKessel` frei.
  */
-function keepFree(seed: number, gang: Gang, { centre, bed }: KesselPlace) {
+function keepFree(seed: number, gang: Gang, { centre, bed }: KesselPlace, holes: readonly Point[]) {
   const { hole, moss } = KESSEL;
-  const [hu, hv] = fromBed([hole.across, hole.out]);
   const [mu, mv] = fromBed([moss.across, moss.out]);
   const portal = fromBed(KESSEL.portal);
   const crates = KESSEL.crates.map(fromBed);
@@ -340,7 +359,7 @@ function keepFree(seed: number, gang: Gang, { centre, bed }: KesselPlace) {
     const [x, y] = gang.at(u, centre + v);
     if (Math.hypot(x - bed[0], y - bed[1]) <= KESSEL.flat + 2) return true;
     if (Math.abs(u) <= gang.half + 3 && v < mouth + 6) return true;
-    if (Math.hypot(u - hu, v - hv) <= hole.r + 4) return true;
+    if (holes.some(([hu, hv]) => Math.hypot(u - hu, v - hv) <= hole.r + 4)) return true;
     if (Math.hypot(u - mu, v - mv) <= moss.r + 2) return true;
     const near = ([a, b]: readonly [number, number], r: number) => Math.max(Math.abs(u - a), Math.abs(v - b)) <= r;
     return near(portal, PLATFORM_HALF + 3) || near(ringPortal, PLATFORM_HALF + 3) || crates.some((p) => near(p, 3));
@@ -381,8 +400,8 @@ function level(cells: readonly Point[], map: Map<string, Cell>) {
   }
 }
 
-/** Zuhause im Tal: Schneebett, Schneewiese mit Eisschale und Wassertrog, Iglu mit fester Rückwand, Eisloch */
-function home(gang: Gang, { bed, centre }: KesselPlace, set: (x: number, y: number, c: Cell) => void) {
+/** Zuhause im Tal: Schneebett, Schneewiese mit Eisschale und Wassertrog, Iglu mit fester Rückwand */
+function home({ bed }: KesselPlace, set: (x: number, y: number, c: Cell) => void) {
   const h = placeHome('eis', bed);
   const r = h.meadow;
   for (let dy = -r; dy <= r; dy++)
@@ -397,15 +416,6 @@ function home(gang: Gang, { bed, centre }: KesselPlace, set: (x: number, y: numb
   const { x0, y0, x1, y1 } = h.shelter;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, { ...snow(1), garden: true, roof: true });
   for (let x = x0; x <= x1; x++) set(x, y0 - 1, fixed('igloo')); // Rückwand, die Mitte ist `shelterStem`
-  // Eisloch: Wasser zum Schöpfen, ringsum ebenes Ufer
-  const { across, out, r: hr } = KESSEL.hole;
-  const [hx, hy] = gang.at(...uv(centre, [across, out]));
-  for (let dy = -4; dy <= 4; dy++)
-    for (let dx = -4; dx <= 4; dx++) {
-      const d = Math.hypot(dx, dy);
-      if (d <= hr) set(hx + dx, hy + dy, { ...snow(0), ground: 'water' });
-      else if (d <= hr + 2) set(hx + dx, hy + dy, snow(1));
-    }
 }
 
 /**

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { drawDeco, type DecoAt } from './mitwachsen-view';
 import { mapColor } from './mitwachsen-map';
+import { KESSEL_COLORS } from '../../data/games/worlds/eis/mitwachsen-kessel';
 import type { Cell } from './mitwachsen-world';
 import type { SkyScene } from './mitwachsen-sky';
 import { EIS_PACK, worldOf } from './test-worlds';
@@ -72,7 +73,8 @@ describe('Haken der 2D-Ansicht für Welt-Pakete (drawDeco)', () => {
   it('Karte: Eiskristalle in ihrer Farbe (nur in der Eis-Welt), Schneewehen wie Schnee', () => {
     const [, , crystal] = find('crystal');
     expect(mapColor(crystal)).toBe(crystal.color);
-    expect(mapColor(crystal)).not.toBe(mapColor({ ...crystal, deco: null, solid: false })); // hebt sich vom Schnee ab
+    const plain: Cell = { ...crystal, deco: null, solid: false, color: undefined };
+    expect(mapColor(crystal)).not.toBe(mapColor(plain)); // hebt sich vom Schnee ab
     const [, , drift] = find('cloudpuff');
     expect(mapColor(drift)).toBe(mapColor({ ...drift, deco: null })); // nur Bild, auf der Karte nicht zu sehen
     const cave: Cell = {
@@ -85,6 +87,32 @@ describe('Haken der 2D-Ansicht für Welt-Pakete (drawDeco)', () => {
       biome: 'hoehle',
     };
     expect(mapColor(cave)).toBe(mapColor({ ...cave, deco: null })); // in der Höhle wie bisher
+  });
+
+  it('Eisscholle auf einem Eisloch: das Paket zeichnet sie weiß auf dem Wasser, sie treibt sanft (nie bei reduzierter Bewegung)', () => {
+    const [x, y, floe] = find('floe');
+    expect([floe.biome, floe.ground]).toEqual(['eis', 'water']);
+    const still = drawDeco(view, world, floe, x, y, at)!;
+    expect(still.length).toBeGreaterThan(0);
+    expect(still.every((b) => b[7] === KESSEL_COLORS.floe[1] && b[2] === 0.8)).toBe(true); // auf dem Wasser
+    expect(drawDeco(null, world, floe, x, y, at)).toBeNull(); // solange das Paket lädt: offenes Wasser
+    expect(drawDeco(view, world, floe, x, y, { ...at, now: 5000 })).toEqual(still);
+    const drift = Array.from(
+      { length: 20 },
+      (_, i) => drawDeco(view, world, floe, x, y, { ...at, reduced: false, now: i * 700 })![0]![0],
+    );
+    expect(Math.max(...drift) - Math.min(...drift)).toBeGreaterThan(0.05);
+    expect(Math.max(...drift.map((d) => Math.abs(d - still[0]![0])))).toBeLessThanOrEqual(0.06 + 1e-9);
+  });
+
+  it('Karte: Schollen weiß auf dem Eisloch, der Eisfall in seiner Farbe, andere Eisklippen und Seen wie Eis', () => {
+    const [, , floe] = find('floe');
+    expect(mapColor(floe)).toBe(KESSEL_COLORS.floe[1]);
+    expect(mapColor({ ...floe, deco: null, color: undefined })).not.toBe(mapColor(floe)); // offenes Wasser
+    const cliff: Cell = { h: 4, ground: 'ice', deco: 'rock', region: 'border', solid: true, biome: 'eis' };
+    expect(mapColor({ ...cliff, color: KESSEL_COLORS.fall })).toBe(KESSEL_COLORS.fall);
+    expect(mapColor(cliff)).not.toBe(KESSEL_COLORS.fall);
+    expect(mapColor({ ...cliff, h: 1, deco: null, region: 'eis', solid: false })).toBe(mapColor(cliff)); // See
   });
 
   it('die Rutschspur glänzt erst bei offenem Eistor', () => {

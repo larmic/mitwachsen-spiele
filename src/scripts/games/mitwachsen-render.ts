@@ -100,6 +100,8 @@ const FLAT_GROUND: Partial<Record<Cell['ground'], readonly [string, string]>> = 
   cloud: ['#e6eef7', '#ffffff'],
   moss: ['#6a4a3a', '#8a76cc'],
 };
+/** Eisklippe; eine gefärbte (`color`, der Eisfall am Talende) mit Seiten in ihrer Farbe und glattem Eis obenauf */
+const iceCliff = (c: Cell) => (c.color ? ([c.color, ICE_COLORS.ice[1]] as const) : ICE_COLORS.cliff);
 
 /**
  * Die Figur, mit Korb auf dem Rücken, Eimer und Netz in den Händen, solange sie Beeren, Wasser und Fische trägt, und mit
@@ -274,7 +276,7 @@ export class Renderer {
       box(this.ctx, P, x, y, 0, 1, 1, 0.6, '#b8380a', '#ff7a1a');
       return;
     }
-    const flat = c.region === 'border' && c.biome === 'eis' ? ICE_COLORS.cliff : FLAT_GROUND[c.ground]; // Eisklippen
+    const flat = c.region === 'border' && c.biome === 'eis' ? iceCliff(c) : FLAT_GROUND[c.ground];
     if (flat) {
       // Böden der Welten hinter den Toren: einfache Blöcke in ihren Farben
       const frontH = world.cell(x, y + 1).h;

@@ -1,10 +1,11 @@
 import { beforeAll, describe, expect, it } from 'vitest';
+import { fromKey } from '../../lib/games/chunks';
 import { DIRS } from '../../lib/games/front';
 import { GATES, REGIONS, type GateId } from '../../data/games/mitwachsen';
 import { HOMES } from '../../data/games/mitwachsen-homes';
 import { BED_STONE, ICE_STONE } from '../../data/games/mitwachsen-stories';
 import { PLATFORM_HALF, platformArea, platformCells, platformLift, withNeighbours } from './mitwachsen-portal';
-import { KESSEL } from '../../data/games/worlds/eis/mitwachsen-kessel';
+import { KESSEL, KESSEL_COLORS } from '../../data/games/worlds/eis/mitwachsen-kessel';
 import { KESSEL_WILDS } from './worlds/eis/mitwachsen-kessel';
 import { FROST } from './worlds/eis/mitwachsen-frost';
 import { ICE_CRYSTALS } from '../../data/games/mitwachsen-eis';
@@ -423,7 +424,7 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
     }
   });
 
-  /** Eisblock im Kessel: Eis eine Stufe über dem Boden (Eisflächen liegen auf Höhe 1, die Spur ist eben) */
+  /** Eisblock im Kessel: Eis eine Stufe über dem Boden (Seen liegen auf Höhe 1, die Spur ist eben) */
   const isBlock = (c: Cell) => c.ground === 'ice' && c.h >= 2 && !c.slide && !c.solid;
   /**
    * Was an Tannen und Eisblöcken im Kessel falsch ist: zu nah an Bett, Spur, Kisten, Eisloch oder Plattformen; Tannen
@@ -466,22 +467,19 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
     .flatMap((dy) => [-2, -1, 0, 1, 2].map((dx) => [dx, dy] as const))
     .filter(([dx, dy]) => dx || dy);
 
-  it('Winterlandschaft: Tannen, Eisblöcke, Eisflächen und Hügel in drei Stufen; Bett, Spur, Kisten, Plattformen und Eisloch bleiben frei (20 Seeds)', () => {
+  it('Winterlandschaft: Tannen, Eisblöcke und Hügel in drei Stufen; Bett, Spur, Kisten, Plattformen und Eislöcher bleiben frei (20 Seeds)', () => {
     let high = 0,
       ground = 0;
     for (const seed of VALLEY_SEEDS) {
       const w = worldOf(seed);
       const kessel = kesselPlace(seed, EIS_PACK).cells.filter(([x, y]) => w.cell(x, y).region === 'eis');
       const wrong = wildFaults(w, kessel);
-      // jeder Kessel, nicht nur im Mittel: ein paar Tannen, Eisblöcke zum Klettern, ein, zwei kleine Eisflächen
+      // jeder Kessel, nicht nur im Mittel: ein paar Tannen und Eisblöcke zum Klettern
       const count = (f: (c: Cell) => boolean) => kessel.filter(([x, y]) => f(w.cell(x, y))).length;
       const pines = count((c) => c.tree === 'snowpine');
       const blocks = count(isBlock);
-      const patch = count((c) => c.ground === 'ice' && c.h === 1 && !c.slide);
       if (pines < KESSEL_WILDS.pines) wrong.push(`nur ${pines} Tannen`);
       if (blocks < KESSEL_WILDS.blocks) wrong.push(`nur ${blocks} Eisblöcke`);
-      const most = KESSEL_WILDS.patches * Math.ceil(Math.PI * KESSEL_WILDS.patchR ** 2);
-      if (patch < 5 || patch > most) wrong.push(`${patch} Felder Eisfläche`);
       for (const [x, y] of kessel) {
         const h = standHeight(w, [], x, y);
         if (h === null) continue;
@@ -569,6 +567,149 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
       expect(wrong, `Seed ${seed}`).toEqual([]);
     }
     expect(special / all).toBeGreaterThan(0.6); // meist am Klippenfuß oder auf einer Kuppe
+  });
+
+  /** Eislöcher: zusammenhängende Wasserflächen im Tal (Nachbarn über Seiten) */
+  function holesOf(w: World, floor: readonly (readonly [number, number])[]) {
+    const water = new Set(floor.filter(([x, y]) => w.cell(x, y).ground === 'water').map(keyOf));
+    const holes: (readonly [number, number])[][] = [];
+    const seen = new Set<string>();
+    for (const k of water) {
+      if (seen.has(k)) continue;
+      seen.add(k);
+      const hole = [fromKey(k)];
+      for (let i = 0; i < hole.length; i++)
+        for (const [dx, dy] of Object.values(DIRS)) {
+          const n = `${hole[i]![0] + dx},${hole[i]![1] + dy}`;
+          if (!water.has(n) || seen.has(n)) continue;
+          seen.add(n);
+          hole.push(fromKey(n));
+        }
+      holes.push(hole);
+    }
+    return holes;
+  }
+
+  /**
+   * Was an einem Eisloch falsch ist: zu klein, ohne weiße Scholle, Ufer (alles näher als `hole.r + shore` an der Mitte
+   * des Lochs) nicht eben aus Eis oder nicht erreichbar
+   */
+  function holeFaults(w: World, hole: readonly (readonly [number, number])[], reach: ReadonlySet<string>) {
+    const wrong: string[] = [];
+    const at = hole[0]!.join(',');
+    if (hole.length < 5) wrong.push(`Loch ${at} mit ${hole.length} Feldern`);
+    const floes = hole.filter(([x, y]) => w.cell(x, y).deco === 'floe');
+    if (!floes.length) wrong.push(`Loch ${at} ohne Scholle`);
+    wrong.push(
+      ...floes.filter(([x, y]) => w.cell(x, y).color !== KESSEL_COLORS.floe[1]).map((p) => `Scholle ${keyOf(p)}`),
+    );
+    const mx = hole.reduce((a, [x]) => a + x, 0) / hole.length;
+    const my = hole.reduce((a, [, y]) => a + y, 0) / hole.length;
+    const r = KESSEL.hole.r + KESSEL.hole.shore;
+    const shore: (readonly [number, number])[] = [];
+    for (let y = Math.floor(my - r); y <= Math.ceil(my + r); y++)
+      for (let x = Math.floor(mx - r); x <= Math.ceil(mx + r); x++)
+        if (Math.hypot(x - mx, y - my) < r && w.cell(x, y).ground !== 'water') shore.push([x, y]);
+    if (shore.length < 16) wrong.push(`Loch ${at} mit ${shore.length} Feldern Ufer`);
+    for (const [x, y] of shore)
+      if (w.cell(x, y).ground !== 'ice' || standHeight(w, [], x, y) !== 1 || !reach.has(`${x},${y}`))
+        wrong.push(`Ufer ${x},${y}`);
+    return wrong;
+  }
+
+  /** Was an den Seen falsch ist: zu klein, nicht erreichbar, Spur, Kiste oder Plattform am Wasser, zu viel Eis */
+  function lakeFaults(w: World, floor: readonly (readonly [number, number])[], reach: ReadonlySet<string>) {
+    const wrong: string[] = [];
+    const cell = ([x, y]: readonly [number, number]) => w.cell(x, y);
+    const lake = floor.filter((p) => cell(p).ground === 'ice' && cell(p).h === 1 && !cell(p).slide);
+    if (lake.length < 250) wrong.push(`nur ${lake.length} Felder Seen`);
+    wrong.push(...lake.filter((p) => !reach.has(keyOf(p))).map((p) => `See ${keyOf(p)} nicht erreichbar`));
+    // Spur, Kisten und Plattformen bleiben vom Wasser weg: Ihre Wege führen nie über ein Loch
+    const marked = floor.filter((p) => cell(p).slide || cell(p).portal || cell(p).deco === 'fishcrate');
+    for (const [x, y] of marked)
+      if (RING_1.some(([dx, dy]) => w.cell(x + dx, y + dy).ground === 'water')) wrong.push(`am Wasser ${x},${y}`);
+    const icy = floor.filter((p) => ['ice', 'water'].includes(cell(p).ground)).length;
+    if (icy / floor.length > 0.15) wrong.push(`${((icy / floor.length) * 100).toFixed(1)} % Eis und Wasser`);
+    return wrong;
+  }
+
+  it('Zugefrorene Seen mit je einem Eisloch: Schollen darauf, Ufer eben und erreichbar, Eis und Wasser höchstens 15 % des Bodens, kein Weg abgeschnitten (20 Seeds)', () => {
+    for (const seed of VALLEY_SEEDS) {
+      const w = worldOf(seed);
+      const floor = kesselPlace(seed, EIS_PACK).cells.filter(([x, y]) => w.cell(x, y).region === 'eis');
+      const reach = new Set(reachable(w, [], w.homes.eis.wake[0]!, 200000).map(keyOf));
+      // je See ein Loch (Wasser, Höhe 0), darauf mindestens eine weiße Scholle; ringsum ebenes Ufer aus Eis, erreichbar
+      const holes = holesOf(w, floor);
+      const wrong = holes.flatMap((hole) => holeFaults(w, hole, reach));
+      if (holes.length !== KESSEL.lakes.length) wrong.push(`${holes.length} Eislöcher`);
+      // Seen: glattes Eis auf Höhe 1, begehbar und vom Schneebett erreichbar (ein See schneidet keinen Weg ab)
+      wrong.push(...lakeFaults(w, floor, reach));
+      // Wohnplätze nur auf erreichbarem Boden (keine Inseln)
+      wrong.push(
+        ...w
+          .spotsOf('eis')
+          .filter((p) => !reach.has(keyOf(p)))
+          .map((p) => `Wohnplatz ${keyOf(p)}`),
+      );
+      expect(wrong, `Seed ${seed}`).toEqual([]);
+    }
+  });
+
+  /**
+   * Was an der Wand des Eisfalls falsch ist: eine Klippe höher als der Fall, kein Becken aus erreichbarem Eis davor, zu
+   * wenig Seiten zur Kamera (sie blickt von Süden: Wo der Fall nach Süden über das Feld davor ragt, zeigt sie seine Seite)
+   */
+  function fallWallFaults(
+    w: World,
+    cells: readonly (readonly [number, number])[],
+    fall: readonly (readonly [number, number])[],
+  ) {
+    const wrong: string[] = [];
+    const isFall = (x: number, y: number) => !!w.cell(x, y).color && w.cell(x, y).region === 'border';
+    for (const [x, y] of cells)
+      if (w.cell(x, y).region === 'border' && w.cell(x, y).h > KESSEL.fall.h) wrong.push(`Klippe ${x},${y}`);
+    const reach = new Set(reachable(w, [], w.homes.eis.wake[0]!, 200000).map(keyOf));
+    const foot = fall
+      .flatMap(([x, y]) => RING_1.map(([dx, dy]) => [x + dx, y + dy] as const))
+      .filter(([x, y]) => w.cell(x, y).region === 'eis');
+    if (foot.length < 10) wrong.push(`nur ${foot.length} Felder am Fuß`);
+    for (const [x, y] of foot)
+      if (w.cell(x, y).ground !== 'ice' || w.cell(x, y).h !== 1 || !reach.has(`${x},${y}`)) wrong.push(`Fuß ${x},${y}`);
+    const faces = fall.filter(([x, y]) => !isFall(x, y + 1) && w.cell(x, y + 1).h < KESSEL.fall.h).length;
+    if (faces < 6) wrong.push(`nur ${faces} Seiten zur Kamera`);
+    return wrong;
+  }
+
+  it('Eisfall am Talende: glatte Wand aus gefrorenem Wasser in der Mitte des hinteren Endes, so hoch wie die höchsten Klippen, davor ein Becken aus Eis; von der Kamera (Süden) aus zu sehen, gleich wie das Tal läuft; in Sichtweite der Plattform des Eis-Portals (20 Seeds)', () => {
+    for (const seed of VALLEY_SEEDS) {
+      const w = worldOf(seed);
+      const home = w.homes.eis;
+      const { out } = w.gates.get('eis')!;
+      const cells = kesselPlace(seed, EIS_PACK).cells;
+      const along = ([x, y]: readonly number[]) => (x! - home.bed[0]) * out[0] + (y! - home.bed[1]) * out[1];
+      const across = ([x, y]: readonly number[]) => (x! - home.bed[0]) * out[1] - (y! - home.bed[1]) * out[0];
+      const fall = cells.filter(([x, y]) => w.cell(x, y).color && w.cell(x, y).region === 'border');
+      const wrong: string[] = [];
+      if (fall.length < 40) wrong.push(`nur ${fall.length} Felder Eisfall`);
+      const end = Math.max(...w.spotsOf('eis').map(along)); // hinterster Wohnplatz im Tal
+      for (const p of fall) {
+        const c = w.cell(...p);
+        if (c.color !== KESSEL_COLORS.fall || !c.solid || c.deco !== 'rock') wrong.push(`Eisfall ${keyOf(p)}`);
+        if (c.h !== KESSEL.fall.h) wrong.push(`Eisfall ${keyOf(p)} mit Höhe ${c.h}`);
+        if (along(p) < end - 5 || Math.abs(across(p)) > KESSEL.fall.half) wrong.push(`nicht am Talende ${keyOf(p)}`);
+      }
+      wrong.push(...fallWallFaults(w, cells, fall));
+      // nur Klippen sind gefärbt (keine Bodenfelder außer Kristallen und Schollen)
+      for (const [x, y] of cells) {
+        const c = w.cell(x, y);
+        if (c.color && c.region !== 'border' && c.deco !== 'crystal' && c.deco !== 'floe')
+          wrong.push(`Farbe ${x},${y}`);
+      }
+      const gate = w.portals.get('eiskessel')!.gate;
+      const near = Math.min(...fall.map((p) => Math.hypot(p[0] - gate[0], p[1] - gate[1])));
+      if (near > 20) wrong.push(`Plattform ${near.toFixed(1)} Felder vom Eisfall`);
+      expect(wrong, `Seed ${seed}`).toEqual([]);
+    }
   });
 
   it('Eis-Portal: Plattform am Talende und im Ring um das Schneebett: 3 × 3, erreichbar, ringsum frei (24 Seeds)', () => {
@@ -701,9 +842,9 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
       expect(home.shelterStem).toEqual([(x0 + x1) / 2, y0 - 1]);
     });
 
-    it(`Seed ${seed}: Eisloch mit Wasser und erreichbarem Ufer`, () => {
+    it(`Seed ${seed}: Eislöcher mit Wasser und erreichbarem Ufer`, () => {
       const water = kessel.filter(([x, y]) => w.cell(x, y).ground === 'water');
-      expect(water.length).toBeGreaterThanOrEqual(5);
+      expect(water.length).toBeGreaterThanOrEqual(5 * KESSEL.lakes.length);
       const reach = new Set(fromSnowBed([]).map(([x, y]) => `${x},${y}`));
       for (const [x, y] of water) expect(w.realm(x, y)).toBe('eis');
       expect(

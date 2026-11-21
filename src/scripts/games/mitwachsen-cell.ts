@@ -52,6 +52,7 @@ export type Deco =
   | 'shelterpilz' // Stiel des Riesenpilzes auf der Wiese (zeichnet auch den Hut)
   | 'igloo' // feste Rückwand des Iglus (die Mitte zeichnet die Kuppel)
   | 'icebowl' // Futterschale aus Eis auf der Schneewiese
+  | 'floe' // Eisscholle auf einem Eisloch im Gletscherkessel (nur Bild; zeichnet nur das Welt-Paket, solange es lädt: Wasser)
   | 'fishcrate' // Fischkiste im Gletscherkessel: Hineinlaufen fängt Fische ins Netz (fest wie ein Busch)
   | 'klangstein'; // Stein mit schwebender Note: Hineinlaufen spielt die Geschichte des Ortes
 export type TreeKind =
