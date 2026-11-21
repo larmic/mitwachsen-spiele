@@ -30,7 +30,9 @@ export const RULES: Rule[] = [
     // 124,8 KB mit dem Eiszapfen-Glockenspiel (Ereignis `icicle` an den Ton aus dem Paket, Glitzern auch bei reduzierter
     // Bewegung); 124,9 KB nachgemessen; 124,7 KB, seit die Farben der Eis-Dinge und Eiskristalle (`ICE_COLORS`,
     // `ICE_CRYSTALS`) mit dem Welt-Paket kommen und der Kern Eisklippen und Schneebett mit den Farben seiner Böden
-    // zeichnet: Platz für die Torplatte (nur 0,24 KB, die Eisklippe muss ohne Paket zeichnen); dazu 1,3 KB Luft
+    // zeichnet: Platz für die Torplatte (nur 0,24 KB, die Eisklippe muss ohne Paket zeichnen); 123,9 KB, seit der
+    // Inhalt des Menüs (Liste der Welten) mit seinen seltenen Handgriffen erst beim Öffnen nachlädt (mitwachsen-menu.ts)
+    // und der Blick durchs Tor im Nebel-Modul liegt: Platz für die Torplatte; dazu 2,1 KB Luft
     budget: 126 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },

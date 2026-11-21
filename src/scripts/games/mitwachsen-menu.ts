@@ -1,6 +1,10 @@
-// Seltene Handgriffe im Menü für Eltern: Welt löschen mit Rückfrage im Menü selbst (kein Dialog des Browsers) und
-// Welt-Code kopieren. Die Web Component (larmic-mitwachsen.ts) lädt sie erst beim ersten Klick nach.
+// Menü für Eltern, nachgeladen: Inhalt (Liste der Welten mit je einem Knopf zum Wechseln mit Welt- und Figurname und
+// einem zum Löschen, Namen, Welt-Code, Ton) und die seltenen Handgriffe: Welt löschen mit Rückfrage im Menü selbst (kein
+// Dialog des Browsers) und Welt-Code kopieren. Die Klicks fängt die Web Component (larmic-mitwachsen.ts) über
+// `data-world` und `data-delete`; sie lädt dieses Modul erst, wenn sie das Menü füllt oder ein Handgriff kommt.
 // Spezifikation: docs/specs/mitwachsen.md („Was angezeigt wird“: Menü)
+
+import { loadIndex, worldCode, type Index, type SavedWorld, type Store } from './mitwachsen-save';
 
 const ARMED_MS = 4000; // so lange wartet der Knopf auf den zweiten Klick
 
@@ -44,4 +48,39 @@ export async function copyCode(button: HTMLElement, written: Promise<void>, menu
     getSelection()?.addRange(range);
     done('Markiert');
   }
+}
+
+/** Menü füllen: Liste der Welten aus `store` (die gespielte markiert), Namen, Welt-Code und Knopf für den Ton */
+export function renderMenu(menu: HTMLElement, store: Store, saved: SavedWorld, muted: boolean) {
+  const index = loadIndex(store);
+  menu.querySelector('.mw-worlds')!.replaceChildren(...index.worlds.map((w) => worldItem(w, w.id === saved.id)));
+  (menu.querySelector('#mw-world-name') as HTMLInputElement).value = saved.worldName;
+  (menu.querySelector('#mw-figure-name') as HTMLInputElement).value = saved.figureName;
+  menu.querySelector('.mw-code')!.textContent = worldCode(saved.seed);
+  const sound = menu.querySelector('[data-act="sound"]')!;
+  sound.setAttribute('aria-pressed', String(!muted));
+  sound.textContent = muted ? 'Ton ist aus' : 'Ton ist an';
+}
+
+/** Ein Eintrag der Liste; die gespielte Welt (`current`) ist markiert */
+function worldItem(w: Index['worlds'][number], current: boolean): HTMLLIElement {
+  const li = document.createElement('li');
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'mw-world';
+  b.dataset.world = w.id;
+  if (current) b.setAttribute('aria-current', 'true');
+  const name = document.createElement('strong');
+  name.textContent = w.worldName;
+  const fig = document.createElement('span');
+  fig.textContent = w.figureName;
+  b.append(name, fig);
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'mw-link mw-delete';
+  del.dataset.delete = w.id;
+  del.textContent = 'Löschen';
+  del.setAttribute('aria-label', `Welt „${w.worldName}“ löschen`);
+  li.append(b, del);
+  return li;
 }

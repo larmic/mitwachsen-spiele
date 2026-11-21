@@ -97,3 +97,22 @@ export class Fog {
     return n;
   }
 }
+
+/**
+ * Nebel um die Figur bei (x, y) lichten (`REVEAL`). Blick durchs Tor: Steht sie vor einem großen Tor (höchstens 8 Felder
+ * von seiner Mitte), lichtet er sich auch im Gang dahinter. Liefert die Stücke, in denen sich etwas geändert hat.
+ */
+export function lookAround(
+  fog: Fog,
+  gates: Iterable<{ mid: readonly [number, number]; out: readonly [number, number] }>,
+  x: number,
+  y: number,
+) {
+  const changed = fog.reveal(x, y, REVEAL);
+  for (const g of gates) {
+    const [mx, my] = g.mid;
+    if (Math.max(Math.abs(x - mx), Math.abs(y - my)) > 8) continue;
+    for (const k of [4, 9, 14]) changed.push(...fog.reveal(mx + g.out[0] * k, my + g.out[1] * k, 4));
+  }
+  return changed;
+}

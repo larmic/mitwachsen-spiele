@@ -27,13 +27,13 @@ import {
 } from './mitwachsen-save';
 import { FREE_KEYS, InputPace, KEYS, STEP_MS, stops } from './input-pace';
 import { drawMap } from './mitwachsen-map';
-import { Fog, REVEAL, START_REVEAL } from './mitwachsen-fog';
+import { Fog, START_REVEAL, lookAround } from './mitwachsen-fog';
 import { attachPack, initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
 import { reshapes, type ChoreEvent } from './mitwachsen-chores';
 import { createWorld, gatePlaces, standHeight, type World } from './mitwachsen-world';
 import { pending, type GuideRules } from './mitwachsen-guide';
 import { Packs, type LoadedPack } from './mitwachsen-packs';
-import { randomId, randomSeed, renderMenu, savedOrNew, showName } from './mitwachsen-world-list';
+import { randomId, randomSeed, savedOrNew, showName } from './mitwachsen-world-list';
 import { platformLift, portalColor } from './mitwachsen-portal';
 import { HOME_STAGGER, SNAP_DELAY, hopOf, snaps } from './mitwachsen-gait';
 import { windAt } from './mitwachsen-weather';
@@ -221,7 +221,7 @@ class LarmicMitwachsen extends HTMLElement {
     this.nightSince = -Infinity;
     this.dayAt = 0;
     this.renderName();
-    this.renderMenu();
+    if (this.menu.open) void this.renderMenu(); // sonst füllt openMenu es beim Öffnen
   }
 
   private save() {
@@ -335,13 +335,7 @@ class LarmicMitwachsen extends HTMLElement {
     const at = `${x},${y}`;
     if (at === this.seenAt) return;
     this.seenAt = at;
-    const changed = this.fog.reveal(x, y, REVEAL);
-    // Blick durchs Tor: Steht die Figur vor einem großen Tor, lichtet sich der Nebel auch im Gang dahinter
-    for (const g of this.world.gates.values()) {
-      const [mx, my] = g.mid;
-      if (Math.max(Math.abs(x - mx), Math.abs(y - my)) > 8) continue;
-      for (const k of [4, 9, 14]) changed.push(...this.fog.reveal(mx + g.out[0] * k, my + g.out[1] * k, 4));
-    }
+    const changed = lookAround(this.fog, this.world.gates.values(), x, y); // auch durchs Tor in den Gang
     if (changed.length) this.gl3d?.invalidate(changed);
   }
 
@@ -398,7 +392,7 @@ class LarmicMitwachsen extends HTMLElement {
     );
     window.addEventListener('pagehide', () => this.save(), { signal });
 
-    this.querySelector('.mw-gear')!.addEventListener('click', () => this.openMenu(), { signal });
+    this.querySelector('.mw-gear')!.addEventListener('click', () => void this.openMenu(), { signal });
     this.listenTouch(signal);
     // Beim Schließen gibt der Dialog den Fokus ans Zahnrad zurück; die Leertaste öffnete dann sofort wieder das Menü
     this.menu.addEventListener(
@@ -827,19 +821,24 @@ class LarmicMitwachsen extends HTMLElement {
     showName(this.querySelector('.mw-name'), this.saved.figureName);
   }
 
-  private openMenu() {
+  private async openMenu() {
+    if (this.menu.open) return;
     this.pace.clear();
     this.save();
-    this.renderMenu();
     if (this.timer !== undefined) clearInterval(this.timer);
     this.timer = undefined;
+    // Erst füllen, dann zeigen: Beim ersten Öffnen lädt der Inhalt nach, ein leeres Menü soll niemand sehen
+    await this.renderMenu();
+    if (this.menu.open) return; // zweimal schnell aufs Zahnrad
     // Ohne Fokus auf dem Zahnrad gibt der Dialog beim Schließen keinen Fokus dorthin zurück
     (document.activeElement as HTMLElement | null)?.blur();
     this.menu.showModal();
   }
 
-  private renderMenu() {
-    renderMenu(this.menu, loadIndex(this.store), this.saved, this.sfx.muted);
+  /** Menü füllen, nachgeladen mit seinen seltenen Handgriffen (mitwachsen-menu.ts) */
+  private async renderMenu() {
+    const m = await import('./mitwachsen-menu').catch(noop);
+    m?.renderMenu(this.menu, this.store, this.saved, this.sfx.muted);
   }
 
   /** Welt löschen mit Rückfrage im Menü: erster Klick fragt, zweiter löscht (innerhalb von 4 Sekunden) */
@@ -849,7 +848,7 @@ class LarmicMitwachsen extends HTMLElement {
     const index = deleteWorld(this.store, id);
     // Die gespielte Welt ist weg: zur nächsten wechseln oder eine neue anlegen
     if (id === this.saved.id) void this.openWorld(index.current);
-    else this.renderMenu();
+    else void this.renderMenu();
   }
 
   private menuClick(e: Event) {
@@ -891,7 +890,7 @@ class LarmicMitwachsen extends HTMLElement {
         }
         if (this.sfx.muted) this.sfx.suspend();
         else this.sfx.unlock();
-        this.renderMenu();
+        void this.renderMenu();
         break;
       case 'fullscreen':
         this.menu.close();
@@ -915,7 +914,7 @@ class LarmicMitwachsen extends HTMLElement {
     else return;
     this.save();
     this.renderName();
-    this.renderMenu();
+    void this.renderMenu();
   }
 }
 

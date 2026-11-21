@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHUNK } from '../../lib/games/chunks';
-import { Fog } from './mitwachsen-fog';
+import { Fog, REVEAL, lookAround } from './mitwachsen-fog';
 
 describe('Nebel', () => {
   it('ist am Anfang überall', () => {
@@ -59,5 +59,16 @@ describe('Nebel', () => {
     expect(Object.keys(fog.serialize()).sort()).toEqual(['-1,-1', '-1,0', '0,-1', '0,0']);
     fog.forget((x, y) => x === 0 && y === 0); // nur ein Feld
     expect([fog.has(0, 0), fog.has(1, 0)]).toEqual([false, true]);
+  });
+
+  it('Blick durchs Tor: vor einem großen Tor lichtet er sich auch im Gang dahinter, weiter weg nicht', () => {
+    const gate = { mid: [0, -20] as const, out: [0, -1] as const }; // Tor im Norden, der Gang führt nach oben
+    const near = new Fog();
+    expect(lookAround(near, [gate], 0, -14).length).toBeGreaterThan(0);
+    expect([near.has(0, -14 - REVEAL), near.has(0, -34), near.has(0, -36)]).toEqual([true, true, true]);
+    const far = new Fog();
+    lookAround(far, [gate], 0, -11); // 9 Felder vor der Tormitte: nur rund um die Figur
+    expect([far.has(0, -11 - REVEAL), far.has(0, -34)]).toEqual([true, false]);
+    expect(lookAround(far, [gate], 0, -11)).toEqual([]); // nichts Neues
   });
 });

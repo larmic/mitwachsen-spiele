@@ -1,18 +1,8 @@
-// Liste der Welten im Menü für Eltern (DOM): je Welt ein Knopf zum Wechseln mit Welt- und Figurname und ein Knopf zum
-// Löschen. Die Klicks fängt die Web Component (larmic-mitwachsen.ts) über `data-world` und `data-delete`. Dazu der Name
-// der Figur im Kopf und neue Welten (Seed und Kennung aus dem Zufall des Browsers).
+// Welten des Spiels im Browser (DOM): Spielstand einer Welt oder eine neue (Seed und Kennung aus dem Zufall des
+// Browsers) und der Name der Figur im Kopf. Die Liste der Welten im Menü füllt mitwachsen-menu.ts (nachgeladen).
 // Spezifikation: docs/specs/mitwachsen.md („Was angezeigt wird“: Menü)
 
-import {
-  DEFAULT_FIGURE,
-  loadIndex,
-  loadWorld,
-  newWorld,
-  type Index,
-  type SavedWorld,
-  type Store,
-  worldCode,
-} from './mitwachsen-save';
+import { DEFAULT_FIGURE, loadIndex, loadWorld, newWorld, type SavedWorld, type Store } from './mitwachsen-save';
 
 export const randomSeed = () => crypto.getRandomValues(new Uint32Array(1))[0]!;
 export const randomId = () => randomSeed().toString(36) + Date.now().toString(36);
@@ -40,38 +30,4 @@ export function showName(tag: Element | null, name: string) {
       }),
   );
   tag.setAttribute('aria-label', name);
-}
-
-/** Menü füllen: Liste der Welten (die gespielte markiert), Namen, Welt-Code und Knopf für den Ton */
-export function renderMenu(menu: HTMLElement, index: Index, saved: SavedWorld, muted: boolean) {
-  menu.querySelector('.mw-worlds')!.replaceChildren(...index.worlds.map((w) => worldItem(w, w.id === saved.id)));
-  (menu.querySelector('#mw-world-name') as HTMLInputElement).value = saved.worldName;
-  (menu.querySelector('#mw-figure-name') as HTMLInputElement).value = saved.figureName;
-  menu.querySelector('.mw-code')!.textContent = worldCode(saved.seed);
-  const sound = menu.querySelector('[data-act="sound"]')!;
-  sound.setAttribute('aria-pressed', String(!muted));
-  sound.textContent = muted ? 'Ton ist aus' : 'Ton ist an';
-}
-
-/** Ein Eintrag der Liste; die gespielte Welt (`current`) ist markiert */
-export function worldItem(w: Index['worlds'][number], current: boolean): HTMLLIElement {
-  const li = document.createElement('li');
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'mw-world';
-  b.dataset.world = w.id;
-  if (current) b.setAttribute('aria-current', 'true');
-  const name = document.createElement('strong');
-  name.textContent = w.worldName;
-  const fig = document.createElement('span');
-  fig.textContent = w.figureName;
-  b.append(name, fig);
-  const del = document.createElement('button');
-  del.type = 'button';
-  del.className = 'mw-link mw-delete';
-  del.dataset.delete = w.id;
-  del.textContent = 'Löschen';
-  del.setAttribute('aria-label', `Welt „${w.worldName}“ löschen`);
-  li.append(b, del);
-  return li;
 }
