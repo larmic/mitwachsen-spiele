@@ -179,6 +179,22 @@ describe('Ruhiger Takt der Eingabe', () => {
     expect(steps(pace, 2000, 1000).length).toBeGreaterThan(0);
   });
 
+  it('held: solange ein Pfeil gedrückt ist, steht die Figur nicht (Torplatte)', () => {
+    const pace = new InputPace();
+    expect(pace.held()).toBe(false);
+    expect(pace.press('e', 0)).toBe('e');
+    expect(pace.held()).toBe(true); // gehalten, auch in der Wartezeit bis HOLD_MS
+    pace.release('e');
+    expect(pace.held()).toBe(false);
+    expect(pace.press('e', 100)).toBeNull(); // Tipp im Takt gemerkt: kommt nach weniger als 260 ms dran
+    pace.release('e');
+    expect(pace.held()).toBe(false);
+    expect(pace.poll(STEP_MS)).toBe('e');
+    pace.press('w', 1000);
+    pace.clear();
+    expect(pace.held()).toBe(false);
+  });
+
   it('Aktionen zählen höchstens im eigenen Takt', () => {
     const pace = new InputPace();
     expect(pace.action(0)).toBe(true);

@@ -55,7 +55,8 @@ export function drawPlatform(
 /**
  * Ein Feld (x, y) der Torplatte vor dem Tor `id` auf Höhe h: Teil eines flachen, ovalen Steins aus Voxeln (einer dick),
  * Rand in der Farbe der Welt; `look`: Schmuck aus dem Welt-Paket (Eis: Scholle mit Schneeflocke). Steht die Figur
- * darauf (`fx`), ist er eingesunken (`plateSink`) und der Rand leuchtet heller.
+ * darauf (`fx`), ist er eingesunken (`plateSink`) und der Rand leuchtet heller; `gold` (0 … 1): so golden ist der
+ * Rand, solange der Pinguin zu diesem Tor führt (pulsierend, `plateGold`).
  */
 export function drawPlate(
   ctx: CanvasRenderingContext2D,
@@ -69,13 +70,14 @@ export function drawPlate(
   now: number,
   reduced: boolean,
   look?: PlateLook,
+  gold = 0,
 ) {
   const g = world.gates.get(id)!; // die Platte liegt vor ihrem Tor
   const [mx, my] = plateMid(g);
   const along = g.out[1] !== 0; // Tor im Norden oder Süden: Die Platte liegt entlang x, sonst entlang y
   const i = ((along ? x - mx : y - my) + PLATE_HALF) * PLATE_VOX; // erstes Voxel dieses Felds entlang der Platte
   const z = h - plateSink(fx, id, now, reduced);
-  const rim = mix(THEME_COLORS[id].portal, '#ffffff', fx?.id === id && fx.on ? 0.5 : 0);
+  const rim = mix(mix(THEME_COLORS[id].portal, GOLD.top, gold), '#ffffff', fx?.id === id && fx.on ? 0.5 : 0);
   const [side, top] = look?.face ?? PLATE_STONE;
   const s = 1 / PLATE_VOX;
   // von hinten nach vorn, je Voxel ein Quader

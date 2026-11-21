@@ -110,7 +110,10 @@ describe('Aufwachen und Schlafen', () => {
     for (let i = 0; i < SLEEP_LOCK - 1; i++) s = run(s, world, TICK, 'e', ACT).s;
     expect(s.sleeping).toBe(true);
     s = run(s, world, TICK, TICK).s;
-    expect(run(s, world, ACT).s.sleeping).toBe(false);
+    expect(s.still).toBeGreaterThan(0);
+    const woke = run(s, world, ACT).s;
+    expect(woke.sleeping).toBe(false);
+    expect(woke.still).toBe(0); // aus dem Bett auf ein neues Feld: Die Stehzeit (Torplatte) beginnt neu
   });
 
   it('läuft ins Bett und schläft ein, ganz ohne Aktionstaste', () => {
@@ -150,6 +153,30 @@ describe('Laufen und Klettern', () => {
     const { s, events } = run(awake(w, 0, 0), w, 'e', 's', 's', 'w');
     expect([s.player.x, s.player.y, s.player.dir]).toEqual([0, 2, 'w']);
     expect(types(events)).toEqual(['step', 'step', 'step', 'step']);
+  });
+
+  it('Stehzähler (Torplatte): zählt die Takte ohne Eingabe auf demselben Feld, jede Eingabe setzt ihn auf 0; nie gespeichert', () => {
+    const w = fakeWorld({ '1,0': { h: 4 } });
+    expect(initialState(w).still).toBe(0);
+    let r = run(awake(w, 0, 0), w, TICK, TICK, TICK);
+    expect(r.s.still).toBe(3);
+    r = run(r.s, w, 'e'); // gegen die Wand: kein Schritt, aber ein Pfeil – das ist kein Stehen
+    expect(types(r.events)).toEqual(['bump']);
+    expect(r.s.still).toBe(0);
+    r = run(r.s, w, TICK, ACT); // Aktion ebenso
+    expect(r.s.still).toBe(0);
+    r = run(r.s, w, TICK, 's');
+    expect(r.s.still).toBe(0);
+    r = run(r.s, w, TICK, TICK);
+    expect(r.s.still).toBe(2);
+    r = run(r.s, w, { type: 'tick', held: true }); // Pfeil gedrückt: Die Figur läuft gleich weiter, das ist kein Stehen
+    expect(r.s.still).toBe(0);
+    r = run(r.s, w, TICK, TICK);
+    expect(r.s.still).toBe(2);
+    expect('still' in progressOf(r.s)).toBe(false); // flüchtig wie das Ritual
+    const file = JSON.parse(JSON.stringify(withProgress(newWorld('a', 1, 'Welt'), progressOf(r.s)))) as SavedWorld;
+    expect(Object.keys(file)).not.toContain('still');
+    expect(initialState(w, progressFrom(file)).still).toBe(0);
   });
 
   it('klettert eine Stufe hoch und runter, zwei Stufen sind eine Wand', () => {

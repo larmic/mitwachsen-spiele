@@ -38,16 +38,14 @@ export type GateCtx = {
 
 /**
  * Teile eines Zugangs aus dem Welt-Paket seiner Welt (worlds/<welt>/view-3d.ts, mit ihm nachgeladen): die Türflügel
- * (`door`, mit Zeichen oder Umriss des verlaufenen Tiers, bis `lit` gefüllt), die Farbe eines Eiszapfens bei `x` und
- * die goldene Bucht vor dem Tor, solange das Tier die Figur dorthin führt (`bay`, `rise(u, t)` Höhe je Feld der Bucht
- * gegenüber der Tormitte), dazu der Schmuck der Torplatte (`plate`: Farbe der Fläche und eingelegtes Zeichen, Zeilen
- * quer zur Platte; mitwachsen-plate-3d.ts). Bis das Paket da ist, baut der Zugang schlicht (Tür ohne Beschläge,
+ * (`door`, mit Zeichen oder Umriss des verlaufenen Tiers, bis `lit` gefüllt), die Farbe eines Eiszapfens bei `x`,
+ * dazu der Schmuck der Torplatte (`plate`: Farbe der Fläche und eingelegtes Zeichen, Zeilen quer zur Platte;
+ * mitwachsen-plate-3d.ts; ihren goldenen Rand, solange das Tier die Figur dorthin führt, legt die 3D-Ansicht an). Bis das Paket da ist, baut der Zugang schlicht (Tür ohne Beschläge,
  * Eiszapfen ohne Leuchten, Platte aus Stein).
  */
 export type GateLook = {
   door: (open: number, outline: boolean, lit: number) => Wing[];
   icicle: (x: number, lit: number) => string;
-  bay: (p: Parts, rise?: (u: number, t: number) => number) => void;
   plate?: PlateLook;
 };
 /** Bauplan eines Zugangs: legt Geometrie in `p` an und liefert Türflügel, falls er welche hat */

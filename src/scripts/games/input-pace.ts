@@ -113,6 +113,14 @@ export class InputPace {
     return dir;
   }
 
+  /**
+   * Ein Pfeil ist gedrückt: Die Figur läuft gleich weiter, sie steht nicht (Torplatte). Ein gemerkter Tipp zählt nicht
+   * extra: Er kam keinen Schritt-Takt (260 ms) nach dem letzten Schritt, so kurz reicht nie zum Öffnen (0,4 s)
+   */
+  held(): boolean {
+    return !!this.down.length;
+  }
+
   /** Aktion (Leertaste o. a.): true, wenn sie zählt */
   action(now: number): boolean {
     if (now - this.lastAction < ACTION_MS) return false;

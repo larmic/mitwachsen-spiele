@@ -11,6 +11,7 @@ import { hash } from '../../../../lib/games/rng';
 import type { Cell } from '../../mitwachsen-cell';
 import type { WorldRules } from '../../mitwachsen-pack-types';
 import type { Wild } from './mitwachsen-frost';
+import { key } from './mitwachsen-flood';
 
 /** So viele Eiszapfen hängen höchstens bzw. mindestens in der Reihe (die Tonleiter hat sieben Töne) */
 export const CHIME = { most: 7, least: 5 } as const;
@@ -19,8 +20,6 @@ export const CHIME = { most: 7, least: 5 } as const;
 export const LIP = 1.6;
 /** Höhe der Eiskante über dem Feld vor der Klippe `back` */
 export const lipOf = (back: Cell, c: Cell) => Math.min(back.h - c.h, LIP);
-
-const key = (x: number, y: number) => `${x},${y}`;
 
 /** Blanker Schnee im Tal: kein Ding darauf, keine Spur, keine Plattform, keine Wiese */
 const bare = (c: Cell | undefined): c is Cell =>

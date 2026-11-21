@@ -73,6 +73,7 @@ export type State = Omit<Progress, 'position'> & {
   calm: number; // Tag, an dem der Pinguin auf die Schneewiese gezogen ist: an ihm weht kein Pustewind (nicht gespeichert)
   guideDue: number; // verlaufener Pinguin: Takt, ab dem er auftaucht bzw. aufgetaucht ist (nicht gespeichert, mitwachsen-guide.ts)
   ritual: number; // Takt, an dem das Eistor mit dem Pinguin aufging (-1: noch nicht; nicht gespeichert, worlds/eis/mitwachsen-ritual.ts)
+  still: number; // Takte, die die Figur auf demselben Feld steht: jeder Schritt setzt ihn auf 0 (nicht gespeichert; Torplatte)
   held?: readonly [number, number]; // gespeicherte Position, solange ein Welt-Paket fehlt: bleibt im Spielstand (Abschnitt „Welt-Pakete“)
 };
 
@@ -93,7 +94,7 @@ export type Progress = {
 export type Step = { state: State; events: GameEvent[] };
 type Explored = (x: number, y: number) => boolean;
 const EVERYWHERE: Explored = () => true;
-export type Cmd = { type: 'move'; dir: Dir } | { type: 'action' } | { type: 'tick' };
+export type Cmd = { type: 'move'; dir: Dir } | { type: 'action' } | { type: 'tick'; held?: boolean }; // held: Pfeil unten
 export type GameEvent =
   | { type: 'step'; climb: number }
   | { type: 'bump' }
@@ -178,6 +179,7 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     calm: -1,
     guideDue: -1,
     ritual: -1,
+    still: 0,
     packs: { ...saved.packs }, // auch ohne Paket bleibt sein Zustand, wie er ist
   };
   // Fehlt das Paket der Welt, zu der die Position gehört, wüsste die Welt nicht, ob die Figur dort war: Position behalten
@@ -274,6 +276,9 @@ export function step(
     picked: { ...state.picked },
   };
   const events: GameEvent[] = [];
+  // Stehzeit (Torplatte): Es zählen nur Takte ohne gedrückten Pfeil; jede Eingabe setzt sie auf 0, und nur Eingaben
+  // versetzen die Figur (Schritt, Reise, Bett), Takte nie
+  s.still = cmd.type === 'tick' && !cmd.held ? s.still + 1 : 0;
   if (cmd.type === 'tick') tick(s, world, events);
   else if (s.sleeping) wake(s, world, events);
   else if (cmd.type === 'move' && !guide?.hold(s, events)) {
@@ -512,9 +517,7 @@ function sleep(s: State, world: World, events: GameEvent[]) {
   }
   s.followers = [];
   s.arrived = null;
-  s.player.x = bx;
-  s.player.y = by;
-  s.player.dir = 's';
+  s.player = { x: bx, y: by, dir: 's' };
   events.push({ type: 'sleep' });
 }
 
@@ -528,9 +531,7 @@ function wake(s: State, world: World, events: GameEvent[]) {
   s.sleeping = false;
   s.wokeAt = s.tick;
   s.dayStart = s.tick; // ein neuer Morgen: Das Wetter des Tages beginnt von vorn (mit Sonne)
-  s.player.x = spot[0];
-  s.player.y = spot[1];
-  s.player.dir = 's';
+  s.player = { x: spot[0], y: spot[1], dir: 's' };
   scatter(s, world, () => random(s)); // ein neuer Morgen: Die verlorenen Tiere sind woanders unterwegs
   events.push({ type: 'wake' });
 }

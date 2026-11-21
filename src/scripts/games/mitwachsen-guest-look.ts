@@ -1,5 +1,5 @@
 // Der verlaufene Pinguin am Tor, solange er die Figur dorthin führt (mitwachsen-guide.ts): sein Umriss mit Goldrahmen
-// auf der Tür und die golden markierte Bucht davor. Geht das Eistor mit ihm auf, füllt sich der Umriss mit seinen Farben,
+// auf der Tür und der golden pulsierende Rand der Torplatte davor (`plateGold`, in 2D und 3D). Geht das Eistor mit ihm auf, füllt sich der Umriss mit seinen Farben,
 // die Eiszapfen leuchten (`ritualGlow`), und es erklingen Eiszapfen-Lied, Rumms und Akkord (`gateScore`). Den Umriss
 // bauen 2D (hier) und 3D (mitwachsen-gatehouse.ts) aus denselben Pixeln. Die 2D-Ansicht lädt dieses Bild mit dem Wetter
 // der Eis-Welt erst nach, wenn er da ist (mitwachsen-ice-sky.ts), nie mit der Spielseite.
@@ -9,7 +9,7 @@ import { box, type Projection } from '../../lib/games/front';
 import type { GateId } from '../../data/games/mitwachsen';
 import { GOLD } from '../../data/games/mitwachsen-portals';
 import { STORIES } from '../../data/games/mitwachsen-stories';
-import { RITUAL, bay, guideGate, opening } from './mitwachsen-guide';
+import { RITUAL, guideGate, opening } from './mitwachsen-guide';
 import type { Scored } from './sfx';
 import type { World } from './mitwachsen-world';
 
@@ -30,22 +30,23 @@ export const GUEST_OUTLINE = [
   'g..oo..oo..g',
   'gggggggggggg',
 ];
-/** Geht das Eistor auf, füllt sich der Umriss mit den Farben des Pinguins: k schwarz, w weiß, y orange */
+/**
+ * Geht das Eistor auf, füllt sich der Umriss mit den Farben des Pinguins: k schwarz, w weiß, y orange (innen, ohne den
+ * Goldrahmen: der bleibt wie im Umriss)
+ */
 export const GUEST_FILLED = [
-  'gggggggggggg',
-  'g...kkkk...g',
-  'g..kkkkkk..g',
-  'g..kwkkwk..g',
-  'g..kkyykk..g',
-  'g.kkwwwwkk.g',
-  'gkkwwwwwwkkg',
-  'gkkwwwwwwkkg',
-  'g.kwwwwwwk.g',
-  'g.kwwwwwwk.g',
-  'g..kwwwwk..g',
-  'g...kkkk...g',
-  'g..yy..yy..g',
-  'gggggggggggg',
+  '...kkkk...',
+  '..kkkkkk..',
+  '..kwkkwk..',
+  '..kkyykk..',
+  '.kkwwwwkk.',
+  'kkwwwwwwkk',
+  'kkwwwwwwkk',
+  '.kwwwwwwk.',
+  '.kwwwwwwk.',
+  '..kwwwwk..',
+  '...kkkk...',
+  '..yy..yy..',
 ];
 export const GUEST_COLORS = {
   g: { side: GOLD.side, top: GOLD.top },
@@ -67,17 +68,26 @@ export const ritualGlow = (s: { tick: number; ritual: number }) =>
 /** Farbe eines Pixels des Umrisses (Zeile `r`, Spalte `c`): Bis `lit` (0 … 1) sind die Zeilen von unten gefüllt */
 export function guestPixel(r: number, c: number, lit: number) {
   const filled = lit > 0 && GUEST_OUTLINE.length - r <= lit * GUEST_OUTLINE.length;
-  const ch = (filled ? GUEST_FILLED : GUEST_OUTLINE)[r]?.[c];
+  const ch = filled ? (GUEST_FILLED[r - 1]?.[c - 1] ?? 'g') : GUEST_OUTLINE[r]?.[c]; // außen herum der Goldrahmen
   return GUEST_COLORS[ch as keyof typeof GUEST_COLORS] as (typeof GUEST_COLORS)['g'] | undefined;
 }
 export const GUEST_PX = 0.2; // ein Pixel des Umrisses (Felder)
 export const GUEST_Y = 1.0; // Unterkante über dem Boden (in 3D zwischen den Eisenbändern, nirgends bündig mit ihnen)
 
-/** Was die 2D-Ansicht am Tor zeichnet, solange der Pinguin führt: Umriss auf seiner Tür, goldener Rand der Bucht */
+/** So lange dauert ein Puls des goldenen Rands der Torplatte (ms) */
+export const PULSE_MS = 1200;
+/** Wie golden der Rand der Torplatte gerade ist (0 … 1): pulsiert weich, bei reduzierter Bewegung ganz golden */
+export const plateGold = (now: number, reduced: boolean) =>
+  reduced ? 1 : 0.5 - 0.5 * Math.cos((2 * Math.PI * now) / PULSE_MS);
+
+/**
+ * Was die 2D-Ansicht am Tor zeichnet, solange der Pinguin führt: Umriss auf seiner Tür; `rim`: wie golden der Rand der
+ * Torplatte vor dem Tor `id` ist (pulsierend, solange das Tor zu ist; sonst 0)
+ */
 export type Guest = {
   gate: GateId;
   outline: (ctx: CanvasRenderingContext2D, P: Projection, cx: number, front: number, h: number) => void;
-  mark(ctx: CanvasRenderingContext2D, P: Projection, x: number, y: number, h: number): void; // auf jedem Feld der Bucht
+  rim(id: GateId, now: number, reduced: boolean): number;
 };
 
 const guests = new WeakMap<object, Guest | null>();
@@ -85,34 +95,16 @@ const guests = new WeakMap<object, Guest | null>();
 export function guestAt(world: World, state: Parameters<typeof guideGate>[0]): Guest | null {
   if (guests.has(state)) return guests.get(state)!;
   const gate = guideGate(state);
-  const g = gate && world.gates.get(gate);
-  const set = g ? new Set(bay(g).map(([x, y]) => `${x},${y}`)) : null;
   const guest: Guest | null =
-    gate && set
+    gate && world.gates.has(gate)
       ? {
           gate,
           outline: (ctx, P, cx, front, h) => doorOutline(ctx, P, cx, front, h, ritualGlow(state)),
-          mark: (ctx, P, x, y, h) => set.has(`${x},${y}`) && bayMark(ctx, P, set, x, y, h),
+          rim: (id, now, reduced) => (id === gate && !state.openGates.includes(gate) ? plateGold(now, reduced) : 0),
         }
       : null;
   guests.set(state, guest);
   return guest;
-}
-
-/** Goldener Rand der Bucht auf dem Feld (x, y): an jeder Seite, an der die Bucht endet, ein schmaler Streifen */
-export function bayMark(
-  ctx: CanvasRenderingContext2D,
-  P: Projection,
-  set: ReadonlySet<string>,
-  x: number,
-  y: number,
-  h: number,
-) {
-  const edge = (dx: number, dy: number) => !set.has(`${x + dx},${y + dy}`);
-  if (edge(0, -1)) box(ctx, P, x, y, h, 1, 0.1, 0.04, GOLD.side, GOLD.top);
-  if (edge(-1, 0)) box(ctx, P, x, y, h, 0.1, 1, 0.04, GOLD.side, GOLD.top);
-  if (edge(1, 0)) box(ctx, P, x + 0.9, y, h, 0.1, 1, 0.04, GOLD.side, GOLD.top);
-  if (edge(0, 1)) box(ctx, P, x, y + 0.9, h, 1, 0.1, 0.04, GOLD.side, GOLD.top);
 }
 
 /**

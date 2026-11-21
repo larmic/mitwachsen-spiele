@@ -506,19 +506,20 @@ export class World3D {
     const lit = ritualGlow(state); // das Eistor geht auf: Eiszapfen und Umriss leuchten
     // Öffnung in Zehnteln: Beim Aufschwingen werden die Torhäuser höchstens zehnmal neu gebaut, nicht in jedem Bild
     const open = (id: GateId) => Math.round((sc.gates.get(id) ?? 0) * 10) / 10;
-    const key = `${guest}|${lit}|${[...sc.gates.keys()].map((id) => `${id}:${open(id)}`).join()}`;
+    const shut = !!guest && !state.openGates.includes(guest); // Goldrand der Platte, bis das Tor aufgeht (wie in 2D)
+    const key = `${guest}|${shut}|${lit}|${[...sc.gates.keys()].map((id) => `${id}:${open(id)}`).join()}`;
     if (key === this.gatesKey) return;
     this.gatesKey = key;
-    this.buildGates(world, open, guest, lit);
+    this.buildGates(world, open, guest, lit, shut);
   }
 
   /**
    * Die großen Tore: mächtige Torhäuser im Felsring, je Welt geschmückt, zur Lichtung schauend. `open` sagt je Tor, wie
    * weit die Tür offen ist (die Flügel stehen an ihrer Angel und sind gedreht); am Tor `guest` (dorthin führt der
-   * verlaufene Pinguin) steht sein Umriss auf der Tür, und die Bucht davor ist golden markiert. Geht das Eistor mit ihm
-   * auf, leuchten bis `lit` seine Eiszapfen, und der Umriss füllt sich mit den Farben des Pinguins.
+   * verlaufene Pinguin) steht sein Umriss auf der Tür, und der Rand der Torplatte davor pulsiert golden, solange es zu
+   * ist (`shut`). Geht das Eistor mit ihm auf, leuchten bis `lit` seine Eiszapfen, und der Umriss füllt sich mit den Farben des Pinguins.
    */
-  private buildGates(world: World, open: (id: GateId) => number = () => 0, guest: GateId | null = null, lit = 0) {
+  private buildGates(world: World, open: (id: GateId) => number, guest: GateId | null, lit: number, shut: boolean) {
     this.clear(this.gateGroup);
     this.moving.clear();
     for (const g of world.gates.values()) {
@@ -527,11 +528,8 @@ export class World3D {
       const look = this.views.look(g.id); // aus dem Welt-Paket hinter dem Tor
       // Richtung zur Kamera (sie steht immer im Süden) in Torhaus-Koordinaten: danach richtet sich das Schild
       const wings = gate(p, g.id, open(g.id), g.id === guest, g.id === GUIDE_GATE ? lit : 0, [-fx || 0, fy || 0], look);
-      const h = world.cell(mx, my).h;
-      // Goldrand der Bucht je Feld auf dessen Höhe: u entlang des Tors (die x-Achse des Torhauses), t Reihen davor
-      if (g.id === guest) look?.bay(p, (u, t) => world.cell(mx + u * fy + t * fx, my - u * fx + t * fy).h - h);
-      const group = this.place(new Group(), mx, my, h, [fx, fy]);
-      group.add(...this.meshes(p), this.platforms.plates.of(g.id, look?.plate)); // Torhaus und Torplatte davor
+      const group = this.place(new Group(), mx, my, world.cell(mx, my).h, [fx, fy]);
+      group.add(...this.meshes(p), this.platforms.plates.of(g.id, look?.plate, g.id === guest && shut)); // Torhaus und Torplatte davor
       if (moves(g.id)) group.add(this.moving.add(g.id, [mx + 0.5, my + 0.5], open(g.id), [-fx || 0, fy || 0]));
       for (const w of wings) {
         const wing = new Group();

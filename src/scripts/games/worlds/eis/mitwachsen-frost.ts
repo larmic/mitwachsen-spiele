@@ -10,8 +10,7 @@
 import { cycle, hash, rand01 } from '../../../../lib/games/rng';
 import { ICE_CRYSTALS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import type { Cell } from '../../mitwachsen-cell';
-
-const key = (x: number, y: number) => `${x},${y}`;
+import { key } from './mitwachsen-flood';
 
 /**
  * Kristalle im Kessel: so viele Gruppen (höchstens), mindestens so viele Felder zwischen ihren Mitten, je Gruppe 2 bis

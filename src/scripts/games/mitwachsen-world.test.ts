@@ -30,7 +30,7 @@ import { wildAnimals } from './mitwachsen-wild';
 import { homeAt } from './mitwachsen-home';
 import { APRON } from './mitwachsen-apron';
 import { PLATE_HALF, plateMid } from './mitwachsen-plate';
-import { bay } from './mitwachsen-guide';
+import { BESIDE, bay, inBay, plateRow } from './worlds/eis/mitwachsen-bay';
 import { EIS_PACK, PACKS, worldOf } from './test-worlds';
 
 /** Alle Felder, die von `start` aus zu Fuß erreichbar sind (bis `limit` Felder) */
@@ -226,6 +226,14 @@ describe('Start auf der Lichtung', () => {
           [0, -1],
         ] as const)
           expect(w.cell(...at(u, t)).plate, `${g.id} neben der Platte`).toBeUndefined();
+        // der Platz des führenden Pinguins neben der Platte (Eistor; dort beginnt sein Weg zum Tor, mitwachsen-lead.ts):
+        // in der Bucht, eben, erreichbar, kein Portal, kein Warteplatz – sonst fände er nie hin, und das Kind säße fest
+        const side = plateRow(place, BESIDE);
+        const c = w.cell(...side);
+        expect(
+          [inBay(place, ...side), standHeight(w, [], ...side), reach.has(key(side)), seats.has(key(side)), !!c.portal],
+          `${g.id} Platz neben der Platte`,
+        ).toEqual([true, 1, true, false, false]);
       }
     });
 

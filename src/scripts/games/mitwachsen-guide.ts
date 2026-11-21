@@ -1,8 +1,9 @@
 // Der verlaufene Pinguin holt die Figur ab – rein, ohne DOM: Hat das Eistor seinen Schlüssel (den Pinguin) und ist die
-// Leiste der Lichtung voll (je Art ein Tier auf der Wiese), taucht er am Bett neben der Figur auf und führt sie zur Bucht vor dem Eistor; dort geht
-// es mit ihm auf (die Regeln dazu im Welt-Paket der Eis-Welt: worlds/eis/mitwachsen-lead.ts und mitwachsen-ritual.ts). Hier steht, was immer gebraucht
-// wird: wann er fällig ist, dass er solange nicht im Kessel wohnt, ob er gerade führt, ob das Tor gerade aufgeht und wo
-// die Bucht liegt. Nichts davon wird gespeichert: Ob er da ist, folgt aus dem Spielstand. Teil der Regeln
+// Leiste der Lichtung voll (je Art ein Tier auf der Wiese), taucht er am Bett neben der Figur auf und führt sie zur Bucht vor dem Eistor; dort
+// stellt er sich neben die Torplatte, und steht die Figur darauf, geht es mit ihm auf (die Regeln dazu im Welt-Paket der
+// Eis-Welt: worlds/eis/mitwachsen-lead.ts, mitwachsen-bay.ts und mitwachsen-ritual.ts). Hier steht, was immer gebraucht
+// wird: wann er fällig ist, dass er solange nicht im Kessel wohnt, ob er gerade führt und ob das Tor gerade aufgeht
+// (wo die Bucht liegt, weiß nur das Welt-Paket: worlds/eis/mitwachsen-bay.ts). Nichts davon wird gespeichert: Ob er da ist, folgt aus dem Spielstand. Teil der Regeln
 // (mitwachsen-state.ts) und der Ansicht.
 // Spezifikation: docs/specs/mitwachsen.md („Der Pinguin holt dich ab“)
 
@@ -19,7 +20,7 @@ import {
 import type { Mode } from './mitwachsen-border';
 import type { Crowd } from './mitwachsen-free';
 import { PENGUIN, type Home } from './mitwachsen-meadow';
-import type { GatePlace, World } from './mitwachsen-world';
+import type { World } from './mitwachsen-world';
 
 export const GUIDE = PENGUIN; // der verlaufene Pinguin
 export const GUIDE_GATE: GateId = 'eis'; // sein Tor: Er ist der Schlüssel
@@ -32,7 +33,6 @@ export const PEEP_EVERY = 40; // höchstens so oft piept er (4 s), damit es nich
 // Takte je Schritt, beim Ankommen, Führen und Einholen: etwas schneller als die Figur mit gehaltener Taste (ein Schritt
 // alle 260 ms), damit sie ihm folgen kann, ohne in ihn hineinzulaufen, und er sie einholt
 export const PACE = { lead: 2, chase: 2 };
-const BAY_DEPTH = 3; // die Bucht reicht so viele Reihen vor die Tür
 // Das Eistor geht auf (worlds/eis/mitwachsen-ritual.ts): So viele Takte nach dem Öffnen rutscht der Pinguin durch den Gang hinter
 // das Tor (2,4 s); so lange dauert das Ritual, in dem jeder Pfeil die Figur nur hüpfen lässt (3 s)
 export const SLIDE = 24;
@@ -42,6 +42,7 @@ export type GuideEvent =
   | { type: 'guide'; id: string; species: SpeciesId; x: number; y: number } // taucht neben der Figur auf
   | { type: 'arrive'; id: string; species: SpeciesId } // ist zur Figur gewatschelt: hüpft und zeigt ein Herz
   | { type: 'peep'; id: string; species: SpeciesId } // dreht sich zur Figur und piept
+  | { type: 'bob'; id: string } // hüpft still (neben der Torplatte, alle 2 s)
   | { type: 'slide'; id: string; species: SpeciesId } // rutscht durch den Gang bzw. voraus zum Schneebett
   | { type: 'breath'; x: number; y: number } // ein kalter Atemzug weht aus dem offenen Eistor Schnee auf die Lichtung
   | { type: 'hop' }; // die Figur hüpft, solange das Eistor aufgeht
@@ -62,12 +63,14 @@ export type Guided = Omit<Crowd, 'player' | 'animals' | 'openGates'> & {
     realm: RegionId;
     spawn: Point;
     rest: number; // beim führenden Pinguin: Takte bis zum nächsten Piep
+    wait?: number; // beim führenden Pinguin: Takte, die er mit der Figur in der Bucht wartet (nicht gespeichert)
   }[];
   garden: { id: string; species: SpeciesId }[];
   followers: string[];
   day: number;
   calm: number; // Tag, an dem der Pinguin eingezogen ist: an ihm kein Pustewind
   ritual: number; // Takt, an dem das Eistor mit ihm aufging (-1: noch nicht)
+  still: number; // Takte, die die Figur schon auf demselben Feld steht (jeder Schritt: 0; nicht gespeichert)
   // Takt, ab dem er auftaucht; ist er da, der Takt seines Auftauchens, solange er erst zur Figur watschelt (-1: weder
   // fällig noch unterwegs zur Figur; nicht gespeichert)
   guideDue: number;
@@ -123,14 +126,7 @@ export const opening = (s: { tick: number; ritual: number }, span = RITUAL) =>
 type Shown = { animals: readonly { mode: Mode }[]; openGates: readonly GateId[]; tick: number; ritual: number };
 /**
  * Tor, zu dem er führt, solange er da ist und das Tor zu ist oder gerade aufgeht, bis er hindurchrutscht (für die
- * Ansicht: Umriss auf der Tür, goldene Bucht, Gast-Platz auf der Leiste, Pfeil der Karte)
+ * Ansicht: Umriss auf der Tür, goldener Rand der Torplatte, Gast-Platz auf der Leiste, Pfeil der Karte)
  */
 export const guideGate = (s: Shown): GateId | null =>
   leader(s) && (!s.openGates.includes(GUIDE_GATE) || opening(s, SLIDE)) ? GUIDE_GATE : null;
-
-/** Bucht vor der Tür eines Tors: so breit wie die Tür, `BAY_DEPTH` Reihen davor, die vorderste Reihe zuerst */
-export function bay(g: Pick<GatePlace, 'cells' | 'out'>): Point[] {
-  const out: Point[] = [];
-  for (let t = 1; t <= BAY_DEPTH; t++) for (const [x, y] of g.cells) out.push([x - g.out[0] * t, y - g.out[1] * t]);
-  return out;
-}

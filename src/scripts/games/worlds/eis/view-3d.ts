@@ -5,7 +5,7 @@
 // Eislöchern, der Eisfall am Talende (Klippen aus gefrorenem Wasser), die Stufen des Eisbergs, Schneehaufen und
 // Schneemänner in ihrer Stufe (mitwachsen-snowman-look.ts, stehen still), die Eiszapfen des
 // Glockenspiels (mitwachsen-chime-look.ts, hängen still), die Fußspuren im Schnee
-// (view-3d-prints.ts) und am Eistor Tür, Eiszapfen und goldene Bucht (view-3d-gate.ts). Braucht Three.js (wie die
+// (view-3d-prints.ts) und am Eistor Tür, Eiszapfen und Eisscholle als Torplatte (view-3d-gate.ts). Braucht Three.js (wie die
 // 3D-Ansicht, beide teilen es) und wird darum nicht mit dem Paket geladen, sondern erst, wenn die 3D-Ansicht es will (`pack.view3d`, index.ts):
 // im Build `_astro/welt-eis-3d.<hash>.js` mit eigener Grenze (scripts/verify-bundles.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)

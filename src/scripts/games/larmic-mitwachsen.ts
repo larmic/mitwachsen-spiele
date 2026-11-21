@@ -271,7 +271,7 @@ class LarmicMitwachsen extends HTMLElement {
   private start() {
     this.lastInput = performance.now(); // nach Menü, Hinweis oder Tab-Wechsel: frisch, die Figur steht
     if (this.timer === undefined && !this.paused() && document.visibilityState === 'visible')
-      this.timer = window.setInterval(() => this.apply({ type: 'tick' }), TICK_MS);
+      this.timer = window.setInterval(() => this.apply({ type: 'tick', held: this.pace.held() }), TICK_MS);
     if (!this.raf) this.raf = requestAnimationFrame(() => this.frame(performance.now()));
   }
 
@@ -687,7 +687,8 @@ class LarmicMitwachsen extends HTMLElement {
    * Schneehaufen wächst um eine Kugel (es ploppt, Töne aus dem Welt-Paket, und gleich gespeichert: der Schneemann
    * bleibt); ein Eiszapfen klingt (Ton aus dem Welt-Paket) und glitzert, die Figur läuft weiter
    */
-  private chore(e: ChoreEvent | Extract<GameEvent, { type: 'snowman' | 'icicle' }>, now: number) {
+  private chore(e: ChoreEvent | Extract<GameEvent, { type: 'snowman' | 'icicle' | 'bob' }>, now: number) {
+    if (e.type === 'bob') return void this.hops.set(e.id, now); // der Pinguin hüpft still neben der Torplatte
     if (reshapes(e)) this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]); // leer, wieder voll, gewachsen
     if (e.type === 'snowman' || e.type === 'icicle') this.sfx.score(this.renderer.view?.score?.(e) ?? []);
     if (e.type === 'icicle')
@@ -702,8 +703,7 @@ class LarmicMitwachsen extends HTMLElement {
       return;
     }
     // Alle Tiere der Wiese hüpfen und bekommen ein Herz
-    if (e.type === 'feed') this.sfx.feed();
-    else this.sfx.pour();
+    this.sfx[e.type === 'feed' ? 'feed' : 'pour']();
     const fish = e.type === 'feed' && e.food === 'fish'; // silberne und goldgelbe Funken, Fischfresser schnappen zu
     this.burst('player', SPARKS[e.type === 'feed' ? e.food : 'pour'], 16);
     e.ids.forEach((id, i) => {

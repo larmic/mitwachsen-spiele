@@ -81,5 +81,5 @@ export type Cell = {
   story?: StoryId; // Klangstein dieser Geschichte
   note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz)
   slide?: true; // Rutschspur vom Eistor zum Schneebett (begehbar; glänzt, sobald das Tor offen ist)
-  plate?: GateId; // Torplatte vor diesem Tor (mitten in der Bucht, eben und frei; nur Bild und Ton, mitwachsen-plate.ts)
+  plate?: GateId; // Torplatte vor diesem Tor (mitten in der Bucht, eben und frei; Bild und Ton, öffnet das Eistor, mitwachsen-plate.ts)
 };

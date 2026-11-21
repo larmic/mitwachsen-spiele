@@ -119,7 +119,7 @@ export class Renderer {
   view: View2D | null = null; // Zeichenteile der Eis-Welt aus ihrem Welt-Paket, sobald es geladen ist
   private at: DecoAt = { now: 0, reduced: false, picked: {}, packs: {} };
   private album = new Album(); // Leiste unten
-  private guest: Guest | null = null; // der Pinguin am Tor, solange er führt (Umriss, goldene Bucht; nachgeladen)
+  private guest: Guest | null = null; // der Pinguin am Tor, solange er führt (Umriss, goldene Torplatte; nachgeladen)
   private blocks: Record<'grass' | 'dirt' | 'stone' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
 
   constructor(private readonly ctx: CanvasRenderingContext2D) {
@@ -323,7 +323,9 @@ export class Renderer {
   private plate(P: Projection, world: World, c: Cell, x: number, y: number, sc: Scene) {
     if (c.plate) {
       const look = c.plate === 'eis' ? this.view?.plate : undefined; // Schmuck aus dem Paket der Eis-Welt
-      drawPlate(this.ctx, P, world, c.plate, x, y, c.h, sc.plate, sc.now, sc.reduced, look);
+      // goldener Rand, solange der Pinguin zu diesem Tor führt (aus dem Paket)
+      const gold = this.guest?.rim(c.plate, sc.now, sc.reduced);
+      drawPlate(this.ctx, P, world, c.plate, x, y, c.h, sc.plate, sc.now, sc.reduced, look, gold);
     }
   }
 
@@ -595,7 +597,6 @@ export class Renderer {
     const { ctx } = this;
     const h = c.h;
     if (c.tufts) this.tufts(P, x, y, h, c.tufts);
-    this.guest?.mark(ctx, P, x, y, h); // goldene Bucht vor dem Tor, zu dem der Pinguin führt
     // Dinge der Eis-Welt (Iglu, Eisschale, Wassertrog, Fischkiste) zeichnet ihr Welt-Paket; solange es lädt, ein Block
     const ice = c.biome === 'eis' ? drawDeco(this.view, world, c, x, y, this.at) : null;
     // gezeichnet erst in der Reihe ihrer Vorderkante: sonst deckte der Boden der Reihen davor die Kuppel unten zu

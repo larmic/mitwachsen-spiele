@@ -1,8 +1,9 @@
 // Der verlaufene Pinguin führt die Figur zum Eistor – rein, ohne DOM: Er taucht neben ihr auf, watschelt zu ihr (Hüpfer,
 // Herz) und geht dann ein paar Felder voraus Richtung Bucht, dann wartet er und piept. Läuft sie weg, holt er sie ein
-// und stellt sich wieder vor sie; er blockiert nie. Nachts schläft er neben dem Bett, morgens führt er weiter. Wann er
-// fällig ist und wo die Bucht liegt, steht in mitwachsen-guide.ts; was in der Bucht geschieht (das Eistor geht auf, er
-// rutscht heim), in mitwachsen-ritual.ts. Beide gehören zum Welt-Paket der Eis-Welt (index.ts, `pack.lead`): Die
+// und stellt sich wieder vor sie; er blockiert nie. Sein Ziel ist der Platz neben der Torplatte. Nachts schläft er neben
+// dem Bett, morgens führt er weiter. Wann er fällig ist und wo die Bucht liegt, steht in mitwachsen-guide.ts; wie er in
+// der Bucht an der Platte wartet, in mitwachsen-bay.ts; was dann geschieht (das Eistor geht auf, er rutscht heim), in
+// mitwachsen-ritual.ts. Beide gehören zum Welt-Paket der Eis-Welt (index.ts, `pack.lead`): Die
 // Ansicht reicht sie `step` erst herein, wenn er fällig ist (mitwachsen-state.ts); so bleibt die Spielseite schlank.
 // Spezifikation: docs/specs/mitwachsen.md („Der Pinguin holt dich ab“)
 
@@ -25,6 +26,8 @@ import {
   type Guided,
 } from '../../mitwachsen-guide';
 import { homeAt } from '../../mitwachsen-home';
+import { BESIDE, atPlate, plateRow } from './mitwachsen-bay';
+import { ALL, flood, key } from './mitwachsen-flood';
 import { homeward, opens, slideOn } from './mitwachsen-ritual';
 
 export { hold } from './mitwachsen-ritual';
@@ -33,40 +36,27 @@ import { canStep, type World } from '../../mitwachsen-world';
 type Walker = Guided['animals'][number];
 type Explored = (x: number, y: number) => boolean;
 
-const key = (x: number, y: number) => `${x},${y}`;
 const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
-const ALL = Object.values(DIRS);
 const SIDE = Array.from({ length: 2 * NEAR + 1 }, (_, i) => i - NEAR);
 const AROUND = SIDE.flatMap((dx) => SIDE.map((dy): Point => [dx, dy])).filter(([dx, dy]) => dx || dy); // bis `NEAR` weit
 export const COME = 40; // so viele Takte watschelt er höchstens zur Figur, dann freut er sich, wo er ist
 const LOOK = 10; // so viele Takte schaut er nach dem Einholen zum Tor, bevor er sich zur Figur umdreht
 
-const fields = new WeakMap<World, Map<string, number>>();
 /**
- * Weg zum Tor: Schritte bis vor die Mitte der Tür von jedem Feld aus, von dem man dorthin kommt (Breitensuche rückwärts
- * mit `canStep`, alle Tore zu). Einmal je Welt.
+ * Weg zum Tor: Schritte bis zu seinem Platz neben der Torplatte (`BESIDE`) von jedem Feld aus, von dem man dorthin
+ * kommt (Breitensuche rückwärts mit `canStep`, alle Tore zu, höchstens 40 000 Felder). Einmal je Welt.
  */
-export function toGate(world: World): Map<string, number> {
-  let field = fields.get(world);
-  if (field) return field;
-  field = new Map();
-  const g = world.gates.get(GUIDE_GATE);
-  const queue: Point[] = g ? [[g.mid[0] - g.out[0], g.mid[1] - g.out[1]]] : [];
-  if (queue[0]) field.set(key(...queue[0]), 0);
-  for (let i = 0; i < queue.length && field.size < 40_000; i++) {
-    const [x, y] = queue[i]!;
-    const n = field.get(key(x, y))!;
-    for (const [dx, dy] of ALL) {
-      const k = key(x + dx, y + dy);
-      if (field.has(k) || !canStep(world, [], x + dx, y + dy, x, y)) continue;
-      field.set(k, n + 1);
-      queue.push([x + dx, y + dy]);
-    }
-  }
-  fields.set(world, field);
-  return field;
-}
+export const toGate = (world: World) =>
+  flood(
+    world,
+    'gate',
+    () => {
+      const g = world.gates.get(GUIDE_GATE);
+      return g ? [plateRow(g, BESIDE)] : [];
+    },
+    (x, y, tx, ty) => canStep(world, [], x, y, tx, ty),
+  );
 
 /** Feld zum Auftauchen: 4 bis 6 Felder neben der Figur, frei, erkundet, mit Weg zum Tor; das dem Tor nächste zuerst */
 function spotNear(s: Guided, world: World, explored: Explored): Point | null {
@@ -89,7 +79,8 @@ function spotNear(s: Guided, world: World, explored: Explored): Point | null {
 /**
  * Nach jedem Befehl: Ist er fällig und steht die Figur am Bett der Lichtung, taucht er auf (gut 2 s danach, nach dem
  * Laden beim Aufwachen). Ist er da, führt er im Takt; beim Einschlafen setzt er sich neben das Bett, beim Aufwachen
- * piept er zur Begrüßung. Stehen beide in der Bucht, geht das Tor auf, und er rutscht heim (mitwachsen-ritual.ts).
+ * piept er zur Begrüßung. Stehen beide in der Bucht, wartet er an der Torplatte (mitwachsen-bay.ts); steht die Figur
+ * darauf, geht das Tor auf, und er rutscht heim (mitwachsen-ritual.ts).
  */
 export function guide(s: Guided, world: World, cmd: 'move' | 'action' | 'tick', events: Events, explored: Explored) {
   const g = s.animals.find((a) => a.id === GUIDE);
@@ -107,8 +98,9 @@ export function guide(s: Guided, world: World, cmd: 'move' | 'action' | 'tick', 
   if (g.mode !== 'lead') return;
   if (events.some((e) => e.type === 'sleep')) return bedside(s, world, g);
   if (woke) return peep(s, g, events); // morgens: zur Begrüßung
-  if (opens(s, world, g, events)) return; // beide in der Bucht: Das Eistor geht auf
-  if (cmd === 'tick' && !s.sleeping) lead(s, world, g, events, explored);
+  if (opens(s, world, g, events)) return; // die Figur steht auf der Platte, er in der Bucht: Das Eistor geht auf
+  // ein Takt: In der Bucht wartet er an der Torplatte (mitwachsen-bay.ts), sonst führt er
+  if (cmd === 'tick' && !s.sleeping && !atPlate(s, world, g, events)) lead(s, world, g, events, explored);
 }
 
 /**
@@ -192,7 +184,7 @@ function bedside(s: Guided, world: World, g: Walker) {
 /**
  * Ein Takt Führen: Ist die Figur weit weg, taucht er neben ihr wieder auf und watschelt zu ihr. Ist sie mehr als `FAR` Felder weg oder nicht
  * mehr hinter ihm, holt er sie ein und stellt sich wieder vor sie. Kommt sie auf `NEAR` heran, geht er weiter Richtung
- * Tor; sonst wartet er, schaut sie an und piept (vor der Tür, mit ihr daneben, schaut er zum Tor).
+ * Tor; sonst wartet er, schaut sie an und piept (an seinem Platz, mit ihr daneben, schaut er zur Torplatte).
  */
 function lead(s: Guided, world: World, g: Walker, events: Events, explored: Explored) {
   const p = s.player;
@@ -215,12 +207,14 @@ function lead(s: Guided, world: World, g: Walker, events: Events, explored: Expl
     if (s.tick % PACE.chase === 0) chase(s, world, g, field);
     return;
   }
-  if (gap <= NEAR && dg > 0) {
+  if ((gap <= NEAR || g.wait) && dg > 0) {
+    // nah bei ihr oder beide in der Bucht (`wait`, mitwachsen-bay.ts): weiter, bis neben die Platte
     if (s.tick % PACE.lead === 0) forward(s, world, g, field);
     return;
   }
   const door = world.gates.get(GUIDE_GATE);
-  if (dg === 0 && gap <= NEAR && door) g.dir = dirTo(door.out[0], door.out[1]);
+  if (dg === 0 && gap <= NEAR && door)
+    g.dir = dirTo(door.out[1], -door.out[0]); // zur Platte (u −)
   else if (g.rest <= 0) peep(s, g, events);
   else if (g.rest <= PEEP_EVERY) g.dir = dirTo(p.x - g.x, p.y - g.y); // sonst schaut er nach dem Einholen noch zum Tor
 }

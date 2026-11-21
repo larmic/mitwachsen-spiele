@@ -1,5 +1,6 @@
-// Das Eistor geht mit dem verlaufenen Pinguin auf – rein, ohne DOM: Stehen Figur und Pinguin in der Bucht vor dem Tor,
-// geht es für immer auf (`gate`, sofort gespeichert). Das Ritual dauert 3 s: Der Pinguin watschelt vor die Tür, hüpft
+// Das Eistor geht mit dem verlaufenen Pinguin auf – rein, ohne DOM: Ist der Pinguin in der Bucht vor dem Tor und steht
+// die wache Figur seit 0,4 s auf der Torplatte (nur Stehen zählt, Drüberlaufen öffnet nie) oder läuft sie gegen die
+// Tür, geht es für immer auf (`gate`, sofort gespeichert). Das Ritual dauert 3 s: Der Pinguin watschelt vor die Tür, hüpft
 // zweimal, ein kalter Atemzug weht Schnee auf die Lichtung, nach 2,4 s rutscht er durch den Gang hinter die Mündung und
 // wartet dort; jeder Pfeil lässt die Figur solange nur hüpfen. Betritt die Figur die Eis-Welt, rutscht er voraus zum
 // Schneebett und zieht als erstes Tier auf der Schneewiese ein. Mit den Regeln des Führens (mitwachsen-lead.ts) Teil
@@ -9,40 +10,37 @@
 import { DIRS } from '../../../../lib/games/front';
 import type { Point } from '../../../../data/games/mitwachsen';
 import { dirTo, freeNear, occupied } from '../../mitwachsen-free';
-import {
-  GUIDE_GATE,
-  RITUAL,
-  SLIDE,
-  bay,
-  opening,
-  type GuideEvents as Events,
-  type Guided,
-} from '../../mitwachsen-guide';
+import { GUIDE_GATE, RITUAL, SLIDE, opening, type GuideEvents as Events, type Guided } from '../../mitwachsen-guide';
 import { atHome, meadowSpots } from '../../mitwachsen-meadow';
+import { ALL, flood, key } from './mitwachsen-flood';
+import { inBay } from './mitwachsen-bay';
 import { canStep, type World } from '../../mitwachsen-world';
 
 type Walker = Guided['animals'][number];
 
 export const HOP_AGAIN = 4; // zweiter Hüpfer vor der Tür (0,4 s)
 export const BREATH = 18; // der kalte Atemzug aus dem Tor (1,8 s)
+export const OPEN_TICKS = 4; // so lange (0,4 s) steht die Figur auf der Torplatte, dann geht das Tor auf
 // Takte je Feld beim Rutschen zum Schneebett: so schnell wie beim Führen (PACE.lead), schneller als die Figur mit
 // gehaltener Taste, damit er wirklich vorausrutscht (die Ansicht gleitet mit)
 export const SLIDE_PACE = 2;
 const REALM = 'eis'; // die Gegend hinter dem Eistor
 
-const key = (x: number, y: number) => `${x},${y}`;
-const ALL = Object.values(DIRS);
-
 /**
- * Stehen Figur und Pinguin (bei ihr angekommen) in der Bucht, geht das Tor auf: Es kommt zu den offenen Toren (Ereignis
- * `gate`, die Ansicht speichert sofort), der Pinguin watschelt vor die Mitte der Tür, schaut zur Figur und hüpft mit
- * seinem Ton (`peep`). Liefert true, wenn das Tor aufging.
+ * Ist der Pinguin (bei der Figur angekommen) in der Bucht und steht die wache Figur seit `OPEN_TICKS` Takten auf der
+ * Torplatte (`still`: Jeder Schritt zählt neu, darum öffnet Drüberlaufen nie) oder ist sie eben gegen die Tür gelaufen
+ * (Ereignis `bump`, zählt wie die Platte), geht das Tor auf: Es kommt zu den offenen Toren (Ereignis `gate`, die Ansicht
+ * speichert sofort), der Pinguin watschelt vor die Mitte der Tür, schaut zur Figur und hüpft mit seinem Ton (`peep`).
+ * Erst jetzt beginnt das Ritual (`ritual`, `hold`), nie schon beim Betreten der Platte. Liefert true, wenn das Tor aufging.
  */
 export function opens(s: Guided, world: World, g: Walker, events: Events): boolean {
   const door = world.gates.get(GUIDE_GATE);
-  if (!door || s.sleeping || s.guideDue >= 0) return false;
-  const cells = new Set(bay(door).map(([x, y]) => key(x, y)));
-  if (!cells.has(key(g.x, g.y)) || !cells.has(key(s.player.x, s.player.y))) return false;
+  if (!door || s.sleeping || s.guideDue >= 0 || !inBay(door, g.x, g.y)) return false;
+  const p = s.player;
+  const [dx, dy] = DIRS[p.dir];
+  const stands = world.cell(p.x, p.y).plate === GUIDE_GATE && s.still >= OPEN_TICKS;
+  const knocks = world.cell(p.x + dx, p.y + dy).gate === GUIDE_GATE && events.some((e) => e.type === 'bump');
+  if (!stands && !knocks) return false;
   s.openGates.push(GUIDE_GATE);
   s.ritual = s.tick;
   const front: Point = [door.mid[0] - door.out[0], door.mid[1] - door.out[1]];
@@ -108,31 +106,17 @@ function behind(s: Guided, world: World, g: Walker, events: Events) {
   if (slid) events.push({ type: 'slide', id: g.id, species: g.species });
 }
 
-const fields = new WeakMap<World, Map<string, number>>();
 /**
  * Weg zur Schneewiese: Schritte von jedem Feld der Eis-Welt bis auf die Wiese (Breitensuche rückwärts mit `canStep`,
  * Eistor offen). Einmal je Welt.
  */
-export function toMeadow(world: World): Map<string, number> {
-  let field = fields.get(world);
-  if (field) return field;
-  field = new Map();
-  const queue = meadowSpots(world, REALM).map(([x, y]): Point => [x, y]);
-  for (const [x, y] of queue) field.set(key(x, y), 0);
-  for (let i = 0; i < queue.length; i++) {
-    const [x, y] = queue[i]!;
-    const n = field.get(key(x, y))!;
-    for (const [dx, dy] of ALL) {
-      const [nx, ny] = [x + dx, y + dy];
-      if (field.has(key(nx, ny)) || world.realm(nx, ny) !== REALM) continue;
-      if (!canStep(world, [GUIDE_GATE], nx, ny, x, y)) continue;
-      field.set(key(nx, ny), n + 1);
-      queue.push([nx, ny]);
-    }
-  }
-  fields.set(world, field);
-  return field;
-}
+export const toMeadow = (world: World) =>
+  flood(
+    world,
+    'meadow',
+    () => meadowSpots(world, REALM).map(([x, y]): Point => [x, y]),
+    (x, y, tx, ty) => world.realm(x, y) === REALM && canStep(world, [GUIDE_GATE], x, y, tx, ty),
+  );
 
 /**
  * Ein Feld weiter Richtung Schneewiese, lieber auf der Rutschspur (`cell.slide`); ist keins frei, wartet er (false). Auf

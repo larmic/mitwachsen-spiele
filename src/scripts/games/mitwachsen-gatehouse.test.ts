@@ -7,8 +7,17 @@ import { PLATE_LEN, PLATE_STONE, PLATE_VOX, SINK, plateSink, plateVoxel } from '
 import { parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
 import { gate as gatehouse, motion, moves } from './mitwachsen-gates-3d';
 import { BEATS } from './mitwachsen-gate-kit';
-import { gateLook, goldenBay } from './worlds/eis/view-3d-gate';
-import { GUEST_COLORS, GUEST_FILLED, GUEST_OUTLINE, guestPixel, ritualGlow } from './mitwachsen-guest-look';
+import { gateLook } from './worlds/eis/view-3d-gate';
+import { GOLD } from '../../data/games/mitwachsen-portals';
+import {
+  GUEST_COLORS,
+  GUEST_FILLED,
+  GUEST_OUTLINE,
+  PULSE_MS,
+  guestPixel,
+  plateGold,
+  ritualGlow,
+} from './mitwachsen-guest-look';
 import { RITUAL } from './mitwachsen-guide';
 
 type Face = { axis: number; dir: number; at: number; min: [number, number]; max: [number, number]; part: string };
@@ -75,7 +84,6 @@ function house(theme: (typeof GATES)[number]['id'], open: number, outline: boole
   const p = parts();
   const look = packed && theme === 'eis' ? gateLook : undefined; // Tür und Eiszapfen aus dem Welt-Paket
   const wings = gatehouse(p, theme, open, outline, lit, [0, 1], look);
-  if (outline) goldenBay(p);
   const placed = wings.flatMap((w, i) =>
     Object.entries(w.parts).flatMap(([name, geo]): [string, BufferGeometry][] =>
       geo.empty ? [] : [[`Flügel ${i} ${name}`, geo.build().rotateY(w.angle).translate(w.hinge[0], 0, w.hinge[1])]],
@@ -175,27 +183,6 @@ describe('Torhäuser und Portal-Plattformen flackern nicht', () => {
     }
   });
 
-  it('goldene Bucht: der Rand liegt je Feld knapp über dessen eigenem Boden, auch an Stufen ohne Flackern', () => {
-    // Reihe 3 rechts eine Stufe höher, Reihe 2 links eine tiefer (so liegt die Bucht oft vor dem Tor)
-    const rise = (u: number, t: number) => (u === 2 && t === 3 ? 1 : u === -2 && t === 2 ? -1 : 0);
-    const p = parts();
-    goldenBay(p, rise);
-    expect(fighting(p)).toEqual([]);
-    const pos = p.bright.build().getAttribute('position').array;
-    for (let i = 0; i < pos.length; i += 3) {
-      const [x, y, z] = [pos[i]!, pos[i + 1]!, pos[i + 2]!];
-      // jede Ecke gehört zu einem Feld der Bucht, auf dessen Höhe (Ecken auf der Grenze zweier Felder: eins davon)
-      const near = (v: number) => [Math.round(v - 0.01), Math.round(v + 0.01)];
-      const heights = near(x).flatMap((u) =>
-        near(z).map((t) => rise(Math.max(-2, Math.min(2, u)), Math.max(1, Math.min(3, t)))),
-      );
-      expect(
-        heights.some((h) => y >= h + 0.02 - 1e-6 && y <= h + 0.07 + 1e-6),
-        `${x} ${y} ${z}`,
-      ).toBe(true);
-    }
-  });
-
   it('verdeckte Flächen fallen weg: Eine wache Plattform hat nur so viele Flächen, wie man sehen kann', () => {
     const sets = platformSets('sand', 'gate');
     const p = parts();
@@ -227,7 +214,17 @@ describe('Das Eistor geht auf: Eiszapfen leuchten, der Umriss füllt sich', () =
     expect(guestPixel(1, 4, 0.2)).toEqual(GUEST_COLORS.o); // oben noch Umriss
     expect(guestPixel(1, 4, 1)).toEqual(GUEST_COLORS.k);
     for (const lit of [0, 0.5, 1]) expect(guestPixel(0, 0, lit)).toEqual(GUEST_COLORS.g);
-    expect(GUEST_FILLED.map((r) => r.length)).toEqual(GUEST_OUTLINE.map((r) => r.length));
+    // gefüllt: innen die Farben des Pinguins, außen derselbe Goldrahmen wie beim Umriss
+    expect(GUEST_FILLED.map((r) => r.length + 2)).toEqual(GUEST_OUTLINE.slice(1, -1).map((r) => r.length));
+    GUEST_OUTLINE.forEach((row, r) =>
+      [...row].forEach((ch, c) => {
+        if (ch === 'g') expect(guestPixel(r, c, 1), `${r},${c}`).toEqual(GUEST_COLORS.g);
+        else
+          expect(guestPixel(r, c, 1), `${r},${c}`).toEqual(
+            GUEST_COLORS[GUEST_FILLED[r - 1]![c - 1] as 'k'] ?? undefined,
+          );
+      }),
+    );
   });
 });
 
@@ -244,9 +241,9 @@ describe('Torplatte vor jedem Tor (3D)', () => {
 
   for (const g of GATES) {
     const look = g.id === 'eis' ? gateLook.plate : undefined;
-    it(`${g.id}: flackert nicht, auch mit Torhaus und goldener Bucht; flach in Reihe 2 der Bucht, 3 × 1 Felder, einen Voxel dick`, () => {
+    it(`${g.id}: flackert nicht, auch mit Torhaus und goldenem Rand; flach in Reihe 2 der Bucht, 3 × 1 Felder, einen Voxel dick`, () => {
       const { p } = house(g.id, 0, g.id === 'eis');
-      plateParts(p, g.id, look);
+      plateParts(p, g.id, look, g.id === 'eis');
       expect(fighting(p)).toEqual([]);
       const solo = parts();
       plateParts(solo, g.id, look);
@@ -261,8 +258,29 @@ describe('Torplatte vor jedem Tor (3D)', () => {
       }
       // Rand in der Farbe der Welt, er leuchtet (eigenes Material, `bright`)
       expect([...colors(solo.bright.build())]).toEqual([hex(THEME_COLORS[g.id].portal)]);
+      // Führt der Pinguin zu diesem Tor, ist der Rand golden (an derselben Stelle), Fläche und Zeichen bleiben
+      const gold = parts();
+      plateParts(gold, g.id, look, true);
+      expect([...colors(gold.bright.build())]).toEqual([hex(GOLD.top)]);
+      expect(gold.bright.build().getAttribute('position').array).toEqual(
+        solo.bright.build().getAttribute('position').array,
+      );
+      expect(gold.solid.build().getAttribute('color').array).toEqual(solo.solid.build().getAttribute('color').array);
     });
   }
+
+  it('goldener Rand pulsiert weich (1,2 s je Puls), bei reduzierter Bewegung ruhig ganz golden', () => {
+    expect(PULSE_MS).toBe(1200);
+    expect(plateGold(0, false)).toBeCloseTo(0);
+    expect(plateGold(PULSE_MS / 2, false)).toBeCloseTo(1);
+    expect(plateGold(PULSE_MS, false)).toBeCloseTo(0);
+    for (let t = 0; t < 3000; t += 37) {
+      expect(plateGold(t, false)).toBeGreaterThanOrEqual(0);
+      expect(plateGold(t, false)).toBeLessThanOrEqual(1);
+      expect(Math.abs(plateGold(t + 10, false) - plateGold(t, false))).toBeLessThan(0.03); // weich, ohne Sprung
+      expect(plateGold(t, true)).toBe(1);
+    }
+  });
 
   it('oval: an den Ecken fehlen Voxel, ein geschlossener Rand aus einem Voxel; das Zeichen liegt mittig in der Fläche', () => {
     const mark = gateLook.plate!.mark;
@@ -323,7 +341,7 @@ describe('Torplatte vor jedem Tor (3D)', () => {
     const p = parts();
     plateParts(p, 'eis', gateLook.plate);
     const [, [, top]] = bounds([p.solid.build(), p.bright.build()]);
-    expect(top - DIP).toBeGreaterThan(0.04); // der Boden liegt bei 0, die goldene Bucht bei 0,02: Abstand wie sie
+    expect(top - DIP).toBeGreaterThan(0.04); // der Boden liegt bei 0: Abstand wie eine Markierung 0,02 darüber
     expect(DIP).toBeGreaterThan(SINK / 2); // sichtbar eingesunken
   });
 });

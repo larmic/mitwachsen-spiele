@@ -1,6 +1,6 @@
 // Haken der 3D-Ansicht für die Welten hinter den Toren: Was nur eine Welt in 3D zeigt (Eis-Welt: Iglu,
 // Eisschale, Eistrog, Fischkiste, Rutschspur, Schnee und Eis im Kessel, Bett aus Schnee, Tür und Eiszapfen des Eistors,
-// goldene Bucht), baut der 3D-Teil ihres Welt-Pakets (worlds/<welt>/view-3d.ts). Das Paket lädt ihn per import() erst,
+// Schmuck der Torplatte), baut der 3D-Teil ihres Welt-Pakets (worlds/<welt>/view-3d.ts). Das Paket lädt ihn per import() erst,
 // wenn es an der Welt hängt und die 3D-Ansicht da ist (`WorldPack.view3d`); bis dahin baut die 3D-Ansicht schlicht:
 // ein Block in Kartenfarbe je Ding der Welt (`drawDeco`), Böden und Bett wie auf der Lichtung, schlichte Türbretter.
 // `Views3D` hält die geladenen 3D-Teile für die 3D-Ansicht (rein, ohne Three.js; läuft mit ihr nachgeladen).
@@ -35,7 +35,7 @@ export type Layer = { object: Object3D; update(world: World): void };
 export type View3D = {
   /** das Tor dieser Welt: Nur an ihm baut `look` mit */
   gate: GateId;
-  /** Tür, Eiszapfen und Bucht seines Zugangs */
+  /** Tür, Eiszapfen und Torplatte seines Zugangs */
   look: GateLook;
   /** je Deko-Art, die nur diese Welt hat, ihre Quader (wie in 2D, `DrawDeco`; in 3D zuckt nichts) */
   decos: View2D['decos'];
@@ -90,7 +90,7 @@ export class Views3D {
     this.retries = [];
   }
 
-  /** Tür, Eiszapfen und Bucht am Tor `gate` aus dem Paket seiner Welt, solange es fehlt nichts */
+  /** Tür, Eiszapfen und Torplatte am Tor `gate` aus dem Paket seiner Welt, solange es fehlt nichts */
   look(gate: GateId): GateLook | undefined {
     return this.views.find((v) => v.gate === gate)?.look;
   }

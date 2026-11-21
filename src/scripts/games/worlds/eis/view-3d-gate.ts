@@ -1,15 +1,14 @@
 // Das Eistor in 3D, soweit es zur Eis-Welt gehört (im 3D-Teil ihres Welt-Pakets, mit ihm nachgeladen): Beschläge und
 // Zeichen der Doppeltür, der Umriss des verlaufenen Pinguins darauf, der sich beim Öffnen füllt, das Leuchten der
-// Eiszapfen im Ritual, die goldene Bucht vor dem Tor, solange er die Figur dorthin führt, und die Torplatte als
-// Eisscholle mit Schneeflocke. Den Zugang selbst (Schlucht,
-// Bogen, Orgel) und die schlichten Türbretter baut der Kern (mitwachsen-gate-eis.ts, mitwachsen-gatehouse.ts).
+// Eiszapfen im Ritual und die Torplatte als Eisscholle mit Schneeflocke (ihren goldenen Rand, solange er die Figur
+// dorthin führt, legt die 3D-Ansicht an). Den Zugang selbst (Schlucht, Bogen, Orgel) und die schlichten Türbretter
+// baut der Kern (mitwachsen-gate-eis.ts, mitwachsen-gatehouse.ts).
 // Spezifikation: docs/specs/mitwachsen.md („Der Pinguin holt dich ab“, Abschnitt „Welt-Pakete“)
 
 import { THEME_COLORS } from '../../../../data/games/mitwachsen';
-import { GOLD } from '../../../../data/games/mitwachsen-portals';
 import { ICE_FLOE } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import type { GateLook } from '../../mitwachsen-gate-kit';
-import { W, block, leaves, onLeaf, wings, type Leaf, type Parts, type Wing } from '../../mitwachsen-gatehouse';
+import { W, leaves, onLeaf, wings, type Leaf, type Wing } from '../../mitwachsen-gatehouse';
 import { GUEST_OUTLINE, GUEST_PX, GUEST_Y, guestPixel } from '../../mitwachsen-guest-look';
 
 const ICE_GLOW = '#7fd6ff'; // eisblau leuchtende Eiszapfen, wenn das Eistor aufgeht
@@ -78,41 +77,9 @@ function penguinOutline(left: Leaf, right: Leaf, lit: number) {
 /** Farbe eines Eiszapfens am Bogen bei `x`: Geht das Eistor auf, leuchten sie bis `lit` von links nach rechts eisblau */
 export const icicle = (x: number, lit: number) => ((x + W) / (2 * W) < lit ? ICE_GLOW : ICICLE);
 
-/**
- * Goldene Bucht vor dem Tor, solange der verlaufene Pinguin die Figur dorthin führt: ein schmaler Goldrand um die drei
- * Reihen vor der Tür, so breit wie das Tor, vorn vor dem Sockel der Türme. Er liegt je Feld knapp über dessen Boden:
- * `rise(u, t)` ist die Höhe des Felds u (−2 … 2 entlang des Tors) in Reihe t (1 … 3) gegenüber der Tormitte. Felder
- * gleicher Höhe teilen sich ein Stück Rand, an einer Stufe setzt er ab.
- */
-export function goldenBay(p: Parts, rise: (u: number, t: number) => number = () => 0) {
-  const [w, depth] = [0.12, 3];
-  const strip = (x0: number, x1: number, z0: number, z1: number, y: number) =>
-    block(p.bright, x0, y + 0.02, z0, x1, y + 0.07, z1, GOLD.side, GOLD.top);
-  /** Felder `from` … `to` als Stücke gleicher Höhe: [erstes, letztes, Höhe] */
-  const runs = (from: number, to: number, h: (i: number) => number) => {
-    const out: [number, number, number][] = [];
-    for (let i = from; i <= to; i++) {
-      const last = out[out.length - 1];
-      if (last && last[2] === h(i)) last[1] = i;
-      else out.push([i, i, h(i)]);
-    }
-    return out;
-  };
-  const front = (t: number) => (t === 1 ? 0.85 : t - 0.5); // vordere Kante der Reihe t
-  for (const [a, b, y] of runs(-2, 2, (u) => rise(u, 1))) strip(a - 0.5, b + 0.5, 0.85, 0.85 + w, y);
-  for (const [a, b, y] of runs(-2, 2, (u) => rise(u, depth))) strip(a - 0.5, b + 0.5, depth + 0.5 - w, depth + 0.5, y);
-  for (const [u, x0] of [
-    [-2, -W],
-    [2, W - w],
-  ] as const)
-    for (const [a, b, y] of runs(1, depth, (t) => rise(u, t)))
-      strip(x0, x0 + w, a === 1 ? front(1) + w : front(a), b === depth ? depth + 0.5 - w : b + 0.5, y);
-}
-
 /** Was die Eis-Welt zum Eistor beiträgt (Haken `look` der Zugänge, mitwachsen-gate-kit.ts) */
 export const gateLook: GateLook = {
   door: (open, outline, lit) => door(THEME_COLORS.eis.portal, open, outline, lit),
   icicle,
-  bay: goldenBay,
   plate: ICE_FLOE, // Torplatte: Eisscholle mit eingelegter Schneeflocke (der Rand ist hellblau wie jedes Eis-Zeichen)
 };

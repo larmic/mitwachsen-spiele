@@ -33,9 +33,12 @@ export const RULES: Rule[] = [
     // zeichnet: Platz für die Torplatte (nur 0,24 KB, die Eisklippe muss ohne Paket zeichnen); 123,9 KB, seit der
     // Inhalt des Menüs (Liste der Welten) mit seinen seltenen Handgriffen erst beim Öffnen nachlädt (mitwachsen-menu.ts)
     // und der Blick durchs Tor im Nebel-Modul liegt; 126,0 KB mit der Torplatte vor jedem Tor (Lage, Form, Einsinken,
-    // 2D-Zeichnung mit Schmuck aus dem Paket, Klonk, Plopp und Motiv je Welt: gut 2 KB); dazu keine 0,03 KB Luft. Der
-    // nächste Schritt der Torplatte (sie öffnet das Eistor) braucht die vereinbarte, begründete Anhebung um höchstens
-    // 1 KB oder vorher Platz
+    // 2D-Zeichnung mit Schmuck aus dem Paket, Klonk, Plopp und Motiv je Welt: gut 2 KB); 125,9 KB, seit die Platte das
+    // Eistor öffnet (Stehzeit im Zustand, nur ohne gedrückten Pfeil, `InputPace.held`; goldener Rand der Platte,
+    // stilles Hüpfen des Pinguins), die Bucht des Eistors aber mit dem Paket kommt (`bay`, nur der Pinguin braucht sie)
+    // und Aufwachen und Einschlafen die Figur in einem Zug setzen: gemessen 129 020 Bytes, also nur 4 Bytes Luft. Die
+    // vereinbarte, begründete Anhebung um höchstens 1 KB ist für die nächsten Schritte der Torplatte (Drehung) gedacht;
+    // was dort mehr kommt, braucht sie
     budget: 126 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
@@ -63,7 +66,11 @@ export const RULES: Rule[] = [
     // der drei); 42,5 KB nachgemessen; 42,7 KB, seit die Farben der Eis-Dinge und Eiskristalle (`ICE_COLORS`,
     // `ICE_CRYSTALS`, src/data/games/worlds/eis/mitwachsen-ice-colors.ts) mit dem Paket kommen statt im Kern zu
     // liegen; 42,9 KB mit der Torplatte vor dem Eistor (Klirren `View2D.clink`, Eisscholle mit Schneeflocke
-    // `ICE_FLOE` für 2D und 3D); dazu knapp 0,1 KB Luft
+    // `ICE_FLOE` für 2D und 3D); 43,0 KB, seit die Platte das Eistor öffnet (Bucht samt Warten an der Platte und
+    // Sicherheitsnetz, Stehzeit in `opens`, goldener Rand statt goldener Bucht), Platz gemacht ohne Anheben: Wege und
+    // Feld-Schlüssel des Pakets je einmal (worlds/eis/mitwachsen-flood.ts), Regeln des Pinguins als schlichtes Objekt
+    // statt Modul-Namensraum, gefüllter Umriss ohne doppelten Goldrahmen; gemessen 44 010 Bytes, also 22 Bytes Luft.
+    // Die nächsten Schritte der Torplatte brauchen hier Platz oder eine begründete, knappe Anhebung
     budget: 43 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
@@ -76,7 +83,7 @@ export const RULES: Rule[] = [
     // Material für Quader, die so hell leuchten, wie ein Welt-Paket sagt (`View3D.glow`); 589,9 KB mit dem Haken der
     // Fußspuren im Schnee (`View3D.layer`, `Views3D.layers`); 596,2 KB mit den bewegten Teilen der Zugänge (fließende
     // Wasserwand, Glutkaskade, wiegende Pilzranken je Takt); 597,0 KB mit den Torplatten (mitwachsen-plate-3d.ts);
-    // dazu 4 KB Luft
+    // 596,8 KB mit ihrem goldenen, pulsierenden Rand statt der goldenen Bucht; dazu gut 4 KB Luft
     budget: 601 * 1024,
     // Probe: Das Leuchten der Eiszapfen gibt es nur im 3D-Teil der Eis-Welt (ICE_GLOW in worlds/eis/view-3d-gate.ts)
     forbidden: /#7fd6ff/,
@@ -91,7 +98,8 @@ export const RULES: Rule[] = [
     // Iglu, Eisschale, Eistrog, Fischkiste, Schnee und Eis im Kessel, Rutschspur, Bett aus Schnee, Tür, Eiszapfen und
     // goldene Bucht des Eistors: gemessen 2,1 KB; 3,3 KB mit den Fußspuren im Schnee (durchsichtige Plättchen in einem Mesh, nur
     // Klassen von Three.js, die die 3D-Ansicht schon nutzt, sonst wüchse three.<hash>.js); 3,5 KB mit der Torplatte als
-    // Eisscholle mit Schneeflocke (`GateLook.plate`, Farben und Zeichen aus `ICE_FLOE`); dazu 2,5 KB Luft
+    // Eisscholle mit Schneeflocke (`GateLook.plate`, Farben und Zeichen aus `ICE_FLOE`); 3,0 KB ohne die goldene Bucht
+    // (den goldenen Rand der Torplatte baut die 3D-Ansicht); dazu 3 KB Luft
     budget: 6 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },

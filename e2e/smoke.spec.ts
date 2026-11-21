@@ -679,6 +679,7 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
       portals: string[];
       sleeping: boolean;
       guideDue: number;
+      still: number;
       animals: (Animal & { home: { kind: string } })[];
       garden: { id: string; species: string }[];
     };
@@ -717,16 +718,23 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
       { timeout: 30_000 }, // ohne Grafikkarte dauert jeder Takt lange
     )
     .toBe('lead');
-  // Figur und Pinguin in die Bucht vor dem Eistor (über die Komponente): Im nächsten Takt geht das Tor auf
-  await game.evaluate((node) => {
+  // Pinguin in die Bucht vor dem Eistor, die Figur mitten auf die Torplatte (über die Komponente, in einem Zug, damit
+  // kein Takt der Seite dazwischenkommt): Nach 0,4 s Stehen (vier Takte, die Stehzeit beginnt neu) geht das Tor auf
+  const standing = await game.evaluate((node) => {
     const el = node as unknown as Game;
     const { mid, out } = el.world.gates.get('eis')!;
     const at = (k: number) => [mid[0] - out[0] * k, mid[1] - out[1] * k] as const;
     const animals = el.state.animals.map((a) => (a.id === 'eis:pinguin' ? { ...a, x: at(1)[0], y: at(1)[1] } : a));
-    el.state = { ...el.state, animals, guideDue: -1, player: { x: at(2)[0], y: at(2)[1], dir: 'n' } };
+    el.state = { ...el.state, animals, guideDue: -1, still: 0, player: { x: at(2)[0], y: at(2)[1], dir: 'n' } };
     el.lift();
-    el.apply({ type: 'tick' });
+    const seen: string[][] = [];
+    for (let i = 0; i < 4; i++) {
+      el.apply({ type: 'tick' });
+      seen.push([...el.state.openGates]);
+    }
+    return seen;
   });
+  expect(standing).toEqual([[], [], [], ['eis']]);
   const open = () => game.evaluate((el) => (el as unknown as Game).state.openGates);
   expect(await open()).toEqual(['eis']);
   // sofort gespeichert

@@ -1,7 +1,8 @@
 // Torplatte vor jedem großen Tor – rein, ohne DOM: Lage (mitten in der Bucht, Reihe 2, drei Felder quer zum Tor), Form
-// als Voxel (ein flacher, ovaler Stein mit Rand) und wie weit sie gerade eingesunken ist. Ein Spielzeug, keine Regel:
-// Die Figur läuft drüber, ohne anzuhalten (keine Begegnung); Betreten und Verlassen merkt sich nur die Ansicht
-// (`PlateFx`, nicht gespeichert). Gesetzt im Weltbau (`forecourt` in mitwachsen-apron.ts), gezeichnet in 2D
+// als Voxel (ein flacher, ovaler Stein mit Rand) und wie weit sie gerade eingesunken ist. Ein Spielzeug: Die Figur läuft
+// drüber, ohne anzuhalten (keine Begegnung); Betreten und Verlassen merkt sich nur die Ansicht (`PlateFx`, nicht
+// gespeichert). Vor dem Eistor öffnet sie das Tor, wenn die Figur darauf steht (Regel im Welt-Paket der Eis-Welt,
+// worlds/eis/mitwachsen-ritual.ts, mit der Stehzeit `still` aus mitwachsen-state.ts). Gesetzt im Weltbau (`forecourt` in mitwachsen-apron.ts), gezeichnet in 2D
 // (mitwachsen-platform-2d.ts) und 3D (mitwachsen-plate-3d.ts), Töne in sfx.ts.
 // Spezifikation: docs/specs/mitwachsen.md („Was angezeigt wird“: Große Tore, Begriff „Torplatte“)
 

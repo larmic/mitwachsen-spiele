@@ -29,8 +29,8 @@ import { frost, type Wild } from './mitwachsen-frost';
 import { chimes } from './mitwachsen-chime';
 import { haunts } from './mitwachsen-haunts';
 import { iceberg, lakes, peaks, type Iceberg } from './mitwachsen-lakes';
+import { key } from './mitwachsen-flood';
 
-const key = (x: number, y: number) => `${x},${y}`;
 const { rx, ry } = KESSEL.shape;
 const OUTER = { rx: rx + KESSEL.cliff, ry: ry + KESSEL.cliff }; // fester Außenrand der Klippen
 /** Reihe des Schneebetts, gemessen von der Mitte des Tals: `KESSEL.bed` Felder hinter dem inneren Rand an der Mündung */

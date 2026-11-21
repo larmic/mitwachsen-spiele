@@ -21,7 +21,7 @@ import { initialState, progressOf, step } from './mitwachsen-state';
 import { beyondRing } from './mitwachsen-world';
 import { worldOf } from './test-worlds';
 import { plateMid } from './mitwachsen-plate';
-import { REGIONS, animalId } from '../../data/games/mitwachsen';
+import { REGIONS, animalId, regionAnimalList } from '../../data/games/mitwachsen';
 
 /** Speicher im Arbeitsspeicher wie localStorage */
 function memoryStore(): Store & { data: Map<string, string> } {
@@ -248,6 +248,29 @@ describe('Torplatte im Spielstand', () => {
         expect(Object.keys(back)).not.toContain('plate');
       }
     }
+  });
+});
+
+describe('Pinguin in der Bucht im Spielstand', () => {
+  it('gespeichert, während der Pinguin in der Bucht an der Platte wartet: lädt mit zugem Tor, ohne Stehzeit, er kommt wieder', () => {
+    const store = memoryStore();
+    const w = worldOf(1);
+    const door = w.gates.get('eis')!;
+    const lichtung = regionAnimalList(REGIONS[0]).map(({ id, species }) => ({ id, species }));
+    // die Leiste voll, die Figur auf der Torplatte, der Pinguin neben ihr in der Bucht (im Spiel nach 0,3 s Stehen)
+    let s = { ...initialState(w, { garden: lichtung }), sleeping: false, still: 3 };
+    const [px, py] = plateMid(door);
+    s = { ...s, player: { x: px, y: py, dir: 'n' as const } };
+    saveWorld(store, withProgress(newWorld('b', 1, 'B'), progressOf(s)));
+    const back = loadWorld(store, 'b')!;
+    expect(back.openGates).toEqual([]);
+    expect(Object.keys(back)).not.toContain('still');
+    const again = initialState(w, progressFrom(back));
+    expect(again.openGates).toEqual([]);
+    expect(again.still).toBe(0);
+    expect(again.ritual).toBe(-1);
+    expect(again.animals.some((a) => a.mode === 'lead')).toBe(false); // er taucht am Bett wieder auf und führt neu
+    expect([again.player.x, again.player.y]).toEqual([...w.homes.lichtung.bed]);
   });
 });
 

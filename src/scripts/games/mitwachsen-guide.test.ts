@@ -22,7 +22,6 @@ import {
   PEEP_EVERY,
   RITUAL,
   SLIDE,
-  bay,
   guideGate,
   leader,
   lost,
@@ -31,11 +30,17 @@ import {
 } from './mitwachsen-guide';
 import * as rules from './worlds/eis/mitwachsen-lead';
 import { COME, toGate } from './worlds/eis/mitwachsen-lead';
-import { BREATH, HOP_AGAIN, SLIDE_PACE, mouth, toMeadow } from './worlds/eis/mitwachsen-ritual';
+import { BREATH, HOP_AGAIN, OPEN_TICKS, SLIDE_PACE, mouth, toMeadow } from './worlds/eis/mitwachsen-ritual';
+import { BESIDE, BOB_EVERY, NET, bay, inBay, plateRow } from './worlds/eis/mitwachsen-bay';
+import { plateMid } from './mitwachsen-plate';
 import { canStep, createWorld, standHeight, type World } from './mitwachsen-world';
+import { dirTo as faceTo } from './mitwachsen-free';
 import { PACKS, worldOf } from './test-worlds';
+import { HOLD_MS } from './input-pace';
 
 const TICK: Cmd = { type: 'tick' };
+const TICK_MS = 100; // Takt der Regeln (larmic-mitwachsen.ts)
+const HELD: Cmd = { type: 'tick', held: true }; // Takt mit gedrücktem Pfeil
 const key = ([x, y]: Point) => `${x},${y}`;
 const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
@@ -53,7 +58,7 @@ function run(s: State, world: World, ...cmds: (Cmd | Dir)[]) {
 }
 const ticks = (n: number): Cmd[] => Array.from({ length: n }, () => TICK);
 const guideOf = (s: State) => s.animals.find((a) => a.id === GUIDE);
-/** Schritte bis vor die Tür des Eistors (Weg der Wegfindung) */
+/** Schritte bis zum Platz des Pinguins neben der Torplatte (Weg der Wegfindung) */
 const dist = (world: World, a: { x: number; y: number }) => toGate(world).get(`${a.x},${a.y}`) ?? Infinity;
 /** Nächstes Feld auf dem Weg zum Tor */
 function downhill(world: World, [x, y]: Point): Point {
@@ -249,24 +254,31 @@ describe('Der Pinguin holt dich ab: Führen', () => {
     ); // schaut sie an
   });
 
-  it('folgt die Figur ihm, führt er sie bis vor die Tür des Eistors (in die golden markierte Bucht); dort geht es auf', () => {
+  it('folgt die Figur ihm, führt er sie in die Bucht vor dem Eistor neben die Torplatte; steht sie darauf, geht es auf', () => {
     let s = leading(world, onPath(world, 40), downhill(world, onPath(world, 40)));
     const door = world.gates.get('eis')!;
     const inBay = new Set(bay(door).map(key));
-    let opened: GameEvent[] = [];
-    for (let i = 0; i < 400 && !s.openGates.length; i++) {
+    for (let i = 0; i < 400 && dist(world, s.player) > 1; i++) {
       const here: Point = [s.player.x, s.player.y];
-      const r = run(s, world, dirTo(here, downhill(world, here)), TICK);
-      s = r.s;
-      opened = r.events;
-      if (!s.openGates.length) expect(cheb(guideOf(s)!, s.player), `Schritt ${i}`).toBeLessThanOrEqual(FAR + 1);
+      s = run(s, world, dirTo(here, downhill(world, here)), TICK).s;
+      expect(cheb(guideOf(s)!, s.player), `Schritt ${i}`).toBeLessThanOrEqual(FAR + 1);
     }
-    expect(s.openGates).toEqual(['eis']);
-    expect(opened).toContainEqual({ type: 'gate', id: 'eis' });
-    const g = guideOf(s)!;
-    expect(dist(world, g)).toBe(0); // direkt vor der Tür
+    s = run(s, world, ...ticks(4)).s;
+    let g = guideOf(s)!;
+    expect([g.x, g.y]).toEqual([...plateRow(door, BESIDE)]); // sein Platz neben der Platte, in der Bucht
+    expect(dist(world, g)).toBe(0);
     expect(inBay.has(key([g.x, g.y]))).toBe(true);
     expect(inBay.has(key([s.player.x, s.player.y]))).toBe(true);
+    expect(s.openGates).toEqual([]); // die Bucht allein öffnet nicht
+    // auf die Platte und stehen bleiben
+    const on = (x: number, y: number) => world.cell(x, y).plate === 'eis';
+    s = walk(s, world, on, 0).s;
+    const opened = run(s, world, ...ticks(OPEN_TICKS));
+    s = opened.s;
+    expect(s.openGates).toEqual(['eis']);
+    expect(opened.events).toContainEqual({ type: 'gate', id: 'eis' });
+    g = guideOf(s)!;
+    expect(inBay.has(key([g.x, g.y]))).toBe(true);
   });
 
   it('mit gehaltener Taste (ein Schritt alle 260 ms) läuft die Figur ihm nach, ohne je in ihn hineinzulaufen', () => {
@@ -470,12 +482,21 @@ describe('Das Eistor geht mit dem Pinguin auf', () => {
   const door = world.gates.get('eis')!;
   const front: Point = [door.mid[0] - door.out[0], door.mid[1] - door.out[1]]; // direkt vor der Mitte der Tür
   const row2: Point = [door.mid[0] - 2 * door.out[0], door.mid[1] - 2 * door.out[1]];
-  /** Figur und Pinguin in der Bucht: Der nächste Takt öffnet das Tor */
-  const atDoor = (extra: Animal[] = []) => leading(world, row2, front, extra);
+  const [bx, by] = plateRow(door, BESIDE);
+  const along = (u: number, t: number): Point => [
+    door.mid[0] - door.out[0] * t - door.out[1] * u,
+    door.mid[1] - door.out[1] * t + door.out[0] * u,
+  ];
+  const toDoor = dirTo([0, 0], door.out); // Pfeil Richtung Tür
+  const onPlate = (x: number, y: number) => world.cell(x, y).plate === 'eis';
+  /** Figur mitten auf der Torplatte (seit 0,3 s), Pinguin vor der Tür in der Bucht: Der nächste Takt öffnet das Tor */
+  const atDoor = (extra: Animal[] = []) => ({ ...leading(world, row2, front, extra), still: OPEN_TICKS - 1 });
   const opened = () => run(atDoor(), world, TICK);
   const ice = (x: number, y: number) => world.realm(x, y) === 'eis';
 
-  it('Pinguin öffnet das Eistor: Stehen Figur und Pinguin in der Bucht, geht es für immer auf; andere Tiere nicht', () => {
+  it('Pinguin öffnet das Eistor: Steht die Figur auf der Platte, er in der Bucht, geht es für immer auf; andere Tiere nicht', () => {
+    expect(plateMid(door)).toEqual(row2);
+    expect(onPlate(...row2)).toBe(true);
     const r = opened();
     expect(r.s.openGates).toEqual(['eis']);
     expect(r.s.ritual).toBe(r.s.tick);
@@ -497,6 +518,158 @@ describe('Das Eistor geht mit dem Pinguin auf', () => {
     }
     // erst, wenn er bei der Figur angekommen ist (Herz), nicht schon beim Auftauchen
     expect(run({ ...atDoor(), guideDue: 0 }, world, 'n').s.openGates).toEqual([]);
+  });
+
+  it('die Bucht allein öffnet nicht: Er stellt sich neben die Platte, schaut sie an und hüpft still alle 2 s', () => {
+    expect(plateRow(door, BESIDE)).toEqual(along(2, 2));
+    expect([1, 0, -1].map((u) => plateRow(door, u))).toEqual([along(1, 2), along(0, 2), along(-1, 2)]);
+    expect([-1, 0, 1].every((u) => onPlate(...plateRow(door, u)))).toBe(true);
+    expect(onPlate(...plateRow(door, -2))).toBe(false);
+    expect(inBay(door, bx, by) && inBay(door, ...along(-2, 3)) && !inBay(door, ...along(0, 4))).toBe(true);
+    expect(onPlate(bx, by)).toBe(false);
+    expect(toGate(world).size).toBeGreaterThan(1); // sein Weg beginnt dort und reicht weit
+    // Figur in der Bucht, aber nicht auf der Platte (vorn links an der Tür), der Pinguin vor der Tür
+    const r = run(leading(world, along(-2, 1), front), world, ...ticks(NET - 1));
+    expect(r.s.openGates).toEqual([]);
+    const g = guideOf(r.s)!;
+    expect([g.x, g.y]).toEqual([bx, by]); // neben die Platte gegangen
+    expect(g.dir).toBe(dirTo([bx, by], along(1, 2))); // schaut die Platte an
+    const bobs = r.events.filter((e) => e.type === 'bob');
+    expect(bobs.length).toBeGreaterThanOrEqual(Math.floor((NET - 1) / BOB_EVERY) - 1);
+    expect(bobs.length).toBeLessThanOrEqual(Math.ceil(NET / BOB_EVERY));
+    expect(bobs[0]).toEqual({ type: 'bob', id: GUIDE });
+    expect(types(r.events)).not.toContain('peep'); // still, ohne zu piepen
+    expect(types(r.events)).not.toContain('hop'); // keine Sperre: das Ritual hat nicht begonnen
+    expect(r.s.ritual).toBe(-1);
+  });
+
+  it('auf der Platte nach 4 Takten Stehen (0,4 s) geht es auf; vorher sperrt nichts, jeder Schritt zählt neu', () => {
+    let s = leading(world, along(0, 3), [bx, by]); // vor der Platte, er an seinem Platz
+    s = run(s, world, toDoor).s; // drauf
+    expect(onPlate(s.player.x, s.player.y)).toBe(true);
+    expect(s.still).toBe(0);
+    let r = run(s, world, ...ticks(OPEN_TICKS - 1));
+    expect(r.s.openGates).toEqual([]);
+    expect(r.s.ritual).toBe(-1);
+    expect(r.s.still).toBe(OPEN_TICKS - 1);
+    // ein Schritt auf das Nachbarfeld der Platte: keine Sperre, der Zähler beginnt neu
+    r = run(r.s, world, dirTo(along(0, 2), along(-1, 2)));
+    expect(types(r.events)).toEqual(['step']);
+    expect(r.s.still).toBe(0);
+    r = run(r.s, world, ...ticks(OPEN_TICKS - 1));
+    expect(r.s.openGates).toEqual([]);
+    r = run(r.s, world, TICK);
+    expect(r.s.openGates).toEqual(['eis']);
+    expect(r.s.ritual).toBe(r.s.tick); // ab jetzt sperrt das Ritual
+    expect(r.events).toContainEqual({ type: 'gate', id: 'eis' });
+    expect(run(r.s, world, toDoor).events).toEqual([{ type: 'hop' }]);
+  });
+
+  it('Drüberlaufen öffnet nie: mit gehaltener Taste (ein Schritt alle 260 ms) längs und quer über die Platte', () => {
+    /**
+     * Taste neu gedrückt und gehalten (input-pace.ts): erster Schritt sofort, der zweite erst nach HOLD_MS (5 Takte),
+     * dann abwechselnd 3 und 2 Takte je Schritt (im Schnitt 260 ms); in jedem Takt ist der Pfeil gedrückt
+     */
+    expect(Math.ceil(HOLD_MS / TICK_MS)).toBeGreaterThanOrEqual(OPEN_TICKS); // ohne `held` öffnete schon die Wartezeit
+    const held = (s: State, path: Point[]) => {
+      const all: GameEvent[] = [];
+      path.forEach((to, i) => {
+        const wait = i === 0 ? Math.ceil(HOLD_MS / TICK_MS) : i % 2 ? 2 : 3;
+        const r = run(s, world, dirTo([s.player.x, s.player.y], to), ...Array<Cmd>(wait).fill(HELD));
+        s = r.s;
+        all.push(...r.events);
+        expect([s.player.x, s.player.y]).toEqual([...to]);
+      });
+      return { s, all };
+    };
+    // längs: von links neben der Platte über alle drei Felder und hinaus nach vorn (der Pinguin steht rechts daneben)
+    const lengthwise = held(leading(world, along(-2, 2), [bx, by]), [
+      along(-1, 2),
+      along(0, 2),
+      along(1, 2),
+      along(1, 3),
+      along(0, 3),
+    ]);
+    expect(lengthwise.s.openGates).toEqual([]);
+    expect(types(lengthwise.all)).not.toContain('gate');
+    expect(types(lengthwise.all)).not.toContain('hop');
+    // quer: von vorn über die Platte bis an die Tür und zurück
+    const across = held(leading(world, along(0, 3), [bx, by]), [
+      along(0, 2),
+      along(0, 1),
+      along(-1, 1),
+      along(-1, 2),
+      along(-1, 3),
+    ]);
+    expect(across.s.openGates).toEqual([]);
+    expect(types(across.all)).not.toContain('gate');
+  });
+
+  it('einzelner Druck, gehalten: Solange ein Pfeil gedrückt ist, steht die Figur nicht; erst nach dem Loslassen zählt es', () => {
+    let s = leading(world, along(0, 3), [bx, by]);
+    s = run(s, world, toDoor).s; // auf die Platte, der Pfeil bleibt gedrückt (z. B. gegen den Pinguin daneben)
+    let r = run(s, world, ...Array<Cmd>(3 * OPEN_TICKS).fill(HELD));
+    expect(r.s.still).toBe(0);
+    expect(r.s.openGates).toEqual([]);
+    expect(types(r.events)).not.toContain('gate');
+    r = run(r.s, world, ...ticks(OPEN_TICKS)); // losgelassen: 0,4 s Stehen
+    expect(r.s.openGates).toEqual(['eis']);
+  });
+
+  it('Steht die Figur schon auf der Platte, wenn der Pinguin in die Bucht kommt, geht es gleich auf', () => {
+    // er ist noch vor der Bucht, sie wartet schon lange auf der Platte
+    let s: State = { ...leading(world, row2, along(2, 5)), still: 50 };
+    let arrived = -1;
+    for (let t = 0; t < 40 && !s.openGates.length; t++) {
+      const g = guideOf(s)!;
+      const inBay = bay(door).some(([x, y]) => x === g.x && y === g.y);
+      s = run(s, world, TICK).s;
+      // im ersten Takt, in dem er in der Bucht ist, geht es auf
+      expect(s.openGates, `Takt ${t}`).toEqual(inBay ? ['eis'] : []);
+      if (inBay) arrived = t;
+    }
+    expect(s.openGates).toEqual(['eis']);
+    expect(arrived).toBeGreaterThan(0);
+    expect(arrived).toBeLessThan(20);
+  });
+
+  it('Anstoßen an der Tür zählt wie die Platte; ohne Pinguin in der Bucht nur ein Anstoßen', () => {
+    const s = leading(world, along(-1, 1), [bx, by]); // vorn an der Tür, nicht auf der Platte
+    const r = run(s, world, toDoor);
+    expect(types(r.events)).toContain('bump');
+    expect(r.s.openGates).toEqual(['eis']);
+    expect(r.events).toContainEqual({ type: 'gate', id: 'eis' });
+    // der Pinguin noch weit weg: Die Tür bleibt zu
+    const far = run(leading(world, along(-1, 1), onPath(world, 12)), world, toDoor);
+    expect(types(far.events)).toEqual(['bump']);
+    expect(far.s.openGates).toEqual([]);
+  });
+
+  it('Sicherheitsnetz: Nach 8 s in der Bucht neben der Platte hüpft er darauf, schaut zur Figur und winkt; kein Kind bleibt hängen', () => {
+    let s = leading(world, along(-2, 1), [bx, by]); // in der Bucht, nicht auf der Platte
+    let r = run(s, world, ...ticks(NET - 1));
+    expect([guideOf(r.s)!.x, guideOf(r.s)!.y]).toEqual([bx, by]);
+    expect(types(r.events)).not.toContain('arrive');
+    r = run(r.s, world, TICK);
+    const g = guideOf(r.s)!;
+    expect([g.x, g.y]).toEqual(along(1, 2)); // auf die Platte, gleich neben seinem Platz
+    expect(onPlate(g.x, g.y)).toBe(true);
+    const [px, py] = along(-2, 1);
+    expect(g.dir).toBe(faceTo(px - g.x, py - g.y)); // schaut zur Figur
+    expect(r.events).toContainEqual({ type: 'arrive', id: GUIDE, species: 'pinguin' }); // Hüpfer und Herz: er winkt
+    expect(r.s.openGates).toEqual([]);
+    // Er bleibt dort und hüpft weiter still, solange sie in der Bucht ist
+    r = run(r.s, world, ...ticks(2 * BOB_EVERY));
+    expect([guideOf(r.s)!.x, guideOf(r.s)!.y]).toEqual(along(1, 2));
+    expect(types(r.events)).toContain('bob');
+    expect(types(r.events)).not.toContain('arrive');
+    // die Figur tritt auf ein freies Feld der Platte und bleibt stehen: Das Tor geht auf
+    s = walk(r.s, world, (x, y) => onPlate(x, y), 0).s;
+    expect(s.openGates).toEqual([]);
+    s = run(s, world, ...ticks(OPEN_TICKS)).s;
+    expect(s.openGates).toEqual(['eis']);
+    // läuft sie stattdessen gegen die Tür, geht es auch auf
+    expect(run(leading(world, along(-2, 1), [bx, by]), world, toDoor).s.openGates).toEqual(['eis']);
   });
 
   it('Ritual: 3 s lang lassen Pfeile die Figur nur hüpfen, danach gibt der nächste Pfeil sie frei', () => {
@@ -696,6 +869,7 @@ describe('Invarianten bei wildem Drücken bis durchs offene Eistor', () => {
         }
         for (let k = 0; k < 6 && !s.openGates.length; k++) {
           go((x, y) => inBay.has(key([x, y])), 2); // zur Bucht, der Pinguin führt
+          go((x, y) => world.cell(x, y).plate === 'eis', 2); // auf die Torplatte und stehen bleiben
           for (let t = 0; t < 30 && !s.openGates.length; t++) s = step(s, world, TICK, undefined, rules).state;
         }
         expect(s.openGates).toEqual(['eis']);
