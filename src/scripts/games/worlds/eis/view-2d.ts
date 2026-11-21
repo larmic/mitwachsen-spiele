@@ -1,6 +1,7 @@
 // Zeichenteile der Eis-Welt für die 2D-Ansicht und die Ebene über 3D, im Welt-Paket der Eis-Welt: Iglu, Eisschale,
 // Eistrog, Fischkiste, Eisscholle und Eiskristall (Quader aus mitwachsen-ice-look.ts, je Deko-Art an den Haken `drawDeco` des Kerns gehängt), die
-// Rutschspur zum Schneebett, das Wetter der Eis-Welt mit Polarlicht und das Bild der Weltgrenze (mitwachsen-ice-sky.ts).
+// Rutschspur zum Schneebett, das Wetter der Eis-Welt mit Polarlicht, das Bild der Weltgrenze (mitwachsen-ice-sky.ts) und
+// die Fußspuren im Schnee (mitwachsen-prints.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
 import { ICE_COLORS, ICE_CRYSTALS } from '../../../../data/games/mitwachsen-eis';
@@ -9,6 +10,7 @@ import type { DrawDeco, View2D } from '../../mitwachsen-view';
 import { gateScore, guestAt } from '../../mitwachsen-guest-look';
 import { realmSign, turnAlbum, waitArrow } from './mitwachsen-border-view';
 import { aurora, iceWeather, shine } from './mitwachsen-ice-sky';
+import { trail } from './mitwachsen-prints';
 
 /** Iglu, Eisschale, Eistrog: Quader wie in 3D */
 const look: DrawDeco = (world, c, x, y) => iceBoxes(world, c, x, y);
@@ -35,4 +37,6 @@ export const view: View2D = {
   ground: (c, x, y, open) => (c.slide && open ? [x + 0.12, y, c.h, 0.76, 1, 0.02, ...ICE_COLORS.slide] : null),
   // Wetter und Bild der Weltgrenze der Eis-Welt in der Form, die der Kern kennt (`Sky` in mitwachsen-view.ts)
   sky: { weather: iceWeather, aurora, waitArrow, realmSign, turnAlbum, guestAt, gateScore },
+  // Fußspuren im Schnee, die langsam verwehen (mitwachsen-prints.ts)
+  trail,
 };

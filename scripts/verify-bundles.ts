@@ -24,7 +24,8 @@ export const RULES: Rule[] = [
     // Regeln, Welt, 2D-Ansicht und Daten des Spiels; 3D (Three.js) und die Welt-Pakete kommen erst per import().
     // Gemessen 122,1 KB, seit die Eis-Welt nur bei Bedarf lädt und ihre Zeichenteile (Iglu, Fischkisten, Wetter) und
     // die Modelle ihrer Tiere mitbringt (vorher 125,7 KB bei 132 KB); 122,3 KB, seit die 3D-Ansicht den Haken drawDeco
-    // mitnutzt; 124,0 KB mit dem Gletschertal (Seen, Eisberg: Farben und Zeichnen gefärbter Eisfelder); dazu 2 KB Luft
+    // mitnutzt; 124,0 KB mit dem Gletschertal (Seen, Eisberg: Farben und Zeichnen gefärbter Eisfelder); mit den
+    // Haken der Fußspuren im Schnee (`View2D.trail`, `View3D.layer`) unverändert 124,0 KB; dazu 2 KB Luft
     budget: 126 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
@@ -42,9 +43,12 @@ export const RULES: Rule[] = [
     // Gletschertal, Seen, Eisfall und fünf Tieren je Art; 33,6 KB mit dem Eisberg zum Erklettern (Stufen, Steg, Fahne
     // auf dem Gipfel; die Lage des Gipfels merkt sich der Bau, statt sie zu suchen). Zweite Abweichung vom Plan, nicht
     // freigegeben (das Anheben ist nur für Schneemann, Glockenspiel und Fußspuren erlaubt): Unter 33 KB passt der
-    // Eisberg nicht, ohne fremde Teile des Pakets umzubauen. Darum 34 KB, eine offene Frage an den Vater; dazu knapp
-    // 0,4 KB Luft
-    budget: 34 * 1024,
+    // Eisberg nicht, ohne fremde Teile des Pakets umzubauen. Darum 34 KB, eine offene Frage an den Vater. 37,1 KB mit
+    // den Fußspuren im Schnee (Ringpuffer mitwachsen-tracks.ts, Formen je Gangart, höchstens zwei je Feld, 2D-Zeichnung
+    // ohne Nebelrand): Bewusst angehoben mit Zustimmung des Vaters (Fußspuren, Schneemann und Glockenspiel gehören zur
+    // Eis-Welt und kommen darum mit ihrem Paket, der Kern wächst nur um die Haken); dazu knapp 0,9 KB Luft. Schneemann
+    // und Glockenspiel heben sie wieder an
+    budget: 38 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {
@@ -53,7 +57,8 @@ export const RULES: Rule[] = [
     chunks: /\/mitwachsen-3d\.[\w-]+\.js$/,
     // Three.js (517,7 KB in three.<hash>.js) und die 3D-Ansicht samt Zugängen, ohne die Teile der Eis-Welt: gemessen
     // 589,5 KB (vorher 591,9 KB in einer Datei mit Iglu, Fischkisten, Tür und Eiszapfen des Eistors); 589,8 KB mit dem
-    // Material für Quader, die so hell leuchten, wie ein Welt-Paket sagt (`View3D.glow`); dazu gut 5 KB Luft
+    // Material für Quader, die so hell leuchten, wie ein Welt-Paket sagt (`View3D.glow`); 589,9 KB mit dem Haken der
+    // Fußspuren im Schnee (`View3D.layer`, `Views3D.layers`); dazu gut 5 KB Luft
     budget: 595 * 1024,
     // Probe: Das Leuchten der Eiszapfen gibt es nur im 3D-Teil der Eis-Welt (ICE_GLOW in worlds/eis/view-3d-gate.ts)
     forbidden: /#7fd6ff/,
@@ -66,7 +71,8 @@ export const RULES: Rule[] = [
     // Fischkisten): was die mitbringen, zählt nicht
     after: /\/(mitwachsen-3d|welt-eis)\.[\w-]+\.js$/,
     // Iglu, Eisschale, Eistrog, Fischkiste, Schnee und Eis im Kessel, Rutschspur, Bett aus Schnee, Tür, Eiszapfen und
-    // goldene Bucht des Eistors: gemessen 2,1 KB, dazu etwa 4 KB Luft
+    // goldene Bucht des Eistors: gemessen 2,1 KB; 3,3 KB mit den Fußspuren im Schnee (durchsichtige Plättchen in einem Mesh, nur
+    // Klassen von Three.js, die die 3D-Ansicht schon nutzt, sonst wüchse three.<hash>.js); dazu gut 2,5 KB Luft
     budget: 6 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },

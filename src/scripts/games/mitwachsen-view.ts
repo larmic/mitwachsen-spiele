@@ -64,6 +64,15 @@ export type Sky = {
   gateScore(): Scored[];
 };
 
+/**
+ * Spuren am Boden einer Welt (Eis-Welt: Fußspuren im Schnee), nur Bild: `step` je Bild (in beiden Ansichten), `draw`
+ * in 2D je Reihe nach ihrem Boden
+ */
+export type Trail = {
+  step(world: World, state: State, sc: SkyScene): void;
+  draw(ctx: CanvasRenderingContext2D, world: World, P: Projection, y: number): void;
+};
+
 /** Zeichenteile einer Welt aus ihrem Paket */
 export type View2D = {
   /** je Deko-Art, die nur diese Welt hat, ihre Zeichnung */
@@ -71,6 +80,7 @@ export type View2D = {
   /** flach auf dem Boden eines Felds (Rutschspur, glänzt bei offenem Tor der Welt), sonst null */
   ground(c: Cell, x: number, y: number, open: boolean): Box | null;
   sky: Sky;
+  trail?: Trail;
 };
 
 /** Deko-Arten, die nur ein Welt-Paket zeichnet: Ohne seine Zeichnung steht dort ein einfacher Block */

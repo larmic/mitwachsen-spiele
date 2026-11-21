@@ -173,6 +173,7 @@ export class Renderer {
     this.guest = this.view?.sky.guestAt(world, state) ?? null;
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) this.ground(P, world, x, y, sc);
+      this.view?.trail?.draw(ctx, world, P, y); // Fußspuren im Schnee (aus dem Welt-Paket)
       for (let x = x0; x <= x1; x++) this.deco(P, world, state, sc, x, y);
       for (const b of this.later) if (Math.ceil(b[1] + b[4] - 1e-6) - 1 === y) drawBox(ctx, P, b);
       const ids = (rows.get(y) ?? []).sort((a, b) => sc.bodies.get(a)!.x - sc.bodies.get(b)!.x);
@@ -213,6 +214,7 @@ export class Renderer {
     const { ctx } = this;
     const z = sc.zoom;
     const followers = new Set(state.followers);
+    this.view?.trail?.step(world, state, sc); // Spuren merken, in beiden Ansichten (nur Bild)
     if (sc.evening > 0) this.eveningGlow(sc);
     this.weather(sc);
     const ice = this.iceSky(world, state); // Wetter der Eis-Welt und Bild der Weltgrenze, erst nachgeladen
@@ -257,8 +259,7 @@ export class Renderer {
 
   private sky(sc: Scene) {
     const { ctx } = this;
-    const bands = ['#79c7ea', '#8dd0ee', '#a6dbf2'];
-    bands.forEach((c, i) => {
+    ['#79c7ea', '#8dd0ee', '#a6dbf2'].forEach((c, i) => {
       ctx.fillStyle = c;
       ctx.fillRect(0, (sc.height * i) / 3, sc.width, sc.height / 3 + 1);
     });
@@ -266,8 +267,7 @@ export class Renderer {
 
   private img(P: Projection, image: HTMLCanvasElement, x: number, y: number, top: number) {
     const [sx, sy] = P(x, y, top);
-    const [ex] = P(x + 1, y, top);
-    const w = ex - sx;
+    const w = P(x + 1, y, top)[0] - sx;
     this.ctx.drawImage(image, sx, sy, w, (w * (TILE_D + LEVEL_H)) / TILE_W);
   }
 

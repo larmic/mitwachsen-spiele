@@ -85,6 +85,7 @@ Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzel
 - **Aussehen:** Schneefelder, glitzernde Eisblöcke zum Klettern, zugefrorene Seen, verschneite Tannen, Iglus. Kühles, helles Licht, sanfter Schneefall (nicht bei reduzierter Bewegung).
 - **Besonderes:** Auf Eis rutscht die Figur nicht (das wäre für ein kleines Kind frustrierend), es knirscht nur beim Laufen.
 - **Tiere:** zehn Arten, je fünf Tiere (50, so dicht wie auf der Lichtung; früher je drei: In alten Spielständen kommen die neuen von selbst wild im Tal dazu). Jede Art hat ihren Lieblingsort im Tal, dort ist das erste Tier jeden Tag zu finden (an einem neuen Morgen steht es ein paar Schritte woanders, aber immer dort): Robben und Walrosse an den großen Seen, der Papageitaucher am kleinen See, Rentiere und Moschusochsen bei den Tannen, die Schneeeule in den Tannen hinten, Polarfuchs und Lemming zwischen Eisblöcken, das Eisbärkind hinten am Eisfall, der Pinguin am Iglu. Die anderen laufen verteilt durch das ganze Tal; überall gibt es etwas zu entdecken. Alle Töne in der Pentatonik, von tief bis hoch, damit man jedes Tier am Ton erkennt. Der Schneehase fehlt mit Absicht: Er sähe aus wie der Hase der Lichtung.
+- **Fußspuren im Schnee:** Wo das Kind im Tal läuft, bleiben hinter der Figur kleine Stiefelabdrücke im Schnee, und jedes Tier hinterlässt seine eigene Spur: Pinguin-Füßchen wie ein Dreizack, Tatzen beim Eisbärkind, Hufe bei Rentier und Moschusochse, die Hoppelspur des Polarfuchses, winzige Trippelspuren von Lemming und Papageitaucher, die breite Rutschspur mit Flossen von Robbe und Walross, feine Krallen der Schneeeule. Die Spuren verwehen langsam (nach gut einer halben Minute sind sie weg), beim Pustewind und bei Schneefall schneller. Läuft eine ganze Kette hinter der Figur, treten die Tiere in dieselben Felder; auf jedem bleiben höchstens zwei Abdrücke, so wird es nie dunkel. Am Nebelrand liegen keine Spuren. Sie sind klein und blaugrau wie Schatten im Schnee, nie golden und nie wie ein Weg: Sie versprechen nichts, sie erzählen nur, wer hier war. Nur Bild, nichts davon wird gespeichert. Bei reduzierter Bewegung verblassen sie nicht, sondern verschwinden in drei Stufen. Dieselben Spuren lassen sich später im Sand wiederverwenden.
 
   | Tier | Merkmal | Ton | Gangart |
   | --- | --- | --- | --- |
@@ -111,7 +112,7 @@ Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzel
 ### Sandwelt
 
 - **Aussehen:** Dünen in sanften Stufen, Kakteen, Palmen an einer kleinen Oase, Sandsteinfelsen, warmes Licht.
-- **Besonderes:** Fußspuren im Sand, die langsam verwehen (reine Zierde).
+- **Besonderes:** Fußspuren im Sand, die langsam verwehen (reine Zierde; der Ringpuffer der Fußspuren im Schnee, `mitwachsen-tracks.ts`, ist dafür schon da).
 - **Tiere (Ideen):** Kamel, Erdmännchen, Eidechse, Wüstenfuchs, Schildkröte aus der Oase.
 - **Portal-Plattform:** Sandsteinstufe, Mini-Pyramiden mit glühender Spitze; Bild: Stufenpyramide.
 

@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cell } from './mitwachsen-cell';
 import { Views3D, type Frame, type View3D } from './mitwachsen-view-3d';
-import { EIS_PACK } from './test-worlds';
+import { Group } from 'three';
+import { EIS_PACK, worldOf } from './test-worlds';
 
 const WOOD: Frame = ['#8a5a30', null, 'planks'];
 const snow: Cell = { h: 2, ground: 'snow', deco: 'bed', region: 'eis', solid: false, biome: 'eis' };
@@ -15,6 +16,9 @@ describe('Haken der 3D-Ansicht für Welt-Pakete (Views3D)', () => {
     expect(v.look('eis')).toBeUndefined();
     expect(v.decos.decos).toEqual({});
     expect(v.glow(1, false, 500)).toEqual([1, 1, 1]); // Quader 'glow' leuchten wie gebaut
+    const scene = new Group();
+    v.layers(worldOf(1), scene);
+    expect(scene.children).toEqual([]); // nichts, was je Bild nachgeführt wird (keine Fußspuren)
   });
 
   it('lädt den 3D-Teil eines Pakets einmal; danach baut er Boden, Bett, Dinge und Tor seiner Welt', async () => {
@@ -42,6 +46,14 @@ describe('Haken der 3D-Ansicht für Welt-Pakete (Views3D)', () => {
     // Leuchten: ohne Polarlicht wie gebaut, mit ihm heller (aus dem Paket)
     expect(v.glow(0, false, 0)).toEqual([1, 1, 1]);
     expect(v.glow(1, true, 0)[1]).toBeGreaterThan(1);
+    // je Bild nachgeführt: die Fußspuren im Schnee, einmal in die Szene gehängt (nach neuem Kontext in die neue)
+    const { layer } = await EIS_PACK.view3d!();
+    const [one, two] = [new Group(), new Group()];
+    v.layers(worldOf(1), one);
+    v.layers(worldOf(1), one);
+    expect(one.children).toEqual([layer!.object]);
+    v.layers(worldOf(1), two);
+    expect([one.children, two.children]).toEqual([[], [layer!.object]]);
   });
 
   it('scheitert das Laden, bleibt es schlicht ohne Fehler und wird beim nächsten Aufruf wieder versucht', async () => {

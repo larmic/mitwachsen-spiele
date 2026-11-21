@@ -363,8 +363,7 @@ export class World3D {
     const cam = sc.cam;
     const tx = cam.x + 0.5,
       tz = cam.y + 0.5;
-    const me = sc.bodies.get('player');
-    const ty = me ? me.z : 1;
+    const ty = sc.bodies.get('player')?.z ?? 1;
     // Im Hochformat (Handy) weiter weg, damit links und rechts genug Welt zu sehen ist; der Nebel rückt mit
     const dist = DISTANCE * Math.min(1.8, Math.max(1, 0.95 / this.camera.aspect));
     const fog = this.scene.fog as Fog;
@@ -406,6 +405,7 @@ export class World3D {
     this.platforms.sync(state, sc);
     this.notes.update(state, sc.now, sc.reduced);
     this.glow.color.setRGB(...this.views.glow(sc.aurora, sc.reduced, sc.now));
+    this.views.layers(world, this.scene); // was die Welt-Pakete je Bild nachführen (Fußspuren im Schnee)
     this.renderer.render(this.scene, this.camera);
   }
 
