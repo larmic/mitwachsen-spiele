@@ -51,7 +51,8 @@ import { Geo, atlas, snapToShadowTexel, type Tile, type V3 } from './mitwachsen-
 import { grown } from './mitwachsen-growth';
 import { iceBoxes } from './mitwachsen-ice-look';
 import { parts, type Parts } from './mitwachsen-gatehouse';
-import { gate } from './mitwachsen-gates-3d';
+import { gate, moves } from './mitwachsen-gates-3d';
+import { MovingGates } from './mitwachsen-gate-motion-3d';
 import { goldenBay } from './mitwachsen-guest-3d';
 import { GUIDE_GATE, guideGate } from './mitwachsen-guide';
 import { ritualGlow } from './mitwachsen-guest-look';
@@ -171,6 +172,7 @@ export class World3D {
   private day = 0; // Tag der Welt: bestimmt, was nachgewachsen ist
   private slide = false; // Eistor offen: Die Rutschspur zum Schneebett glänzt
   private gatesKey = ''; // wie die Torhäuser gebaut sind: Öffnung je Tor und wohin der Pinguin führt
+  private moving = new MovingGates(); // bewegte Teile der Zugänge (fließende Wand, wiegende Ranken), je Takt gebaut
   private models = new Map<string, BufferGeometry>();
   private bodies = new Map<string, Mesh>();
   private signs = new Group();
@@ -400,6 +402,7 @@ export class World3D {
 
     this.updateFog(cam.x, cam.y);
     this.syncGates(world, state, sc);
+    this.moving.sync(sc, (p) => this.meshes(p));
     this.syncChunks(world, cam.x, cam.y);
     this.syncBodies(state, sc);
     this.syncSigns(state);
@@ -490,6 +493,7 @@ export class World3D {
    */
   private buildGates(world: World, open: (id: GateId) => number = () => 0, guest: GateId | null = null, lit = 0) {
     this.clear(this.gateGroup);
+    this.moving.clear();
     for (const g of world.gates.values()) {
       const p = parts();
       const [[mx, my], [fx, fy]] = [g.mid, [-g.out[0], -g.out[1]]];
@@ -500,6 +504,7 @@ export class World3D {
       if (g.id === guest) goldenBay(p, (u, t) => world.cell(mx + u * fy + t * fx, my - u * fx + t * fy).h - h);
       const group = this.place(new Group(), mx, my, h, [fx, fy]);
       group.add(...this.meshes(p));
+      if (moves(g.id)) group.add(this.moving.add(g.id, [mx + 0.5, my + 0.5], open(g.id), [-fx || 0, fy || 0]));
       for (const w of wings) {
         const wing = new Group();
         wing.position.set(w.hinge[0], 0, w.hinge[1]);

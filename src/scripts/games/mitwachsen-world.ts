@@ -250,7 +250,7 @@ function buildStart(
         // Hinter den Türmen steckt das Torhaus im Fels (3D: 2,5 Felder tief). Dort bleibt der Fels flach wie das Turmfeld,
         // sonst stünden seine Wände genau in den Turmwänden und flackerten mit ihnen (Z-Fighting)
         if (Math.abs(u) > GATE_HALF) set(x, y, rock(t <= p.depth + HOUSE_DEPTH ? 1 : ringHeight(1.1)));
-        // Die ersten Reihen des Gangs gehören zum Zugang (Steg, Platten, Bach …): dort wächst nichts durch
+        // Die ersten Reihen des Gangs gehören zum Zugang (Becken, Stufen, Platten …): dort wächst nichts durch
         else if (t <= p.depth + GATE_FLOOR) set(x, y, { ...passage(seed, p.id, x, y), deco: null, tufts: 0 });
         else set(x, y, passage(seed, p.id, x, y));
       }

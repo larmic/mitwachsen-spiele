@@ -20,7 +20,7 @@ export const APRON: Record<GateId, Ground> = {
   pilze: 'moss',
 };
 const APRON_ROWS = 6; // so viele Reihen reicht das Vorfeld in die Lichtung
-/** So viele Reihen des Gangs hinter der Torreihe gehören zum Zugang (Steg, Platten, Bach …): ohne Blumen und Büschel */
+/** So viele Reihen des Gangs hinter der Torreihe gehören zum Zugang (Becken, Stufen, Platten …): ohne Blumen und Büschel */
 export const GATE_FLOOR = 4;
 
 type Place = { id: GateId; at: (u: number, t: number) => Point; depth: number };

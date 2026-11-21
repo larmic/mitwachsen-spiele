@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { BufferGeometry } from 'three';
 import { GATES } from '../../data/games/mitwachsen';
 import { parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
-import { gate as gatehouse } from './mitwachsen-gates-3d';
+import { gate as gatehouse, motion, moves } from './mitwachsen-gates-3d';
+import { BEATS } from './mitwachsen-gate-kit';
 import { goldenBay } from './mitwachsen-guest-3d';
 import { GUEST_COLORS, GUEST_FILLED, GUEST_OUTLINE, guestPixel, ritualGlow } from './mitwachsen-guest-look';
 import { RITUAL } from './mitwachsen-guide';
@@ -95,6 +96,19 @@ describe('Torhäuser und Portal-Plattformen flackern nicht', () => {
         for (const w of wings) expect(fighting(w.parts), `Flügel bei ${open}`).toEqual([]); // jeder Flügel für sich
       }
     });
+    if (moves(g.id))
+      it(`${g.id}: bewegte Teile in jedem Takt ebenso, auch zusammen mit dem festen Raster`, () => {
+        for (const open of [0, 0.5, 1])
+          for (let beat = 0; beat < BEATS; beat++) {
+            const { p } = house(g.id, open, false);
+            const m = parts();
+            motion(m, g.id, beat, open);
+            const moving = Object.entries(m).flatMap(([name, geo]): [string, BufferGeometry][] =>
+              geo.empty ? [] : [[`Takt ${name}`, geo.build()]],
+            );
+            expect(fighting(p, moving), `offen ${open}, Takt ${beat}`).toEqual([]);
+          }
+      });
     it(`${g.id}: mit Umriss des Pinguins und goldener Bucht ebenso, auch wenn er sich füllt und die Eiszapfen leuchten`, () => {
       for (const open of [0, 0.5, 1])
         for (const lit of [0, 0.5, 1]) {

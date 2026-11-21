@@ -3,17 +3,19 @@
 // Spezifikation: docs/specs/mitwachsen.md („Was angezeigt wird“: Große Tore)
 
 import type { GateTheme } from '../../data/games/mitwachsen';
-import type { GateBuild, Parts, Wing } from './mitwachsen-gate-kit';
+import type { GateBuild, GateMotion, Parts, Wing } from './mitwachsen-gate-kit';
 import { build as eis } from './mitwachsen-gate-eis';
 import { build as sand } from './mitwachsen-gate-sand';
-import { build as wasser } from './mitwachsen-gate-wasser';
-import { build as lava } from './mitwachsen-gate-lava';
+import { build as wasser, motion as wasserMotion } from './mitwachsen-gate-wasser';
+import { build as lava, motion as lavaMotion } from './mitwachsen-gate-lava';
 import { build as hoehle } from './mitwachsen-gate-hoehle';
 import { build as wald } from './mitwachsen-gate-wald';
 import { build as wolken } from './mitwachsen-gate-wolken';
-import { build as pilze } from './mitwachsen-gate-pilze';
+import { build as pilze, motion as pilzeMotion } from './mitwachsen-gate-pilze';
 
 const BUILD: Record<GateTheme, GateBuild> = { eis, sand, wasser, lava, hoehle, wald, wolken, pilze };
+// Zugänge mit bewegten Teilen: die fließende Wasserwand, die Glutkaskade, die wiegenden Pilzranken
+const MOTION: Partial<Record<GateTheme, GateMotion>> = { wasser: wasserMotion, lava: lavaMotion, pilze: pilzeMotion };
 
 /**
  * Ein Zugang: Geometrie in `p`, dazu seine Türflügel (nur das Eistor hat welche). `open` 0 zu … 1 offen, `outline` der
@@ -29,4 +31,12 @@ export function gate(
   cam: readonly [number, number] = [0, 1],
 ): Wing[] {
   return BUILD[theme](p, { open, outline, lit, cam });
+}
+
+/** Ob ein Zugang bewegte Teile hat (dann zeichnet `motion` sie je Takt) */
+export const moves = (theme: GateTheme) => theme in MOTION;
+
+/** Bewegte Teile eines Zugangs im Takt `beat` in `p` (gleiche Bedeutung von `open` und `cam` wie bei `gate`) */
+export function motion(p: Parts, theme: GateTheme, beat: number, open = 0, cam: readonly [number, number] = [0, 1]) {
+  MOTION[theme]?.(p, { open, outline: false, lit: 0, cam }, beat);
 }
