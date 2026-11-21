@@ -9,12 +9,13 @@ import type { Cell } from '../../mitwachsen-cell';
 
 /**
  * Gehört ein Feld zum Thema? Seen: das offene Wasser ihrer Eislöcher (nur die drei Seen haben eins; glattes Eis liegt
- * auch auf kleinen Tümpeln und im Becken des Eisfalls); Eisblöcke: Eis eine Stufe höher
+ * auch auf kleinen Tümpeln und im Becken des Eisfalls); Eisblöcke: Eis eine Stufe höher (nicht die gefärbten Stufen des
+ * Eisbergs)
  */
 export const HAUNTS: Record<IceHaunt, (c: Cell) => boolean> = {
   lake: (c) => c.region === 'eis' && c.ground === 'water',
   pines: (c) => c.tree === 'snowpine',
-  blocks: (c) => c.region === 'eis' && !c.solid && c.ground === 'ice' && c.h >= 2,
+  blocks: (c) => c.region === 'eis' && !c.solid && c.ground === 'ice' && c.h >= 2 && !c.color,
   fall: (c) => c.color === KESSEL_COLORS.fall,
   igloo: (c) => c.deco === 'igloo',
 };

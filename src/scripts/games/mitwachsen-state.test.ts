@@ -27,6 +27,7 @@ import { heardStone } from './mitwachsen-story';
 import { EIS_PACK, PACKS, worldOf } from './test-worlds';
 import { ICE_ANIMALS } from '../../data/games/worlds/eis/mitwachsen-kessel';
 import { HAUNTS } from './worlds/eis/mitwachsen-haunts';
+import { bergPeak } from './worlds/eis/mitwachsen-ice-sky';
 import { migrate, newWorld, progressFrom, withProgress, type SavedWorld } from './mitwachsen-save';
 
 /** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich; Zuhause der Eis-Welt (im Kessel von Seed 1) */
@@ -1029,6 +1030,29 @@ describe('Zuhause je Gegend', () => {
       }
     }
     expect(tried).toBeGreaterThan(20);
+  });
+
+  it('gespeicherte Position auf dem Eisberg (Gipfel oder Stufe): Start im Schneebett, kein neues Speicherformat', () => {
+    // Der Eisberg kam nach: Eine alte Position kann auf seinen Stufen oder dem Gipfel liegen. Sie ist begehbar, die
+    // Figur startet trotzdem wie jede im Kessel im Schneebett und wacht daneben auf
+    for (const seed of [1, 42, 2026]) {
+      const world = worldOf(seed);
+      const [px, py] = bergPeak(world)!;
+      for (const p of [
+        [px, py],
+        [px + 3, py],
+      ] as const) {
+        expect(world.cell(...p), `Seed ${seed}: ${p.join(',')}`).toMatchObject({ ground: 'ice', region: 'eis' });
+        expect(world.cell(...p).h, `Seed ${seed}: ${p.join(',')}`).toBeGreaterThanOrEqual(2);
+        expect(standHeight(world, ['eis'], ...p), `Seed ${seed}: begehbar`).not.toBeNull();
+        expect(startRealm(world, ['eis'], [...p]), `Seed ${seed}`).toBe('eis');
+        let s = initialState(world, { position: [...p], openGates: ['eis'] });
+        expect([s.player.x, s.player.y], `Seed ${seed}: ${p.join(',')}`).toEqual([...world.homes.eis.bed]);
+        s = run(s, world, ...Array<typeof TICK>(SLEEP_LOCK).fill(TICK), 'n').s;
+        expect(world.realm(s.player.x, s.player.y)).toBe('eis');
+      }
+      expect(world.cell(px, py).h, `Seed ${seed}: Gipfel`).toBe(5);
+    }
   });
 
   it('alter Spielstand hinter dem Felsring, der heute zu keinem Feld des Gletschertals gehört (Umbau): Start im Schneebett', () => {

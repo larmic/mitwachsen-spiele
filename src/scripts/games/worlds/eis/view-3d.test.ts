@@ -118,6 +118,16 @@ describe('3D-Teil des Welt-Pakets der Eis-Welt (view-3d.ts)', () => {
     expect(view3d.ground(cliff, ['eis'])).toEqual({ tiles: ['snowTop', 'ice', 'ice'] });
   });
 
+  it('Eisberg: Stufen aus Eis mit Seiten in ihrem Blau, glattes Eis obenauf (wie der Eisfall); das Eis ringsum bleibt Eis', () => {
+    const step: Cell = { ...snow, h: 4, ground: 'ice' };
+    expect(view3d.ground({ ...step, color: KESSEL_COLORS.berg }, [])).toEqual({
+      tiles: ['snowTop', 'snowTop', 'snowTop'],
+      top: ICE_COLORS.ice[1],
+      side: KESSEL_COLORS.berg,
+    });
+    expect(view3d.ground({ ...step, h: 1 }, [])).toBeNull(); // glattes Eis wie die Seen
+  });
+
   it('das Bett im Kessel ist aus Schnee, sonst sagt das Paket nichts (Holz)', () => {
     expect(view3d.bedFrame({ ...snow, deco: 'bed' })).toEqual([...ICE_COLORS.snow, 'white']);
     expect(view3d.bedFrame({ ...snow, deco: 'bed', biome: undefined, region: 'lichtung' })).toBeNull();

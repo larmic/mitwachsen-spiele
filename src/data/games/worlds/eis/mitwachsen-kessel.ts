@@ -1,5 +1,5 @@
-// Gletscherkessel (Gletschertal) der Eis-Welt: Maße, Lage von Seen und Eislöchern, Fischkisten, Moosfleck, Eisfall und
-// Eis-Portal, Lieblingsorte der zehn
+// Gletscherkessel (Gletschertal) der Eis-Welt: Maße, Lage von Seen und Eislöchern, Eisberg, Fischkisten, Moosfleck,
+// Eisfall und Eis-Portal, Lieblingsorte der zehn
 // Eis-Tiere. Nur das Welt-Paket der Eis-Welt (src/scripts/games/worlds/eis/) liest diese Daten; es wird nachgeladen.
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md (Abschnitte „Welt-Pakete“ und Gletscherkessel)
 
@@ -40,6 +40,14 @@ export const KESSEL = {
    */
   fall: { half: 7, h: 6, foot: 2 },
   /**
+   * Eisberg zum Erklettern am ersten großen See (`lake`, Index in `lakes`): `out` Felder hinter seinem Eisloch (vom Tor
+   * weg, er wandert mit dem See). Runde Stufen aus Eis, jede eine Ebene höher (Höhe 2 bis `top`), jede `step` Felder
+   * breit, oben ein ebener Gipfel (Radius `plateau`) mit Fahne; ringsum `girdle` Felder glattes Eis des Sees, und von
+   * dort ein Steg aus Eis (drei Felder breit) quer zur Mitte des Tals, bis `steg` Felder neben der Achse (dem Hauptweg
+   * vom Schneebett zum Eis-Portal)
+   */
+  berg: { lake: 1, out: 12, top: 5, plateau: 1.5, step: 1.2, girdle: 2, steg: 4 },
+  /**
    * Sechs Fischkisten [quer, vom Tor weg]: drei nah am Zuhause (am Ende der Rutschspur nahe dem Tor, hinter dem Bett
    * und nahe dem Eisloch, jede 8 bis 14 Felder von der Schneewiese), drei weiter hinten im Tal (links, rechts, ganz
    * hinten vor dem Eis-Portal); einzeln mit freiem Platz ringsum
@@ -62,11 +70,12 @@ export const KESSEL = {
 } as const;
 
 /**
- * Farben, die nur das Tal kennt (der Kern liest sie als `color` des Felds): Seite des Eisfalls, Eisscholle (Seite, oben;
- * oben auch auf der Karte)
+ * Farben, die nur das Tal kennt (der Kern liest sie als `color` des Felds): Seite des Eisfalls, Seite der Stufen des
+ * Eisbergs, Eisscholle (Seite, oben; oben auch auf der Karte)
  */
 export const KESSEL_COLORS = {
   fall: '#6fbde6',
+  berg: '#7ac3ea',
   floe: ['#d9e6f0', '#ffffff'],
 } as const;
 

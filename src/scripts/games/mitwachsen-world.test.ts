@@ -9,6 +9,7 @@ import { ICE_ANIMALS, KESSEL, KESSEL_COLORS } from '../../data/games/worlds/eis/
 import { KESSEL_WILDS } from './worlds/eis/mitwachsen-kessel';
 import { FROST } from './worlds/eis/mitwachsen-frost';
 import { HAUNTS } from './worlds/eis/mitwachsen-haunts';
+import { bergPeak } from './worlds/eis/mitwachsen-ice-sky';
 import { ICE_CRYSTALS } from '../../data/games/mitwachsen-eis';
 import { SEATS, crossings } from './mitwachsen-border';
 import {
@@ -425,8 +426,13 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
     }
   });
 
-  /** Eisblock im Kessel: Eis eine Stufe über dem Boden (Seen liegen auf Höhe 1, die Spur ist eben) */
-  const isBlock = (c: Cell) => c.ground === 'ice' && c.h >= 2 && !c.slide && !c.solid;
+  /**
+   * Eisblock im Kessel: Eis eine Stufe über dem Boden (Seen liegen auf Höhe 1, die Spur ist eben; die Stufen des
+   * Eisbergs sind gefärbt)
+   */
+  const isBlock = (c: Cell) => c.ground === 'ice' && c.h >= 2 && !c.slide && !c.solid && !c.color;
+  /** Stufe des Eisbergs */
+  const isBerg = (c: Cell) => c.region === 'eis' && c.color === KESSEL_COLORS.berg;
   /**
    * Was an Tannen und Eisblöcken im Kessel falsch ist: zu nah an Bett, Spur, Kisten, Eisloch oder Plattformen; Tannen
    * nicht einzeln, Eisblöcke nicht über allen Nachbarn
@@ -486,7 +492,7 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
         if (h === null) continue;
         ground++;
         if (h >= 2) high++;
-        if (h > 3) wrong.push(`zu hoch ${x},${y}`);
+        if (h > (isBerg(w.cell(x, y)) ? KESSEL.berg.top : 3)) wrong.push(`zu hoch ${x},${y}`); // Hügel bis 3
         const steps = Object.values(DIRS).map(([dx, dy]) => standHeight(w, [], x + dx, y + dy));
         if (steps.some((to) => to !== null && Math.abs(to - h) > 1)) wrong.push(`Stufe ${x},${y}`);
       }
@@ -700,16 +706,100 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
         if (along(p) < end - 5 || Math.abs(across(p)) > KESSEL.fall.half) wrong.push(`nicht am Talende ${keyOf(p)}`);
       }
       wrong.push(...fallWallFaults(w, cells, fall));
-      // nur Klippen sind gefärbt (keine Bodenfelder außer Kristallen und Schollen)
+      // nur Klippen sind gefärbt (keine Bodenfelder außer Kristallen, Schollen und den Stufen des Eisbergs)
       for (const [x, y] of cells) {
         const c = w.cell(x, y);
-        if (c.color && c.region !== 'border' && c.deco !== 'crystal' && c.deco !== 'floe')
+        if (c.color && c.region !== 'border' && c.deco !== 'crystal' && c.deco !== 'floe' && !isBerg(c))
           wrong.push(`Farbe ${x},${y}`);
       }
       const gate = w.portals.get('eiskessel')!.gate;
       const near = Math.min(...fall.map((p) => Math.hypot(p[0] - gate[0], p[1] - gate[1])));
       if (near > 20) wrong.push(`Plattform ${near.toFixed(1)} Felder vom Eisfall`);
       expect(wrong, `Seed ${seed}`).toEqual([]);
+    }
+  });
+
+  /** Fehler in der Höhe des Tals: absolute Höhe über 5 oder mehr als eine Stufe zwischen Nachbarn */
+  function heightFaults(w: World, floor: readonly (readonly [number, number])[]) {
+    const wrong: string[] = [];
+    for (const [x, y] of floor) {
+      const h = standHeight(w, [], x, y);
+      if (h === null) continue;
+      if (h > KESSEL.berg.top) wrong.push(`zu hoch ${x},${y}`);
+      for (const [dx, dy] of Object.values(DIRS)) {
+        const to = standHeight(w, [], x + dx, y + dy);
+        if (to !== null && Math.abs(to - h) > 1) wrong.push(`Stufe ${x},${y} → ${x + dx},${y + dy}`);
+      }
+    }
+    return wrong;
+  }
+
+  /**
+   * Was an den Stufen des Eisbergs falsch ist: zu wenige, nicht aus begehbarem Eis auf Höhe 2 bis 5, nicht erreichbar,
+   * eine Höhe fehlt, Tanne, Kristall, Eisblock oder Wasser bis zwei Felder daneben
+   */
+  function stepFaults(w: World, berg: readonly (readonly [number, number])[], reach: ReadonlySet<string>) {
+    const wrong: string[] = [];
+    if (berg.length < 60) wrong.push(`nur ${berg.length} Felder Eisberg`);
+    for (const p of berg) {
+      const c = w.cell(...p);
+      if (c.ground !== 'ice' || c.solid || c.h < 2 || c.h > KESSEL.berg.top) wrong.push(`Stufe ${keyOf(p)} (${c.h})`);
+      if (!reach.has(keyOf(p))) wrong.push(`Stufe ${keyOf(p)} nicht erreichbar`);
+      for (const [dx, dy] of RING_2) {
+        const n = w.cell(p[0] + dx, p[1] + dy);
+        if (n.deco === 'tree' || n.deco === 'crystal' || isBlock(n) || n.ground === 'water')
+          wrong.push(`${n.deco ?? n.ground} am Eisberg`);
+      }
+    }
+    // jede Höhe von 2 bis 5 kommt vor: Stufe für Stufe hinauf
+    for (let h = 2; h <= KESSEL.berg.top; h++) if (!berg.some((p) => w.cell(...p).h === h)) wrong.push(`keine ${h}`);
+    return wrong;
+  }
+
+  /**
+   * Was am Eisberg falsch ist: Stufen nicht aus begehbarem Eis, nicht erreichbar, eine Höhe fehlt, Gipfel nicht auf 5,
+   * fern vom See oder vom Hauptweg (der Achse vom Schneebett zum Eis-Portal), kein Steg, etwas wächst darauf
+   */
+  function bergFaults(w: World, floor: readonly (readonly [number, number])[], reach: ReadonlySet<string>) {
+    const bed = w.homes.eis.bed;
+    const gate = w.portals.get('eiskessel')!.gate;
+    const out = [Math.sign(gate[0] - bed[0]), Math.sign(gate[1] - bed[1])] as const;
+    /** Abstand quer zur Achse des Tals */
+    const across = ([x, y]: readonly number[]) => Math.abs(out[0] ? y! - bed[1] : x! - bed[0]);
+    const berg = floor.filter(([x, y]) => isBerg(w.cell(x, y)));
+    const wrong = stepFaults(w, berg, reach);
+    // Gipfel auf Höhe 5, dort steht die Fahne
+    const peak = bergPeak(w);
+    if (!peak || w.cell(...peak).h !== KESSEL.berg.top || !isBerg(w.cell(...peak))) return [...wrong, 'kein Gipfel'];
+    if (!reach.has(keyOf(peak))) wrong.push('Gipfel nicht erreichbar');
+    // am See: offenes Wasser seines Eislochs nah
+    const water = floor.filter(([x, y]) => w.cell(x, y).ground === 'water');
+    const d = Math.min(...water.map((p) => Math.hypot(p[0] - peak[0], p[1] - peak[1])));
+    if (d < 8 || d > 16) wrong.push(`Eisloch ${d.toFixed(1)} Felder vom Gipfel`);
+    // in Sichtweite des Hauptwegs (3D zeigt etwa 40 Felder weit)
+    if (across(peak) > 40) wrong.push(`Gipfel ${across(peak)} Felder neben der Achse`);
+    // Steg: in der Reihe des Gipfels durchgehend glattes Eis auf Höhe 1, von `steg` Feldern neben der Achse bis an die
+    // unterste Stufe (dazwischen das Eis ringsum)
+    const { steg, plateau, top, step } = KESSEL.berg;
+    const side = Math.sign(out[0] ? peak[1] - bed[1] : peak[0] - bed[0]);
+    const foot = across(peak) - Math.ceil(plateau + (top - 2) * step); // letztes Feld vor der untersten Stufe
+    for (let a = steg; a <= foot; a++) {
+      const p: [number, number] = out[0] ? [peak[0], bed[1] + side * a] : [bed[0] + side * a, peak[1]];
+      const c = w.cell(...p);
+      if (c.region !== 'eis' || c.ground !== 'ice' || c.h !== 1 || c.solid) wrong.push(`Steg unterbrochen bei ${a}`);
+    }
+    return wrong;
+  }
+
+  it('Eisberg am See: Stufe für Stufe bis Höhe 5 erreichbar, nie mehr als eine Stufe, Fahne auf dem Gipfel, Steg zur Mitte des Tals, in Sichtweite des Hauptwegs; Seeufer und Eislöcher bleiben erreichbar (20 Seeds)', () => {
+    for (const seed of VALLEY_SEEDS) {
+      const w = worldOf(seed);
+      const floor = kesselPlace(seed, EIS_PACK).cells.filter(([x, y]) => w.cell(x, y).region === 'eis');
+      const reach = new Set(reachable(w, [], w.homes.eis.wake[0]!, 200000).map(keyOf));
+      const wrong = [...heightFaults(w, floor), ...bergFaults(w, floor, reach)];
+      // Seeufer und Eislöcher bleiben erreichbar (auch der See am Eisberg)
+      wrong.push(...holesOf(w, floor).flatMap((hole) => holeFaults(w, hole, reach)), ...lakeFaults(w, floor, reach));
+      expect([...new Set(wrong)], `Seed ${seed}`).toEqual([]);
     }
   });
 

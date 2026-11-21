@@ -1,7 +1,7 @@
 // Wetter der Eis-Welt in der Luft, gleich für beide Ansichten (die 3D-Ansicht zeichnet die Ebene darüber mit ihrer
 // eigenen Projektion): leiser Schneefall, Pustewind mit Flockenwellen, Schneewirbeln und Pulverfahnen an den Klippen,
-// Glitzerluft danach, der Wimpel auf dem Iglu und nachts im Schneebett das Polarlicht, zu dem die Eiskristalle sanft
-// leuchten (über der Nacht gezeichnet, damit man es sieht). Alles, was sich bewegt, nur
+// Glitzerluft danach, der Wimpel auf dem Iglu, die Fahne auf dem Eisberg und nachts im Schneebett das Polarlicht, zu
+// dem die Eiskristalle sanft leuchten (über der Nacht gezeichnet, damit man es sieht). Alles, was sich bewegt, nur
 // ohne reduzierte Bewegung. Teil des Welt-Pakets der Eis-Welt (über view-2d.ts); die Ansicht zeichnet es, wenn die
 // Figur im Kessel, das Eistor offen oder der verlaufene Pinguin da ist. view-2d.ts legt es mit dem Bild der Weltgrenze
 // und dem Pinguin am Tor in die Form `Sky` des Kerns (mitwachsen-view.ts).
@@ -11,10 +11,12 @@ import type { Projection } from '../../../../lib/games/front';
 import { hash } from '../../../../lib/games/rng';
 import { IGLOO_H } from '../../../../data/games/mitwachsen-eis';
 import { crystalGlow } from './mitwachsen-ice-look';
+import { peaks } from './mitwachsen-lakes';
 import { wrap, type SkyScene } from '../../mitwachsen-sky';
 import type { World } from '../../mitwachsen-world';
 
 const NEAR = 24; // Dinge in der Welt (Wirbel, Fahnen, Wimpel) nur so nah an der Kamera zeichnen
+const FAR = 44; // die Fahne auf dem Eisberg (ein Wahrzeichen) so weit, wie man den Berg sieht
 const PENNANT = ['#e8504a', '#ffffff', '#3f8fd8', '#6dbd47']; // bunter Wimpel (kein Gold: das ist die Aktionsfarbe)
 const AURORA = ['#5ee0a0', '#4fd1c5', '#8a7be8']; // Polarlicht: Grün, Türkis, Violett
 
@@ -22,14 +24,21 @@ const AURORA = ['#5ee0a0', '#4fd1c5', '#8a7be8']; // Polarlicht: Grün, Türkis,
  * Wetter der Eis-Welt in der Luft: leiser Schneefall (senkrecht, langsam), beim Pustewind Flockenwellen waagerecht
  * über das Bild (bei einer Böe dichter und schneller), kleine Schneewirbel auf der Ebene und Pulverfahnen an den
  * Kanten der Eisklippen; nach dem Wind Glitzerluft. Der Wimpel auf dem Iglu flattert im Wind (bei reduzierter Bewegung
- * steht er still waagerecht, bei Windstille hängt er).
+ * steht er still waagerecht, bei Windstille hängt er). Die Fahne auf dem Gipfel des Eisbergs weht immer (dort oben geht
+ * stets ein Lüftchen), beim Pustewind stärker; bei reduzierter Bewegung steht sie still waagerecht.
  */
 export function iceWeather(ctx: CanvasRenderingContext2D, world: World, sc: SkyScene, P: Projection) {
   const { snow, wind, gust, sparkle } = sc.weather;
   const home = world.homes.eis;
-  const near = (x: number, y: number) =>
-    Math.abs(x - sc.cam.x) + Math.abs(y - sc.cam.y) < NEAR && sc.explored(Math.round(x), Math.round(y));
-  if (near(...home.shelterStem)) pennant(ctx, world, sc, P);
+  const near = (x: number, y: number, r = NEAR) =>
+    Math.abs(x - sc.cam.x) + Math.abs(y - sc.cam.y) < r && sc.explored(Math.round(x), Math.round(y));
+  const [sx, sy] = home.shelterStem;
+  if (near(sx, sy)) pennant(ctx, sc, P, [sx + 0.5, sy + 2, world.cell(sx, sy).h + IGLOO_H], sc.weather.wind > 0.1);
+  const peak = bergPeak(world);
+  if (peak && near(peak[0], peak[1], FAR)) {
+    const [px, py] = [peak[0], peak[1] - 1]; // hinten am Gipfel (die Kamera blickt von Süden), nicht durch die Figur
+    pennant(ctx, sc, P, [px + 0.5, py + 0.5, world.cell(px, py).h], true, sc.weather.wind > 0.1 ? 1 : 0.4);
+  }
   if (sc.reduced) return;
   const { width: W, height: H, zoom: z, now } = sc;
   if (snow > 0) {
@@ -133,17 +142,25 @@ export function rims(world: World): [number, number, number][] {
   return out;
 }
 
-/** Bunter Wimpel oben auf dem Iglu, an einer kleinen Stange */
-function pennant(ctx: CanvasRenderingContext2D, world: World, sc: SkyScene, P: Projection) {
-  const [sx, sy] = world.homes.eis.shelterStem;
-  const top = world.cell(sx, sy).h + IGLOO_H;
-  const [bx, by] = P(sx + 0.5, sy + 2, top - 0.1);
-  const [, ty] = P(sx + 0.5, sy + 2, top + 1.2);
+/**
+ * Bunter Wimpel an einer kleinen Stange, die bei `foot` (x, y, Höhe) steht: auf dem Iglu und auf dem Gipfel des
+ * Eisbergs. Weht er (`blowing`), flattert er waagerecht, so kräftig wie `strength` (bei reduzierter Bewegung steht er
+ * still waagerecht); sonst hängt er an der Stange herunter.
+ */
+function pennant(
+  ctx: CanvasRenderingContext2D,
+  sc: SkyScene,
+  P: Projection,
+  [x, y, top]: readonly [number, number, number],
+  blowing: boolean,
+  strength = 1,
+) {
+  const [bx, by] = P(x, y, top - 0.1);
+  const [, ty] = P(x, y, top + 1.2);
   const z = sc.zoom;
   const pole = Math.max(2, Math.round(3 * z));
   ctx.fillStyle = '#6b4a36';
   ctx.fillRect(Math.round(bx - pole / 2), Math.round(ty), pole, Math.round(by - ty));
-  const blowing = sc.weather.wind > 0.1;
   const seg = Math.round(9 * z);
   PENNANT.forEach((color, k) => {
     ctx.fillStyle = color;
@@ -152,9 +169,17 @@ function pennant(ctx: CanvasRenderingContext2D, world: World, sc: SkyScene, P: P
       ctx.fillRect(Math.round(bx + pole / 2), Math.round(ty + k * seg), size / 1.5, seg); // hängt an der Stange herunter
       return;
     }
-    const wave = sc.reduced ? 0 : Math.sin(sc.now / (110 - sc.weather.gust * 40) - k * 0.9) * k * 2.5 * z;
+    const wave = sc.reduced ? 0 : Math.sin(sc.now / (110 - sc.weather.gust * 40) - k * 0.9) * k * 2.5 * z * strength;
     ctx.fillRect(Math.round(bx + pole / 2 + k * seg), Math.round(ty + wave + (16 * z - size) / 2), seg, size);
   });
+}
+
+/**
+ * Gipfel des Eisbergs (`KESSEL.berg`): die Mitte seines ebenen Gipfels, wie `buildKessel` sie beim Bau einträgt; dort
+ * steht die Fahne (ein Feld weiter hinten). Ohne Eis-Portal (Paket fehlt, kein Tal gebaut) null.
+ */
+export function bergPeak(world: World): readonly [number, number] | null {
+  return (world.portals.has('eiskessel') && peaks.get(world.seed)) || null;
 }
 
 /**
