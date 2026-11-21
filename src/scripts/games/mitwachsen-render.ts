@@ -130,7 +130,7 @@ export class Renderer {
   /** Eis-Quader des Bilds (Iglu, Eisschale, Trog): jeder kommt in der Reihe seiner Vorderkante dran */
   private later: Box[] = [];
   view: View2D | null = null; // Zeichenteile der Eis-Welt aus ihrem Welt-Paket, sobald es geladen ist
-  private at: DecoAt = { now: 0, reduced: false, picked: {} };
+  private at: DecoAt = { now: 0, reduced: false, picked: {}, packs: {} };
   private album = new Album(); // Leiste unten
   private guest: Guest | null = null; // der Pinguin am Tor, solange er führt (Umriss, goldene Bucht; nachgeladen)
   private blocks: Record<'grass' | 'dirt' | 'stone' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
@@ -169,7 +169,7 @@ export class Renderer {
     const byId = new Map(state.animals.map((a) => [a.id, a]));
 
     this.later = [];
-    this.at = { now: sc.now, reduced: sc.reduced, picked: state.picked };
+    this.at = { now: sc.now, reduced: sc.reduced, picked: state.picked, packs: state.packs };
     this.guest = this.view?.sky.guestAt(world, state) ?? null;
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) this.ground(P, world, x, y, sc);

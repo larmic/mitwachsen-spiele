@@ -168,7 +168,7 @@ export class World3D {
   private platforms!: Platforms3D; // Portal-Plattformen
   private chunks = new Map<string, Chunk>();
   private stale = new Set<string>(); // Stücke, die neu gebaut werden müssen; bis dahin bleibt das alte stehen
-  private at: DecoAt = { now: 0, reduced: true, picked: {} }; // für drawDeco, `picked`: Büsche ohne Beeren, leere Kisten
+  private at: DecoAt = { now: 0, reduced: true, picked: {}, packs: {} }; // für drawDeco: leere Büsche, Schneemänner
   private day = 0; // Tag der Welt: bestimmt, was nachgewachsen ist
   private opened: readonly GateId[] = []; // offene Tore: danach glänzt z. B. die Rutschspur zum Schneebett
   private views = new Views3D(); // 3D-Teile der Welt-Pakete, sobald geladen
@@ -352,7 +352,7 @@ export class World3D {
   render(world: World, state: State, sc: Scene) {
     if (this.world !== world) this.reset(world);
     this.explored = sc.explored;
-    if (this.at.picked !== state.picked) this.at = { ...this.at, picked: state.picked }; // in 3D zuckt nichts
+    this.at = { ...this.at, picked: state.picked, packs: state.packs }; // in 3D zuckt nichts
     if (state.day !== this.day || state.openGates.join() !== this.opened.join()) {
       // ein neuer Tag: Stücke neu bauen, denn es sind Blumen und Pilze nachgewachsen (oder ein Tor ging auf, dann
       // glänzt etwa die Rutschspur)

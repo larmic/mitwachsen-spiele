@@ -16,7 +16,7 @@ import {
   type RegionId,
   type SpeciesId,
 } from '../../data/games/mitwachsen';
-import { STORIES, told, type StoryId } from '../../data/games/mitwachsen-stories';
+import { STORIES, type StoryId } from '../../data/games/mitwachsen-stories';
 import { beyondRing, canStep, standHeight, type World } from './mitwachsen-world';
 import { packAt, wakeRealm } from './mitwachsen-pack';
 import { scatter, scatterArrivals } from './mitwachsen-scatter';
@@ -31,6 +31,8 @@ import { comesHome, homeward, ownSpot, walkHome } from './mitwachsen-arrive';
 import { dirTo, freeNear, occupied } from './mitwachsen-free';
 import { crossBorder, type BorderEvent, type Mode } from './mitwachsen-border';
 import { lost, type GuideEvent, type GuideRules } from './mitwachsen-guide';
+import type { PackEvent, WorldRules } from './mitwachsen-pack-types';
+import { listen } from './mitwachsen-listen';
 
 export const SLEEP_LOCK = 30; // Takte nach dem Einschlafen, in denen Tasten nicht wecken (3 s)
 export const WAKE_GRACE = 15; // Takte nach dem Aufwachen, in denen das Bett nur ein Hindernis ist (1,5 s)
@@ -53,7 +55,7 @@ export type Animal = {
 };
 export type HomeAnimal = { id: string; species: SpeciesId };
 
-export type State = {
+export type State = Omit<Progress, 'position'> & {
   tick: number;
   rng: number;
   player: { x: number; y: number; dir: Dir };
@@ -62,33 +64,30 @@ export type State = {
   wokeAt: number;
   animals: Animal[];
   followers: string[]; // Reihenfolge = Platz in der Kette hinter der Figur
-  met: string[];
-  garden: HomeAnimal[];
-  openGates: GateId[];
-  portals: PortalId[]; // wache Portal-Plattformen (je Portal eine, mit Gegenstück am Bett)
   arrived: readonly [number, number] | null; // Mittelfeld, auf dem die Figur angekommen ist: erst runter, dann wieder rauf (nicht gespeichert)
   picked: Record<string, number>; // Büsche ohne Beeren und leere Fischkisten: "x,y" → Takt des Leerens (nicht gespeichert)
-  day: number; // Tage, die die Welt schon erlebt hat (jedes Schlafen zählt einen); Blumen wachsen damit
   dayStart: number; // Takt, an dem der heutige Tag begann (Aufwachen): Das Wetter zählt ab hier, jeder Tag beginnt mit Sonne
   basket: boolean; // Korb mit Beeren auf dem Rücken (nach dem Pflücken, bis zum Futtertrog)
   bucket: boolean; // Eimer mit Wasser in der Hand (nach dem Schöpfen, bis zum Wassertrog)
   fish: boolean; // Netz mit Fischen in der linken Hand (nach dem Fangen an der Fischkiste, bis zur Eisschale)
-  heard: StoryId[]; // Geschichten, deren Klangstein schon einmal erklungen ist
   calm: number; // Tag, an dem der Pinguin auf die Schneewiese gezogen ist: an ihm weht kein Pustewind (nicht gespeichert)
   guideDue: number; // verlaufener Pinguin: Takt, ab dem er auftaucht bzw. aufgetaucht ist (nicht gespeichert, mitwachsen-guide.ts)
   ritual: number; // Takt, an dem das Eistor mit dem Pinguin aufging (-1: noch nicht; nicht gespeichert, worlds/eis/mitwachsen-ritual.ts)
   held?: readonly [number, number]; // gespeicherte Position, solange ein Welt-Paket fehlt: bleibt im Spielstand (Abschnitt „Welt-Pakete“)
 };
 
-/** Was gespeichert wird */
+/** Was gespeichert wird (und im Zustand steht, bis auf die Position: die hat die Figur) */
 export type Progress = {
   met: string[];
   garden: HomeAnimal[];
   openGates: GateId[];
-  portals: PortalId[];
+  portals: PortalId[]; // wache Portal-Plattformen (je Portal eine, mit Gegenstück am Bett)
   position: [number, number];
-  day: number;
-  heard: StoryId[];
+  day: number; // Tage, die die Welt schon erlebt hat (jedes Schlafen zählt einen); Blumen wachsen damit
+  heard: StoryId[]; // Geschichten, deren Klangstein schon einmal erklungen ist
+  // Zustand der Welt-Pakete je Kennung, in ihrem eigenen Format (Eis-Welt: gebaute Schneemänner); der Kern trägt ihn nur,
+  // auch solange ein Paket fehlt (`WorldRules` in mitwachsen-pack-types.ts)
+  packs: Record<string, unknown>;
 };
 
 export type Step = { state: State; events: GameEvent[] };
@@ -109,6 +108,7 @@ export type GameEvent =
   | ChoreEvent // Handgriffe: pflücken, fangen, nachwachsen, füttern, schöpfen, tränken (mitwachsen-chores.ts)
   | BorderEvent // Weltgrenze am Tor: warten, wieder einreihen, Gegend wechseln (mitwachsen-border.ts)
   | GuideEvent // der verlaufene Pinguin taucht auf und piept (mitwachsen-guide.ts)
+  | PackEvent // Regeln einer Welt aus ihrem Paket: ein Schneehaufen wächst (mitwachsen-pack-types.ts)
   | { type: 'call' }
   | { type: 'sleep' }
   | { type: 'wake' };
@@ -178,6 +178,7 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     calm: -1,
     guideDue: -1,
     ritual: -1,
+    packs: { ...saved.packs }, // auch ohne Paket bleibt sein Zustand, wie er ist
   };
   // Fehlt das Paket der Welt, zu der die Position gehört, wüsste die Welt nicht, ob die Figur dort war: Position behalten
   if (saved.position && !world.spotsOf('eis').length && packAt(saved.position, world.gates, beyondRing))
@@ -237,6 +238,7 @@ export const progressOf = (s: State): Progress => ({
   position: s.held ? [...s.held] : [s.player.x, s.player.y],
   day: s.day,
   heard: [...s.heard],
+  packs: { ...s.packs },
 });
 
 /** Tiere einer Gegend (Kennungen) */
@@ -249,9 +251,16 @@ export const regionAnimals = (region: RegionId): string[] =>
  * Ein Befehl. `explored(x, y)` sagt, ob ein Feld schon aus dem Nebel ist (der Nebel gehört der Ansicht): Nur dort
  * erwacht eine Portal-Plattform. Ohne Angabe gilt alles als erkundet. `guide` sind die Regeln des verlaufenen Pinguins
  * (worlds/eis/mitwachsen-lead.ts, aus dem Welt-Paket), die die Ansicht erst hereinreicht, wenn er fällig ist; ohne sie
- * taucht er nicht auf.
+ * taucht er nicht auf. `rules`: Regeln der Welten aus ihren geladenen Paketen (`WorldPack.rules`, Eis-Welt: Schneemänner).
  */
-export function step(state: State, world: World, cmd: Cmd, explored: Explored = EVERYWHERE, guide?: GuideRules): Step {
+export function step(
+  state: State,
+  world: World,
+  cmd: Cmd,
+  explored: Explored = EVERYWHERE,
+  guide?: GuideRules,
+  rules: readonly { rules?: WorldRules }[] = [],
+): Step {
   // Flache Kopie: Tiere werden beim Ändern ersetzt, nie verändert – alte Zustände bleiben gültig
   const s: State = {
     ...state,
@@ -270,7 +279,7 @@ export function step(state: State, world: World, cmd: Cmd, explored: Explored = 
   else if (cmd.type === 'move' && !guide?.hold(s, events)) {
     // Ein Schritt (während das Eistor aufgeht, hüpft die Figur stattdessen nur: `hold` in worlds/eis/mitwachsen-ritual.ts)
     const from: Point = [s.player.x, s.player.y];
-    move(s, world, cmd.dir, events);
+    move(s, world, cmd.dir, events, rules);
     guide?.meetGuide(s, world, events); // in den führenden Pinguin gelaufen: Er hüpft voraus oder tauscht den Platz
     // Neues Feld: Plattformen (reisen, wieder bereit), dann die Weltgrenze am Tor (warten, wieder einreihen)
     if (s.player.x !== from[0] || s.player.y !== from[1]) {
@@ -370,22 +379,6 @@ function meetAnimal(s: State, world: World, animal: Animal, dir: Dir, events: Ga
   return true;
 }
 
-/**
- * Klangstein angelaufen: Die Geschichte des Ortes erklingt (abspielen und anhalten macht die Ansicht). Tiere in der Nähe
- * drehen sich zur Figur und bleiben eine Weile stehen, als hörten sie mit.
- */
-function listen(s: State, stone: StoryId, events: GameEvent[]) {
-  const id = told(stone, s.openGates); // offenes Eistor: Sein Stein erzählt die zweite Fassung der Eis-Geschichte
-  const first = !s.heard.includes(id);
-  if (first) s.heard = [...s.heard, id].sort();
-  for (const a of s.animals)
-    if (a.mode !== 'follow' && cheb(a.x, a.y, s.player.x, s.player.y) <= 3) {
-      a.dir = dirTo(s.player.x - a.x, s.player.y - a.y);
-      a.rest = Math.max(a.rest, 40);
-    }
-  events.push({ type: 'story', id, first });
-}
-
 /** Freies Feld neben einem Tier der Wiese, auf das es ausweichen kann: lieber seitlich als weiter geradeaus */
 function asideCell(s: State, world: World, a: Animal, dir: Dir): [number, number] | null {
   const sides: Dir[] = dir === 'e' || dir === 'w' ? ['n', 's'] : ['e', 'w'];
@@ -400,7 +393,7 @@ function asideCell(s: State, world: World, a: Animal, dir: Dir): [number, number
 const dist = (a: Animal, d: Dir, goal: readonly [number, number]) =>
   Math.abs(a.x + DIRS[d][0] - goal[0]) + Math.abs(a.y + DIRS[d][1] - goal[1]);
 
-function move(s: State, world: World, dir: Dir, events: GameEvent[]) {
+function move(s: State, world: World, dir: Dir, events: GameEvent[], packs: readonly { rules?: WorldRules }[]) {
   const p = s.player;
   p.dir = dir;
   const [dx, dy] = DIRS[dir];
@@ -416,6 +409,8 @@ function move(s: State, world: World, dir: Dir, events: GameEvent[]) {
   if (story) return listen(s, story, events);
   // Handgriffe: Beeren pflücken, Fische fangen, Wasser schöpfen, in die Tröge der Wiese bringen (mitwachsen-chores.ts)
   if (chore(s, world, tx, ty, events)) return;
+  // Regeln der Welten aus ihren Paketen: etwa ein Schneehaufen, der um eine Kugel wächst (worlds/eis/mitwachsen-snowman.ts)
+  if (packs.some((p) => p.rules?.bump(s, world.cell(tx, ty), tx, ty, events))) return;
   // Ins Bett laufen: Die Figur legt sich schlafen (nicht gleich nach dem Aufwachen, sonst schläft sie aus Versehen ein)
   if (world.cell(tx, ty).deco === 'bed' && s.tick - s.wokeAt >= WAKE_GRACE) return sleep(s, world, events);
   if (!canStep(world, s.openGates, p.x, p.y, tx, ty)) {

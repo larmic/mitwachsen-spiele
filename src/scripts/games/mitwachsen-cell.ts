@@ -54,6 +54,7 @@ export type Deco =
   | 'icebowl' // Futterschale aus Eis auf der Schneewiese
   | 'floe' // Eisscholle auf einem Eisloch im Gletscherkessel (nur Bild; zeichnet nur das Welt-Paket, solange es lädt: Wasser)
   | 'fishcrate' // Fischkiste im Gletscherkessel: Hineinlaufen fängt Fische ins Netz (fest wie ein Busch)
+  | 'snowheap' // Schneehaufen im Gletscherkessel: Hineinlaufen lässt eine Kugel wachsen, bis ein Schneemann steht (fest)
   | 'klangstein'; // Stein mit schwebender Note: Hineinlaufen spielt die Geschichte des Ortes
 export type TreeKind =
   'oak' | 'birch' | 'autumn' | 'red' | 'blossom' | 'winter' | 'pine' | 'snowpine' | 'palm' | 'dead';
@@ -64,7 +65,7 @@ export type Cell = {
   deco: Deco | null;
   color?: string; // Blumenfarbe
   region: RegionId | 'wild' | 'border'; // border: Fels, Zaun oder Wasser zwischen Gegenden
-  solid: boolean; // Deko versperrt das Feld (Baum, Busch, Fischkiste, Fels, Zaun, Bett, Tafel)
+  solid: boolean; // Deko versperrt das Feld (Baum, Busch, Fischkiste, Schneehaufen, Fels, Zaun, Bett, Tafel)
   gate?: GateId; // Tor oder Brücke: begehbar, sobald offen
   sign?: GateId; // Tafel zu diesem Tor
   garden?: true; // Wiese ums Bett: Hier sind gefundene Tiere zu Hause

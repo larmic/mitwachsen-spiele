@@ -6,7 +6,7 @@ import type { Cell } from './mitwachsen-world';
 import type { SkyScene } from './mitwachsen-sky';
 import { EIS_PACK, worldOf } from './test-worlds';
 
-const at: DecoAt = { now: 0, reduced: true, picked: {} };
+const at: DecoAt = { now: 0, reduced: true, picked: {}, packs: {} };
 const world = worldOf(1);
 const view = EIS_PACK.view!;
 /** Erstes Feld im Kessel (um das Schneebett) mit dieser Deko-Art */

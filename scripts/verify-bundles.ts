@@ -25,7 +25,9 @@ export const RULES: Rule[] = [
     // Gemessen 122,1 KB, seit die Eis-Welt nur bei Bedarf lädt und ihre Zeichenteile (Iglu, Fischkisten, Wetter) und
     // die Modelle ihrer Tiere mitbringt (vorher 125,7 KB bei 132 KB); 122,3 KB, seit die 3D-Ansicht den Haken drawDeco
     // mitnutzt; 124,0 KB mit dem Gletschertal (Seen, Eisberg: Farben und Zeichnen gefärbter Eisfelder); mit den
-    // Haken der Fußspuren im Schnee (`View2D.trail`, `View3D.layer`) unverändert 124,0 KB; dazu 2 KB Luft
+    // Haken der Fußspuren im Schnee (`View2D.trail`, `View3D.layer`) unverändert 124,0 KB; 124,5 KB mit dem Haken für
+    // die Regeln der Welten (`WorldPack.rules`, Eis-Welt: Schneemänner) und ihrem gespeicherten Zustand (`packs`); dazu
+    // 1,5 KB Luft
     budget: 126 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
@@ -46,9 +48,10 @@ export const RULES: Rule[] = [
     // Eisberg nicht, ohne fremde Teile des Pakets umzubauen. Darum 34 KB, eine offene Frage an den Vater. 37,1 KB mit
     // den Fußspuren im Schnee (Ringpuffer mitwachsen-tracks.ts, Formen je Gangart, höchstens zwei je Feld, 2D-Zeichnung
     // ohne Nebelrand): Bewusst angehoben mit Zustimmung des Vaters (Fußspuren, Schneemann und Glockenspiel gehören zur
-    // Eis-Welt und kommen darum mit ihrem Paket, der Kern wächst nur um die Haken); dazu knapp 0,9 KB Luft. Schneemann
-    // und Glockenspiel heben sie wieder an
-    budget: 38 * 1024,
+    // Eis-Welt und kommen darum mit ihrem Paket, der Kern wächst nur um die Haken); 40,2 KB mit den Schneemännern
+    // (Schneehaufen im Generator, Regel samt Migration ihres Spielstands, Quader der vier Stufen, Wackeln und Ploppen):
+    // bewusst angehoben, wie vereinbart; dazu knapp 0,8 KB Luft. Das Glockenspiel hebt sie wieder an
+    budget: 41 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

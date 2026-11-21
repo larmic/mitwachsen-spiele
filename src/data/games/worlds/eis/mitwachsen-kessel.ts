@@ -80,6 +80,21 @@ export const KESSEL_COLORS = {
 } as const;
 
 /**
+ * Farben der Schneemänner (Seite, oben): Kohle für Augen und Knöpfe, Möhrennase, roter Schal, blaue Wollmütze mit
+ * weißem Bommel (kein Gold: das ist die Aktionsfarbe). Dazu, was einen Schneehaufen von den begehbaren Schneewehen
+ * unterscheidet: ein bläulicher Schattenrand, eine kleine Kugel daneben und ein Zweig obenauf.
+ */
+export const SNOWMAN_COLORS = {
+  coal: '#2b2f3a',
+  carrot: ['#e8892a', '#f2a043'],
+  scarf: ['#d9473a', '#e8504a'],
+  hat: ['#3f8fd8', '#5aa6e8'],
+  bommel: '#ffffff',
+  shadow: ['#a9c6dd', '#c3d9ea'],
+  twig: ['#6b4a2b', '#7d5a36'],
+} as const;
+
+/**
  * Lieblingsorte der Eis-Tiere: Seen (glattes Eis und Eislöcher), Tannen, Eisblöcke, der Eisfall am Talende, das Iglu
  */
 export type IceHaunt = 'lake' | 'pines' | 'blocks' | 'fall' | 'igloo';

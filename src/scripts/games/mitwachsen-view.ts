@@ -7,6 +7,7 @@
 import { box, type Projection } from '../../lib/games/front';
 import type { RegionId } from '../../data/games/mitwachsen';
 import type { Deco } from './mitwachsen-cell';
+import type { PackEvent } from './mitwachsen-pack-types';
 import type { Guest } from './mitwachsen-guest-look';
 import { mapColor } from './mitwachsen-map';
 import type { SkyScene } from './mitwachsen-sky';
@@ -26,8 +27,16 @@ export function drawBox(ctx: CanvasRenderingContext2D, P: Projection, b: Box | n
   if (b) box(ctx, P, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]);
 }
 
-/** Was eine Zeichnung vom Bild weiß: Zeit, reduzierte Bewegung, geleerte Büsche und Fischkisten ("x,y") */
-export type DecoAt = { now: number; reduced: boolean; picked: Readonly<Record<string, number>> };
+/**
+ * Was eine Zeichnung vom Bild weiß: Zeit, reduzierte Bewegung, geleerte Büsche und Fischkisten ("x,y"), Zustand der
+ * Welt-Pakete (`State.packs`, Eis-Welt: wie weit jeder Schneemann gewachsen ist)
+ */
+export type DecoAt = {
+  now: number;
+  reduced: boolean;
+  picked: Readonly<Record<string, number>>;
+  packs: Readonly<Record<string, unknown>>;
+};
 
 /** Zeichnung einer Deko-Art: Quader, die in der Reihe ihrer Vorderkante drankommen; null: wie sonst zeichnen */
 export type DrawDeco = (world: World, c: Cell, x: number, y: number, at: DecoAt) => readonly Box[] | null;
@@ -81,10 +90,12 @@ export type View2D = {
   ground(c: Cell, x: number, y: number, open: boolean): Box | null;
   sky: Sky;
   trail?: Trail;
+  /** Töne zu Ereignissen der Regeln dieser Welt (Eis-Welt: Ploppen, wenn ein Schneemann wächst) */
+  score?(e: PackEvent): Scored[];
 };
 
 /** Deko-Arten, die nur ein Welt-Paket zeichnet: Ohne seine Zeichnung steht dort ein einfacher Block */
-const PACKED: ReadonlySet<Deco> = new Set<Deco>(['igloo', 'icebowl', 'fishcrate']);
+const PACKED: ReadonlySet<Deco> = new Set<Deco>(['igloo', 'icebowl', 'fishcrate', 'snowheap']);
 
 /**
  * Quader eines Dings, das ein Welt-Paket zeichnet (`view`, null solange es lädt): seine Zeichnung je Deko-Art, ohne sie

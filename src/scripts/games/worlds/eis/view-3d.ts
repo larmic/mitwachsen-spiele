@@ -2,7 +2,8 @@
 // Fischkiste (Quader aus mitwachsen-ice-look.ts, wie in 2D; die Schwanzflossen wiegen sich im Wind statt zu zucken),
 // Schnee und Eis als Boden und Klippen des Kessels, die glänzende Rutschspur bei offenem Eistor, das Bett aus Schnee,
 // Eiskristalle, die beim Polarlicht heller und grüntürkis leuchten (bei reduzierter Bewegung ruhig), Eisschollen auf den
-// Eislöchern, der Eisfall am Talende (Klippen aus gefrorenem Wasser), die Stufen des Eisbergs, die Fußspuren im Schnee
+// Eislöchern, der Eisfall am Talende (Klippen aus gefrorenem Wasser), die Stufen des Eisbergs, Schneehaufen und
+// Schneemänner in ihrer Stufe (mitwachsen-snowman-look.ts, stehen still), die Fußspuren im Schnee
 // (view-3d-prints.ts) und am Eistor Tür, Eiszapfen und goldene Bucht (view-3d-gate.ts). Braucht Three.js (wie die
 // 3D-Ansicht, beide teilen es) und wird darum nicht mit dem Paket geladen, sondern erst, wenn die 3D-Ansicht es will (`pack.view3d`, index.ts):
 // im Build `_astro/welt-eis-3d.<hash>.js` mit eigener Grenze (scripts/verify-bundles.ts).
@@ -14,6 +15,8 @@ import type { Frame, Ground, View3D } from '../../mitwachsen-view-3d';
 import type { DrawDeco } from '../../mitwachsen-view';
 import { gateLook } from './view-3d-gate';
 import { layer } from './view-3d-prints';
+import { stageAt } from './mitwachsen-snowman';
+import { snowBoxes } from './mitwachsen-snowman-look';
 
 /** Im Gletscherkessel (Boden und Klippen): Schnee obenauf, darunter Eis */
 const KESSEL: Ground = { tiles: ['snowTop', 'ice', 'ice'] };
@@ -41,13 +44,16 @@ const crate: DrawDeco = (world, c, x, y, { picked }) =>
 /** Eiskristall der Eis-Welt: leuchtet aus sich selbst (`'glow'`); Kristalle anderer Welten baut die 3D-Ansicht wie immer */
 const crystal: DrawDeco = (_world, c, x, y) => (c.biome === 'eis' ? crystalBoxes(c, x, y, 0, true) : null);
 
+/** Schneehaufen bzw. Schneemann in seiner Stufe; wächst er, baut die 3D-Ansicht sein Stück neu (in 3D wackelt nichts) */
+const heap: DrawDeco = (_world, c, x, y, { packs }) => snowBoxes(x, y, c.h, stageAt(packs, x, y));
+
 /** Eisscholle auf einem Eisloch, liegt still */
 const floe: DrawDeco = (_world, _c, x, y) => floeBoxes(x, y);
 
 export const view3d: View3D = {
   gate: 'eis',
   look: gateLook,
-  decos: { igloo: look, icebowl: look, watertrough: look, fishcrate: crate, crystal, floe },
+  decos: { igloo: look, icebowl: look, watertrough: look, fishcrate: crate, crystal, floe, snowheap: heap },
   ground(c, open) {
     if (c.biome !== 'eis' || c.region === 'wild') return null;
     if (c.slide && open.includes('eis')) return SLIDE;

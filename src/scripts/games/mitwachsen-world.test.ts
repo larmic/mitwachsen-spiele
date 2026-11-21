@@ -7,7 +7,7 @@ import { BED_STONE, ICE_STONE } from '../../data/games/mitwachsen-stories';
 import { PLATFORM_HALF, platformArea, platformCells, platformLift, withNeighbours } from './mitwachsen-portal';
 import { ICE_ANIMALS, KESSEL, KESSEL_COLORS } from '../../data/games/worlds/eis/mitwachsen-kessel';
 import { KESSEL_WILDS } from './worlds/eis/mitwachsen-kessel';
-import { FROST } from './worlds/eis/mitwachsen-frost';
+import { FROST, HEAPS } from './worlds/eis/mitwachsen-frost';
 import { HAUNTS } from './worlds/eis/mitwachsen-haunts';
 import { bergPeak } from './worlds/eis/mitwachsen-ice-sky';
 import { ICE_CRYSTALS } from '../../data/games/mitwachsen-eis';
@@ -574,6 +574,47 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
       expect(wrong, `Seed ${seed}`).toEqual([]);
     }
     expect(special / all).toBeGreaterThan(0.6); // meist am Klippenfuß oder auf einer Kuppe
+  });
+
+  /** Was an den Schneehaufen im Tal falsch ist (sie werden zu Schneemännern, fest in jeder Stufe) */
+  function heapFaults(w: World, kessel: readonly (readonly [number, number])[], reach: ReadonlySet<string>) {
+    const heaps = kessel.filter(([x, y]) => w.cell(x, y).deco === 'snowheap');
+    const wrong: string[] = [];
+    // gut ein Dutzend; gemessen über 100 Seeds immer alle `HEAPS.count` (14), weniger als 10 wäre zu karg
+    if (heaps.length < 10 || heaps.length > HEAPS.count) wrong.push(`${heaps.length} Schneehaufen`);
+    for (const p of heaps) {
+      const c = w.cell(...p);
+      const at = `Schneehaufen ${p.join(',')}`;
+      if (!c.solid || c.region !== 'eis' || c.ground !== 'snow') wrong.push(`nicht fest auf Schnee ${at}`);
+      if (heaps.some((q) => q !== p && Math.hypot(q[0] - p[0], q[1] - p[1]) < HEAPS.spacing)) wrong.push(`dicht ${at}`);
+      // ringsum zwei Felder frei: nichts Festes, kein Wasser, keine Spur, keine Plattform, keine Wiese
+      for (const [dx, dy] of RING_2) {
+        const n = w.cell(p[0] + dx, p[1] + dy);
+        if (n.solid || n.ground === 'water' || n.slide || n.portal || n.garden) wrong.push(`eng ${at}`);
+      }
+      // alle acht Nachbarn gleich hoch und vom Schneebett aus erreichbar: Man läuft immer um ihn herum
+      for (const [dx, dy] of RING_1.filter(([dx, dy]) => dx || dy)) {
+        if (standHeight(w, [], p[0] + dx, p[1] + dy) !== c.h) wrong.push(`ohne Lücke ${at}`);
+        if (!reach.has(keyOf([p[0] + dx, p[1] + dy]))) wrong.push(`nicht erreichbar ${at}`);
+      }
+    }
+    return wrong;
+  }
+
+  it('Schneehaufen liegen einzeln und weit verstreut, ringsum frei und erreichbar; sie sperren nie etwas ab (20 Seeds)', () => {
+    for (const seed of VALLEY_SEEDS) {
+      const w = worldOf(seed);
+      const kessel = kesselPlace(seed, EIS_PACK).cells.filter(([x, y]) => w.cell(x, y).region === 'eis');
+      const reach = new Set(reachable(w, [], w.homes.eis.wake[0]!, 200000).map(keyOf));
+      const wrong = heapFaults(w, kessel, reach);
+      // ohne die Haufen wäre kein Feld mehr erreichbar: Jedes begehbare Feld des Tals ist es schon mit ihnen
+      wrong.push(
+        ...kessel
+          .filter(([x, y]) => standHeight(w, [], x, y) !== null && !reach.has(`${x},${y}`))
+          .map((p) => `abgesperrt ${p.join(',')}`),
+      );
+      expect(wrong, `Seed ${seed}`).toEqual([]);
+    }
   });
 
   /** Eislöcher: zusammenhängende Wasserflächen im Tal (Nachbarn über Seiten) */

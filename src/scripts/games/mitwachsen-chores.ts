@@ -5,6 +5,7 @@
 
 import { fromKey } from '../../lib/games/chunks';
 import type { RegionId } from '../../data/games/mitwachsen';
+import type { PackEvent } from './mitwachsen-pack-types';
 import type { World } from './mitwachsen-world';
 
 export const REGROW = 300; // Takte, bis an einem Busch neue Beeren hängen und in einer Fischkiste neue Fische liegen (30 s)
@@ -26,6 +27,16 @@ export type ChoreEvent =
   | { type: 'feed'; food: 'berries' | 'fish'; ids: string[] } // Futter in Trog oder Eisschale: diese Tiere freuen sich
   | { type: 'fill'; x: number; y: number } // Eimer am Wasser gefüllt
   | { type: 'pour'; ids: string[] }; // Wasser in den Wassertrog: diese Tiere der Wiese freuen sich
+
+/**
+ * Nach diesen Ereignissen sieht ein Feld anders aus (Busch oder Fischkiste leer bzw. wieder voll, Schneehaufen um eine
+ * Kugel gewachsen): Die 3D-Ansicht baut sein Stück neu. Ausdrücklich aufgezählt, damit ein neues Ereignis mit Feld nicht
+ * unbemerkt Stücke neu bauen lässt.
+ */
+export const reshapes = (e: {
+  type: string;
+}): e is Extract<ChoreEvent, { type: 'pick' | 'catch' | 'regrow' }> | PackEvent =>
+  e.type === 'pick' || e.type === 'catch' || e.type === 'regrow' || e.type === 'snowman';
 
 /** Wohin die Ereignisse gehen (die Liste der Regeln, die auch andere Ereignisse enthält) */
 type Events = { push(e: ChoreEvent): unknown };

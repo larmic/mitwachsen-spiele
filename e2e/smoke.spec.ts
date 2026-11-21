@@ -327,6 +327,114 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
   expect(errors).toEqual([]);
 });
 
+test('Spiel: Schneemann bauen im Gletschertal (Tor im Test offen): dreimal hinein, er steht und übersteht Neuladen, ohne Fehler', async ({
+  page,
+}) => {
+  // Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte: Jedes Bild und jeder Aufruf in die Seite dauert dort lange
+  test.setTimeout(180_000);
+  const errors = watchErrors(page);
+  await page.goto('/spielen/');
+  await page.getByRole('button', { name: /Verstanden/ }).click();
+  const game = page.locator('larmic-mitwachsen');
+  await expect(game).toHaveClass(/ready/);
+  await withIce(game);
+  type Game = {
+    world: { homes: { eis: { bed: [number, number] } }; cell(x: number, y: number): { deco: string | null } };
+    state: {
+      player: { x: number; y: number; dir: string };
+      openGates: string[];
+      sleeping: boolean;
+      wokeAt: number;
+      packs: Record<string, { snow?: Record<string, number> } | undefined>;
+    };
+    apply(cmd: { type: 'move'; dir: string }): void;
+    lift(): void;
+  };
+  /** Die Figur steht wach vor dem Schneehaufen (südlich davon, schaut zu ihm), das Tor ist offen */
+  const stand = (heap: readonly [number, number]) =>
+    game.evaluate((node, [x, y]) => {
+      const el = node as unknown as Game;
+      el.state = { ...el.state, openGates: ['eis'], sleeping: false, wokeAt: -100, player: { x, y: y + 1, dir: 'n' } };
+      el.lift();
+    }, heap);
+  const stage = (heap: readonly [number, number]) =>
+    game.evaluate((node, [x, y]) => (node as unknown as Game).state.packs.eis?.snow?.[`${x},${y}`] ?? 0, heap);
+  // der Schneehaufen, der dem Schneebett am nächsten liegt
+  const heap = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const [bx, by] = el.world.homes.eis.bed;
+    for (let r = 1; r < 200; r++)
+      for (let y = by - r; y <= by + r; y++)
+        for (let x = bx - r; x <= bx + r; x++)
+          if (Math.max(Math.abs(x - bx), Math.abs(y - by)) === r && el.world.cell(x, y).deco === 'snowheap')
+            return [x, y] as const;
+    return null;
+  });
+  expect(heap).not.toBeNull();
+  await stand(heap!);
+  await waitFrames(page, 30);
+  // Jedes Hineinlaufen lässt eine Kugel wachsen, beim dritten Mal steht der Schneemann (gezeichnet nach jedem Schritt)
+  for (let i = 1; i <= 3; i++) {
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 'n' }));
+    expect(await stage(heap!)).toBe(i);
+    await waitFrames(page, 20);
+  }
+  // Noch einmal hinein: Er bleibt, wie er ist
+  await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 'n' }));
+  expect(await stage(heap!)).toBe(3);
+  // Neu laden: Der Schneemann steht noch da (gespeichert, sobald er gewachsen ist) und wird gezeichnet
+  await page.reload();
+  await expect(game).toHaveClass(/ready/);
+  expect(await stage(heap!)).toBe(3);
+  await stand(heap!);
+  await waitFrames(page, 30);
+  /** Farben der Quader, die eine Ansicht für den Schneehaufen zeichnet (3D: aus dem 3D-Teil des Pakets) */
+  type Drawn = { decos: Record<string, ((...a: unknown[]) => unknown[][] | null) | undefined> } | null | undefined;
+  type Views = Game & {
+    gl3d: { views: { decos: Drawn }; at: unknown } | null;
+    renderer: { later: unknown[][] };
+    r3d: unknown;
+  };
+  const carrot = '#e8892a'; // Möhrennase (SNOWMAN_COLORS.carrot)
+  // In 3D baut das Stück des Felds den Schneemann mit Möhrennase (sobald der 3D-Teil des Pakets da ist)
+  const in3d = await game.evaluate((node) => !!(node as unknown as Views).gl3d);
+  if (in3d)
+    await expect
+      .poll(() =>
+        game.evaluate((node, [x, y]) => {
+          const el = node as unknown as Views;
+          const draw = el.gl3d!.views.decos?.decos.snowheap; // Zeichnungen der geladenen 3D-Teile
+          return (draw?.(el.world, el.world.cell(x, y), x, y, el.gl3d!.at) ?? []).map((b) => b[6]);
+        }, heap!),
+      )
+      .toContain(carrot);
+  // In 2D steht er ebenso da: Die Quader des Schneemanns liegen im gezeichneten Bild
+  await game.evaluate((node) => {
+    (node as unknown as Views).r3d = null; // ohne 3D: so zeichnet die 2D-Ansicht von vorn
+  });
+  await stand(heap!);
+  await waitFrames(page, 20);
+  const later = () => game.evaluate((node) => (node as unknown as Views).renderer.later.map((b) => b[6] as string));
+  expect(await later()).toContain(carrot);
+  // Auch in 2D wächst ein Haufen (dort wackelt die frische Kugel kurz): der nächste Haufen, eine Kugel
+  const next = await game.evaluate((node, [hx, hy]) => {
+    const el = node as unknown as Game;
+    for (let r = 1; r < 200; r++)
+      for (let y = hy - r; y <= hy + r; y++)
+        for (let x = hx - r; x <= hx + r; x++)
+          if (Math.max(Math.abs(x - hx), Math.abs(y - hy)) === r && el.world.cell(x, y).deco === 'snowheap')
+            return [x, y] as const;
+    return null;
+  }, heap!);
+  expect(next).not.toBeNull();
+  await stand(next!);
+  await waitFrames(page, 10);
+  await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 'n' }));
+  expect(await stage(next!)).toBe(1);
+  await waitFrames(page, 20);
+  expect(errors).toEqual([]);
+});
+
 test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten in der Bucht, die Leiste klappt um, ohne Fehler', async ({
   page,
 }) => {

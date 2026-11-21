@@ -29,7 +29,7 @@ import { FREE_KEYS, InputPace, KEYS, STEP_MS, stops } from './input-pace';
 import { drawMap } from './mitwachsen-map';
 import { Fog, REVEAL, START_REVEAL } from './mitwachsen-fog';
 import { attachPack, initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
-import type { ChoreEvent } from './mitwachsen-chores';
+import { reshapes, type ChoreEvent } from './mitwachsen-chores';
 import { createWorld, gatePlaces, standHeight, type World } from './mitwachsen-world';
 import { pending, type GuideRules } from './mitwachsen-guide';
 import { Packs, type LoadedPack } from './mitwachsen-packs';
@@ -92,6 +92,7 @@ class LarmicMitwachsen extends HTMLElement {
   private resize: ResizeObserver | null = null;
   private readonly reduced = matchMedia('(prefers-reduced-motion: reduce)');
   private fog = new Fog(); // erkundete Felder; der Rest liegt im Nebel
+  private seen = (x: number, y: number) => this.fog.has(x, y); // Ist das Feld erkundet? (Regeln, Bild, Karte)
   private seenAt = '';
   private map!: HTMLCanvasElement;
   private mapCtx!: CanvasRenderingContext2D;
@@ -283,7 +284,7 @@ class LarmicMitwachsen extends HTMLElement {
     if (this.opening !== this.live) return; // die alte Welt ruht, bis die neue steht
     if (cmd.type !== 'tick') this.lastInput = performance.now(); // jemand spielt
     if (cmd.type === 'move' && performance.now() < this.sitUntil) return; // die müde Figur sitzt kurz
-    const { state, events } = step(this.state, this.world, cmd, (x, y) => this.fog.has(x, y), this.guide);
+    const { state, events } = step(this.state, this.world, cmd, this.seen, this.guide, this.packs.loaded);
     this.state = state;
     // Ist die Leiste der Lichtung voll, gelten die Regeln des Pinguins aus dem Paket der Eis-Welt (bis er im Kessel wohnt)
     if (!this.guide && pending(state)) this.guide = this.packs.get('eis')?.lead;
@@ -685,16 +686,20 @@ class LarmicMitwachsen extends HTMLElement {
     }
   }
 
-  /** Beeren gepflückt, Fische gefangen, nachgewachsen, Eimer geschöpft; Beeren, Fische oder Wasser in den Trog */
-  private chore(e: ChoreEvent, now: number) {
-    if (e.type === 'pick' || e.type === 'catch' || e.type === 'regrow')
-      this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]); // Busch oder Fischkiste ist jetzt leer bzw. wieder voll
+  /**
+   * Beeren gepflückt, Fische gefangen, nachgewachsen, Eimer geschöpft; Beeren, Fische oder Wasser in den Trog; ein
+   * Schneehaufen wächst um eine Kugel (es ploppt, Töne aus dem Welt-Paket, und gleich gespeichert: der Schneemann bleibt)
+   */
+  private chore(e: ChoreEvent | Extract<GameEvent, { type: 'snowman' }>, now: number) {
+    if (reshapes(e)) this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]); // leer, wieder voll, gewachsen
     if (e.type === 'regrow') return;
-    if (e.type === 'pick' || e.type === 'catch' || e.type === 'fill') {
-      // Die Figur hüpft vor Freude: Beeren springen heraus, Fische platschen, beim Schöpfen spritzen Tropfen
-      this.sfx[e.type]();
+    if (e.type === 'pick' || e.type === 'catch' || e.type === 'fill' || e.type === 'snowman') {
+      // Die Figur hüpft vor Freude: Beeren springen heraus, Fische platschen, beim Schöpfen spritzen Tropfen, Schnee stiebt
+      if (e.type === 'snowman') this.sfx.score(this.renderer.view?.score?.(e) ?? []);
+      else this.sfx[e.type]();
       this.hops.set('player', now);
-      this.burst('player', SPARKS[e.type], 12);
+      this.burst('player', SPARKS[e.type === 'snowman' ? 'snow' : e.type], 12);
+      if (e.type === 'snowman') this.save();
       return;
     }
     // Alle Tiere der Wiese hüpfen und bekommen ein Herz
@@ -795,7 +800,7 @@ class LarmicMitwachsen extends HTMLElement {
       look: LOOK,
       reduced: this.reduced.matches,
       bottomInset: this.touchUi.offsetParent ? this.touchUi.offsetHeight + 16 : 0,
-      explored: (x, y) => this.fog.has(x, y),
+      explored: this.seen,
     };
     if (this.r3d) {
       // 3D-Welt, darüber die durchsichtige 2D-Ebene mit Zeichen, Pfeil, Nacht und Leiste
@@ -809,16 +814,7 @@ class LarmicMitwachsen extends HTMLElement {
       const m = this.map.clientWidth;
       this.mapCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       this.mapCtx.imageSmoothingEnabled = false;
-      drawMap(
-        this.mapCtx,
-        this.world,
-        this.state,
-        player.x,
-        player.y,
-        m,
-        (x, y) => this.fog.has(x, y),
-        this.reduced.matches ? 0 : t,
-      );
+      drawMap(this.mapCtx, this.world, this.state, player.x, player.y, m, this.seen, this.reduced.matches ? 0 : t);
     }
   }
 

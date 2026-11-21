@@ -29,9 +29,10 @@ export const FREE_KEYS = new Set([
 
 /**
  * Begegnungen: Tier gefunden oder angestoßen, Beeren gepflückt, Fische gefangen, Futter oder Wasser gebracht, Wasser
- * geschöpft, Plattform erwacht, gereist, Klangstein, das Eistor geht auf (und jeder Hüpfer, solange es aufgeht), ins
- * Bett gegangen. Danach bleibt die Figur kurz stehen (`pause`, so lange wie die Wartezeit am Anfang, damit man Herz und
- * Noten sieht) und läuft mit gehaltenem Pfeil weiter. Nur aus dem Bett muss der Pfeil neu gedrückt werden (`AGAIN`).
+ * geschöpft, Plattform erwacht, gereist, Klangstein, das Eistor geht auf (und jeder Hüpfer, solange es aufgeht), ein
+ * Schneehaufen wächst um eine Kugel (Eis-Welt), ins Bett gegangen. Danach bleibt die Figur kurz stehen (`pause`, so
+ * lange wie die Wartezeit am Anfang, damit man Herz und Noten sieht) und läuft mit gehaltenem Pfeil weiter. Nur aus dem
+ * Bett muss der Pfeil neu gedrückt werden (`AGAIN`).
  */
 export const ENCOUNTERS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['type']>([
   'sing',
@@ -46,6 +47,7 @@ export const ENCOUNTERS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['typ
   'story',
   'gate',
   'hop',
+  'snowman',
   'sleep',
 ]);
 /** Danach erst nach neuem Druck weiter: sonst weckte der noch gehaltene Pfeil sie gleich wieder, und sie liefe zurück ins Bett */

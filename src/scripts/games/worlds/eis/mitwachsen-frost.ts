@@ -1,8 +1,10 @@
-// Eiskristalle und Schneewehen im Gletscherkessel – rein und deterministisch, nach Tannen und Eisblöcken gesetzt
-// (mitwachsen-kessel.ts). Kristalle stehen in kleinen Gruppen am Fuß der Eisklippen und oben auf den Kuppen (Höhe 3),
-// fest wie ein Stein, jeder mit einem Feld Lücke ringsum; Schneewehen liegen begehbar im Lee der Tannen (der Pustewind
-// weht nach rechts, also rechts daneben). Das Leuchten der Kristalle beim Polarlicht (`crystalGlow`) zeichnen die
-// Ansichten des Welt-Pakets: 2D in mitwachsen-ice-sky.ts, 3D in view-3d.ts.
+// Eiskristalle, Schneewehen und Schneehaufen im Gletscherkessel – rein und deterministisch, nach Tannen und Eisblöcken
+// gesetzt (mitwachsen-kessel.ts). Kristalle stehen in kleinen Gruppen am Fuß der Eisklippen und oben auf den Kuppen
+// (Höhe 3), fest wie ein Stein, jeder mit einem Feld Lücke ringsum; Schneewehen liegen begehbar im Lee der Tannen (der
+// Pustewind weht nach rechts, also rechts daneben); Schneehaufen, aus denen das Kind Schneemänner baut
+// (mitwachsen-snowman.ts), liegen einzeln und weit verstreut, fest, mit zwei Feldern freiem, ebenem Schnee ringsum. Das
+// Leuchten der Kristalle beim Polarlicht (`crystalGlow`) zeichnen die Ansichten des Welt-Pakets: 2D in
+// mitwachsen-ice-sky.ts, 3D in view-3d.ts.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Gletscherkessel“ und „Wetter und Unterstand“)
 
 import { cycle, hash, rand01 } from '../../../../lib/games/rng';
@@ -17,6 +19,8 @@ const key = (x: number, y: number) => `${x},${y}`;
  * Schneewehen: Jede Tanne hat eine direkt im Lee (wo Platz ist), Anteil `second` ein zweites Häufchen dahinter.
  */
 export const FROST = { groups: 24, spacing: 9, size: 4, least: 12, second: 0.4 } as const;
+/** Schneehaufen: so viele (höchstens) je Tal, mindestens so viele Felder zwischen zweien */
+export const HEAPS = { count: 14, spacing: 14 } as const;
 
 /** Ein Feld des Kessels, auf dem Tannen, Eisblöcke, Kristalle und Wehen wachsen dürfen (nicht dort, wo er frei bleibt) */
 export type Wild = { readonly x: number; readonly y: number };
@@ -30,6 +34,7 @@ const STEPS = [-2, -1, 0, 1, 2]
 export function frost(seed: number, wild: readonly Wild[], map: Map<string, Cell>) {
   crystals(seed, wild, map);
   drifts(seed, wild, map);
+  heaps(seed, wild, map);
 }
 
 /** Schnee ohne alles darauf: dort darf ein Kristall oder eine Wehe hin */
@@ -110,5 +115,43 @@ function drifts(seed: number, wild: readonly Wild[], map: Map<string, Cell>) {
   for (const { x, y } of wild) {
     if (map.get(key(x, y))?.tree !== 'snowpine') continue;
     if (drift(x + 1, y) && rand01(seed, x, y, 74) < FROST.second) drift(x + 2, y);
+  }
+}
+
+/**
+ * Schneehaufen (`'snowheap'`, fest): einzeln und weit verstreut (`HEAPS`), nie auf Wegen, Spur, Plattformen oder Wiese
+ * (nur auf `wild`, auf blankem Schnee). Ringsum zwei Felder ebener, freier Schnee: kein Wasser, nichts Festes, keine
+ * Spur, keine Plattform, keine Wiese, alle acht Nachbarn gleich hoch. So läuft man immer um ihn (und den Schneemann
+ * daraus) herum, und er sperrt nie etwas ab.
+ */
+function heaps(seed: number, wild: readonly Wild[], map: Map<string, Cell>) {
+  const at = (x: number, y: number) => map.get(key(x, y));
+  const inWild = new Set(wild.map(({ x, y }) => key(x, y)));
+  const open = (n: Cell | undefined, h: number, near: boolean) =>
+    !!n &&
+    n.region === 'eis' &&
+    !n.solid &&
+    n.ground !== 'water' &&
+    !n.slide &&
+    !n.portal &&
+    !n.garden &&
+    (!near || n.h === h);
+  const fits = (x: number, y: number) => {
+    const c = at(x, y);
+    if (!inWild.has(key(x, y)) || !bare(c)) return false;
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        if (!(dx || dy)) continue;
+        if (!open(at(x + dx, y + dy), c.h, Math.abs(dx) <= 1 && Math.abs(dy) <= 1)) return false;
+      }
+    return true;
+  };
+  const placed: Wild[] = [];
+  const roll = (x: number, y: number) => hash(seed, x, y, 75);
+  for (const w of [...wild].sort((a, b) => roll(a.x, a.y) - roll(b.x, b.y))) {
+    if (placed.length >= HEAPS.count) break;
+    if (!placed.every((p) => Math.hypot(p.x - w.x, p.y - w.y) >= HEAPS.spacing) || !fits(w.x, w.y)) continue;
+    map.set(key(w.x, w.y), { ...at(w.x, w.y)!, deco: 'snowheap', solid: true }); // `fits` hat das Feld geprüft
+    placed.push(w);
   }
 }

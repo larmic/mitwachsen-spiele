@@ -8,7 +8,7 @@ import { view3d } from './view-3d';
 import { gateLook } from './view-3d-gate';
 import { crystalGlint, crystalGlow, glowTint } from './mitwachsen-ice-look';
 
-const at: DecoAt = { now: 1234, reduced: false, picked: {} };
+const at: DecoAt = { now: 1234, reduced: false, picked: {}, packs: {} };
 const world = worldOf(1);
 /** Erstes Feld um das Bett einer Gegend (sonst im Kessel, um das Schneebett) mit dieser Deko-Art */
 function find(deco: Cell['deco'], home: 'eis' | 'lichtung' = 'eis'): [number, number, Cell] {
