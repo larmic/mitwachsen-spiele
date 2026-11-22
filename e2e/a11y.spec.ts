@@ -1,29 +1,13 @@
-// Barrierefreiheit der fertigen Seite: axe-core prüft jede Seite nach WCAG 2.2 A/AA.
+// Barrierefreiheit des Spiels: axe-core prüft die Spielseite nach WCAG 2.2 A/AA (die Seiten ohne Spiel: e2e/site.spec.ts).
 // Das Gate fällt bei jedem Verstoß; die Liste nennt Regel, Wirkung und betroffene Elemente.
 // Geprüft wird die ruhende Seite (reduzierte Bewegung): Mitten im Einblenden misst axe Mischfarben als Kontrast.
-import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
-import { openGame, openMenu, settled } from './helpers';
+import { expect, test } from '@playwright/test';
+import { gotoGame, openGame, openMenu, render, settled, ticks, violations } from './helpers';
 
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
 
-async function violations(page: Page) {
-  const result = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
-    .analyze();
-  return result.violations.map(
-    (v) => `${v.impact}: ${v.id} – ${v.help} (${v.nodes.map((n) => n.target.join(' ')).join(', ')})`,
-  );
-}
-
-for (const path of ['/', '/datenschutz/', '/gibt-es-nicht/'])
-  test(`Barrierefrei: ${path}`, async ({ page }) => {
-    await page.goto(path);
-    expect(await violations(page)).toEqual([]);
-  });
-
 test('Barrierefrei: Spiel mit Hinweis für Eltern und danach', async ({ page }) => {
-  await page.goto('/spielen/');
+  await gotoGame(page);
   await settled(page);
   await expect(page.locator('dialog.mw-info')).toHaveJSProperty('open', true);
   expect(await violations(page)).toEqual([]);
@@ -34,23 +18,17 @@ test('Barrierefrei: Spiel mit Hinweis für Eltern und danach', async ({ page }) 
 
 // Je Zustand des Schalters ein Test: Laden, Menü und zwei Prüfungen mit axe sprengten auf dem Runner die 30 s eines Tests
 test('Barrierefrei: Menü für Eltern mit den Schaltern für Ton und Kamera', async ({ page }) => {
-  await openGame(page);
+  await openGame(page, { clock: true });
   const menu = await openMenu(page);
   await expect(menu.getByRole('button', { name: 'Kamera bewegen: an' })).toHaveAttribute('aria-pressed', 'true');
   expect(await violations(page)).toEqual([]);
 });
 
 test('Barrierefrei: Menü für Eltern, Schalter „Kamera bewegen“ umgelegt', async ({ page }) => {
-  await openGame(page);
+  await openGame(page, { clock: true });
   const menu = await openMenu(page);
   await menu.getByRole('button', { name: 'Kamera bewegen: an' }).click();
   await expect(menu.getByRole('button', { name: 'Kamera bewegen: aus' })).toHaveAttribute('aria-pressed', 'false');
-  expect(await violations(page)).toEqual([]);
-});
-
-test('Barrierefrei: Startseite auf dem Handy (320 px)', async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 640 });
-  await page.goto('/');
   expect(await violations(page)).toEqual([]);
 });
 
@@ -58,10 +36,9 @@ test('Barrierefrei: „Noch nicht“ am Eistor sagt die Live-Region, was fehlt',
   type Game = {
     world: { gates: Map<string, { mid: [number, number]; out: [number, number] }> };
     state: { player: { x: number; y: number; dir: string }; sleeping: boolean; still: number; garden: unknown[] };
-    apply(cmd: { type: 'tick' }): void;
     lift(): void;
   };
-  const game = await openGame(page);
+  const game = await openGame(page, { clock: true });
   const say = page.locator('.mw-say');
   await expect(say).toHaveAttribute('role', 'status');
   await expect(say).toHaveText('');
@@ -72,8 +49,14 @@ test('Barrierefrei: „Noch nicht“ am Eistor sagt die Live-Region, was fehlt',
     const player = { x: mid[0] - 2 * out[0], y: mid[1] - 2 * out[1], dir: 'n' };
     el.state = { ...el.state, player, sleeping: false, still: 0, garden: [] };
     el.lift();
-    for (let i = 0; i < 10; i++) el.apply({ type: 'tick' });
   });
-  await expect(say).toHaveText('Noch nicht. Es fehlt noch: Hase');
+  await ticks(page, 10);
+  // Gezeigt wird je Bild, Bild und Ton kommen beim ersten Mal nach (mitwachsen-hint-look.ts)
+  await expect
+    .poll(async () => {
+      await render(page);
+      return say.textContent();
+    })
+    .toBe('Noch nicht. Es fehlt noch: Hase');
   expect(await violations(page)).toEqual([]);
 });

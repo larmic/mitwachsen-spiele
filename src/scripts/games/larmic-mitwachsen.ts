@@ -79,6 +79,9 @@ class LarmicMitwachsen extends HTMLElement {
   private globals: AbortController | null = null;
   private timer: number | undefined;
   private raf = 0;
+  // Test-Uhr der Browser-Tests (e2e/helpers.ts): Mit `window.__MW_TEST` ruhen Takt und Bildschleife, der Test spielt
+  // Takte (`apply`) und zeichnet Bilder (`frame`) selbst
+  private manual = '__MW_TEST' in window;
   private lastFrame = 0;
   private lastSave = 0;
   private pace = new InputPace(); // ruhiger Takt: Tippen ist nicht schneller als Halten
@@ -284,6 +287,7 @@ class LarmicMitwachsen extends HTMLElement {
 
   private start() {
     this.lastInput = performance.now(); // nach Menü, Hinweis oder Tab-Wechsel: frisch, die Figur steht
+    if (this.manual) return;
     if (this.timer === undefined && !this.paused() && document.visibilityState === 'visible')
       this.timer = window.setInterval(() => this.apply({ type: 'tick', held: this.pace.held() }), TICK_MS);
     if (!this.raf) this.raf = requestAnimationFrame(() => this.frame(performance.now()));
@@ -697,7 +701,7 @@ class LarmicMitwachsen extends HTMLElement {
   private frame(t: number) {
     // Eine Uhr für alles: Tasten, Ereignisse und Bild laufen über performance.now(). Die Bildzeit von rAF kann auf dem
     // Mac weit davon abweichen (z. B. nach dem Ruhezustand); dann lief ein gehaltener Pfeil nie weiter.
-    this.raf = requestAnimationFrame(() => this.frame(performance.now()));
+    if (!this.manual) this.raf = requestAnimationFrame(() => this.frame(performance.now()));
     const dt = Math.min(0.05, (t - (this.lastFrame || t)) / 1000);
     this.lastFrame = t;
     if (!this.size.w) this.measure();

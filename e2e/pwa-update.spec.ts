@@ -6,12 +6,14 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseServiceWorker } from '../scripts/pwa.ts';
 import { SLEEP_LOCK } from '../src/scripts/games/mitwachsen-state.ts';
+import { RITUAL_MS } from '../src/scripts/games/pwa-update.ts';
 import { openGame, reloadGame, settled, watchErrors } from './helpers.ts';
 import { CHUNK, VERSIONS } from './versions-dirs.ts';
 
-// Diese Tests warten echte Abläufe ab (Ritual, Installation einer Fassung, Neuladen mit 3D) und brauchen schon allein
-// auf einem Runner mit 2 CPUs gut 20 s; parallel zu anderen Tests reichen die üblichen 30 s nicht
-test.describe.configure({ timeout: 120_000 });
+// Diese Tests warten echte Abläufe ab (Laden zweier Fassungen, Installation, Schlaflied nach echter Uhr, Neuladen, teils
+// zwei Tabs): In `gates:ci` (2 CPUs, in 2D, einzeln im Projekt `pwa-update`) brauchte der längste 20 s, zwei Drittel der
+// üblichen 30 s – zu knapp für die Pipeline, wo parallel ein zweiter Test läuft. Die Grenze gilt nur gegen Hänger
+test.describe.configure({ timeout: 60_000 });
 
 /** Cache-Name und 3D-Datei (Pfad, Größe) einer Fassung, aus ihrem Service Worker gelesen */
 function version(n: '1' | '2') {
@@ -24,12 +26,47 @@ function version(n: '1' | '2') {
 
 type GameEl = { state: { sleeping: boolean }; apply(cmd: { type: string }): void };
 
+/** Was `probe` in der Seite mitschreibt */
+type Probe = { mwAsked: number; mwChanged: boolean; mwLeaving: boolean };
+
+/**
+ * Vor dem ersten Skript der Seite: zählt beendete Fragen nach einer neuen Version (`update()`, jeder Auslöser in
+ * pwa-register.ts fragt), merkt einen Wechsel des Service Workers (vor dem Spiel angemeldet, also vor dessen Entscheidung)
+ * und ob die Seite geht (`beforeunload` kommt noch im Aufruf von `location.reload()`). So prüfen die Tests „lädt nicht neu“
+ * an dem Punkt, an dem die Seite entschieden hat, statt eine Weile zu warten
+ */
+function probe() {
+  const w = window as unknown as Probe;
+  Object.assign(w, { mwAsked: 0, mwChanged: false, mwLeaving: false });
+  const proto = ServiceWorkerRegistration.prototype;
+  const update = Object.getOwnPropertyDescriptor(proto, 'update')!.value as (
+    this: ServiceWorkerRegistration,
+  ) => Promise<unknown>;
+  proto.update = function (this: ServiceWorkerRegistration) {
+    const asked = update.call(this);
+    const done = () => void w.mwAsked++;
+    asked.then(done, done);
+    return asked;
+  } as ServiceWorkerRegistration['update'];
+  navigator.serviceWorker.addEventListener('controllerchange', () => (w.mwChanged = true));
+  addEventListener('beforeunload', () => (w.mwLeaving = true));
+}
+const asked = (page: Page) => page.evaluate(() => (window as unknown as Probe).mwAsked);
+/** Dieselbe Seite wie beim Öffnen, und sie ist nicht im Gehen */
+const stays = (page: Page) =>
+  page.evaluate(() => {
+    const w = window as unknown as Probe & { mwSame?: boolean };
+    return w.mwSame === true && !w.mwLeaving;
+  });
+
 /**
  * Spiel öffnen, bis es steht (Tasten kommen an), Hinweis schließen, warten, bis der Service Worker die Seite steuert.
  * `firstTime: false`: zweiter Tab, der Hinweis ist schon gesehen
  */
 async function openApp(page: Page, firstTime = true) {
+  await page.addInitScript(probe);
   const game = await openGame(page, { info: firstTime });
+  await page.evaluate(() => ((window as unknown as { mwSame: boolean }).mwSame = true));
   // Angemeldet wird erst nach dem Laden (samt 3D); auf langsamen Runnern dauert das
   await expect
     .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null), { timeout: 30_000 })
@@ -140,8 +177,11 @@ test('App-Update: nach dem Gute-Nacht-Ritual kommt die wartende Fassung, einmal 
   // Fassung 2 aktiv, alter Cache weg (keine andere Spielseite offen)
   await expect.poll(() => registration(page)).toEqual({ waiting: null, active: 'activated' });
   await expect.poll(() => cacheNames(page)).toEqual([v2.cache]);
-  // Kein zweites Neuladen
-  await page.waitForTimeout(6000);
+  // Kein zweites Neuladen: Die neu geladene Seite hat gefragt (Auslöser „neu geladen“), keine Fassung wartet mehr
+  await page.evaluate(() => ((window as unknown as { mwSame: boolean }).mwSame = true));
+  await expect.poll(() => asked(page)).toBeGreaterThan(0);
+  expect(await registration(page)).toEqual({ waiting: null, active: 'activated' });
+  expect(await stays(page)).toBe(true);
   expect(loads()).toBe(1);
   expect(await sleeping()).toBe(true);
   expect(errors).toEqual([]);
@@ -191,7 +231,9 @@ test('App-Update: weckt das Kind die Figur zwischen Bitte und Übernahme, wird e
   await expect.poll(sleeping).toBe(false);
   await page.evaluate(() => (window as unknown as { releaseSkip: () => void }).releaseSkip());
   await expect.poll(() => registration(page)).toEqual({ waiting: null, active: 'activated' });
-  await page.waitForTimeout(3000);
+  // Die Seite hat den Wechsel gesehen und entschieden: nicht neu laden, die Figur ist wach
+  await expect.poll(() => page.evaluate(() => (window as unknown as Probe).mwChanged)).toBe(true);
+  expect(await stays(page)).toBe(true);
   expect(loads()).toBe(0);
   expect(await sleeping()).toBe(false);
   // Die Seite läuft noch mit Fassung 1: Ihr alter Cache bleibt, ihr altes Three.js kommt auch ohne Netz
@@ -206,7 +248,11 @@ test('App-Update: weckt das Kind die Figur zwischen Bitte und Übernahme, wird e
   await settled(page); // die neu geladene Seite
   expect(await sleeping()).toBe(true);
   await expect.poll(() => cacheNames(page)).toEqual([v2.cache]);
-  await page.waitForTimeout(6000);
+  // Kein zweites Neuladen: Die neu geladene Seite hat gefragt, keine Fassung wartet mehr
+  await page.evaluate(() => ((window as unknown as { mwSame: boolean }).mwSame = true));
+  await expect.poll(() => asked(page)).toBeGreaterThan(0);
+  expect(await registration(page)).toEqual({ waiting: null, active: 'activated' });
+  expect(await stays(page)).toBe(true);
   expect(loads()).toBe(1);
   expect(errors).toEqual([]);
 });
@@ -219,7 +265,7 @@ test('App-Update: zurück nach langer Pause, das Spiel schläft noch – die neu
   const errors = watchErrors(page);
   const { sleeping, loads } = await openApp(page);
   await goLive(context);
-  await page.waitForTimeout(4500); // die Figur schläft seit dem Laden länger als das Ritual
+  // Die Figur schläft seit dem Öffnen der Welt: für das Spiel schon unendlich lange (`updateMoment` in larmic-mitwachsen.ts)
   await longPause(page);
   await expect.poll(loads, { timeout: 30_000 }).toBe(1);
   expect(await sleeping()).toBe(true);
@@ -256,10 +302,13 @@ test('App-Update: mitten im Spiel wird nie neu geladen, die neue Fassung wartet'
   await goLive(context);
   await askForUpdate(page);
   await expect.poll(() => registration(page)).toEqual({ waiting: 'installed', active: 'activated' });
-  // Auslöser wie beim Einschlafen und nach langer Pause – aber die Figur ist wach
+  // Auslöser wie beim Einschlafen und nach langer Pause – aber die Figur ist wach. Beide fragen nach einer neuen Fassung
+  // und entscheiden dann; der Auslöser „Einschlafen“ erst nach dem Schlaflied (RITUAL_MS, echte Uhr in pwa-register.ts)
+  const before = await asked(page);
   await page.evaluate(() => document.dispatchEvent(new Event('mitwachsen-sleep')));
   await longPause(page);
-  await page.waitForTimeout(6000);
+  await expect.poll(() => asked(page), { timeout: RITUAL_MS + 5_000 }).toBeGreaterThanOrEqual(before + 2);
+  expect(await stays(page)).toBe(true);
   expect(loads()).toBe(0);
   expect(await sleeping()).toBe(false);
   expect(await registration(page)).toEqual({ waiting: 'installed', active: 'activated' });
