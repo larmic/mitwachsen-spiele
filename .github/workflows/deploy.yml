@@ -1,7 +1,8 @@
 name: Build und Deploy
 
-# Prüfen: jeder Pull Request (auch von Renovate) und jeder Push auf main – mit allen Guard-Gates.
+# Prüfen: jeder Pull Request (auch von Renovate) und jeder Push auf main – mit allen Guard-Gates, in parallelen Jobs.
 # Veröffentlichen: nur Pushes auf main, in einem eigenen Job über GitHub Pages (Quelle „GitHub Actions“, kein gh-pages-Branch).
+# Lokal dieselben Schritte und Playwright-Projekte, nur nacheinander in einem Container: npm run gates:ci (scripts/ci-local.sh)
 on:
   push:
     branches: [main]
@@ -12,20 +13,26 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Pull Requests: ein neuer Push bricht den alten Lauf ab. Auf main bekommt jeder Push sein eigenes Urteil (eigene Gruppe
+# je Lauf, nie abgebrochen oder verdrängt); dass kein älterer Lauf einen neueren Stand überschreibt, prüft der Deploy-Job.
+concurrency:
+  group: gates-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # Actions sind auf Commit-SHAs gepinnt (Tags lassen sich umhängen); Renovate hält die SHAs aktuell.
 # Standard: nur lesen. Install-Skripte frisch aktualisierter Pakete (Renovate) laufen damit ohne Schreib-Token.
 permissions:
   contents: read
 
+# Fristen je Job: etwa das 2,5-Fache der Dauer auf 2 CPUs (npm run gates:ci) samt geschätztem Einrichten (Checkout und
+# npm ci etwa 1 min, Browser samt Systempaketen etwa 1,5 min). Gemessen: static 61 s, coverage 78 s, build und verify
+# wenige Sekunden, e2e-site 9 s, e2e-game 19 s und 78 s. Reißt eine, erst die Ursache suchen; anheben nur mit
+# Begründung in der Commit-Nachricht.
 jobs:
-  gates:
-    name: Guard-Gates und Build
+  static:
+    name: Format, Lint, Architektur, Typen, Unit-Tests
     runs-on: ubuntu-latest
-    # Notlösung: Der Smoke-Test (reales 3D-Spiel in Software-WebGL auf 4 vCPUs) wächst mit dem Spiel; in P1 wird er geteilt
-    timeout-minutes: 25
-    concurrency:
-      group: gates-${{ github.ref }}
-      cancel-in-progress: true
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -49,8 +56,42 @@ jobs:
       - name: Guard-Gate – Typen und Inhalte prüfen
         run: npm run check
 
+      # Ohne Abdeckung: Die misst der Job coverage parallel, ein roter Test zeigt sich hier früher
       - name: Guard-Gate – Unit-Tests
+        run: npx vitest run
+
+  coverage:
+    name: Unit-Tests mit Abdeckung
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Guard-Gate – Unit-Tests mit Mindest-Abdeckung
         run: npm test
+
+  build:
+    name: Build und fertige Seite prüfen
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
 
       - name: Build
         run: npm run build
@@ -58,27 +99,15 @@ jobs:
       - name: Guard-Gate – Fertige Seite (HTML, Links, Bundles, externe Ressourcen, App)
         run: npm run verify
 
-      - name: Browser für den Smoke-Test installieren
-        run: npx playwright install --with-deps chromium
-
-      - name: Guard-Gate – Smoke-Test im Browser (Startseite, Spiel, Rechtliches)
-        run: npm run test:e2e
-
-      # Auch bei rotem Smoke-Test: Bericht und Traces zum Nachsehen (npx playwright show-report bzw. show-trace)
-      - name: Bericht des Smoke-Tests hochladen
-        if: ${{ !cancelled() }}
+      # Für die Browser-Tests: dieselbe Seite, kein zweiter Build (e2e/serve.ts liefert dist/, e2e/versions.ts leitet
+      # daraus Fassung 2 ab)
+      - name: Fertige Seite für die Browser-Tests bereitstellen
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-report
-          path: |
-            test-results/
-            playwright-report/
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Wackelige Browser-Tests in die Zusammenfassung
-        if: ${{ !cancelled() }}
-        run: node scripts/flaky-summary.ts
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Fertige Seite für den Deploy-Job bereitstellen
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
@@ -87,14 +116,150 @@ jobs:
           path: dist/
           retention-days: 1
 
+  # Browser-Tests: je Job ein Blob-Bericht, e2e-merge führt sie zu einem Bericht zusammen. Browser werden nicht
+  # zwischengespeichert: Chromium lädt etwa so schnell, wie ein Cache sich zurückholt, und die Systempakete (--with-deps)
+  # kommen ohnehin jedes Mal per apt.
+  e2e-site:
+    name: Browser-Tests – Seiten ohne Spiel
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Fertige Seite holen
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - name: Browser installieren
+        run: npx playwright install --with-deps chromium
+
+      - name: Guard-Gate – Browser-Tests (Projekt site)
+        run: npx playwright test --project=site --reporter=github,blob
+        env:
+          PLAYWRIGHT_BLOB_OUTPUT_NAME: report-site.zip
+
+      - name: Blob-Bericht hochladen
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: blob-report-site
+          path: blob-report/
+          if-no-files-found: ignore
+          retention-days: 1
+
+  # Alle Projekte, die das Spiel öffnen. Playwright teilt nach Zahl der Tests in Projekt-Reihenfolge: Teil 1 bekommt fast
+  # nur `game` (2D, 2 Worker), Teil 2 den Rest samt `3d` und `pwa-update`, die je mit einem Worker nebeneinander laufen
+  # (gemessen auf 2 CPUs etwa 58 s und 74 s). `pwa-update` allein bestimmt die Dauer von Teil 2, ein dritter Teil kürzte
+  # nichts. Neues Projekt in playwright.config.ts: hier oder bei e2e-site eintragen, sonst läuft es in der Pipeline nicht.
+  e2e-game:
+    name: Browser-Tests – Spiel ${{ matrix.shard }}/2
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Fertige Seite holen
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - name: Browser installieren
+        run: npx playwright install --with-deps chromium
+
+      - name: Guard-Gate – Browser-Tests (Projekte game, 3d, pwa-update)
+        run: >-
+          npx playwright test --project=game --project=3d --project=pwa-update
+          --shard=${{ matrix.shard }}/2 --reporter=github,blob
+        env:
+          PLAYWRIGHT_BLOB_OUTPUT_NAME: report-game-${{ matrix.shard }}.zip
+
+      - name: Blob-Bericht hochladen
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: blob-report-game-${{ matrix.shard }}
+          path: blob-report/
+          if-no-files-found: ignore
+          retention-days: 1
+
+  # Kein Gate: ein Bericht für alle Browser-Tests, auch nach Rot (npx playwright show-report, mit Traces der
+  # gescheiterten Versuche), und wackelige Tests in die Zusammenfassung des Laufs
+  e2e-merge:
+    name: Bericht der Browser-Tests
+    needs: [build, e2e-site, e2e-game]
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Blob-Berichte holen
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: blob-report-*
+          path: blob-report/
+          merge-multiple: true
+
+      - name: Berichte zusammenführen (HTML und JSON)
+        run: npx playwright merge-reports --reporter=html,json blob-report/
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/report.json
+
+      - name: Bericht der Browser-Tests hochladen
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Wackelige Browser-Tests in die Zusammenfassung
+        run: node scripts/flaky-summary.ts
+
   deploy:
     name: Deploy auf GitHub Pages
-    needs: gates
+    needs: [static, coverage, build, e2e-site, e2e-game]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Nur dieser Job darf veröffentlichen – ohne Schreibrechte aufs Repo. Er baut nichts und installiert nichts.
+    # contents: read nur für die Frage, ob main inzwischen weiter ist.
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
@@ -105,5 +270,25 @@ jobs:
       group: pages
       cancel-in-progress: false
     steps:
+      # Läufe auf main laufen parallel: Ein älterer, langsamerer Lauf darf den Stand eines neueren nicht überschreiben.
+      # Übersprungen wird nur, wenn ein neuerer Commit mehr als Doku ändert – nur dann hat er einen eigenen Lauf
+      # (paths-ignore oben), der veröffentlicht.
+      - name: Nur den neuesten Stand von main veröffentlichen
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          head=$(gh api "repos/$REPO/commits/main" --jq .sha)
+          files=$(gh api "repos/$REPO/compare/$GITHUB_SHA...$head" --jq '.files[].filename')
+          newer=$(echo "$files" | grep -Ev '^(README\.md|CLAUDE\.md|docs/.*)?$' || true)
+          if [ "$head" = "$GITHUB_SHA" ] || [ -z "$newer" ]; then
+            echo "newest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=Deploy übersprungen::main ist schon bei $head, dessen Lauf veröffentlicht"
+            echo "newest=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - id: deployment
+        if: steps.latest.outputs.newest == 'true'
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

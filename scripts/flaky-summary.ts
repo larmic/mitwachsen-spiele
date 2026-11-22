@@ -1,6 +1,7 @@
-// Nach dem Smoke-Test in der Pipeline (deploy.yml): wackelige Browser-Tests aus dem JSON-Bericht in die Zusammenfassung
-// des Laufs ($GITHUB_STEP_SUMMARY) und als Warnung am Test. Kein Gate – scheitert nie, auch ohne Bericht (dann lief der
-// Smoke-Test nicht oder wurde abgebrochen). Lokal: node scripts/flaky-summary.ts nach CI=1 npx playwright test.
+// Nach den Browser-Tests in der Pipeline (Job e2e-merge in deploy.yml, JSON aus den zusammengeführten Blob-Berichten
+// aller Browser-Jobs): wackelige Tests in die Zusammenfassung des Laufs ($GITHUB_STEP_SUMMARY) und als Warnung am Test.
+// Kein Gate – scheitert nie, auch ohne Bericht (dann lief der Smoke-Test nicht oder wurde abgebrochen).
+// Lokal: node scripts/flaky-summary.ts nach CI=1 npx playwright test.
 // Logik und Tests: scripts/flaky.ts, scripts/flaky.test.ts
 
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';

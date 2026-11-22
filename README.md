@@ -96,10 +96,10 @@ Lokal laufen alle zusammen mit `npm run gates`. Zusätzlich prüft ein Git-Hook 
 
 ## Deployment
 
-Die Pipeline `.github/workflows/deploy.yml` läuft bei jedem Pull Request (auch von Renovate) und bei jedem Push auf `main`. Sie hat zwei Jobs:
+Die Pipeline `.github/workflows/deploy.yml` läuft bei jedem Pull Request (auch von Renovate) und bei jedem Push auf `main`. Ihre Jobs:
 
-1. **Guard-Gates und Build** – nur mit Leserechten: installiert die Abhängigkeiten (`npm ci`), durchläuft die Guard-Gates, baut die Seite und prüft das Ergebnis (`npm run verify`) und im Browser (`npm run test:e2e`).
-2. **Deploy auf GitHub Pages** – nur auf `main`, erst wenn Job 1 grün ist: veröffentlicht die fertige Seite mit `actions/deploy-pages`. Er braucht nur die Rechte `pages: write` und `id-token: write`, keine Schreibrechte aufs Repo, und installiert und baut nichts.
+1. **Guard-Gates** – nur mit Leserechten und parallel: `static` (Formatierung, Lint, Architektur, Typen, Unit-Tests), `coverage` (Unit-Tests mit Mindest-Abdeckung), `build` (baut die Seite und prüft das Ergebnis mit `npm run verify`), danach die Browser-Tests auf genau diesem Build: `e2e-site` (Seiten ohne Spiel) und `e2e-game` (das Spiel, in zwei Teilen). `e2e-merge` führt deren Berichte zu einem zusammen (Artefakt `playwright-report`).
+2. **Deploy auf GitHub Pages** – nur auf `main`, erst wenn alle Guard-Gates grün sind: veröffentlicht die fertige Seite mit `actions/deploy-pages`. Er braucht nur die Rechte `pages: write` und `id-token: write` und zum Lesen `contents: read` (ist `main` schon weiter, veröffentlicht der neuere Lauf), keine Schreibrechte aufs Repo, und installiert und baut nichts.
 
 So laufen die Install-Skripte neuer Paketversionen nie mit einem Schreib-Token.
 
