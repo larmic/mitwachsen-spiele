@@ -1,0 +1,43 @@
+name: Tiefe Unit-Tests
+
+# Nachts (und von Hand): Eigenschafts-Tests über ihre vollen Seed-Bereiche (`npm run test:deep`, MITWACHSEN_DEEP=1).
+# Im normalen Lauf (deploy.yml, pre-commit) prüfen sie nur SAMPLE_SEEDS und REGRESSION_SEEDS (test-worlds.ts), damit die
+# Laufzeit nicht mit jeder Welt wächst. Dieser Lauf veröffentlicht nichts und hält keinen Deploy auf.
+# Rot? Die Meldung nennt den Seed („Seed …“). Ihn in REGRESSION_SEEDS in src/scripts/games/test-worlds.ts anhängen
+# (dann prüft ihn jeder Lauf), die Ursache beheben, nie den Test lockern.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+# Actions sind auf Commit-SHAs gepinnt (wie deploy.yml); nur lesen.
+permissions:
+  contents: read
+
+jobs:
+  deep:
+    name: Unit-Tests über alle Seeds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: deep-tests
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Unit-Tests über alle Seeds (MITWACHSEN_DEEP=1)
+        run: npm run test:deep
+
+      - name: Hinweis bei Rot
+        if: failure()
+        run: |
+          echo "::error title=Tiefe Unit-Tests::Gescheiterte Seeds (in der Meldung „Seed …“) in REGRESSION_SEEDS (src/scripts/games/test-worlds.ts) anhängen und die Ursache beheben"
+          echo "Gescheiterte Seeds (Meldung „Seed …“ oben im Log) in \`REGRESSION_SEEDS\` in \`src/scripts/games/test-worlds.ts\` anhängen und die Ursache beheben." >> "$GITHUB_STEP_SUMMARY"

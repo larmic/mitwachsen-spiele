@@ -1,18 +1,18 @@
-// Zeitbudget der Unit-Tests (vitest.config.ts): Kein Test darf auf dem Entwickler-Rechner länger brauchen als das
-// Budget. Gemessen wird relativ: `calibrate` misst vor den Tests eine kleine, reine JS-Last (so ähnlich wie die Tests:
-// Rauschen, Map mit Zahl- und Text-Schlüsseln, Breitensuche, Sortieren). Ist der Rechner langsamer (ausgelastet,
-// Stromsparen, Abdeckung), braucht auch sie länger, und das Budget wächst im selben Verhältnis.
+// Zeitbudget der Unit-Tests (vitest.config.ts): Ab dem Budget meldet der Bericht einen Test als langsam (nur Warnung;
+// Fehler ist erst die Frist von 60 s, die Hänger abfängt). Gemessen wird relativ: `calibrate` misst vor den Tests eine
+// kleine, reine JS-Last (so ähnlich wie die Tests: Rauschen, Map mit Zahl- und Text-Schlüsseln, Breitensuche,
+// Sortieren). Ist der Rechner langsamer (ausgelastet, Stromsparen, Abdeckung, Runner der Pipeline), braucht auch sie
+// länger, und das Budget wächst im selben Verhältnis.
 //
 // Herleitung: Die Pipeline (GitHub-Runner ubuntu-latest, 4 vCPUs, mit Abdeckung) war bis gut 4-mal langsamer als der
-// Rechner, an dem `REF` gemessen ist (gemessen 11/2026). 4 s Budget × 4 ≈ 16 s; die Grenze der Pipeline (60 s) lässt
-// mehr als das Dreifache Luft.
+// Rechner, an dem `REF` gemessen ist (gemessen 11/2026). 4 s Budget × 4 ≈ 16 s, weit unter der Frist von 60 s.
 import { performance } from 'node:perf_hooks';
 
 /** Bezug: Kalibrierung (Minimum aus 5 Läufen) auf dem Rechner, für den das Budget gilt, und das Budget dort */
 export const REF = { calibMs: 56, budgetMs: 4000 } as const;
 /** Mit Abdeckung (v8) laufen die Tests etwa so viel langsamer, die Kalibrierung (ohne Abdeckung geladen) nicht */
 export const COVERAGE_FACTOR = 1.7;
-/** Grenzen des Budgets: nicht so knapp, dass Rauschen zählt, nicht so weit, dass ein Test die Pipeline sprengt */
+/** Grenzen des Budgets: nicht so knapp, dass Rauschen meldet, nicht so weit, dass ein langsamer Test untergeht */
 export const BUDGET_RANGE = [1500, 8000] as const;
 
 /** Budget je Test in ms aus der Kalibrierung dieses Rechners; `coverage`: läuft mit Abdeckung */

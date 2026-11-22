@@ -2,9 +2,9 @@
 # Guard-Gate vor jedem Commit: die schnellen Prüfungen der Pipeline (wenige Sekunden).
 # Build, astro check und die Prüfung der fertigen Seite laufen in der Pipeline bzw. lokal mit `npm run gates`.
 # Aktiviert wird der Hook durch `npm install` (Skript "prepare"). Im Notfall überspringen: git commit --no-verify
-# Unit-Tests mit Zeitbudget (vitest.config.ts, scripts/test-budget.ts): Kein Test über dem Budget, sonst scheitert er
-# hier und nicht erst in der langsameren Pipeline. Zu langsam? Mit `it.each` in Seed-Bereiche teilen, Welten über
-# `worldOf`/`bareOf` (test-worlds.ts), kein `expect` in Schleifen je Takt oder Feld.
+# Unit-Tests (vitest.config.ts): Fehler nur bei Rot oder Hänger (60 s); Tests über dem Zeitbudget (scripts/test-budget.ts)
+# markiert der Bericht nur. Zu langsam? Eigenschafts-Tests über `seedsFor` (Stichprobe, volle Bereiche nur in
+# `npm run test:deep`), Welten über `worldOf`/`bareOf` (test-worlds.ts), kein `expect` in Schleifen je Takt oder Feld.
 set -e
 
 if [ ! -d node_modules ]; then

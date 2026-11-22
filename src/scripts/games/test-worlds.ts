@@ -1,23 +1,83 @@
 // Nur für Tests: alle Welt-Pakete und Welten mit ihnen, je Seed einmal gebaut (eine Welt ändert sich nie, die Tests
 // teilen sie sich, so steigt die Laufzeit nicht). Das Spiel lädt die Pakete per import() (larmic-mitwachsen.ts).
+// Dazu die Seeds der Eigenschafts-Tests: im normalen Lauf (npm test, pre-commit, Pipeline) nur wenige, die vollen
+// Bereiche im tiefen Lauf (`npm run test:deep`, nachts in .github/workflows/deep-tests.yml). So wächst die Laufzeit
+// nicht mit jeder Welt, und doch prüft jede Nacht alle Seeds.
 // Achtung, Seiteneffekt beim Import: Er trägt die Modelle der Eis-Tiere in `SPECIES` ein (`addModels`, wie im Spiel beim
 // Ankommen des Pakets). Ein Test, der Eis-Tiere zeichnet oder vermisst, importiert diesen Helfer, sonst sind ihre
 // Modelle leer (geprüft in mitwachsen-packs.test.ts).
 
 import { pack as eis } from './worlds/eis';
-import { createWorld, type World } from './mitwachsen-world';
+import { DIRS } from '../../lib/games/front';
+import type { GateId } from '../../data/games/mitwachsen';
+import { canStep, createWorld, type World } from './mitwachsen-world';
 import { addModels } from './mitwachsen-packs';
+import type { WorldPack } from './mitwachsen-pack-types';
 
 addModels(eis.models); // wie im Spiel, wenn das Paket ankommt: Modelle der Eis-Tiere
 export const PACKS = [eis] as const;
 export const EIS_PACK = eis;
 
-const worlds = new Map<number, World>();
-/** Die Welt eines Seeds mit allen Paketen, wie im Spiel */
-export function worldOf(seed: number): World {
-  let w = worlds.get(seed);
-  if (!w) worlds.set(seed, (w = createWorld(seed, PACKS)));
+const worlds = new Map<string, World>();
+/**
+ * Die Welt eines Seeds mit den Paketen `packs`, je Seed und Paketen einmal gebaut. Ohne `packs` mit allen, wie im
+ * Spiel (für Tests, die das Zusammenspiel prüfen); Tests einer Welt reichen nur ihr Paket herein, dann baut ein neues
+ * Paket ihre Welten nicht mit
+ */
+export function worldOf(seed: number, packs: readonly WorldPack[] = PACKS): World {
+  const key = `${seed}:${packs.map((p) => p.id).join(',')}`;
+  let w = worlds.get(key);
+  if (!w) worlds.set(key, (w = createWorld(seed, packs)));
   return w;
+}
+
+/** Tiefer Lauf (`MITWACHSEN_DEEP=1`, `npm run test:deep`): Eigenschafts-Tests über ihre vollen Seed-Bereiche */
+export const DEEP = process.env.MITWACHSEN_DEEP === '1';
+/** Wenige Seeds, die zeigen, wie die Welten meist sind: Über sie (und REGRESSION_SEEDS) laufen Eigenschafts-Tests sonst */
+export const SAMPLE_SEEDS: readonly number[] = [1, 7, 42, 2026, 123456];
+/**
+ * Seeds, an denen ein Eigenschafts-Test im tiefen Lauf einmal scheiterte (die Meldung nennt den Seed): Nur anhängen, nie
+ * streichen, auch wenn der Fehler behoben ist. Sie laufen in jedem Lauf mit, in jedem Eigenschafts-Test
+ */
+export const REGRESSION_SEEDS: readonly number[] = [];
+
+/** Die Seeds `from` bis `to` (beide eingeschlossen) */
+export const seedRange = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+/**
+ * Seeds eines Eigenschafts-Tests: im tiefen Lauf alle aus `full`, sonst nur `quick` (sonst SAMPLE_SEEDS); immer dazu
+ * REGRESSION_SEEDS, jeder Seed einmal
+ */
+export function seedsFor(full: readonly number[], quick: readonly number[] = SAMPLE_SEEDS): number[] {
+  return [...new Set([...(DEEP ? full : quick), ...REGRESSION_SEEDS])];
+}
+
+/**
+ * Seeds in Abschnitten zu je `size` (für `it.each`): Jeder Abschnitt ist ein eigener Test, so bleibt auch der tiefe Lauf
+ * über tausende Seeds weit unter der Frist (vitest.config.ts). `label` für den Namen des Tests
+ */
+export function seedChunks(seeds: readonly number[], size: number) {
+  return Array.from({ length: Math.ceil(seeds.length / size) }, (_, i) => {
+    const part = seeds.slice(i * size, (i + 1) * size);
+    const label = part.length > 6 ? `${part[0]} … ${part.at(-1)}` : part.join(', ');
+    return { seeds: part, label };
+  });
+}
+
+/** Alle Felder, die von `start` aus zu Fuß erreichbar sind (bis `limit` Felder) */
+export function reachable(world: World, open: GateId[], start: readonly [number, number], limit = 30000) {
+  const seen = new Set<string>([`${start[0]},${start[1]}`]);
+  const queue: [number, number][] = [[start[0], start[1]]];
+  while (queue.length && seen.size < limit) {
+    const [x, y] = queue.shift()!;
+    for (const [dx, dy] of Object.values(DIRS)) {
+      const k = `${x + dx},${y + dy}`;
+      if (seen.has(k) || !canStep(world, open, x, y, x + dx, y + dy)) continue;
+      seen.add(k);
+      queue.push([x + dx, y + dy]);
+    }
+  }
+  return [...seen].map((k) => k.split(',').map(Number) as [number, number]);
 }
 
 const bare = new Map<number, World>();

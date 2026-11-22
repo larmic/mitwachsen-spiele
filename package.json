@@ -10,6 +10,7 @@
     "preview": "astro preview",
     "check": "astro check",
     "test": "vitest run --coverage",
+    "test:deep": "MITWACHSEN_DEEP=1 vitest run",
     "lint": "astro sync && eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

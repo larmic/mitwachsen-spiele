@@ -2,28 +2,28 @@
 import { defineConfig } from 'vitest/config';
 import { budgetMs, calibrate } from './scripts/test-budget.ts';
 
-// Zeitbudget je Test (scripts/test-budget.ts): Die Pipeline ist bis gut 4-mal langsamer als ein Entwickler-Rechner
-// (gemessen 11/2026). Eine feste Grenze für beide fiel lokal nie auf und riss in der Pipeline bei jedem Push einen
-// anderen Test. Darum gilt die enge Grenze lokal (npm test, pre-commit): 4 s auf dem Bezugsrechner, relativ zur
-// Geschwindigkeit dieses Rechners, ohne Abdeckung entsprechend weniger. 4 s × 4 ≈ 16 s; die Grenze der Pipeline (60 s)
-// lässt mehr als das Dreifache Luft und fängt nur noch Hänger ab. Hooks (Welten vorab bauen) bekommen lokal das
-// Zehnfache des Budgets, ohne eigene Frist im Test. Wird ein Test zu langsam: in Abschnitte teilen (`it.each` über Seed-Bereiche), Welten über
-// `worldOf`/`bareOf` (test-worlds.ts), kein `expect` in Schleifen je Takt oder Feld.
+// Fristen: 60 s je Test und 120 s je Hook, lokal wie in der Pipeline. Sie fangen nur Hänger ab und sind kein Maß für
+// Geschwindigkeit: Eine an den Rechner kalibrierte Grenze als Fehler riss bei jeder neuen Welt einen anderen Test, je
+// nach Last des Rechners. Langsam wird darum nur gemeldet: Tests über dem Budget (scripts/test-budget.ts: 4 s auf dem
+// Bezugsrechner mit Abdeckung, relativ zur Geschwindigkeit dieses Rechners) markiert der Bericht. Damit die Laufzeit
+// nicht mit jeder Welt wächst, laufen Eigenschafts-Tests über SAMPLE_SEEDS und REGRESSION_SEEDS (`seedsFor` in
+// test-worlds.ts), die vollen Seed-Bereiche nur im tiefen Lauf (`npm run test:deep`, MITWACHSEN_DEEP=1, nachts).
+// Welten kommen über `worldOf`/`bareOf` (test-worlds.ts), kein `expect` in Schleifen je Takt oder Feld.
 const CI = !!process.env.CI;
 const coverage = process.argv.includes('--coverage');
 const calib = calibrate();
 const budget = budgetMs(calib, coverage);
 // in der Pipeline sichtbar: Stimmt der Faktor zum Bezugsrechner (REF in scripts/test-budget.ts)?
-if (CI) console.log(`::notice title=Zeitbudget::Kalibrierung ${calib.toFixed(0)} ms, Budget lokal wäre ${budget} ms`);
+if (CI) console.log(`::notice title=Zeitbudget::Kalibrierung ${calib.toFixed(0)} ms, langsam ab ${budget} ms`);
 
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
     environment: 'node',
-    testTimeout: CI ? 60_000 : budget,
-    hookTimeout: CI ? 120_000 : 10 * budget,
-    // Tests, die sich dem Budget nähern, markiert der Bericht
-    slowTestThreshold: CI ? 15_000 : Math.round(budget / 2),
+    testTimeout: 60_000,
+    hookTimeout: 120_000,
+    // Tests über dem Budget markiert der Bericht (nur Warnung); kalibriert, also auch auf dem langsameren Runner passend
+    slowTestThreshold: budget,
     // Lokal die Hälfte der Kerne: weniger Rauschen durch viele Worker (und Effizienzkerne)
     maxWorkers: CI ? undefined : '50%',
     // Abdeckung nur für die reinen Module – Web Components, Canvas und Three.js prüft der Browser-Test (e2e/)

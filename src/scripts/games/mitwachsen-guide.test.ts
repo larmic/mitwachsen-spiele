@@ -51,13 +51,15 @@ import { BESIDE, BOB_EVERY, NET, bay, inBay, plateRow } from './worlds/eis/mitwa
 import { plateMid } from './mitwachsen-plate';
 import { canStep, standHeight, type World } from './mitwachsen-world';
 import { dirTo as faceTo } from './mitwachsen-free';
-import { PACKS, worldOf } from './test-worlds';
+import { PACKS, seedRange, seedsFor, worldOf } from './test-worlds';
 import { HOLD_MS } from './input-pace';
 
 // Die Welten der Tests einmal vorab bauen (Frist der Hooks: vitest.config.ts): Sonst zahlt der erste Test je Seed den Bau (`worldOf`)
-beforeAll(() => [1, 2, 3].forEach(worldOf));
+beforeAll(() => [1, 2, 3].forEach((s) => worldOf(s)));
 
 const TICK: Cmd = { type: 'tick' };
+/** Seeds der wilden Läufe mit führendem Pinguin: sonst 1 und 2, tief (MITWACHSEN_DEEP) 1 bis 12 (seedsFor) */
+const WILD = seedsFor(seedRange(1, 12), [1, 2]);
 const TICK_MS = 100; // Takt der Regeln (larmic-mitwachsen.ts)
 const HELD: Cmd = { type: 'tick', held: true }; // Takt mit gedrücktem Pfeil
 const key = ([x, y]: Point) => `${x},${y}`;
@@ -432,7 +434,7 @@ describe('Der Pinguin holt dich ab: Führen', () => {
 });
 
 describe('Invarianten bei wildem Drücken mit führendem Pinguin', () => {
-  for (const seed of [1, 2]) {
+  for (const seed of WILD) {
     it(`Seed ${seed}: höchstens ein Pinguin, immer führend, nie zwei auf einem Feld, Figur begehbar, wiederholbar`, () => {
       const world = worldOf(seed);
       const dirs: Dir[] = ['n', 'e', 's', 'w'];
