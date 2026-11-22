@@ -222,4 +222,15 @@ describe('App-Gate: Budget für vorab Gespeichertes', () => {
       'Service Worker speichert 1000 Bytes vorab, erlaubt sind 999 (PRECACHE_BUDGET in scripts/verify-pwa.ts)',
     ]);
   });
+
+  it('zählt Three.js nicht, wenn es ausgenommen ist (eigene Grenze im Bundle-Gate), alles andere schon', () => {
+    const withThree: Record<string, number> = { ...sizes, '_astro/three.x.js': 5000, '_astro/welt-eis.x.js': 70 };
+    const readThree = (path: string) => (path in withThree ? new Uint8Array(withThree[path]!) : null);
+    const all = [...files, '/_astro/three.x.js', '/_astro/welt-eis.x.js'];
+    expect(checkPrecacheSize(all, readThree, 1070, ['Three.js'])).toEqual([]);
+    expect(checkPrecacheSize(all, readThree, 1069, ['Three.js'])).toEqual([
+      'Service Worker speichert ohne Three.js 1070 Bytes vorab, erlaubt sind 1069 (PRECACHE_BUDGET in scripts/verify-pwa.ts)',
+    ]);
+    expect(checkPrecacheSize(all, readThree, 1070)).toHaveLength(1);
+  });
 });

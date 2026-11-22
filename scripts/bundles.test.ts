@@ -149,6 +149,61 @@ describe('Bundle-Gate', () => {
       expect(packs(html, read, D3, /welt-eis/)[0]!.files).toEqual(['/_astro/welt-eis-3d.1.js']);
     });
 
+    it('meldet ein Paket, das schon beim Laden kommt (Three.js nur per import())', () => {
+      const THREE: Rule = { ...PACK, name: 'Three.js', chunks: /\/three\.js$/, forbidden: /Mitwachsen/ };
+      expect(check('spielen/index.html', html, readLazy, [THREE])).toEqual([]);
+      const eager: Record<string, string> = { ...lazy, '/_astro/shared.js': 'import"./three.js";export const a=1;' };
+      expect(check('spielen/index.html', html, (p: string) => eager[p] ?? null, [THREE])).toEqual([
+        'spielen/index.html: /_astro/three.js kommt schon beim Laden, nicht erst per import() („Three.js“)',
+      ]);
+    });
+
+    describe('mit `parts`: mehrere Pakete unter einer Grenze', () => {
+      const late: Record<string, string> = {
+        ...lazy,
+        '/_astro/core.js': 'import"./shared.js";import(`./view.1.js`);import("./welt-eis.1.js");',
+        '/_astro/view.1.js': 'import"./three.js";import"./kit.js";export const v=1;',
+        '/_astro/kit.js': 'export const kit=1;',
+        '/_astro/welt-eis.1.js': 'import"./ice.js";import("./welt-eis-3d.1.js");',
+        '/_astro/welt-eis-3d.1.js': 'import"./three.js";import"./kit.js";import"./ice.js";import"./door.js";',
+        '/_astro/door.js': 'export const door=1;',
+      };
+      const read = (p: string) => late[p] ?? null;
+      const WORLD: Rule = {
+        name: 'Welt',
+        pages: /^spielen\//,
+        parts: [
+          { chunks: /\/welt-eis\.[\w-]+\.js$/ },
+          { chunks: /\/welt-eis-3d\.[\w-]+\.js$/, after: /\/(view|welt-eis)\.[\w-]+\.js$/ },
+        ],
+        budget: 1000,
+        forbidden: /WebGLRenderer/,
+      };
+      const len = (...fs: string[]) => fs.reduce((n, f) => n + late[f]!.length, 0);
+
+      it('misst alle Teile zusammen, jede Datei einmal, je Teil mit seinem `after`', () => {
+        const usage: Usage[] = [];
+        expect(check('spielen/index.html', html, read, [WORLD], usage)).toEqual([]);
+        // ice.js holen beide Teile, gezählt wird es einmal; kit.js und Three.js bringt die Ansicht mit
+        const bytes = len('/_astro/welt-eis.1.js', '/_astro/ice.js', '/_astro/welt-eis-3d.1.js', '/_astro/door.js');
+        const file = '/_astro/welt-eis.1.js + /_astro/welt-eis-3d.1.js';
+        expect(usage).toEqual([{ rule: 'Welt', page: 'spielen/index.html', file, bytes }]);
+        expect(check('spielen/index.html', html, read, [{ ...WORLD, budget: bytes }])).toEqual([]);
+        expect(check('spielen/index.html', html, read, [{ ...WORLD, budget: bytes - 1 }])).toEqual([
+          `spielen/index.html: ${file} lädt ${bytes} Bytes JavaScript nach, erlaubt sind ${bytes - 1} („Welt“)`,
+        ]);
+      });
+
+      it('meldet Verbotenes in einem Teil und jeden Teil ohne Paket', () => {
+        const loose: Rule = { ...WORLD, parts: [WORLD.parts![0]!, { chunks: /\/welt-eis-3d\.[\w-]+\.js$/ }] };
+        expect(check('spielen/index.html', html, read, [loose])[0]).toMatch(/three\.js enthält Verbotenes/);
+        const missing: Rule = { ...WORLD, parts: [...WORLD.parts!, { chunks: /\/welt-wald\.[\w-]+\.js$/ }] };
+        expect(check('spielen/index.html', html, read, [missing])).toEqual([
+          `spielen/index.html: kein nachgeladenes Paket für „Welt“ (${String(/\/welt-wald\.[\w-]+\.js$/)})`,
+        ]);
+      });
+    });
+
     it('zählt das Paket nicht in die Seite und gilt nur für ihre Seiten', () => {
       const core: Rule = { name: 'Kern', pages: /^spielen\//, budget: 1000, forbidden: /WebGLRenderer/ };
       const usage: Usage[] = [];

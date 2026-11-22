@@ -2,8 +2,8 @@
 // Manifest und Icons stimmen, jede Seite verweist auf das Manifest, und der Service Worker des Spiels speichert alles,
 // was die Spielseite braucht (auch das nachträglich geladene Three.js und alle Welt-Pakete samt ihren 3D-Teilen: Das
 // Kind muss ohne Netz in jede offene Welt gehen können, ein Paket erst bei Bedarf zu holen, scheiterte offline), nur von
-// der eigenen Seite, in einer Version, die zum Inhalt passt, und alles zusammen im Budget. Die Ausgabe zeigt Kern,
-// 3D-Ansicht, Three.js und je Welt-Paket getrennt. Logik und Tests: scripts/pwa.ts, scripts/pwa.test.ts
+// der eigenen Seite, in einer Version, die zum Inhalt passt, und alles außer Three.js zusammen im Budget. Die Ausgabe
+// zeigt Kern, 3D-Ansicht, Three.js und je Welt-Paket getrennt. Logik und Tests: scripts/pwa.ts, scripts/pwa.test.ts
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -14,6 +14,7 @@ import {
   checkPrecacheSize,
   checkServiceWorker,
   parseServiceWorker,
+  partOf,
   precacheBytes,
   precacheParts,
   type PwaOptions,
@@ -25,28 +26,14 @@ import { SITE } from '../src/data/site.ts';
 const DIST = 'dist';
 /**
  * Höchstens so viele Bytes speichert der Service Worker vorab – jedes Gerät lädt sie mit jeder neuen Version ganz.
- * Knapp über dem Stand von heute (rund 1002 KiB, davon knapp 518 KiB Three.js, gut 35 KiB das Paket der Eis-Welt und
- * gut 3 KiB sein 3D-Teil): Wächst es, bewusst anheben. 1024 statt 960 KiB seit den eigenen Zugängen je Welt
- * (mitwachsen-gate-<welt>.ts, gut 35 KiB im 3D-Teil). Das Schneiden in Kern, Three.js und Welt-Pakete kostete nur
- * knapp 2 KiB (Importe zwischen den Dateien), das Budget bleibt. Mit den Fußspuren im Schnee (gut 4 KiB im Paket der
- * Eis-Welt und seinem 3D-Teil) rund 1002 KiB: Das Budget reicht noch, es bleibt; gut 22 KiB Luft. Mit den
- * Schneemännern (knapp 2 KiB im Paket der Eis-Welt) knapp 1005 KiB, das Budget bleibt; gut 19 KiB Luft. Mit dem
- * Eiszapfen-Glockenspiel (knapp 2 KiB im Paket der Eis-Welt) gut 1007 KiB: Das Budget reicht, es bleibt; gut 16 KiB
- * Luft. Mit der Torplatte bis „noch nicht“ am Eistor (Platten, Öffnen auf der Platte, die nachgeladene Datei
- * mitwachsen-hint-look.<hash>.js) gut 1020 KiB: knapp 4 KiB Luft für die nächsten Schritte der Torplatte (Drehung,
- * Blinzeln, Kamera vor den Flügeln, Elternschalter, Platten der anderen Welten). Reicht das nicht, bewusst und
- * begründet anheben. Mit der Postkarte der Torfront (nachgeladene 2D-Zeichnung mitwachsen-postcard.<hash>.js,
- * Standbild in der 3D-Ansicht) und dem Elternschalter 1023,6 KiB: Das Budget reicht noch, es bleibt; 0,4 KiB
- * Luft. Die Drehung in 3D wird es bewusst und knapp anheben müssen: Mit ihr (Drehregler und Einbau in der nachgeladenen
- * Datei mitwachsen-turn-3d.<hash>.js, Kamera, Sonne und Zugang zur Front in der 3D-Ansicht) 1029,8 KiB, darum bewusst
- * auf 1032 KiB angehoben; gut 2 KiB Luft für die Kamera vor den Flügeln und die Platten der anderen Welten. Die
- * nachgeladene Anmeldung des Service Workers (eigene Datei pwa-register.<hash>.js, macht im Kern Platz für die Platten)
- * kostet mit den Importen zwischen den Dateien knapp 0,1 KiB: 1032,03 KiB, darum bewusst auf 1033 KiB angehoben. Mit
- * den Platten der anderen Welten (sieben Platten in der 3D-Ansicht, „noch nicht“ an den Toren, die nie aufgehen, in
- * der nachgeladenen Datei mitwachsen-hint-look.<hash>.js, Klang und Zeichen je Welt im Kern) 1034,5 KiB: bewusst und
- * knapp auf 1035 KiB angehoben; 0,5 KiB Luft.
+ * Gezählt ohne Three.js (`PRECACHE_WITHOUT`): Dessen Größe hängt an seiner Version und hat im Bundle-Gate eine eigene
+ * Grenze (gemessen + 5 %, scripts/verify-bundles.ts). So gelten die 10 % Luft für das, was das Spiel selbst wächst,
+ * statt zur Hälfte für eine fremde Bibliothek; zusammen bleibt alles durch beide Grenzen gedeckelt.
+ * Gemessen 529 274 Bytes (516,9 KiB, mit Three.js 1034,6 KiB), Grenze gemessen + 10 %. Angehoben wird erst, wenn
+ * weniger als 3 % Luft bleiben, dann wieder auf gemessen + 10 %, mit einem Satz Begründung in der Commit-Nachricht.
  */
-const PRECACHE_BUDGET = 1035 * 1024;
+const PRECACHE_BUDGET = 569 * 1024;
+const PRECACHE_WITHOUT = ['Three.js'];
 const OPTS: PwaOptions = { origin: SITE.url, manifest: '/manifest.webmanifest', sw: SERVICE_WORKER };
 
 const filesIn = (dir: string): string[] =>
@@ -74,7 +61,7 @@ const bytes = precacheBytes(precached, read);
 
 const problems = [
   ...checkServiceWorker(read, scripts, OPTS),
-  ...checkPrecacheSize(precached, read, PRECACHE_BUDGET),
+  ...checkPrecacheSize(precached, read, PRECACHE_BUDGET, PRECACHE_WITHOUT),
   ...checkManifest(read, OPTS),
   ...checkManifestLinks(pages, OPTS.manifest),
 ];
@@ -90,5 +77,11 @@ if (problems.length) {
 }
 const kib = (n: number) => `${(n / 1024).toFixed(1)} KiB`;
 console.log(`✓ App-Gate: Manifest und Icons gültig, Service Worker speichert alles für ${SERVICE_WORKER.entry}`);
-console.log(`  vorab gespeichert: ${precached.length} Dateien, ${kib(bytes)} von ${kib(PRECACHE_BUDGET)} Budget`);
+const counted = precacheBytes(
+  precached.filter((f) => !PRECACHE_WITHOUT.includes(partOf(f))),
+  read,
+);
+console.log(
+  `  vorab gespeichert: ${precached.length} Dateien, ${kib(bytes)}; ohne ${PRECACHE_WITHOUT.join(', ')} ${kib(counted)} von ${kib(PRECACHE_BUDGET)} Budget`,
+);
 for (const part of precacheParts(precached, read)) console.log(`    ${part.name}: ${kib(part.bytes)}`);

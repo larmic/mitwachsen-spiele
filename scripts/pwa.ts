@@ -6,8 +6,8 @@
 // – Das Manifest startet im Spiel, hat Icons in den Größen, die es angibt, und legt die Drehung nicht fest.
 // – Jede Seite verweist auf das Manifest.
 // – Was vorab gespeichert wird, bleibt im Budget: Jedes Gerät lädt es bei jeder neuen Version ganz (am HTTP-Cache
-//   vorbei), auch über das Mobilfunknetz. Wächst es, fällt das Gate; dann bewusst entscheiden und das Budget anheben.
-//   Die Ausgabe zeigt die Teile getrennt: Kern, Three.js und je Welt-Paket (samt seinem 3D-Teil).
+//   vorbei), auch über das Mobilfunknetz. Gezählt wird ohne Three.js, das hat im Bundle-Gate eine eigene, an seine
+//   Version gebundene Grenze. Die Ausgabe zeigt die Teile getrennt: Kern, Three.js und je Welt-Paket (samt 3D-Teil).
 import { cacheVersion, distFile, htmlRefs, precacheList, type ReadFile } from '../src/lib/pwa/precache.ts';
 
 export type PwaOptions = {
@@ -107,12 +107,19 @@ export function precacheParts(files: string[], read: ReadFile): PrecachePart[] {
     .sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
 }
 
-/** Verstoß, wenn die vorab gespeicherten Dateien zusammen größer sind als `budget` Bytes */
-export function checkPrecacheSize(files: string[], read: ReadFile, budget: number): string[] {
-  const bytes = precacheBytes(files, read);
+/**
+ * Verstoß, wenn die vorab gespeicherten Dateien zusammen größer sind als `budget` Bytes; Dateien der Teile in `without`
+ * (Namen wie bei `partOf`, z. B. 'Three.js') zählen nicht
+ */
+export function checkPrecacheSize(files: string[], read: ReadFile, budget: number, without: string[] = []): string[] {
+  const bytes = precacheBytes(
+    files.filter((f) => !without.includes(partOf(f))),
+    read,
+  );
+  const what = without.length ? ` ohne ${without.join(', ')}` : '';
   return bytes > budget
     ? [
-        `Service Worker speichert ${bytes} Bytes vorab, erlaubt sind ${budget} (PRECACHE_BUDGET in scripts/verify-pwa.ts)`,
+        `Service Worker speichert${what} ${bytes} Bytes vorab, erlaubt sind ${budget} (PRECACHE_BUDGET in scripts/verify-pwa.ts)`,
       ]
     : [];
 }

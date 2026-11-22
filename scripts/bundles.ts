@@ -4,6 +4,8 @@
 // Nachgeladene Pakete (z. B. die Welt-Pakete des Spiels) misst eine Regel mit `chunks` für sich: das Paket samt seinen
 // statischen Importen, abzüglich dessen, was die Seite beim Laden schon hat und, mit `after`, was die Pakete schon
 // mitbringen, nach denen es erst kommt (der 3D-Teil einer Welt nach der 3D-Ansicht und dem Paket der Welt).
+// Mit `parts` misst eine Regel mehrere nachgeladene Pakete zusammen (je mit eigenem `after`), mit einer Grenze für alle.
+// Ein nachgeladenes Paket, das die Seite schon beim Laden holt, ist ein Verstoß: Es käme dann nicht erst per import().
 
 export type Rule = {
   name: string;
@@ -17,7 +19,12 @@ export type Rule = {
    * was sie samt ihren statischen Importen mitbringen (etwa Three.js), ist dann schon da und zählt nicht
    */
   after?: RegExp;
+  /** Statt `chunks`: mehrere Teile, zusammen gemessen (jede Datei einmal); jeder Teil muss ein Paket finden */
+  parts?: Part[];
 };
+
+/** Teil einer Regel mit `parts`: nachgeladene Pakete wie bei `chunks`, mit eigenem `after` */
+export type Part = { chunks: RegExp; after?: RegExp };
 
 /** Größe je Regel und Seite bzw. Paket, für die Ausgabe des Gates */
 export type Usage = { rule: string; page: string; file?: string; bytes: number };
@@ -109,23 +116,42 @@ export function packs(html: string, read: Read, chunks: RegExp, after?: RegExp):
 
 const size = (code: string) => new TextEncoder().encode(code).length;
 
-/** Verstöße eines nachgeladenen Pakets gegen seine Regel */
-function checkPacks(page: string, html: string, read: Read, rule: Rule & { chunks: RegExp }, usage: Usage[]): string[] {
-  const found = packs(html, read, rule.chunks, rule.after);
-  if (!found.length) return [`${page}: kein nachgeladenes Paket für „${rule.name}“ (${rule.chunks})`];
-  const problems: string[] = [];
-  for (const { file, files } of found) {
-    let bytes = 0;
-    for (const f of files) {
-      const code = read(f);
-      if (code === null) {
-        problems.push(`${page}: ${f} fehlt in dist`);
-        continue;
-      }
-      bytes += size(code);
-      if (rule.forbidden.test(code) || rule.forbidden.test(f))
-        problems.push(`${page}: ${f} enthält Verbotenes für „${rule.name}“ (${rule.forbidden})`);
+/** Bytes und Verbotenes in Dateien; fehlende Dateien sind ein Verstoß */
+function measure(page: string, files: string[], read: Read, rule: Rule, problems: string[]): number {
+  let bytes = 0;
+  for (const f of files) {
+    const code = read(f);
+    if (code === null) {
+      problems.push(`${page}: ${f} fehlt in dist`);
+      continue;
     }
+    bytes += size(code);
+    if (rule.forbidden.test(code) || rule.forbidden.test(f))
+      problems.push(`${page}: ${f} enthält Verbotenes für „${rule.name}“ (${rule.forbidden})`);
+  }
+  return bytes;
+}
+
+/** Verstöße nachgeladener Pakete gegen ihre Regel: mit `chunks` je Paket, mit `parts` alle zusammen */
+function checkPacks(page: string, html: string, read: Read, rule: Rule, usage: Usage[]): string[] {
+  const parts: Part[] = rule.parts ?? (rule.chunks ? [{ chunks: rule.chunks, after: rule.after }] : []);
+  const core = new Set(loaded(html, read));
+  const problems: string[] = [];
+  const groups: { file: string; files: string[] }[] = [];
+  for (const part of parts) {
+    const found = packs(html, read, part.chunks, part.after);
+    if (!found.length) problems.push(`${page}: kein nachgeladenes Paket für „${rule.name}“ (${part.chunks})`);
+    for (const { file } of found)
+      if (core.has(file))
+        problems.push(`${page}: ${file} kommt schon beim Laden, nicht erst per import() („${rule.name}“)`);
+    groups.push(...found);
+  }
+  if (problems.length) return problems;
+  const together = rule.parts
+    ? [{ file: groups.map((g) => g.file).join(' + '), files: [...new Set(groups.flatMap((g) => g.files))] }]
+    : groups;
+  for (const { file, files } of together) {
+    const bytes = measure(page, files, read, rule, problems);
     usage.push({ rule: rule.name, page, file, bytes });
     if (bytes > rule.budget)
       problems.push(
@@ -141,21 +167,11 @@ export function check(page: string, html: string, read: Read, rules: Rule[], usa
   const problems: string[] = [];
   for (const rule of rules) {
     if (!rule.pages.test(page)) continue;
-    if (rule.chunks) {
-      problems.push(...checkPacks(page, html, read, { ...rule, chunks: rule.chunks }, usage));
+    if (rule.chunks || rule.parts) {
+      problems.push(...checkPacks(page, html, read, rule, usage));
       continue;
     }
-    let bytes = 0;
-    for (const f of files) {
-      const code = read(f);
-      if (code === null) {
-        problems.push(`${page}: ${f} fehlt in dist`);
-        continue;
-      }
-      bytes += size(code);
-      if (rule.forbidden.test(code) || rule.forbidden.test(f))
-        problems.push(`${page}: ${f} enthält Verbotenes für „${rule.name}“ (${rule.forbidden})`);
-    }
+    let bytes = measure(page, files, read, rule, problems);
     // Eingebettete Skripte zählen mit: ins Budget und bei Verbotenem (z. B. eine Anmeldung des Service Workers)
     for (const [i, code] of inlineScriptsOf(html).entries()) {
       bytes += size(code);

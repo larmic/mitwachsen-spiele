@@ -1,7 +1,7 @@
 // Lint-Gate: empfohlene Regeln für JavaScript, TypeScript und Astro. Formatierung übernimmt Prettier.
 // TypeScript-Dateien laufen mit Typinformation (typbewusste Regeln, z. B. nicht abgewartete Promises,
-// überflüssige Casts). Dazu Grenzen für Größe und Verschachtelung als Sperrklinke: knapp über dem heutigen Stand,
-// damit nichts weiter wächst; beim Aufräumen werden sie gesenkt.
+// überflüssige Casts). Dazu Grenzen für Größe und Verschachtelung: für neuen Code die Vorgaben unten, für die großen
+// Dateien von heute eigene Grenzen mit gut 5 % Luft.
 import { defineConfig } from 'eslint/config';
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
@@ -28,56 +28,56 @@ export default defineConfig(
     },
   },
   { files: ['**/*.test.ts', 'e2e/**'], rules: { 'max-lines': 'off', 'max-lines-per-function': 'off' } },
-  // Sperrklinke für die großen Dateien von heute: genau ihr jetziger Stand, damit sie nicht weiter wachsen.
-  // Wer eine davon verkleinert, senkt hier die Zahl (oder streicht die Zeile).
+  // Grenzen für die großen Dateien von heute: gemessen + gut 5 % (gerundet), damit nicht jede Zeile erst Platz machen
+  // muss. Sie werden nicht bei jedem Schrumpfen von Hand gesenkt; angehoben wird erst, wenn weniger als 3 % Luft
+  // bleiben, dann wieder auf gemessen + 5 %, mit einem Satz Begründung in der Commit-Nachricht. Was unter die Vorgabe
+  // fällt, verliert seine Zeile.
   {
     files: ['src/data/games/mitwachsen.ts'],
-    rules: { 'max-lines': ['error', { max: 486, skipBlankLines: true, skipComments: true }] },
+    rules: { 'max-lines': ['error', { max: 510, skipBlankLines: true, skipComments: true }] },
   },
   {
     files: ['src/scripts/games/larmic-mitwachsen.ts'],
     rules: {
-      complexity: ['error', 30],
-      'max-lines': ['error', { max: 755, skipBlankLines: true, skipComments: true }],
-      'max-lines-per-function': ['error', { max: 91, skipBlankLines: true, skipComments: true }],
+      complexity: ['error', 32],
+      'max-lines': ['error', { max: 792, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['error', { max: 90, skipBlankLines: true, skipComments: true }],
     },
   },
   {
     files: ['src/scripts/games/mitwachsen-3d.ts'],
     rules: {
-      complexity: ['error', 36],
-      'max-depth': ['error', 6],
-      'max-lines': ['error', { max: 816, skipBlankLines: true, skipComments: true }],
-      'max-lines-per-function': ['error', { max: 133, skipBlankLines: true, skipComments: true }],
+      complexity: ['error', 38],
+      'max-lines': ['error', { max: 857, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['error', { max: 140, skipBlankLines: true, skipComments: true }],
     },
   },
   {
     files: ['src/scripts/games/mitwachsen-map.ts'],
-    rules: { 'max-lines-per-function': ['error', { max: 84, skipBlankLines: true, skipComments: true }] },
+    rules: { 'max-lines-per-function': ['error', { max: 88, skipBlankLines: true, skipComments: true }] },
   },
   {
     files: ['src/scripts/games/mitwachsen-render.ts'],
     rules: {
-      complexity: ['error', 57],
-      'max-lines': ['error', { max: 857, skipBlankLines: true, skipComments: true }],
-      'max-lines-per-function': ['error', { max: 172, skipBlankLines: true, skipComments: true }],
+      complexity: ['error', 53],
+      'max-lines': ['error', { max: 899, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['error', { max: 153, skipBlankLines: true, skipComments: true }],
     },
   },
-  { files: ['src/scripts/games/mitwachsen-save.ts'], rules: { complexity: ['error', 26] } },
+  { files: ['src/scripts/games/mitwachsen-save.ts'], rules: { complexity: ['error', 22] } },
   {
     files: ['src/scripts/games/mitwachsen-state.ts'],
     rules: {
-      complexity: ['error', 23],
-      'max-lines': ['error', { max: 452, skipBlankLines: true, skipComments: true }],
+      complexity: ['error', 24],
+      'max-lines': ['error', { max: 474, skipBlankLines: true, skipComments: true }],
     },
   },
   {
     files: ['src/scripts/games/mitwachsen-world.ts'],
     rules: {
-      complexity: ['error', 65],
-      'max-depth': ['error', 5],
-      'max-lines': ['error', { max: 564, skipBlankLines: true, skipComments: true }],
-      'max-lines-per-function': ['error', { max: 125, skipBlankLines: true, skipComments: true }],
+      complexity: ['error', 68],
+      'max-lines': ['error', { max: 592, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['error', { max: 128, skipBlankLines: true, skipComments: true }],
     },
   },
   // Konfigurationsdateien laufen in Node
