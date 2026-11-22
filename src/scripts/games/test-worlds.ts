@@ -19,3 +19,14 @@ export function worldOf(seed: number): World {
   if (!w) worlds.set(seed, (w = createWorld(seed, PACKS)));
   return w;
 }
+
+const bare = new Map<number, World>();
+/**
+ * Die Welt eines Seeds ohne Pakete, wie im Spiel, solange kein Paket geladen ist; je Seed einmal gebaut. Nur für Tests,
+ * die sie lesen (auch `attach` lässt sie, wie sie ist); wer sie für einen Vergleich frisch braucht, baut selbst
+ */
+export function bareOf(seed: number): World {
+  let w = bare.get(seed);
+  if (!w) bare.set(seed, (w = createWorld(seed, [])));
+  return w;
+}

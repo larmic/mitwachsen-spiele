@@ -7,7 +7,7 @@ Seite des Kinderspiels Mitwachsen (www.mitwachsen-spiele.de) von Lars Michaelis,
 ```bash
 npm run dev      # Entwicklungsserver auf http://localhost:4321
 npm run check    # Guard-Gate: Typen und Inhalts-Schemas prüfen – muss grün sein
-npm test         # Guard-Gate: Unit-Tests (Vitest) mit Mindest-Abdeckung der reinen Module (vitest.config.ts) – muss grün sein
+npm test         # Guard-Gate: Unit-Tests (Vitest) mit Mindest-Abdeckung der reinen Module und Zeitbudget je Test (vitest.config.ts) – muss grün sein
 npm run lint     # Guard-Gate: ESLint – muss grün sein
 npm run format   # Prettier; `npm run format:check` ist das Guard-Gate
 npm run arch     # Guard-Gate: Architekturregeln (dependency-cruiser) – muss grün sein
@@ -31,7 +31,7 @@ Vor jedem Commit `npm run format`, `npm run lint`, `npm run arch`, `npm run chec
 - `src/lib/voxel/` – Würfel-Grafik, läuft beim Build: `textures.ts` (Pixel-Raster, auch vom Spiel genutzt), `render.ts`, `cube.ts`, `blocks.ts` (Würfel-Symbole, Texturen als CSS, Insel `ISLAND` und Säulen `tower` für Startseite und Vorschaubild), `icon.ts` (Favicon und Icons der App)
 - `src/data/site.ts` – Titel, Adresse, Kontakt; `src/data/landing.ts` – alle Texte der Startseite
 - `src/styles/` – `tokens.css` (Design-Tokens), `global.css`, `sections.css`
-- `scripts/` – Gates nach dem Build: `bundles.ts` (Bundle-Gate: Kern der Spielseite, 3D-Ansicht samt Three.js und je Welt-Paket und 3D-Teil eine eigene Grenze, ebenso das nachgeladene „noch nicht“ am Tor und die nachgeladene Drehung zur Torfront), `dist.ts` (Seiten-Gate), `pwa.ts` (App-Gate, vorab Gespeichertes nach Kern, 3D-Ansicht, Three.js und Welt-Paketen)
+- `scripts/` – Gates nach dem Build: `bundles.ts` (Bundle-Gate: Kern der Spielseite, 3D-Ansicht samt Three.js und je Welt-Paket und 3D-Teil eine eigene Grenze, ebenso das nachgeladene „noch nicht“ am Tor und die nachgeladene Drehung zur Torfront), `dist.ts` (Seiten-Gate), `pwa.ts` (App-Gate, vorab Gespeichertes nach Kern, 3D-Ansicht, Three.js und Welt-Paketen); dazu `test-budget.ts` (Zeitbudget der Unit-Tests: Kalibrierung und Budget, genutzt von `vitest.config.ts`)
 - `docs/design-system.md` – Farben, Typografie, Bausteine
 - `docs/games/` – Mitwachsen, wächst mit meinem Sohn: `README.md` (Einleitung, Altersstufen, gemeinsame Regeln), `mitwachsen.md` (Konzept der Stufe ab 3). Vor Arbeiten am Spiel lesen
 - `docs/specs/mitwachsen.md` – Spec des Spiels (Regeln, Invarianten, zugehörige Tests). Bei Änderungen am Verhalten Spec und Tests mitziehen
@@ -50,5 +50,6 @@ Vor jedem Commit `npm run format`, `npm run lint`, `npm run arch`, `npm run chec
 - Der Service Worker gehört nur dem Spiel (`scope` `/spielen/`) und wird nur von der Spielseite angemeldet. `skipWaiting` und Neuladen nur auf Bitte des Spiels an sicheren Stellen (Gute Nacht im Bett, Rückkehr nach langer Pause, solange die Figur schläft; Entscheidungen in `src/scripts/games/pwa-update.ts`), nie mitten im Spiel. Alte Caches löscht erst die aktive neue Version, und nur, wenn keine andere Spielseite mehr offen ist. Die Liste der gespeicherten Dateien entsteht beim Build, nie von Hand, und bleibt im Budget (geprüft durch `npm run verify:pwa`). Gespeichert wird alles vorab, auch Three.js und jedes Welt-Paket samt 3D-Teil: Ohne Netz muss das Kind in jede offene Welt gehen können. Angemeldet wird mit `updateViaCache: 'none'`, nie `'all'`. Das Manifest legt die Drehung nicht fest.
 - Keine Navigation per View Transitions (`ClientRouter`): Jede Seite lädt neu, das Spiel startet und endet sauber.
 - TypeScript prüft jeden Index-Zugriff (`noUncheckedIndexedAccess`): fehlende Einträge behandeln; Auswahl aus Listen über `pick`/`cycle` (`src/lib/games/rng.ts`), Feld-Schlüssel über `fromKey` (`chunks.ts`). `!` nur, wo die Stelle selbst zeigt, dass der Eintrag existiert, und in Tests.
+- Unit-Tests bleiben im Zeitbudget (`vitest.config.ts`, `scripts/test-budget.ts`): lokal (`npm test`, pre-commit) gilt je Test ein Budget, kalibriert an der Geschwindigkeit des Rechners (4 s auf dem Bezugsrechner mit Abdeckung); die Pipeline ist bis gut 4-mal langsamer (4 s × 4 ≈ 16 s), ihre Grenze von 60 s fängt nur Hänger ab. Hooks bekommen lokal das Zehnfache des Budgets, keine eigene Frist im Test. Schwere Eigenschafts-Tests teilt man mit `it.each` in Seed-Bereiche, Welten kommen über `worldOf`/`bareOf` (`test-worlds.ts`), `expect` wird nicht in Schleifen je Takt oder Feld aufgerufen (Fehler sammeln, ein `expect`).
 - Spielstände liegen nur im `localStorage` (Präfix `larmic.games.`, von larmic.de übernommen). Ändert sich das Format, gehört eine Migration in `mitwachsen-save.ts` mit Test.
 - Ändert sich eine Adresse, leitet die alte weiter (`redirects` in `astro.config.mjs`) und kommt in `LEGACY` in `scripts/verify-dist.ts`.

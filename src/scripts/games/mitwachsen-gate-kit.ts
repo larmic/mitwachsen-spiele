@@ -115,6 +115,11 @@ export class Vox {
     else this.cells.set(at, { i, j, k, c, top: top ?? c, part });
   }
 
+  /** alle gesetzten Voxel, nur zum Lesen */
+  voxels(): Iterable<Readonly<Voxel & { i: number; j: number; k: number }>> {
+    return this.cells.values();
+  }
+
   has(i: number, j: number, k: number) {
     return this.cells.has(key(i, j, k));
   }

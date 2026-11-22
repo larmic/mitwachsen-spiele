@@ -22,7 +22,7 @@ import {
   ritualGlow,
 } from './mitwachsen-guest-look';
 import { RITUAL } from './mitwachsen-guide';
-import { bounds, checkPlate, fighting } from './test-plates';
+import { bounds, byPlane, checkPlate, facesOf, fighting, fightingFaces, fightingWith } from './test-plates';
 import { sandGate } from './mitwachsen-gate-sand';
 import { pilzVox } from './mitwachsen-gate-pilze';
 import { voxels as wolkenVox } from './mitwachsen-gate-wolken';
@@ -62,16 +62,19 @@ describe('Torhäuser und Portal-Plattformen flackern nicht', () => {
     });
     if (moves(g.id))
       it(`${g.id}: bewegte Teile in jedem Takt ebenso, auch zusammen mit dem festen Raster`, () => {
-        for (const open of [0, 0.5, 1])
+        for (const open of [0, 0.5, 1]) {
+          // Das feste Raster ist in jedem Takt dasselbe: einmal bauen, nach Ebenen ordnen und für sich prüfen; je Takt
+          // dann nur noch die bewegten Teile unter sich und gegen das Raster (zusammen dieselben Paare wie alle auf einmal)
+          const fixed = facesOf(house(g.id, open, false).p);
+          expect(fightingFaces(fixed), `offen ${open}`).toEqual([]);
+          const planes = byPlane(fixed);
           for (let beat = 0; beat < BEATS; beat++) {
-            const { p } = house(g.id, open, false);
             const m = parts();
             motion(m, g.id, beat, open);
-            const moving = Object.entries(m).flatMap(([name, geo]): [string, BufferGeometry][] =>
-              geo.empty ? [] : [[`Takt ${name}`, geo.build()]],
-            );
-            expect(fighting(p, moving), `offen ${open}, Takt ${beat}`).toEqual([]);
+            const moving = facesOf(m).map((f) => ({ ...f, part: `Takt ${f.part}` }));
+            expect(fightingWith(planes, moving), `offen ${open}, Takt ${beat}`).toEqual([]);
           }
+        }
       });
     it(`${g.id}: mit Umriss des Pinguins und goldener Bucht ebenso, auch wenn er sich füllt und die Eiszapfen leuchten`, () => {
       for (const open of [0, 0.5, 1])

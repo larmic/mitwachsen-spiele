@@ -621,7 +621,10 @@ function dress(seed: number, x: number, y: number, c: Cell): Cell {
 }
 
 /** Lage des Gletscherkessels einer Welt (mit dem Paket der Eis-Welt); schnell, ohne die Welt zu bauen */
-export const kesselPlace = (seed: number, p: WorldPack) => p.place(seed, gangOf(layouts(seed)), roomOf(layouts(seed)));
+export const kesselPlace = (seed: number, p: WorldPack) => {
+  const l = layouts(seed);
+  return p.place(seed, gangOf(l), roomOf(l));
+};
 /** Liegt ein Feld ganz hinter dem Felsring der Lichtung (Landschaft, Gänge ins Freie, Kessel)? */
 export const beyondRing = outside;
 /** Die Portal-Plattformen der Lichtung (an den Toren); schnell, ohne die Welt zu bauen */

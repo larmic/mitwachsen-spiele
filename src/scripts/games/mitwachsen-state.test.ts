@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { DIRS as DIRECTIONS, type Dir } from '../../lib/games/front';
 import { GATES, REGIONS, animalId, type RegionId } from '../../data/games/mitwachsen';
 import {
@@ -17,14 +17,14 @@ import {
 } from './mitwachsen-state';
 import { meadowSpots, windOk } from './mitwachsen-meadow';
 import { SCATTER } from './mitwachsen-scatter';
-import { beyondRing, canStep, createWorld, kesselPlace, standHeight, type Cell, type World } from './mitwachsen-world';
+import { beyondRing, canStep, kesselPlace, standHeight, type Cell, type World } from './mitwachsen-world';
 import { startRealm, type Homestead } from './mitwachsen-home';
 import { BLOCK, raining, windy } from './mitwachsen-weather';
 import { platformArea } from './mitwachsen-portal';
 import { SEATS, crossings } from './mitwachsen-border';
 import { dirTo, freeNear } from './mitwachsen-free';
 import { heardStone } from './mitwachsen-story';
-import { EIS_PACK, PACKS, worldOf } from './test-worlds';
+import { EIS_PACK, PACKS, bareOf, worldOf } from './test-worlds';
 import { ICE_ANIMALS } from '../../data/games/worlds/eis/mitwachsen-kessel';
 import { HAUNTS } from './worlds/eis/mitwachsen-haunts';
 import { bergPeak } from './worlds/eis/mitwachsen-ice-sky';
@@ -32,6 +32,11 @@ import { migrate, newWorld, progressFrom, withProgress, type SavedWorld } from '
 
 /** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich; Zuhause der Eis-Welt (im Kessel von Seed 1) */
 const { lichtung: LICHTUNG, eis: EIS_HOME } = worldOf(1).homes;
+// Die Welten der Tests einmal vorab bauen (Frist der Hooks: vitest.config.ts): Sonst zahlt der erste Test je Seed den Bau (`worldOf`)
+beforeAll(() => {
+  [1, 2, 3, 4, 5, 7, 42, 2026].forEach(worldOf);
+  [1, 3].forEach(bareOf);
+});
 
 /** Kleine Testwelt: überall flaches Gras des Zuhauses, einzelne Felder überschreibbar */
 function fakeWorld(cells: Record<string, Partial<Cell>> = {}, home: Partial<Homestead> = {}): World {
@@ -492,7 +497,7 @@ describe('Tiere an wechselnden Stellen', () => {
     expect(where(s)).not.toEqual(before);
     atHaunts(s, world);
     // das Welt-Paket kommt mitten im Spiel an
-    const bare = createWorld(3, []);
+    const bare = bareOf(3);
     const { world: full } = bare.attach(PACKS[0]);
     atHaunts(attachPack(initialState(bare, open, 5), full), full);
   });
@@ -1029,11 +1034,12 @@ describe('Zuhause je Gegend', () => {
     expect([s.player.x, s.player.y]).toEqual([...world.homes.lichtung.bed]);
   });
 
-  it('alter Spielstand im Gletscherkessel, wo heute eine Tanne, ein Eisblock, ein Eiskristall oder ein Eisloch ist: Start im Schneebett', () => {
-    // Die Winterlandschaft und die Seen kamen nach: Eine gespeicherte Position kann jetzt auf einer Tanne oder im Wasser
-    // eines Eislochs liegen. Die Figur schläft trotzdem im Schneebett und wacht auf begehbarem Boden daneben auf
-    let tried = 0;
-    for (const seed of [1, 42, 2026, 7]) {
+  // je Seed ein eigener Test (gut 2.800 Felder je Seed), so bleibt jeder im Zeitbudget (vitest.config.ts)
+  it.each([1, 42, 2026, 7])(
+    'alter Spielstand im Gletscherkessel, wo heute eine Tanne, ein Eisblock, ein Eiskristall oder ein Eisloch ist: Start im Schneebett (Seed %i)',
+    (seed) => {
+      // Die Winterlandschaft und die Seen kamen nach: Eine gespeicherte Position kann jetzt auf einer Tanne oder im Wasser
+      // eines Eislochs liegen. Die Figur schläft trotzdem im Schneebett und wacht auf begehbarem Boden daneben auf
       const world = worldOf(seed);
       const snowy = kesselPlace(seed, EIS_PACK).cells.filter(([x, y]) => {
         const c = world.cell(x, y);
@@ -1045,23 +1051,25 @@ describe('Zuhause je Gegend', () => {
           (c.ground === 'water' && c.region === 'eis')
         );
       });
+      expect(snowy.length).toBeGreaterThan(20);
+      // Den Start prüft jedes Feld (Fehler gesammelt, ein `expect`); das Aufwachen im Schneebett ist für alle dasselbe
+      // Bett, es prüft jedes hundertste
+      const wrong: string[] = [];
+      const [bx, by] = world.homes.eis.bed;
       for (const [n, [x, y]] of snowy.entries()) {
-        tried++;
-        expect(startRealm(world, ['eis'], [x, y]), `Seed ${seed}: ${x},${y}`).toBe('eis'); // bleibt im Kessel
-        // Gut 2.800 Felder je Seed: Den ganzen Start prüft jedes zehnte, das Aufwachen im Schneebett (für alle dasselbe
-        // Bett) jedes hundertste, sonst läuft der Test auf langsamen CI-Rechnern in die Zeitgrenze
-        if (n % 10) continue;
+        if (startRealm(world, ['eis'], [x, y]) !== 'eis') wrong.push(`${x},${y}: nicht im Kessel`); // bleibt im Kessel
         let s = initialState(world, { position: [x, y], openGates: ['eis'] });
-        expect([s.player.x, s.player.y], `Seed ${seed}: ${x},${y}`).toEqual([...world.homes.eis.bed]);
+        if (s.player.x !== bx || s.player.y !== by) wrong.push(`${x},${y}: Start ${s.player.x},${s.player.y}`);
         if (n % 100) continue;
         s = run(s, world, ...Array<typeof TICK>(SLEEP_LOCK).fill(TICK), 'n').s;
-        expect(s.sleeping).toBe(false);
-        expect(world.realm(s.player.x, s.player.y)).toBe('eis');
-        expect(standHeight(world, s.openGates, s.player.x, s.player.y), `Seed ${seed}`).not.toBeNull();
+        if (s.sleeping) wrong.push(`${x},${y}: schläft noch`);
+        if (world.realm(s.player.x, s.player.y) !== 'eis') wrong.push(`${x},${y}: wacht außerhalb des Kessels auf`);
+        if (standHeight(world, s.openGates, s.player.x, s.player.y) === null)
+          wrong.push(`${x},${y}: wacht unbegehbar auf`);
       }
-    }
-    expect(tried).toBeGreaterThan(20);
-  });
+      expect(wrong).toEqual([]);
+    },
+  );
 
   it('gespeicherte Position auf dem Eisberg (Gipfel oder Stufe): Start im Schneebett, kein neues Speicherformat', () => {
     // Der Eisberg kam nach: Eine alte Position kann auf seinen Stufen oder dem Gipfel liegen. Sie ist begehbar, die
@@ -1107,7 +1115,7 @@ describe('Zuhause je Gegend', () => {
       const closed = initialState(world, { position: p });
       expect([closed.player.x, closed.player.y]).toEqual([...world.homes.lichtung.bed]);
     }
-    const bare = createWorld(1, []);
+    const bare = bareOf(1);
     const held = initialState(bare, { position: beside[0]!, openGates: ['eis'] });
     expect([held.player.x, held.player.y]).toEqual([...bare.homes.lichtung.bed]);
     expect(progressOf(held).position).toEqual(beside[0]);
@@ -1135,7 +1143,7 @@ describe('Zuhause je Gegend', () => {
 
   it('ohne Paket der Eis-Welt (Laden gescheitert): Ein Stand aus dem Kessel startet auf der Lichtung und verliert nichts', () => {
     const full = worldOf(1);
-    const bare = createWorld(1, []);
+    const bare = bareOf(1);
     const saved = {
       position: [...full.homes.eis.wake[0]!] as [number, number],
       openGates: ['eis' as const],
@@ -1169,7 +1177,7 @@ describe('Zuhause je Gegend', () => {
   });
 
   it('Eis-Tiere ohne Wohnort (Paket noch nicht da): nie getroffen, nie gezeichnet, nirgends; der Spielstand bleibt', () => {
-    const bare = createWorld(1, []);
+    const bare = bareOf(1);
     const met = ['eis:robbe:1', 'lichtung:hase'];
     const s = initialState(bare, { met, position: [3, 2] }); // Tor zu, die Figur war auf der Lichtung
     expect(s.animals.some((a) => a.id.startsWith('eis:'))).toBe(false);
@@ -1182,7 +1190,7 @@ describe('Zuhause je Gegend', () => {
   });
 
   it('Paket kommt mitten im Spiel an (attachPack): Eis-Tiere ziehen ein, alles andere bleibt, wie es ist', () => {
-    const bare = createWorld(1, []);
+    const bare = bareOf(1);
     const { world } = bare.attach(PACKS[0]);
     const saved = {
       met: ['lichtung:hase', 'eis:robbe:1'],
@@ -1219,7 +1227,7 @@ describe('Zuhause je Gegend', () => {
   });
 
   it('nach dem Einbau mitten im Spiel speichern und neu laden: gleiches Format, gleicher Stand wie mit Paket gestartet', () => {
-    const bare = createWorld(1, []);
+    const bare = bareOf(1);
     const { world } = bare.attach(EIS_PACK);
     const saved = { met: ['lichtung:hase'], portals: ['eis' as const], heard: ['bett' as const], day: 3 };
     let s = initialState(bare, saved, 7);
@@ -1244,7 +1252,7 @@ describe('Zuhause je Gegend', () => {
 
   it('Paket kommt an, während ein Stand aus dem Kessel gehalten wird: Eis-Tiere zu Hause ziehen ein, gehalten wird nicht mehr', () => {
     const full = worldOf(1);
-    const bare = createWorld(1, []);
+    const bare = bareOf(1);
     const position = [...full.homes.eis.wake[0]!] as [number, number];
     const garden = [{ id: 'eis:robbe:2', species: 'robbe' as const }];
     const s = initialState(bare, { position, openGates: ['eis'], garden });
@@ -1359,22 +1367,38 @@ describe('Spielstand', () => {
  * Tiere der Wiese verlassen sie nie: Wer eingezogen ist, als die Figur nah an der Wiese war, steht noch kurz draußen
  * und läuft hin; ist es einmal auf der Wiese (`settled`), bleibt es dort.
  */
-function stayOnMeadow(world: World, s: State, settled: Set<string>) {
+function stayOnMeadow(world: World, s: State, settled: Set<string>, wrong: string[], at: string) {
   for (const a of s.animals) {
     if (a.mode !== 'home') continue;
     const on = world.cell(a.x, a.y).garden === true;
-    if (settled.has(a.id)) expect(on, a.id).toBe(true);
+    if (settled.has(a.id) && !on) wrong.push(`${at}: ${a.id} nicht mehr auf der Wiese`);
     else if (on) settled.add(a.id);
   }
+}
+
+/**
+ * Was in jedem Takt gelten muss: Figur steht begehbar (wenn wach), nie zwei auf einem Feld, keiner folgt doppelt, Tiere
+ * der Wiese bleiben drauf. Sammelt Fehler in `wrong`, statt je Takt `expect` aufzurufen: Bei tausenden Takten kosten die
+ * `expect` mehr als die Takte selbst
+ */
+function everyTick(world: World, s: State, settled: Set<string>, wrong: string[], at: string) {
+  if (!s.sleeping && standHeight(world, s.openGates, s.player.x, s.player.y) === null)
+    wrong.push(`${at}: Figur bei ${s.player.x},${s.player.y} nicht begehbar`);
+  const spots = s.animals.map((a) => `${a.x},${a.y}`);
+  if (!s.sleeping) spots.push(`${s.player.x},${s.player.y}`);
+  if (new Set(spots).size !== spots.length) wrong.push(`${at}: zwei auf einem Feld`);
+  if (new Set(s.followers).size !== s.followers.length) wrong.push(`${at}: ein Tier folgt doppelt`);
+  stayOnMeadow(world, s, settled, wrong, at);
 }
 
 describe('Invarianten bei wildem Drücken', () => {
   const DIRS: Dir[] = ['n', 's', 'e', 'w'];
   for (const seed of [1, 2, 3]) {
     it(`Seed ${seed}: Figur steht immer begehbar, nie zwei auf einem Feld, Tiere der Wiese bleiben drauf, alles wiederholbar`, () => {
-      const world = createWorld(seed, PACKS);
+      const world = worldOf(seed);
       const play = () => {
         const settled = new Set<string>();
+        const wrong: string[] = [];
         let s = initialState(world, {}, seed);
         let r = seed * 7919;
         for (let i = 0; i < 4000; i++) {
@@ -1382,13 +1406,9 @@ describe('Invarianten bei wildem Drücken', () => {
           const pick = r % 10;
           const cmd: Cmd = pick < 6 ? { type: 'move', dir: DIRS[(r >>> 8) % 4]! } : pick < 8 ? ACT : TICK;
           s = step(s, world, cmd).state;
-          if (!s.sleeping) expect(standHeight(world, s.openGates, s.player.x, s.player.y)).not.toBeNull();
-          const spots = s.animals.map((a) => `${a.x},${a.y}`);
-          if (!s.sleeping) spots.push(`${s.player.x},${s.player.y}`);
-          expect(new Set(spots).size).toBe(spots.length);
-          stayOnMeadow(world, s, settled);
-          expect(new Set(s.followers).size).toBe(s.followers.length);
+          everyTick(world, s, settled, wrong, `Takt ${i}`);
         }
+        expect(wrong).toEqual([]);
         return s;
       };
       expect(play()).toEqual(play());
@@ -1398,10 +1418,11 @@ describe('Invarianten bei wildem Drücken', () => {
   // Ab dem Schneebett der Eis-Welt (das Eistor ist im Test offen, die Figur kann auch auf die Lichtung laufen)
   for (const seed of [1, 2]) {
     it(`Seed ${seed}: ab dem Schneebett: Figur steht immer begehbar, nie zwei auf einem Feld, alles wiederholbar`, () => {
-      const world = createWorld(seed, PACKS);
+      const world = worldOf(seed);
       const [bx, by] = world.homes.eis.bed;
       const play = () => {
         const settled = new Set<string>();
+        const wrong: string[] = [];
         let s: State = { ...initialState(world, { openGates: ['eis'] }, seed), player: { x: bx, y: by, dir: 's' } };
         let r = seed * 104729;
         for (let i = 0; i < 4000; i++) {
@@ -1412,15 +1433,12 @@ describe('Invarianten bei wildem Drücken', () => {
           if (i === 0) expect(s.animals.filter((a) => a.realm === 'eis')).toHaveLength(50);
           if (i === 0) expect(world.realm(s.player.x, s.player.y)).toBe('eis'); // aufgewacht am Schneebett
           // Eis-Tiere: frei umherlaufende bleiben im Kessel, zu Hause sind sie nur auf der Schneewiese
-          for (const a of s.animals.filter((t) => t.realm === 'eis' && t.mode !== 'follow'))
-            expect(world.realm(a.x, a.y), a.id).toBe('eis');
-          if (!s.sleeping) expect(standHeight(world, s.openGates, s.player.x, s.player.y)).not.toBeNull();
-          const spots = s.animals.map((a) => `${a.x},${a.y}`);
-          if (!s.sleeping) spots.push(`${s.player.x},${s.player.y}`);
-          expect(new Set(spots).size).toBe(spots.length);
-          stayOnMeadow(world, s, settled);
-          expect(new Set(s.followers).size).toBe(s.followers.length);
+          for (const a of s.animals)
+            if (a.realm === 'eis' && a.mode !== 'follow' && world.realm(a.x, a.y) !== 'eis')
+              wrong.push(`Takt ${i}: ${a.id} bei ${a.x},${a.y} außerhalb des Kessels`);
+          everyTick(world, s, settled, wrong, `Takt ${i}`);
         }
+        expect(wrong).toEqual([]);
         return s;
       };
       expect(play()).toEqual(play());
@@ -1442,24 +1460,28 @@ describe('Randfälle aus der Prüfung', () => {
 describe('Durchgänge bleiben frei', () => {
   it('umherlaufende Tiere bleiben nie an Toren oder auf Portal-Plattformen und ihren Zugängen stehen', () => {
     const world = worldOf(5);
-    const passages = [
+    // Als Set: 4.000 Takte mal alle Tiere, ein Array-Vergleich je Tier war zu langsam für CI
+    const passages = new Set([
       ...platformArea(world.portals),
       ...[...world.gates.values()]
         .flatMap((g) => g.cells)
         .flatMap(([x, y]) => [`${x},${y}`, `${x + 1},${y}`, `${x - 1},${y}`, `${x},${y + 1}`, `${x},${y - 1}`]),
-    ];
+    ]);
     // Alle Tore offen, Figur weit weg: Die Tiere laufen lange frei umher
     let s: State = {
       ...initialState(world),
       sleeping: false,
       player: { x: 0, y: 30, dir: 's' },
     };
+    const blocked: string[] = [];
     for (let i = 0; i < 4000; i++) {
       s = step(s, world, TICK).state;
+      // erst sammeln, dann einmal vergleichen: Ein expect je Tier und Takt kostet mehr als der Takt selbst
       for (const a of s.animals)
-        if (a.mode === 'wander' && a.home.kind === 'region')
-          expect(passages, `${a.id} ${a.x},${a.y}`).not.toContain(`${a.x},${a.y}`);
+        if (a.mode === 'wander' && a.home.kind === 'region' && passages.has(`${a.x},${a.y}`))
+          blocked.push(`Takt ${i}: ${a.id} ${a.x},${a.y}`);
     }
+    expect(blocked).toEqual([]);
   });
 });
 
@@ -1962,7 +1984,7 @@ describe('Invarianten bei wildem Drücken durchs offene Eistor', () => {
 
   for (const seed of [1, 2]) {
     it(`Seed ${seed}: hin und her durchs Tor mit Tieren beider Gegenden: Wartende auf eigenen Feldern in ihrer Gegend, nie zwei auf einem Feld, alles wiederholbar`, () => {
-      const world = createWorld(seed, PACKS);
+      const world = worldOf(seed);
       const gate = world.gates.get('eis')!;
       const { cells } = crossings(world)[0]!;
       const bay: [number, number] = [gate.mid[0] - gate.out[0] * 6, gate.mid[1] - gate.out[1] * 6];
@@ -1991,6 +2013,7 @@ describe('Invarianten bei wildem Drücken durchs offene Eistor', () => {
           followers: chained.map((a) => a.id),
         };
         const seen = new Set<string>();
+        const wrong: string[] = [];
         let r = seed * 48271;
         for (let i = 0; i < 2400; i++) {
           r = (Math.imul(r, 1103515245) + 12345) >>> 0;
@@ -2007,21 +2030,19 @@ describe('Invarianten bei wildem Drücken durchs offene Eistor', () => {
           s = out.state;
           for (const e of out.events)
             if (e.type === 'wait' || e.type === 'rejoin') seen.add(`${e.type} ${e.id.split(':')[0]}`);
-          if (!s.sleeping) expect(standHeight(world, s.openGates, s.player.x, s.player.y)).not.toBeNull();
-          const spots = s.animals.map((a) => `${a.x},${a.y}`);
-          if (!s.sleeping) spots.push(`${s.player.x},${s.player.y}`);
-          expect(new Set(spots).size).toBe(spots.length);
-          expect(new Set(s.followers).size).toBe(s.followers.length);
-          stayOnMeadow(world, s, settled);
+          const at = `Takt ${i}`;
+          everyTick(world, s, settled, wrong, at);
           for (const a of s.animals) {
-            if (a.realm === 'eis' && a.mode !== 'follow') expect(world.realm(a.x, a.y), a.id).toBe('eis');
+            if (a.realm === 'eis' && a.mode !== 'follow' && world.realm(a.x, a.y) !== 'eis')
+              wrong.push(`${at}: ${a.id} außerhalb des Kessels`);
             if (a.mode !== 'wait') continue;
             // Wartende: auf der eigenen Seite, nie im Durchgang (jedes auf eigenem Feld, siehe oben)
-            expect(world.realm(a.x, a.y), a.id).toBe(a.realm);
-            expect(cells.has(`${a.x},${a.y}`), a.id).toBe(false);
-            expect(s.followers).not.toContain(a.id);
+            if (world.realm(a.x, a.y) !== a.realm) wrong.push(`${at}: ${a.id} wartet in fremder Gegend`);
+            if (cells.has(`${a.x},${a.y}`)) wrong.push(`${at}: ${a.id} wartet im Durchgang`);
+            if (s.followers.includes(a.id)) wrong.push(`${at}: ${a.id} wartet und folgt`);
           }
         }
+        expect(wrong).toEqual([]);
         return { s, seen };
       };
       const first = play();
@@ -2031,7 +2052,7 @@ describe('Invarianten bei wildem Drücken durchs offene Eistor', () => {
     });
 
     it(`Seed ${seed}: Tiere bleiben in ihrer Gegend: aus der Bucht mit Tieren der Lichtung und aus dem Kessel mit Eis-Tieren hin und her, außerhalb des Durchgangs steht nie ein Tier in einer fremden Gegend, auch kein folgendes`, () => {
-      const world = createWorld(seed, PACKS);
+      const world = worldOf(seed);
       const gate = world.gates.get('eis')!;
       const { cells, seats } = crossings(world)[0]!;
       const bay: [number, number] = [gate.mid[0] - gate.out[0] * 6, gate.mid[1] - gate.out[1] * 6];
@@ -2064,6 +2085,7 @@ describe('Invarianten bei wildem Drücken durchs offene Eistor', () => {
         };
         let r = seed * 69621;
         let crossed = 0;
+        const wrong: string[] = [];
         for (let i = 0; i < 2400; i++) {
           r = (Math.imul(r, 1103515245) + 12345) >>> 0;
           const goal = Math.floor(i / 300) % 2 === 0 ? other : start;
@@ -2078,8 +2100,10 @@ describe('Invarianten bei wildem Drücken durchs offene Eistor', () => {
           s = out.state;
           for (const e of out.events) if (e.type === 'wait' && e.id.startsWith(`${realm}:`)) crossed++;
           for (const a of s.animals)
-            if (!cells.has(`${a.x},${a.y}`)) expect(world.realm(a.x, a.y), `${a.id} (${a.mode})`).toBe(a.realm);
+            if (!cells.has(`${a.x},${a.y}`) && world.realm(a.x, a.y) !== a.realm)
+              wrong.push(`Takt ${i}: ${a.id} (${a.mode}) bei ${a.x},${a.y} in fremder Gegend`);
         }
+        expect(wrong, realm).toEqual([]);
         expect(crossed, realm).toBeGreaterThan(0); // die Grenze hat wirklich gegriffen
       }
     });

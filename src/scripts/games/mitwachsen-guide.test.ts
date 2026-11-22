@@ -1,5 +1,5 @@
 // Der verlaufene Pinguin holt die Figur ab und öffnet das Eistor (`opens: { key: 'pinguin' }`), gegen die echten Daten.
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../lib/games/front';
 import { GATES, REGIONS, animalId, type Point } from '../../data/games/mitwachsen';
 import {
@@ -49,10 +49,13 @@ import {
 import { lageOf, leadTicks, type Lage } from './mitwachsen-turn-pace';
 import { BESIDE, BOB_EVERY, NET, bay, inBay, plateRow } from './worlds/eis/mitwachsen-bay';
 import { plateMid } from './mitwachsen-plate';
-import { canStep, createWorld, standHeight, type World } from './mitwachsen-world';
+import { canStep, standHeight, type World } from './mitwachsen-world';
 import { dirTo as faceTo } from './mitwachsen-free';
 import { PACKS, worldOf } from './test-worlds';
 import { HOLD_MS } from './input-pace';
+
+// Die Welten der Tests einmal vorab bauen (Frist der Hooks: vitest.config.ts): Sonst zahlt der erste Test je Seed den Bau (`worldOf`)
+beforeAll(() => [1, 2, 3].forEach(worldOf));
 
 const TICK: Cmd = { type: 'tick' };
 const TICK_MS = 100; // Takt der Regeln (larmic-mitwachsen.ts)
@@ -159,7 +162,7 @@ describe('Der Pinguin holt dich ab: Auftauchen', () => {
 
   for (const seed of [1, 2, 3]) {
     it(`Seed ${seed}: alter Stand mit allen Tieren zu Hause: beim nächsten Aufwachen 4 bis 6 Felder neben der Figur, auf freiem Feld`, () => {
-      const world = createWorld(seed, PACKS);
+      const world = worldOf(seed);
       let s = initialState(world, { garden: everyone() });
       s = run(s, world, ...ticks(50)).s; // im Schlaf: noch nicht
       expect(guideOf(s)).toBeUndefined();
@@ -178,7 +181,7 @@ describe('Der Pinguin holt dich ab: Auftauchen', () => {
 
   for (const seed of [1, 2, 3]) {
     it(`Seed ${seed}: er watschelt selbst zur Figur, hüpft und zeigt ein Herz (arrive), erst dann führt er`, () => {
-      const world = createWorld(seed, PACKS);
+      const world = worldOf(seed);
       let r = run(initialState(world, { garden: everyone() }), world, 'n'); // aufwachen: Er taucht auf
       let g = guideOf(r.s)!;
       let t = 0;
@@ -431,7 +434,7 @@ describe('Der Pinguin holt dich ab: Führen', () => {
 describe('Invarianten bei wildem Drücken mit führendem Pinguin', () => {
   for (const seed of [1, 2]) {
     it(`Seed ${seed}: höchstens ein Pinguin, immer führend, nie zwei auf einem Feld, Figur begehbar, wiederholbar`, () => {
-      const world = createWorld(seed, PACKS);
+      const world = worldOf(seed);
       const dirs: Dir[] = ['n', 'e', 's', 'w'];
       const play = () => {
         let s = initialState(world, { garden: everyone() }, seed);
@@ -466,21 +469,32 @@ describe('Invarianten bei wildem Drücken mit führendem Pinguin', () => {
   }
 });
 
-/** Erster Schritt der Figur auf dem kürzesten Weg zu einem Feld, das `goal` erfüllt (Tiere zählen dabei nicht) */
-function toward(world: World, s: State, goal: (x: number, y: number) => boolean): Dir | null {
-  const first = new Map<string, Dir | null>([[key([s.player.x, s.player.y]), null]]);
+/** Kürzester Weg der Figur (Felder samt Start) zu einem Feld, das `goal` erfüllt (Tiere zählen dabei nicht) */
+function route(world: World, s: State, goal: (x: number, y: number) => boolean): Point[] | null {
+  const from = new Map<string, Point | null>([[key([s.player.x, s.player.y]), null]]);
   const queue: Point[] = [[s.player.x, s.player.y]];
   for (let i = 0; i < queue.length && i < 60_000; i++) {
-    const [x, y] = queue[i]!;
-    if (goal(x, y)) return first.get(key([x, y])) ?? null;
-    for (const [d, [dx, dy]] of Object.entries(DIRS)) {
+    const here = queue[i]!;
+    const [x, y] = here;
+    if (goal(x, y)) {
+      const path: Point[] = [];
+      for (let p: Point | null = here; p; p = from.get(key(p)) ?? null) path.unshift(p);
+      return path;
+    }
+    for (const [dx, dy] of Object.values(DIRS)) {
       const k = key([x + dx, y + dy]);
-      if (first.has(k) || !canStep(world, s.openGates, x, y, x + dx, y + dy)) continue;
-      first.set(k, first.get(key([x, y])) ?? (d as Dir));
+      if (from.has(k) || !canStep(world, s.openGates, x, y, x + dx, y + dy)) continue;
+      from.set(k, here);
       queue.push([x + dx, y + dy]);
     }
   }
   return null;
+}
+/** Erster Schritt der Figur auf dem kürzesten Weg zu einem Feld, das `goal` erfüllt (Tiere zählen dabei nicht) */
+function toward(world: World, s: State, goal: (x: number, y: number) => boolean): Dir | null {
+  const path = route(world, s, goal);
+  const [a, b] = path ?? [];
+  return a && b ? dirTo(a, b) : null;
 }
 /** Die Figur läuft zu einem Feld, das `goal` erfüllt; nach jedem Schritt `pause` Takte. Liefert Zustand und Ereignisse */
 function walk(s: State, world: World, goal: (x: number, y: number) => boolean, pause = 1, max = 300) {
@@ -1111,7 +1125,7 @@ describe('„Noch nicht“ an den Toren, die nie aufgehen', () => {
 describe('Invarianten bei wildem Drücken bis durchs offene Eistor', () => {
   for (const seed of [1, 2]) {
     it(`Seed ${seed}: führen, Tor öffnen, in den Kessel, einziehen: nie zwei auf einem Feld, Figur begehbar, wiederholbar`, () => {
-      const world = createWorld(seed, PACKS);
+      const world = worldOf(seed);
       const door = world.gates.get('eis')!;
       const inBay = new Set(bay(door).map(key));
       const dirs: Dir[] = ['n', 'e', 's', 'w'];
@@ -1144,8 +1158,20 @@ describe('Invarianten bei wildem Drücken bis durchs offene Eistor', () => {
           }
         };
         const go = (goal: (x: number, y: number) => boolean, pause: number) => {
+          // Die Breitensuche über die ganze Welt ist teuer: Den Weg nur neu suchen, wenn die Figur von ihm abkommt
+          // (Plattform, Schlafen), er zu Ende ist oder sich ein Tor öffnet; sonst läuft sie ihn weiter. Steht ein Tier
+          // im Weg, bleibt sie auf ihm und versucht denselben Schritt noch einmal, wie bei der Suche je Schritt.
+          let path: Point[] = [];
+          let gates = '';
           for (let i = 0; i < 400 && !goal(s.player.x, s.player.y); i++) {
-            const d = toward(world, s, goal);
+            let at = path.findIndex(([x, y]) => x === s.player.x && y === s.player.y);
+            if (at < 0 || at === path.length - 1 || gates !== s.openGates.join()) {
+              path = route(world, s, goal) ?? [];
+              gates = s.openGates.join();
+              at = 0;
+            }
+            const next = path[at + 1];
+            const d = next ? dirTo(path[at]!, next) : null;
             for (const cmd of [d ? { type: 'move' as const, dir: d } : TICK, ...ticks(pause)]) {
               s = step(s, world, cmd, undefined, rules).state;
               check(s);

@@ -141,8 +141,9 @@ export const RULES: Rule[] = [
     // wie im Konzept „Torplatte“ vereinbart. Ihr Aussehen (Fläche, Zeichen aus `PALETTE`, Lage darunter, Federn,
     // Wippen) gehört zum Bauplan ihres Zugangs (`plate` in mitwachsen-gate-<welt>.ts), es gibt für diese Welten noch
     // kein Welt-Paket, in das es ausweichen könnte. Sieben kleine Raster (doppelte Zeilen geteilt) und das Bauen
-    // in mitwachsen-plate-3d.ts kosten knapp 1 KB; gemessen 616 428 Bytes, 20 Bytes Luft
-    budget: 602 * 1024,
+    // in mitwachsen-plate-3d.ts kosten knapp 1 KB; gemessen 616 428 Bytes. Mit `Vox.voxels()` aus main (Lesezugriff
+    // für die Tests im Zeitbudget) 616 464 Bytes: um 0,1 KB angehoben, 86 Bytes Luft
+    budget: 602.1 * 1024,
     // Probe: Das Leuchten der Eiszapfen gibt es nur im 3D-Teil der Eis-Welt (ICE_GLOW in worlds/eis/view-3d-gate.ts)
     forbidden: /#7fd6ff/,
   },

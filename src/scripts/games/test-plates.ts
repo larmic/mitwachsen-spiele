@@ -38,31 +38,50 @@ export function faces(g: BufferGeometry, part: string): Face[] {
   return out;
 }
 
-/** Paare von Flächen, die in derselben Ebene in dieselbe Richtung schauen und sich überdecken: Sie flackern (Z-Fighting) */
-export function fighting(p: Parts, extra: [string, BufferGeometry][] = []): string[] {
-  const all = [
-    ...Object.entries(p).flatMap(([name, geo]) => (geo.empty ? [] : faces(geo.build(), name))),
-    ...extra.flatMap(([name, g]) => faces(g, name)),
-  ];
-  // nur Flächen in derselben Ebene mit derselben Richtung können sich überdecken
+/** Achsenparallele Flächen aller Teile, dazu fertig gebaute Geometrie (`extra`) */
+export const facesOf = (p: Parts, extra: [string, BufferGeometry][] = []): Face[] => [
+  ...Object.entries(p).flatMap(([name, geo]) => (geo.empty ? [] : faces(geo.build(), name))),
+  ...extra.flatMap(([name, g]) => faces(g, name)),
+];
+
+/** Flächen nach Ebene: nur Flächen in derselben Ebene mit derselben Richtung können sich überdecken */
+export function byPlane(all: Face[]): Map<string, Face[]> {
   const planes = new Map<string, Face[]>();
   for (const f of all) {
     const k = `${f.axis},${f.dir},${Math.round(f.at * 1e3)}`;
-    planes.set(k, [...(planes.get(k) ?? []), f]);
+    const list = planes.get(k);
+    if (list) list.push(f);
+    else planes.set(k, [f]);
   }
+  return planes;
+}
+
+/** Überdecken sich zwei Flächen derselben Ebene? Dann flackern sie (Z-Fighting) */
+function clash(a: Face, b: Face, found: string[]) {
+  if (Math.abs(a.at - b.at) > 1e-4) return;
+  const du = Math.min(a.max[0], b.max[0]) - Math.max(a.min[0], b.min[0]);
+  const dw = Math.min(a.max[1], b.max[1]) - Math.max(a.min[1], b.min[1]);
+  if (du > 1e-3 && dw > 1e-3) found.push(`${a.part}/${b.part} Achse ${'xyz'[a.axis]} bei ${a.at.toFixed(2)}`);
+}
+
+/** Alle Paare innerhalb der Flächen, die sich überdecken */
+export function fightingFaces(all: Face[]): string[] {
   const found: string[] = [];
-  for (const list of planes.values())
-    for (let i = 0; i < list.length; i++)
-      for (let j = i + 1; j < list.length; j++) {
-        const a = list[i]!,
-          b = list[j]!;
-        if (Math.abs(a.at - b.at) > 1e-4) continue;
-        const du = Math.min(a.max[0], b.max[0]) - Math.max(a.min[0], b.min[0]);
-        const dw = Math.min(a.max[1], b.max[1]) - Math.max(a.min[1], b.min[1]);
-        if (du > 1e-3 && dw > 1e-3) found.push(`${a.part}/${b.part} Achse ${'xyz'[a.axis]} bei ${a.at.toFixed(2)}`);
-      }
+  for (const list of byPlane(all).values())
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) clash(list[i]!, list[j]!, found);
   return found;
 }
+
+/** Zu den Paaren innerhalb von `moving` die Paare zwischen `moving` und dem schon geordneten Raster `fixed` */
+export function fightingWith(fixed: Map<string, Face[]>, moving: Face[]): string[] {
+  const found = fightingFaces(moving);
+  for (const [k, list] of byPlane(moving)) for (const a of list) for (const b of fixed.get(k) ?? []) clash(b, a, found);
+  return found;
+}
+
+/** Paare von Flächen, die in derselben Ebene in dieselbe Richtung schauen und sich überdecken: Sie flackern (Z-Fighting) */
+export const fighting = (p: Parts, extra: [string, BufferGeometry][] = []): string[] =>
+  fightingFaces(facesOf(p, extra));
 
 /** Grenzen einer Geometrie (min, max je Achse) */
 export const bounds = (gs: BufferGeometry[]) => {

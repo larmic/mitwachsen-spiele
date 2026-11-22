@@ -32,15 +32,18 @@ function version(n: '1' | '2') {
 
 type GameEl = { state: { sleeping: boolean }; apply(cmd: { type: string }): void };
 
-/** Spiel öffnen, Hinweis schließen, warten, bis der Service Worker die Seite steuert */
+/** Spiel öffnen, warten, bis es läuft, Hinweis schließen, warten, bis der Service Worker die Seite steuert */
 async function openGame(page: Page, firstTime = true) {
+  const game = page.locator('larmic-mitwachsen');
   await page.goto('/spielen/');
+  // Tasten hört das Spiel erst, wenn es läuft (`ready`, in `begin`). Steuert der Service Worker die Seite schon vorher
+  // (zweiter Tab), ginge ein Druck davor verloren und die Figur schliefe weiter
+  await expect(game).toHaveClass(/ready/, { timeout: 30_000 });
   if (firstTime) await page.getByRole('button', { name: /Verstanden/ }).click();
   // Angemeldet wird erst nach dem Laden (samt 3D); auf langsamen Runnern dauert das
   await expect
     .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null), { timeout: 30_000 })
     .toMatch(/\/spielen\/sw\.js$/);
-  const game = page.locator('larmic-mitwachsen');
   const sleeping = () => game.evaluate((el) => (el as unknown as GameEl).state.sleeping);
   let loads = 0;
   page.on('load', () => loads++);
