@@ -80,6 +80,34 @@ export default defineConfig(
       'max-lines-per-function': ['error', { max: 128, skipBlankLines: true, skipComments: true }],
     },
   },
+  // Browser-Tests warten auf einen Zustand, nie auf Uhrzeit oder eine Zahl von Bildern; das Spiel öffnen nur die Helfer
+  // (e2e/helpers.ts: openGame mit Test-Uhr, ticks, render)
+  {
+    files: ['e2e/**'],
+    ignores: ['e2e/helpers.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          property: 'waitForTimeout',
+          message: 'Nicht auf Uhrzeit warten: auf einen Zustand warten oder die Test-Uhr nutzen (e2e/helpers.ts).',
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'CallExpression[callee.name=/^(waitFrames|frames)$/]',
+          message:
+            'Nicht auf eine Zahl von Bildern warten: Bilder zeichnet `render`, Takte spielt `ticks` (e2e/helpers.ts).',
+        },
+        {
+          selector: "CallExpression[callee.property.name='goto'][arguments.0.value=/^\\/spielen\\//]",
+          message:
+            'Das Spiel nur über e2e/helpers.ts öffnen: `openGame` (wartet, bis es steht), `gotoGame` nur fürs Laden.',
+        },
+      ],
+    },
+  },
   // Konfigurationsdateien laufen in Node
   { files: ['*.{js,mjs}'], languageOptions: { globals: { URL: 'readonly', process: 'readonly' } } },
   {
