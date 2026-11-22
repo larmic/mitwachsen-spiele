@@ -5,6 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 /** Specs, die das Spiel öffnen (Projekte `game` und `3d`) */
 const GAME = /(smoke|a11y|pwa)\.spec\.ts$/;
+/** Spec der App-Updates (Projekte `pwa-update` und `pwa-update-3d`) */
+const UPDATE = /pwa-update\.spec\.ts$/;
 /** Ohne WebGL: Das Spiel zeichnet in 2D */
 const NO_WEBGL = ['--disable-3d-apis'];
 
@@ -44,12 +46,20 @@ export default defineConfig({
       workers: 1,
       use: { ...devices['Desktop Chrome'], viewport: { width: 960, height: 540 } },
     },
-    // App-Updates mit zwei Fassungen, teils zwei Tabs je Test: einzeln, in 2D (es geht um den Service Worker)
+    // App-Updates mit zwei Fassungen, teils zwei Tabs je Test: einzeln, in 2D (es geht um den Service Worker). Tests mit
+    // Tag @3d zusätzlich mit (Software-)WebGL: Die neu geladene Seite holt ihre neue 3D-Datei, der alte Tab zeichnet weiter
     {
       name: 'pwa-update',
-      testMatch: /pwa-update\.spec\.ts$/,
+      testMatch: UPDATE,
       workers: 1,
       use: { ...devices['Desktop Chrome'], launchOptions: { args: NO_WEBGL } },
+    },
+    {
+      name: 'pwa-update-3d',
+      testMatch: UPDATE,
+      grep: /@3d/,
+      workers: 1,
+      use: { ...devices['Desktop Chrome'], viewport: { width: 960, height: 540 } },
     },
   ],
   webServer: { command: 'node e2e/serve.ts', url: 'http://localhost:4321', reuseExistingServer: !process.env.CI },

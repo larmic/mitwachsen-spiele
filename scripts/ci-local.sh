@@ -3,10 +3,10 @@
 # (.github/workflows/deploy.yml), aber nacheinander in einem Docker-Container mit so wenig Rechenkraft wie der Runner
 # (2 CPUs, CPUS=4 für den 4-vCPU-Runner). Das echte Spiel rendert dort per Software-WebGL; feste Wartezeiten, die auf
 # 18 Kernen reichen, reißen erst hier. Strenger als die Pipeline: kein Wiederholen fehlgeschlagener Browser-Tests.
-# Die Pipeline verteilt dieselben Schritte auf Jobs: static (Format, Lint, Architektur, Typen, Unit-Tests ohne
-# Abdeckung), coverage (npm test), build (Build, verify), e2e-site (Projekt site), e2e-game (übrige Projekte, in zwei
-# Teilen per --shard). Hier deckt `npm test` beide Unit-Läufe ab, die Browser-Tests laufen in einem Aufruf über alle
-# Projekte; vorher wird geprüft, dass die Pipeline jedes Projekt aus playwright.config.ts aufruft.
+# Die Pipeline verteilt dieselben Schritte auf Jobs: static (Format, Lint, Architektur, Typen, Unit-Tests über alle
+# Seeds), coverage (npm test), build (Build, verify), e2e-site (Projekt site), e2e-game (übrige Projekte, in zwei
+# Teilen per --shard). Hier laufen sie nacheinander, die Browser-Tests in einem Aufruf über alle Projekte; vorher wird
+# geprüft, dass die Pipeline jedes Projekt aus playwright.config.ts aufruft.
 # Geprüft wird der Arbeitsstand samt nicht committeter Änderungen (ohne node_modules und Ignoriertes). Nach einem
 # vollen grünen Lauf steht in .ci-local-ok der Tree-Hash des geprüften Stands – gleich `git rev-parse HEAD^{tree}`,
 # sobald genau dieser Stand committet ist. Der Hook .githooks/pre-push verlangt ihn vor jedem Push.
@@ -72,7 +72,7 @@ if [ "$NODE_HAVE" != "${NODE_WANT%%.*}" ]; then
   echo "gates:ci: Warnung – Node $NODE_HAVE im Image, die Pipeline nutzt $NODE_WANT (.nvmrc)" >&2
 fi
 
-# Im Container: die Schritte der Pipeline-Jobs nacheinander, je mit Dauer (`npm test` = Unit-Tests aus static und coverage)
+# Im Container: die Schritte der Pipeline-Jobs nacheinander, je mit Dauer (test:deep aus static, `npm test` aus coverage)
 # shellcheck disable=SC2016
 INNER='
 set -uo pipefail
@@ -90,6 +90,7 @@ step format:check npm run --silent format:check
 step lint npm run --silent lint
 step arch npm run --silent arch
 step check npm run --silent check
+step test:deep npm run --silent test:deep
 step test npm test --silent
 step build npm run --silent build
 step verify npm run --silent verify

@@ -25,12 +25,12 @@ permissions:
   contents: read
 
 # Fristen je Job: etwa das 2,5-Fache der Dauer auf 2 CPUs (npm run gates:ci) samt geschätztem Einrichten (Checkout und
-# npm ci etwa 1 min, Browser samt Systempaketen etwa 1,5 min). Gemessen: static 61 s, coverage 78 s, build und verify
-# wenige Sekunden, e2e-site 9 s, e2e-game 19 s und 78 s. Reißt eine, erst die Ursache suchen; anheben nur mit
+# npm ci etwa 1 min, Browser samt Systempaketen etwa 1,5 min). Gemessen: static 74 s, coverage 76 s, build und verify
+# wenige Sekunden, e2e-site 9 s, e2e-game 20 s und 119 s. Reißt eine, erst die Ursache suchen; anheben nur mit
 # Begründung in der Commit-Nachricht.
 jobs:
   static:
-    name: Format, Lint, Architektur, Typen, Unit-Tests
+    name: Format, Lint, Architektur, Typen, Unit-Tests über alle Seeds
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -56,9 +56,12 @@ jobs:
       - name: Guard-Gate – Typen und Inhalte prüfen
         run: npm run check
 
-      # Ohne Abdeckung: Die misst der Job coverage parallel, ein roter Test zeigt sich hier früher
-      - name: Guard-Gate – Unit-Tests
-        run: npx vitest run
+      # Ohne Abdeckung (die misst der Job coverage parallel), dafür Eigenschafts-Tests über ihre vollen Seed-Bereiche
+      # (MITWACHSEN_DEEP=1, test-worlds.ts): Ein Fehler der Welt-Erzeugung, den nur manche Seeds zeigen, hält so jeden
+      # Pull Request und jeden Deploy auf. Gemessen auf 2 CPUs 62 s; der Job liegt neben build und den Browser-Tests,
+      # nicht auf dem längsten Weg
+      - name: Guard-Gate – Unit-Tests über alle Seeds
+        run: npm run test:deep
 
   coverage:
     name: Unit-Tests mit Abdeckung
@@ -159,9 +162,8 @@ jobs:
           retention-days: 1
 
   # Alle Projekte, die das Spiel öffnen. Playwright teilt nach Zahl der Tests in Projekt-Reihenfolge: Teil 1 bekommt fast
-  # nur `game` (2D, 2 Worker), Teil 2 den Rest samt `3d` und `pwa-update`, die je mit einem Worker nebeneinander laufen
-  # (gemessen auf 2 CPUs etwa 58 s und 74 s). `pwa-update` allein bestimmt die Dauer von Teil 2, ein dritter Teil kürzte
-  # nichts. Neues Projekt in playwright.config.ts: hier oder bei e2e-site eintragen, sonst läuft es in der Pipeline nicht.
+  # nur `game` (2D, 2 Worker), Teil 2 den Rest samt `3d`, `pwa-update` und `pwa-update-3d` (je ein Worker; gemessen auf
+  # 2 CPUs 20 s und 119 s). Die App-Updates mit echter Uhr bestimmen die Dauer von Teil 2. Neues Projekt in playwright.config.ts: hier oder bei e2e-site eintragen, sonst läuft es in der Pipeline nicht.
   e2e-game:
     name: Browser-Tests – Spiel ${{ matrix.shard }}/2
     needs: build
@@ -191,9 +193,9 @@ jobs:
       - name: Browser installieren
         run: npx playwright install --with-deps chromium
 
-      - name: Guard-Gate – Browser-Tests (Projekte game, 3d, pwa-update)
+      - name: Guard-Gate – Browser-Tests (Projekte game, 3d, pwa-update, pwa-update-3d)
         run: >-
-          npx playwright test --project=game --project=3d --project=pwa-update
+          npx playwright test --project=game --project=3d --project=pwa-update --project=pwa-update-3d
           --shard=${{ matrix.shard }}/2 --reporter=github,blob
         env:
           PLAYWRIGHT_BLOB_OUTPUT_NAME: report-game-${{ matrix.shard }}.zip

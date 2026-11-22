@@ -7,7 +7,8 @@ import { budgetMs, calibrate } from './scripts/test-budget.ts';
 // nach Last des Rechners. Langsam wird darum nur gemeldet: Tests über dem Budget (scripts/test-budget.ts: 4 s auf dem
 // Bezugsrechner mit Abdeckung, relativ zur Geschwindigkeit dieses Rechners) markiert der Bericht. Damit die Laufzeit
 // nicht mit jeder Welt wächst, laufen Eigenschafts-Tests über SAMPLE_SEEDS und REGRESSION_SEEDS (`seedsFor` in
-// test-worlds.ts), die vollen Seed-Bereiche nur im tiefen Lauf (`npm run test:deep`, MITWACHSEN_DEEP=1, nachts).
+// test-worlds.ts), die vollen Seed-Bereiche im tiefen Lauf (`npm run test:deep`, MITWACHSEN_DEEP=1, Job static der
+// Pipeline und gates:ci).
 // Welten kommen über `worldOf`/`bareOf` (test-worlds.ts), kein `expect` in Schleifen je Takt oder Feld.
 const CI = !!process.env.CI;
 const coverage = process.argv.includes('--coverage');

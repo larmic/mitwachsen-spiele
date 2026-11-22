@@ -1,13 +1,16 @@
 // App-Updates mit zwei echten Fassungen der Seite: Fassung 1 ist der Build (dist/), Fassung 2 leitet e2e/versions.ts
 // daraus ab (neues Three.js unter neuem Namen, neuer Service Worker). Mit dem Cookie `mw-version=2` geht für einen
 // Browser-Kontext Fassung 2 „live“ (e2e/serve.ts). Spec: docs/specs/mitwachsen.md („App“, „Updates an sicheren Stellen“).
+// Im Projekt `pwa-update` in 2D (es geht um den Service Worker); Tests mit Tag @3d laufen dazu im Projekt
+// `pwa-update-3d` mit WebGL: Dort holt die neu geladene Seite ihre neue 3D-Datei über den Service Worker und zeichnet
+// mit ihr, und der alte Tab zeichnet mit seinem alten Three.js weiter.
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseServiceWorker } from '../scripts/pwa.ts';
 import { SLEEP_LOCK } from '../src/scripts/games/mitwachsen-state.ts';
 import { RITUAL_MS } from '../src/scripts/games/pwa-update.ts';
-import { openGame, reloadGame, settled, watchErrors } from './helpers.ts';
+import { expectView, hasWebGL, openGame, reloadGame, render, settled, watchErrors } from './helpers.ts';
 import { CHUNK, VERSIONS } from './versions-dirs.ts';
 
 // Diese Tests warten echte Abläufe ab (Laden zweier Fassungen, Installation, Schlaflied nach echter Uhr, Neuladen, teils
@@ -61,11 +64,12 @@ const stays = (page: Page) =>
 
 /**
  * Spiel öffnen, bis es steht (Tasten kommen an), Hinweis schließen, warten, bis der Service Worker die Seite steuert.
- * `firstTime: false`: zweiter Tab, der Hinweis ist schon gesehen
+ * `firstTime: false`: zweiter Tab, der Hinweis ist schon gesehen. `clock: true`: mit Test-Uhr (`openGame`), für einen
+ * Tab, dessen Entscheidungen nicht an der Uhr hängen: Takt und Bildschleife ruhen, Bilder zeichnet der Test
  */
-async function openApp(page: Page, firstTime = true) {
+async function openApp(page: Page, firstTime = true, clock = false) {
   await page.addInitScript(probe);
-  const game = await openGame(page, { info: firstTime });
+  const game = await openGame(page, { info: firstTime, clock });
   await page.evaluate(() => ((window as unknown as { mwSame: boolean }).mwSame = true));
   // Angemeldet wird erst nach dem Laden (samt 3D); auf langsamen Runnern dauert das
   await expect
@@ -99,6 +103,29 @@ const fetchBytes = (page: Page, url: string) =>
     (u) => fetch(u, { cache: 'no-store' }).then((r) => (r.ok ? r.arrayBuffer().then((b) => b.byteLength) : -r.status)),
     url,
   );
+/**
+ * Die Ansicht passt zum Projekt (`expectView`); mit WebGL hat die Seite die 3D-Datei `chunk` geladen (bei einem Update:
+ * die ihrer Fassung, über den Service Worker) und zeichnet mit ihr (Three.js zählt die Bilder; mit Test-Uhr zeichnet der
+ * Test zwei, sonst die Bildschleife der Seite)
+ */
+async function drawsWith(page: Page, chunk: string) {
+  if (!(await expectView(page))) return;
+  const loaded = () =>
+    page.evaluate(() => performance.getEntriesByType('resource').map((e) => new URL(e.name).pathname));
+  await expect.poll(loaded).toContain(`/${chunk.replace(/^\//, '')}`);
+  const frame = () =>
+    page
+      .locator('larmic-mitwachsen')
+      .evaluate(
+        (el) =>
+          (el as unknown as { gl3d: { renderer: { info: { render: { frame: number } } } } }).gl3d.renderer.info.render
+            .frame,
+      );
+  const before = await frame();
+  if (await page.evaluate(() => '__MW_TEST' in window)) await render(page, 2);
+  await expect.poll(frame).toBeGreaterThan(before);
+}
+
 /** Seite lange verborgen, dann wieder sichtbar (Uhr eine halbe Stunde vor) */
 const longPause = (page: Page) =>
   page.evaluate(() => {
@@ -154,38 +181,41 @@ test('Zwei Fassungen: die offene alte Seite läuft weiter, die neue wartet und g
   expect(nextErrors).toEqual([]);
 });
 
-test('App-Update: nach dem Gute-Nacht-Ritual kommt die wartende Fassung, einmal neu geladen, das Spiel schläft weiter', async ({
-  page,
-  context,
-}) => {
-  const v2 = version('2');
-  const errors = watchErrors(page);
-  const { game, sleeping, loads } = await openApp(page);
-  await page.keyboard.press('ArrowDown');
-  await expect.poll(sleeping).toBe(false);
-  await goLive(context);
-  await askForUpdate(page);
-  await expect.poll(() => registration(page)).toEqual({ waiting: 'installed', active: 'activated' });
-  expect(loads()).toBe(0); // eine wartende Fassung allein lädt nichts neu
-  // Ins Bett (wie Hineinlaufen): Schlaflied, Nacht, gespeichert – danach übernimmt das Spiel die wartende Fassung
-  await game.evaluate((el) => (el as unknown as GameEl).apply({ type: 'action' }));
-  await expect.poll(sleeping).toBe(true);
-  await expect.poll(loads, { timeout: 30_000 }).toBe(1);
-  await settled(page); // die neu geladene Seite
-  expect(await sleeping()).toBe(true);
-  await expect(page.locator('dialog.mw-info')).not.toHaveAttribute('open');
-  // Fassung 2 aktiv, alter Cache weg (keine andere Spielseite offen)
-  await expect.poll(() => registration(page)).toEqual({ waiting: null, active: 'activated' });
-  await expect.poll(() => cacheNames(page)).toEqual([v2.cache]);
-  // Kein zweites Neuladen: Die neu geladene Seite hat gefragt (Auslöser „neu geladen“), keine Fassung wartet mehr
-  await page.evaluate(() => ((window as unknown as { mwSame: boolean }).mwSame = true));
-  await expect.poll(() => asked(page)).toBeGreaterThan(0);
-  expect(await registration(page)).toEqual({ waiting: null, active: 'activated' });
-  expect(await stays(page)).toBe(true);
-  expect(loads()).toBe(1);
-  expect(await sleeping()).toBe(true);
-  expect(errors).toEqual([]);
-});
+test(
+  'App-Update: nach dem Gute-Nacht-Ritual kommt die wartende Fassung, einmal neu geladen, das Spiel schläft weiter',
+  { tag: '@3d' },
+  async ({ page, context }) => {
+    const [v1, v2] = [version('1'), version('2')];
+    const errors = watchErrors(page);
+    const { game, sleeping, loads } = await openApp(page);
+    await drawsWith(page, v1.chunk);
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(sleeping).toBe(false);
+    await goLive(context);
+    await askForUpdate(page);
+    await expect.poll(() => registration(page)).toEqual({ waiting: 'installed', active: 'activated' });
+    expect(loads()).toBe(0); // eine wartende Fassung allein lädt nichts neu
+    // Ins Bett (wie Hineinlaufen): Schlaflied, Nacht, gespeichert – danach übernimmt das Spiel die wartende Fassung
+    await game.evaluate((el) => (el as unknown as GameEl).apply({ type: 'action' }));
+    await expect.poll(sleeping).toBe(true);
+    await expect.poll(loads, { timeout: 30_000 }).toBe(1);
+    await settled(page); // die neu geladene Seite
+    await drawsWith(page, v2.chunk); // mit WebGL: mit der neuen 3D-Datei
+    expect(await sleeping()).toBe(true);
+    await expect(page.locator('dialog.mw-info')).not.toHaveAttribute('open');
+    // Fassung 2 aktiv, alter Cache weg (keine andere Spielseite offen)
+    await expect.poll(() => registration(page)).toEqual({ waiting: null, active: 'activated' });
+    await expect.poll(() => cacheNames(page)).toEqual([v2.cache]);
+    // Kein zweites Neuladen: Die neu geladene Seite hat gefragt (Auslöser „neu geladen“), keine Fassung wartet mehr
+    await page.evaluate(() => ((window as unknown as { mwSame: boolean }).mwSame = true));
+    await expect.poll(() => asked(page)).toBeGreaterThan(0);
+    expect(await registration(page)).toEqual({ waiting: null, active: 'activated' });
+    expect(await stays(page)).toBe(true);
+    expect(loads()).toBe(1);
+    expect(await sleeping()).toBe(true);
+    expect(errors).toEqual([]);
+  },
+);
 
 test('App-Update: weckt das Kind die Figur zwischen Bitte und Übernahme, wird erst beim nächsten Schlafen neu geladen', async ({
   page,
@@ -315,35 +345,44 @@ test('App-Update: mitten im Spiel wird nie neu geladen, die neue Fassung wartet'
   expect(errors).toEqual([]);
 });
 
-test('App-Update: ein zweiter, alter Tab spielt ungestört weiter und bekommt sein altes Three.js bis zuletzt', async ({
-  page,
-  context,
-}) => {
-  const [v1, v2] = [version('1'), version('2')];
-  const errors = watchErrors(page);
-  const a = await openApp(page);
-  const other = await context.newPage();
-  const otherErrors = watchErrors(other);
-  const b = await openApp(other, false);
-  await other.keyboard.press('ArrowDown');
-  await expect.poll(b.sleeping).toBe(false);
-  await page.keyboard.press('ArrowDown');
-  await expect.poll(a.sleeping).toBe(false);
-  await goLive(context);
-  await a.game.evaluate((el) => (el as unknown as GameEl).apply({ type: 'action' }));
-  await expect.poll(a.loads, { timeout: 30_000 }).toBe(1);
-  // Der Tab, der schlafen ging, hat die neue Fassung; der andere spielt weiter und lädt nicht neu
-  expect(b.loads()).toBe(0);
-  expect(await b.sleeping()).toBe(false);
-  // Der alte Cache bleibt, solange der andere Tab offen ist: Er holt sein altes Three.js auch ohne Netz,
-  // obwohl Fassung 2 ihn jetzt steuert und der Server die Datei nicht mehr hat
-  expect((await cacheNames(page)).sort()).toEqual([v1.cache, v2.cache].sort());
-  await context.setOffline(true);
-  expect(await fetchBytes(other, v1.chunk)).toBe(v1.chunkBytes);
-  await context.setOffline(false);
-  // … und geht, sobald eine Spielseite allein offen ist und sich meldet
-  await other.close();
-  await reloadGame(page);
-  await expect.poll(() => cacheNames(page)).toEqual([v2.cache]);
-  expect([...errors, ...otherErrors]).toEqual([]);
-});
+test(
+  'App-Update: ein zweiter, alter Tab spielt ungestört weiter und bekommt sein altes Three.js bis zuletzt',
+  { tag: '@3d' },
+  async ({ page, context }) => {
+    const [v1, v2] = [version('1'), version('2')];
+    const errors = watchErrors(page);
+    const a = await openApp(page);
+    // Mit WebGL der zweite Tab mit Test-Uhr: Zwei Bildschleifen mit Software-WebGL teilten sich die Kerne, und das
+    // Schlaflied im ersten Tab läuft nach echter Uhr. Ob er neu lädt, entscheidet er nach seinem Zustand (wach), nicht
+    // nach der Uhr; in 2D läuft er live
+    const other = await context.newPage();
+    const otherErrors = watchErrors(other);
+    const b = await openApp(other, false, await hasWebGL(other));
+    await drawsWith(other, v1.chunk);
+    await other.keyboard.press('ArrowDown');
+    await expect.poll(b.sleeping).toBe(false);
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(a.sleeping).toBe(false);
+    await goLive(context);
+    await a.game.evaluate((el) => (el as unknown as GameEl).apply({ type: 'action' }));
+    await expect.poll(a.loads, { timeout: 30_000 }).toBe(1);
+    // Der Tab, der schlafen ging, hat die neue Fassung (mit WebGL samt neuer 3D-Datei); der andere spielt weiter und lädt
+    // nicht neu, mit WebGL zeichnet er mit seinem alten Three.js weiter (Fehler sammelt der Test)
+    await settled(page);
+    await drawsWith(page, v2.chunk);
+    expect(b.loads()).toBe(0);
+    expect(await b.sleeping()).toBe(false);
+    await drawsWith(other, v1.chunk);
+    // Der alte Cache bleibt, solange der andere Tab offen ist: Er holt sein altes Three.js auch ohne Netz,
+    // obwohl Fassung 2 ihn jetzt steuert und der Server die Datei nicht mehr hat
+    expect((await cacheNames(page)).sort()).toEqual([v1.cache, v2.cache].sort());
+    await context.setOffline(true);
+    expect(await fetchBytes(other, v1.chunk)).toBe(v1.chunkBytes);
+    await context.setOffline(false);
+    // … und geht, sobald eine Spielseite allein offen ist und sich meldet
+    await other.close();
+    await reloadGame(page);
+    await expect.poll(() => cacheNames(page)).toEqual([v2.cache]);
+    expect([...errors, ...otherErrors]).toEqual([]);
+  },
+);

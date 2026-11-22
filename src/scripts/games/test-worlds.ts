@@ -1,8 +1,8 @@
 // Nur für Tests: alle Welt-Pakete und Welten mit ihnen, je Seed einmal gebaut (eine Welt ändert sich nie, die Tests
 // teilen sie sich, so steigt die Laufzeit nicht). Das Spiel lädt die Pakete per import() (larmic-mitwachsen.ts).
-// Dazu die Seeds der Eigenschafts-Tests: im normalen Lauf (npm test, pre-commit, Pipeline) nur wenige, die vollen
-// Bereiche im tiefen Lauf (`npm run test:deep`, nachts in .github/workflows/deep-tests.yml). So wächst die Laufzeit
-// nicht mit jeder Welt, und doch prüft jede Nacht alle Seeds.
+// Dazu die Seeds der Eigenschafts-Tests: im normalen Lauf (npm test, pre-commit, Job coverage) nur wenige, die vollen
+// Bereiche im tiefen Lauf (`npm run test:deep`, im Job static der Pipeline und in gates:ci). So bleibt der Hook vor
+// jedem Commit schnell, und doch prüft jeder Pull Request und jeder Deploy alle Seeds.
 // Achtung, Seiteneffekt beim Import: Er trägt die Modelle der Eis-Tiere in `SPECIES` ein (`addModels`, wie im Spiel beim
 // Ankommen des Pakets). Ein Test, der Eis-Tiere zeichnet oder vermisst, importiert diesen Helfer, sonst sind ihre
 // Modelle leer (geprüft in mitwachsen-packs.test.ts).

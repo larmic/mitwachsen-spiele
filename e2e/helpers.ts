@@ -42,6 +42,41 @@ export async function violations(page: Page) {
 export const settled = (page: Page) =>
   expect(page.locator('larmic-mitwachsen')).toHaveClass(/\bsettled\b/, { timeout: SETTLE_MS });
 
+/** Hat der Browser WebGL (Projekte `3d` und `pwa-update-3d`)? Geht auf jeder Seite, auch vor dem ersten Aufruf */
+export const hasWebGL = (page: Page) => page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
+
+/**
+ * Die Ansicht passt zum Projekt: mit WebGL (Projekt `3d`) zeichnet die 3D-Ansicht (Klasse `three`), ohne WebGL (Projekt
+ * `game`) die 2D-Ansicht. Liefert, ob WebGL da ist. Für Tests mit Tag @3d, damit ihr Lauf im Projekt `3d` sicher in 3D
+ * zeichnet und nicht still in 2D
+ */
+export async function expectView(page: Page) {
+  const webgl = await hasWebGL(page);
+  const game = page.locator('larmic-mitwachsen');
+  if (webgl) await expect(game).toHaveClass(/\bthree\b/);
+  else await expect(game).not.toHaveClass(/\bthree\b/);
+  return webgl;
+}
+
+/**
+ * 3D: Bilder der Test-Uhr, bis der 3D-Teil des Welt-Pakets `id` geladen und eingebaut ist (`look` der 3D-Ansicht kennt
+ * sein Tor). Ohne 3D-Ansicht (2D) gibt es nichts zu warten
+ */
+export const view3d = (page: Page, id: string) =>
+  expect
+    .poll(async () => {
+      await render(page);
+      return page
+        .locator('larmic-mitwachsen')
+        .evaluate(
+          (node, gate) =>
+            !(node as unknown as { r3d: unknown }).r3d ||
+            !!(node as unknown as { gl3d: { views: { look(gate: string): unknown } } }).gl3d.views.look(gate),
+          id,
+        );
+    })
+    .toBe(true);
+
 /**
  * Die Spielseite aufrufen, ohne zu warten. Nur für Tests, die das Laden selbst prüfen (ohne JavaScript, ohne Netz, der
  * Hinweis für Eltern beim ersten Mal); sonst `openGame`
