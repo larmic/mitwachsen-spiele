@@ -10,6 +10,7 @@ import { needsBlink } from '../src/scripts/games/mitwachsen-turn';
 import {
   FRAME_MS,
   arrive,
+  drawEvery,
   gotoGame,
   openGame,
   openMenu,
@@ -1337,6 +1338,9 @@ test(
     const webgl = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
     test.skip(!webgl, 'ohne WebGL gibt es keine 3D-Ansicht (dort kommt die Postkarte, Test oben)');
     await expect(game).toHaveClass(/three/);
+    // Gut 200 Bilder bis zum Ende, geprüft werden Kamera, Karte, Sonne und Schritt, nicht die Pixel: Gezeichnet wird
+    // jedes zehnte (alle 0,5 s der Test-Uhr) und zum Schluss wieder jedes, sonst kostet allein das Software-WebGL 25–30 s
+    await drawEvery(page, 10);
     type Game = {
       world: { gates: Map<string, { mid: [number, number]; out: [number, number] }> };
       state: { player: { x: number; y: number; dir: string }; sleeping: boolean; wokeAt: number };
@@ -1434,6 +1438,7 @@ test(
     expect(waited).toBeGreaterThanOrEqual(290); // der Schritt wartet aufs Blinzeln (300 ms), er geht nicht verloren
     expect(await game.evaluate((node) => (node as unknown as Game).state.player.y)).toBe(south.y - 1);
     expect(Math.abs(await yaw())).toBeLessThan(5);
+    await drawEvery(page, 1);
     await render(page);
     expect(await css('--mw-fan')).toBe('0');
     expect(errors).toEqual([]);

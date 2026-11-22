@@ -159,6 +159,28 @@ export const play = (page: Page, ms: number) =>
   );
 
 /**
+ * 3D: Nur jedes `n`-te Bild auf dem Schirm wirklich an WebGL geben (`n = 1`: wieder jedes). Software-WebGL braucht in
+ * der Pipeline je Bild 80–150 ms, auch in kleinem Fenster (die Ecken der Welt und die Schattenkarte kosten), und die
+ * Seite holt das beim nächsten Aufruf nach. Kamera, Drehung, Sonne, Schattenziel und Regeln laufen in jedem Bild weiter,
+ * es fällt nur der letzte Aufruf weg (`renderer.render` am Ende von `render` in mitwachsen-3d.ts); Bilder in ein Ziel
+ * (Postkarte) bleiben. Für Tests, die viele Bilder abspielen und den Zustand prüfen, nicht die Pixel
+ */
+export const drawEvery = (page: Page, n: number) =>
+  page.locator('larmic-mitwachsen').evaluate((node, every) => {
+    type Draw = (...args: unknown[]) => void;
+    type Renderer = { render: Draw; getRenderTarget(): unknown; mwDraw?: Draw };
+    const r = (node as unknown as { gl3d: { renderer: Renderer } }).gl3d.renderer;
+    const draw = (r.mwDraw ??= r.render.bind(r));
+    let i = 0;
+    r.render =
+      every === 1
+        ? draw
+        : (...args) => {
+            if (r.getRenderTarget() !== null || i++ % every === 0) draw(...args);
+          };
+  }, n);
+
+/**
  * Menü für Eltern über das Zahnrad öffnen. Offen heißt gefüllt: Das Spiel füllt das nachgeladene Menü erst und zeigt es
  * dann (`openMenu` in larmic-mitwachsen.ts)
  */
