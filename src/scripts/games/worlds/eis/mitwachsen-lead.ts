@@ -290,14 +290,20 @@ function towards(s: Guided, world: World, g: Walker, goals: readonly Point[]): P
 /**
  * Die Figur ist in den führenden Pinguin hineingelaufen (er hat dabei gesungen): Er hüpft ein Feld voraus Richtung Tor
  * oder, wenn dort nichts frei ist, tauscht er mit ihr den Platz. So blockiert er nie. Ist das Tor offen, rutscht er
- * statt zu hüpfen ein Feld weiter Richtung Schneebett.
+ * statt zu hüpfen ein Feld weiter Richtung Schneebett (im Vorspiel nicht: Er bleibt vor der Tür).
  */
 export function meetGuide(s: Guided, world: World, events: Events) {
   const g = leader(s);
   const [dx, dy] = DIRS[s.player.dir];
   if (!g || g.x !== s.player.x + dx || g.y !== s.player.y + dy) return;
   if (!events.some((e) => e.type === 'sing' && e.id === g.id)) return;
-  if (s.openGates.includes(GUIDE_GATE) ? slideOn(s, world, g, events) : forward(s, world, g, toGate(world))) return;
+  // im Vorspiel bleibt er vor der Tür (die Flügel sind noch zu): nicht rutschen, nicht tauschen
+  if (
+    s.openGates.includes(GUIDE_GATE)
+      ? s.tick < s.ritual || slideOn(s, world, g, events)
+      : forward(s, world, g, toGate(world))
+  )
+    return;
   const p = s.player;
   if (!canStep(world, s.openGates, p.x, p.y, g.x, g.y) || !canStep(world, s.openGates, g.x, g.y, p.x, p.y)) return;
   [g.x, g.y, p.x, p.y] = [p.x, p.y, g.x, g.y];

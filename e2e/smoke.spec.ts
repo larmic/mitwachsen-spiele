@@ -680,6 +680,8 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
       sleeping: boolean;
       guideDue: number;
       still: number;
+      tick: number;
+      ritual: number;
       animals: (Animal & { home: { kind: string } })[];
       garden: { id: string; species: string }[];
     };
@@ -744,7 +746,12 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
       .map((k) => (JSON.parse(localStorage.getItem(k)!) as { openGates: string[] }).openGates),
   );
   expect(stored).toEqual([['eis']]);
-  // Während des Rituals hüpft die Figur nur
+  // Erst das Vorspiel (ohne Sperre, die Kamera dreht zur Front), dann das Ritual: Während es läuft, hüpft die Figur nur
+  await frames(10);
+  await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    while (el.state.tick < el.state.ritual) el.apply({ type: 'tick' });
+  });
   const before = await game.evaluate((el) => ({ ...(el as unknown as Game).state.player }));
   await page.keyboard.press('ArrowUp');
   expect(await game.evaluate((el) => ({ ...(el as unknown as Game).state.player }))).toMatchObject({

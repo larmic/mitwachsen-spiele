@@ -20,6 +20,15 @@ describe('Töne beim Öffnen des Eistors', () => {
     expect(Math.max(...score.map(([, len, , , , at]) => at + len + TAIL))).toBeLessThan(5);
   });
 
+  it('mit Vorspiel: alles wie ohne, nur später; die Melodie beginnt mit dem Leuchten der Eiszapfen (Süd: Flügel bei 4,7 s)', () => {
+    const late = gateScore(47); // Takte
+    expect(late.map(([f, len, wave, gain, r]) => [f, len, wave, gain, r])).toEqual(
+      score.map(([f, len, wave, gain, r]) => [f, len, wave, gain, r]),
+    );
+    for (const [i, [, , , , , at]] of late.entries()) expect(at, `Ton ${i}`).toBeCloseTo(score[i]![5] + 3.5);
+    expect(late[0]![5]).toBeCloseTo(3.8); // 0,3 s nach Beginn des Rituals, wie die Eiszapfen
+  });
+
   it('höchstens 6 Stimmen zugleich, alle Töne in der Pentatonik C–D–E–G–A', () => {
     const PENTA = [0, 2, 4, 7, 9];
     for (const [, , , , , at] of score) {

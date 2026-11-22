@@ -72,7 +72,7 @@ export type State = Omit<Progress, 'position'> & {
   fish: boolean; // Netz mit Fischen in der linken Hand (nach dem Fangen an der Fischkiste, bis zur Eisschale)
   calm: number; // Tag, an dem der Pinguin auf die Schneewiese gezogen ist: an ihm weht kein Pustewind (nicht gespeichert)
   guideDue: number; // verlaufener Pinguin: Takt, ab dem er auftaucht bzw. aufgetaucht ist (nicht gespeichert, mitwachsen-guide.ts)
-  ritual: number; // Takt, an dem das Eistor mit dem Pinguin aufging (-1: noch nicht; nicht gespeichert, worlds/eis/mitwachsen-ritual.ts)
+  ritual: number; // Takt, an dem das Ritual am Eistor beginnt, nach dem Vorspiel (-1: noch nicht; nicht gespeichert, worlds/eis/mitwachsen-ritual.ts)
   still: number; // Takte, die die Figur auf demselben Feld steht: jeder Schritt setzt ihn auf 0 (nicht gespeichert; Torplatte)
   held?: readonly [number, number]; // gespeicherte Position, solange ein Welt-Paket fehlt: bleibt im Spielstand (Abschnitt „Welt-Pakete“)
 };
@@ -104,7 +104,7 @@ export type GameEvent =
   | { type: 'story'; id: StoryId; first: boolean } // Klangstein angelaufen: Melodie und Geschichte des Ortes
   | { type: 'aside'; id: string; species: SpeciesId } // ein Tier der Wiese macht der Figur Platz
   | { type: 'home'; id: string; species: SpeciesId } // auf der Wiese angekommen
-  | { type: 'gate'; id: GateId }
+  | { type: 'gate'; id: GateId; at: number } // `at`: Takte, bis die Flügel aufschwingen (nach dem Vorspiel)
   | PortalEvent // Plattformen erwachen, reisen, wieder bereit (mitwachsen-travel.ts)
   | ChoreEvent // Handgriffe: pflücken, fangen, nachwachsen, füttern, schöpfen, tränken (mitwachsen-chores.ts)
   | BorderEvent // Weltgrenze am Tor: warten, wieder einreihen, Gegend wechseln (mitwachsen-border.ts)

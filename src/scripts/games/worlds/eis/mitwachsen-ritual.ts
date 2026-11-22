@@ -1,9 +1,12 @@
 // Das Eistor geht mit dem verlaufenen Pinguin auf – rein, ohne DOM: Ist der Pinguin in der Bucht vor dem Tor und steht
 // die wache Figur seit 0,4 s auf der Torplatte (nur Stehen zählt, Drüberlaufen öffnet nie) oder läuft sie gegen die
-// Tür, geht es für immer auf (`gate`, sofort gespeichert). Das Ritual dauert 3 s: Der Pinguin watschelt vor die Tür, hüpft
-// zweimal, ein kalter Atemzug weht Schnee auf die Lichtung, nach 2,4 s rutscht er durch den Gang hinter die Mündung und
-// wartet dort; jeder Pfeil lässt die Figur solange nur hüpfen. Betritt die Figur die Eis-Welt, rutscht er voraus zum
-// Schneebett und zieht als erstes Tier auf der Schneewiese ein. Mit den Regeln des Führens (mitwachsen-lead.ts) Teil
+// Tür, geht es für immer auf (`gate`, sofort gespeichert). Erst das Vorspiel je Torlage (`preTicks`, Nord 0,6 s, Ost
+// und West 1,2 s, Süd 3,5 s), ohne Sperre: Der Pinguin watschelt vor die Tür und hüpft, die 3D-Ansicht dreht zur Front;
+// nur in die noch geschlossenen Flügel geht kein Schritt (`shut`). Dann das Ritual, 3 s in jeder Lage: Er hüpft noch
+// einmal, die Flügel schwingen auf, ein kalter Atemzug weht Schnee auf die Lichtung, nach 2,4 s rutscht er durch den
+// Gang hinter die Mündung und wartet dort; jeder Pfeil lässt die Figur solange nur hüpfen. Gleich in 2D, 3D und bei
+// reduzierter Bewegung: Die Kamera steuert nichts. Betritt die Figur die Eis-Welt, rutscht er voraus zum Schneebett und
+// zieht als erstes Tier auf der Schneewiese ein. Mit den Regeln des Führens (mitwachsen-lead.ts) Teil
 // des Welt-Pakets der Eis-Welt; Bild und Ton macht die Ansicht.
 // Spezifikation: docs/specs/mitwachsen.md (Regel 8a „Das Eistor geht auf“)
 
@@ -15,12 +18,21 @@ import { atHome, meadowSpots } from '../../mitwachsen-meadow';
 import { ALL, flood, key } from './mitwachsen-flood';
 import { inBay } from './mitwachsen-bay';
 import { canStep, type World } from '../../mitwachsen-world';
+import type { WorldRules } from '../../mitwachsen-pack-types';
 
 type Walker = Guided['animals'][number];
 
 export const HOP_AGAIN = 4; // zweiter Hüpfer vor der Tür (0,4 s)
 export const BREATH = 18; // der kalte Atemzug aus dem Tor (1,8 s)
 export const OPEN_TICKS = 4; // so lange (0,4 s) steht die Figur auf der Torplatte, dann geht das Tor auf
+export const WINGS = 12; // so viele Takte nach Beginn des Rituals schwingen die Flügel auf (1,2 s, nach dem Eiszapfen-Lied)
+export const PRE_HOP = 5; // im Vorspiel hüpft er vor der Tür alle 0,5 s
+/**
+ * Vorspiel in Takten aus der Lage des Tors (`out`): Nord 6, Süd 35, Ost und West 12. Doppelt zu `leadTicks` in
+ * mitwachsen-turn-pace.ts, das hier nicht hergeben darf (sonst wird es eine eigene Datei, die Kern, Paket und Drehung
+ * nachladen); ein Test hält beide gleich
+ */
+export const preTicks = (out: Point) => (out[1] < 0 ? 6 : out[1] > 0 ? 35 : 12);
 // Takte je Feld beim Rutschen zum Schneebett: so schnell wie beim Führen (PACE.lead), schneller als die Figur mit
 // gehaltener Taste, damit er wirklich vorausrutscht (die Ansicht gleitet mit)
 export const SLIDE_PACE = 2;
@@ -30,8 +42,10 @@ const REALM = 'eis'; // die Gegend hinter dem Eistor
  * Ist der Pinguin (bei der Figur angekommen) in der Bucht und steht die wache Figur seit `OPEN_TICKS` Takten auf der
  * Torplatte (`still`: Jeder Schritt zählt neu, darum öffnet Drüberlaufen nie) oder ist sie eben gegen die Tür gelaufen
  * (Ereignis `bump`, zählt wie die Platte), geht das Tor auf: Es kommt zu den offenen Toren (Ereignis `gate`, die Ansicht
- * speichert sofort), der Pinguin watschelt vor die Mitte der Tür, schaut zur Figur und hüpft mit seinem Ton (`peep`).
- * Erst jetzt beginnt das Ritual (`ritual`, `hold`), nie schon beim Betreten der Platte. Liefert true, wenn das Tor aufging.
+ * speichert sofort; `at`: Takte, bis die Flügel aufschwingen), der Pinguin watschelt vor die Mitte der
+ * Tür, schaut zur Figur und hüpft mit seinem Ton (`peep`). Nach dem Vorspiel der Lage (`preTicks`, ohne Sperre:
+ * Läuft die Figur weg, geht das Tor trotzdem auf) beginnt das Ritual (`ritual`, `hold`), nie schon beim Betreten der
+ * Platte. Liefert true, wenn das Tor aufging.
  */
 export function opens(s: Guided, world: World, g: Walker, events: Events): boolean {
   const door = world.gates.get(GUIDE_GATE);
@@ -42,28 +56,45 @@ export function opens(s: Guided, world: World, g: Walker, events: Events): boole
   const knocks = world.cell(p.x + dx, p.y + dy).gate === GUIDE_GATE && events.some((e) => e.type === 'bump');
   if (!stands && !knocks) return false;
   s.openGates.push(GUIDE_GATE);
-  s.ritual = s.tick;
+  const pre = preTicks(door.out);
+  s.ritual = s.tick + pre;
   const front: Point = [door.mid[0] - door.out[0], door.mid[1] - door.out[1]];
   if (!occupied(s, ...front, g.id)) [g.x, g.y] = front;
   g.dir = dirTo(s.player.x - g.x, s.player.y - g.y);
-  events.push({ type: 'gate', id: GUIDE_GATE }, { type: 'peep', id: g.id, species: g.species });
+  events.push({ type: 'gate', id: GUIDE_GATE, at: pre + WINGS }, { type: 'peep', id: g.id, species: g.species });
   return true;
 }
 
-/** Während das Tor aufgeht (`RITUAL` Takte), lässt jeder Pfeil die Figur nur hüpfen (`hop`); danach ist sie frei */
+/**
+ * Während das Ritual läuft (`RITUAL` Takte nach dem Vorspiel), lässt jeder Pfeil die Figur nur hüpfen (`hop`); im
+ * Vorspiel und danach ist sie frei
+ */
 export function hold(s: Guided, events: Events): boolean {
-  if (!opening(s, RITUAL)) return false;
+  if (s.tick < s.ritual || !opening(s, RITUAL)) return false; // im Vorspiel frei
   events.push({ type: 'hop' });
   return true;
 }
 
 /**
- * Nach jedem Befehl, solange das Eistor offen ist und der Pinguin noch nicht auf der Schneewiese wohnt: das Ritual vor
- * der Tür, dann hinter die Gangmündung (nach dem Laden wartet er gleich dort), und steht die Figur in der Eis-Welt,
- * rutscht er voraus zum Schneebett. Nachts ruht er, wo er ist.
+ * Im Vorspiel ist das Tor schon offen gespeichert, seine Flügel sind aber noch zu: Ein Pfeil in die Tür lässt die Figur
+ * nur hüpfen (`hop`), sie läuft nie durch die geschlossenen Flügel. Danach sperrt das Ritual (`hold`) ohnehin, bis sie
+ * offen sind. Eine Regel der Eis-Welt (`rules.bump`), sonst bleibt alles frei
+ */
+export const shut: WorldRules['bump'] = (s, c, _x, _y, events) =>
+  c.gate === GUIDE_GATE && s.tick < s.ritual && !!events.push({ type: 'hop' });
+
+/**
+ * Nach jedem Befehl, solange das Eistor offen ist und der Pinguin noch nicht auf der Schneewiese wohnt: Vorspiel und
+ * Ritual vor der Tür, dann hinter die Gangmündung (nach dem Laden, auch mitten im Vorspiel, wartet er gleich dort), und
+ * steht die Figur in der Eis-Welt, rutscht er voraus zum Schneebett. Nachts ruht er, wo er ist.
  */
 export function homeward(s: Guided, world: World, g: Walker, cmd: 'move' | 'action' | 'tick', events: Events) {
   const door = world.gates.get(GUIDE_GATE);
+  if (s.tick < s.ritual) {
+    // Vorspiel: Er hüpft vor der Tür, bis die Kamera vorn ist
+    if (cmd === 'tick' && s.tick % PRE_HOP === 0) events.push({ type: 'bob', id: g.id });
+    return;
+  }
   if (opening(s, SLIDE)) {
     // vor der Tür: zweiter Hüpfer, dann weht ein kalter Atemzug aus dem Tor
     const t = cmd === 'tick' ? s.tick - s.ritual : -1;

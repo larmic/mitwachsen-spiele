@@ -60,7 +60,10 @@ export const RULES: Rule[] = [
     // an die 3D-Ansicht vor jedem Schritt (`blink`, danach der Takt wie nach einem frischen Druck) und die 3D-Ansicht
     // als Argument für „noch nicht“ (wartet, bis die Kamera vorn ist). Abdunkeln und Blickfächer setzt die 3D-Ansicht
     // als CSS-Variablen, den Schalter liest sie selbst. Kamera vor den Flügeln und „noch nicht“ an den anderen Toren
-    // brauchen im Kern Platz: dafür die bewusste Anhebung um höchstens 1 KB aus dem Konzept „Torplatte“
+    // brauchen im Kern Platz: dafür die bewusste Anhebung um höchstens 1 KB aus dem Konzept „Torplatte“. Mit dem
+    // Eistor von vorn (`opening` zählt das Vorspiel mit, so gilt auch der Umriss in `guideGate`; die Flügel nach `at`
+    // aus dem Ereignis `gate`, in Takten der Regeln statt nach der Uhr, damit sie bei offenem Menü mitwarten)
+    // 130 033 Bytes, 15 Bytes Luft. Eine Taktuhr als eigene Klasse kostete gut 0,2 KB und passte nicht
     budget: 127 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
@@ -95,8 +98,17 @@ export const RULES: Rule[] = [
     // 43,5 KB mit „noch nicht“ am Eistor: bewusst um 0,5 KB angehoben, wie für diesen Schritt vereinbart. Wann das Tor
     // zeigt, was fehlt, und das frühe Holen von Bild und Ton (worlds/eis/mitwachsen-plate-hint.ts, `View2D.hint`) gehört
     // nur zur Eis-Welt und liegt darum hier statt im Kern (dort sparte es gut 0,3 KB); gemessen 44 453 Bytes, also
-    // 91 Bytes Luft. Die nächsten Schritte der Torplatte brauchen hier Platz oder eine begründete, knappe Anhebung
-    budget: 43.5 * 1024,
+    // 91 Bytes Luft. Die nächsten Schritte der Torplatte brauchen hier Platz oder eine begründete, knappe Anhebung.
+    // 43,6 KB, seit das Eistor von vorn aufgeht: Vorspiel je Torlage (`preTicks`, doppelt zu `leadTicks`, damit
+    // mitwachsen-turn-pace.ts keine eigene, von Kern, Paket und Drehung nachgeladene Datei wird; die kostete im Kern
+    // den Eintrag in der Liste zum Vorladen, und der Kern hat keine Luft), Hüpfen im Vorspiel, wann die Flügel
+    // aufschwingen (`at`), Rumms und Akkord erst dann (`gateScore`): 0,17 KB, das liegt nur in der Eis-Welt.
+    // Bewusst knapp um 0,1 KB angehoben; gemessen 44 628 Bytes, 18 Bytes Luft. 43,8 KB nach der Prüfung des Schritts:
+    // Im Vorspiel läuft niemand durch die noch geschlossenen Flügel (Regel `shut` in `rules.bump`, der Pinguin rutscht
+    // nicht und tauscht nicht), die Sperre prüft das Vorspiel selbst (`hold`), der Umriss füllt sich schon im Vorspiel
+    // (`ritualGlow`, geteilt mit der 3D-Ansicht) und die Eis-Melodie liegt beim Leuchten der Eiszapfen. Das gehört nur
+    // zur Eis-Welt, der Kern hat keine Luft; bewusst knapp um 0,2 KB angehoben, gemessen 44 823 Bytes, 28 Bytes Luft
+    budget: 43.8 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {
@@ -116,7 +128,9 @@ export const RULES: Rule[] = [
     // zusammen (mitwachsen-gatehouses-3d.ts). Der Drehregler selbst samt Blinzeln und Fächer kommt
     // erst dann (Regel „Drehung zur Torfront“ unten), sonst wäre die Grenze um 1,4 KB überschritten. 600,9 KB (615 310
     // Bytes), seit die Fassungen zur Front im Leerlauf entstehen und beim Betreten der Bucht nichts umspringt (zwei
-    // Fassungen je Tor, alle Takte der bewegten Teile vorab, `MovingGates.fill`); 114 Bytes Luft
+    // Fassungen je Tor, alle Takte der bewegten Teile vorab, `MovingGates.fill`); 114 Bytes Luft. 615 400 Bytes mit dem
+    // Eistor von vorn (Umriss füllt sich schon im Vorspiel, `ritualGlow`; wann die Eiszapfen leuchten, `iceGlow`, liegt
+    // im 3D-Teil der Eis-Welt), 24 Bytes Luft
     budget: 601 * 1024,
     // Probe: Das Leuchten der Eiszapfen gibt es nur im 3D-Teil der Eis-Welt (ICE_GLOW in worlds/eis/view-3d-gate.ts)
     forbidden: /#7fd6ff/,
@@ -140,8 +154,12 @@ export const RULES: Rule[] = [
     after: /\/mitwachsen-3d\.[\w-]+\.js$/,
     // Drehregler (mitwachsen-turn.ts: Fortschritt, Feder, Pendeln, Heranrücken, Blinzeln, Bucht) und sein Einbau
     // (mitwachsen-turn-3d.ts: Platte, Schritt und Pfeile je Bild, Elternschalter, Abdunkeln und Blickfächer als
-    // CSS-Variablen, welcher Zugang zur Front gebaut ist, ob mehr als halb gedreht): gemessen 3,9 KB (3951 Bytes)
-    budget: 4 * 1024,
+    // CSS-Variablen, welcher Zugang zur Front gebaut ist, ob mehr als halb gedreht): gemessen 3,9 KB (3951 Bytes);
+    // 4094 Bytes mit dem Eistor von vorn (Vorspiel ohne Wartezeit, Ritual vorn nur auf der Platte, Rückfahrt in den
+    // letzten 0,6 s, Süd blinzelt zurück). 4,1 KB, bewusst knapp angehoben: Nach einem Blinzeln im Vorspiel dreht das
+    // Ritual nicht neu und blinzelt nicht zweimal (`mode`), und `busy` gilt erst ab Beginn des Rituals, seit `opening`
+    // das Vorspiel mitzählt; gemessen 4165 Bytes, 33 Bytes Luft. Das liegt nur hier, nicht im Kern
+    budget: 4.1 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

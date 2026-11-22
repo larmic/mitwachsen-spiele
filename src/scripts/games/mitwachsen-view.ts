@@ -71,8 +71,8 @@ export type Sky = {
   turnAlbum(t: Turn, realm: RegionId, now: number, reduced: boolean): [RegionId, number];
   /** Gast am Tor der Welt (der führende Pinguin), sonst null */
   guestAt(world: World, state: State): Guest | null;
-  /** Töne beim Öffnen des Tors */
-  gateScore(): Scored[];
+  /** Töne beim Öffnen des Tors; `at`: Takte (0,1 s), bis die Flügel aufschwingen (sonst 12, also 1,2 s) */
+  gateScore(at?: number): Scored[];
 };
 
 /**

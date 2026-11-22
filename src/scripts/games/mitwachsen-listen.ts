@@ -9,7 +9,7 @@ import { dirTo } from './mitwachsen-free';
 import type { Ruled } from './mitwachsen-pack-types';
 
 /** Was das Herschauen vom Zustand braucht: Figur und Tiere (folgende Tiere schauen ohnehin her) */
-export type Onlookers = Omit<Ruled, 'packs'>;
+export type Onlookers = Omit<Ruled, 'packs' | 'tick' | 'ritual'>;
 
 /** Tiere bis `r` Felder um die Figur (auch schräg) drehen sich zu ihr und bleiben mindestens `rest` Takte stehen */
 export function lookUp(s: Onlookers, rest: number, r = 3) {

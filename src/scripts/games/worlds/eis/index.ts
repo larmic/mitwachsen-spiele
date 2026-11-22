@@ -18,6 +18,7 @@ import { buildKessel, placeKessel } from './mitwachsen-kessel';
 import { view } from './view-2d';
 import { ICE_MODELS } from '../../../../data/games/worlds/eis/mitwachsen-ice-models';
 import { guide, hold, meetGuide } from './mitwachsen-lead';
+import { shut } from './mitwachsen-ritual';
 import { rules as snowman } from './mitwachsen-snowman';
 import { rules as chime } from './mitwachsen-chime';
 
@@ -27,8 +28,8 @@ export const pack: WorldPack<GuideRules, View2D, View3D> = {
   build: buildKessel,
   place: placeKessel,
   lead: { guide, meetGuide, hold }, // Regeln des Pinguins (ein schlichtes Objekt, kein Modul-Namensraum: spart Bytes)
-  // Schneemänner bauen; Eiszapfen klingen (ohne Halt, darum zuletzt)
-  rules: { bump: (...a) => snowman.bump(...a) || chime.bump(...a) },
+  // Tür im Vorspiel des Eistors (die Flügel sind noch zu); Schneemänner bauen; Eiszapfen klingen (ohne Halt, darum zuletzt)
+  rules: { bump: (...a) => shut(...a) || snowman.bump(...a) || chime.bump(...a) },
   view,
   view3d: () => import('./view-3d').then((m) => m.view3d),
   models: ICE_MODELS,

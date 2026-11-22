@@ -12,10 +12,12 @@ import type { GateId } from '../../data/games/mitwachsen';
 import { GUIDE_GATE, RITUAL, guideGate, opening } from './mitwachsen-guide';
 import type { PlateFx } from './mitwachsen-plate';
 import type { State } from './mitwachsen-state';
-import { TARGET_DEG, lageOf, type Lage } from './mitwachsen-turn-pace';
+import { RULE_TICK_MS, TARGET_DEG, lageOf, type Lage } from './mitwachsen-turn-pace';
 import {
   Blink,
+  CAMERA_BACK_S,
   TURN_REST,
+  backNeedsBlink,
   bayOf,
   fanDeg,
   sunYaw,
@@ -117,12 +119,18 @@ export class PlateTurn {
 
   /**
    * Eingabe des Drehreglers: Platte unter den Füßen, Schritt (der Körper gleitet noch), Pfeil (die Stehzeit der Regeln
-   * zählt nicht), Bedingung des Tors erfüllt; während das Eistor aufgeht, bleibt die Kamera vorn (`lead`), auch wenn
-   * die Figur hüpft, beim Blinzeln wächst nichts
+   * zählt nicht), Bedingung des Tors erfüllt oder Vorspiel (dann ohne Wartezeit; läuft die Figur weg, dreht es zurück);
+   * während des Rituals bleibt die Kamera vorn (`lead`), auch wenn die Figur hüpft, in seinen letzten 0,6 s fährt sie
+   * zurück (`back`, Süd blinzelt), beim Blinzeln wächst nichts
    */
   private input(world: World, state: State, sc: Frame): TurnInput {
-    this.busy = opening(state, RITUAL);
+    const t = state.tick - state.ritual; // Takte seit Beginn des Rituals, negativ im Vorspiel
+    this.busy = t >= 0 && opening(state, RITUAL); // Ritual, nicht schon das Vorspiel
     const on = !!sc.plate?.on && !state.sleeping;
+    const back = this.busy && t >= RITUAL - (CAMERA_BACK_S * 1000) / RULE_TICK_MS;
+    if (back && backNeedsBlink(this.lage)) this.blinker.ask(this.view.yaw, sc.now, () => {}); // einmal: danach 0°
+    // im Ritual das Eistor; im Vorspiel (noch nicht `busy`) ist es das Tor der Platte, auf der die Figur steht, und
+    // läuft sie weg, bleibt `id`, wie es war: Das Eistor
     if (this.busy) this.id = GUIDE_GATE;
     else if (on && sc.plate) this.id = sc.plate.id;
     const g = this.id ? world.gates.get(this.id) : undefined;
@@ -133,10 +141,20 @@ export class PlateTurn {
       onPlate: on,
       moving: !!body && Math.abs(body.x - state.player.x) + Math.abs(body.y - state.player.y) > 0.02,
       held: state.still === 0,
-      ready: !!g && guideGate(state) === g.id && !state.openGates.includes(g.id),
+      ready: t < 0 || (!!g && guideGate(state) === g.id && !state.openGates.includes(g.id)),
       reduce: this.still,
-      mode: this.blinker.busy ? 'blink' : this.busy ? 'lead' : 'play',
+      mode: this.mode(on, back),
     };
+  }
+
+  /**
+   * Blinzeln, sonst im Ritual vorn (`lead`, am Ende `back`): nur, wenn die Figur auf der Platte steht (sonst ging das Tor
+   * durch Anstoßen auf, oder sie lief im Vorspiel weg: dann dreht es zurück) und die Kamera nicht schon im Vorspiel
+   * zurückgeblinzelt hat (`p` 0 und `needLeave`: dann keine neue Drehung und kein zweites Blinzeln im Ritual)
+   */
+  private mode(on: boolean, back: boolean): TurnInput['mode'] {
+    if (this.blinker.busy) return 'blink';
+    return this.busy && on && (this.st.p || !this.st.needLeave) ? (back ? 'back' : 'lead') : 'play';
   }
 
   /** Abdunkeln und Blickfächer an der Spielfläche (CSS-Variablen), nur wenn sich etwas ändert */

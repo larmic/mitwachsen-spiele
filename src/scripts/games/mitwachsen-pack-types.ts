@@ -44,10 +44,13 @@ export type PackEvent =
 
 /**
  * Was die Regeln einer Welt vom Zustand sehen und ändern dürfen: den gespeicherten Zustand der Welt-Pakete (`packs`, je
- * Paket unter seiner Kennung in seinem eigenen Format; der Kern trägt ihn nur und speichert ihn mit), Figur und Tiere
+ * Paket unter seiner Kennung in seinem eigenen Format; der Kern trägt ihn nur und speichert ihn mit), Figur und Tiere,
+ * Takt und Beginn des Rituals am Eistor (`ritual`, mitwachsen-guide.ts)
  */
 export type Ruled = {
   packs: Record<string, unknown>;
+  tick: number;
+  ritual: number;
   player: { x: number; y: number };
   animals: { x: number; y: number; dir: Dir; mode: string; rest: number }[];
 };
@@ -64,7 +67,7 @@ export type WorldRules = {
     c: Cell,
     x: number,
     y: number,
-    events: { push(e: PackEvent): unknown },
+    events: { push(e: PackEvent | { type: 'hop' }): unknown }, // `hop`: Die Figur hüpft nur (Eistor im Vorspiel)
     move: { here: Cell; walks: boolean },
   ): boolean;
 };

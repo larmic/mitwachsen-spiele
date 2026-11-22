@@ -7,7 +7,7 @@ import { PLATE_LEN, PLATE_STONE, PLATE_VOX, SINK, plateSink, plateVoxel } from '
 import { parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
 import { gate as gatehouse, motion, moves } from './mitwachsen-gates-3d';
 import { BEATS, type Vox } from './mitwachsen-gate-kit';
-import { gateLook } from './worlds/eis/view-3d-gate';
+import { gateLook, iceGlow, icicle } from './worlds/eis/view-3d-gate';
 import { GOLD } from '../../data/games/mitwachsen-portals';
 import {
   GUEST_COLORS,
@@ -16,6 +16,8 @@ import {
   PULSE_MS,
   guestPixel,
   plateGold,
+  PRE_FILL,
+  PRE_SPAN,
   ritualGlow,
 } from './mitwachsen-guest-look';
 import { RITUAL } from './mitwachsen-guide';
@@ -225,12 +227,39 @@ describe('Torhäuser und Portal-Plattformen flackern nicht', () => {
 });
 
 describe('Das Eistor geht auf: Eiszapfen leuchten, der Umriss füllt sich', () => {
-  it('ab 0,3 s bis 1,2 s nacheinander (Takte nach dem Öffnen), sonst nicht', () => {
-    const at = (t: number) => ritualGlow({ tick: 100 + t, ritual: 100 });
-    expect([at(0), at(3), at(12), at(20), at(RITUAL)]).toEqual([0, 0, 1, 1, 0]);
+  it('Eiszapfen ab 0,3 s bis 1,2 s nach Beginn des Rituals nacheinander, sonst nicht', () => {
+    const at = (t: number) => iceGlow(ritualGlow({ tick: 100 + t, ritual: 100 }));
+    expect([at(0), at(3), at(12), at(20)]).toEqual([0, 0, 1, 1]);
     expect(at(7)).toBeGreaterThan(0);
     expect(at(7)).toBeLessThan(1);
-    expect(ritualGlow({ tick: 100, ritual: -1 })).toBe(0); // kein Ritual
+    expect(ritualGlow({ tick: 100 + RITUAL, ritual: 100 })).toBe(0); // danach wie ohne Ritual
+    expect(ritualGlow({ tick: 100, ritual: -1 })).toBe(0); // kein Ritual, auch nach dem Laden mitten im Vorspiel
+    // die Farbe am Bogen (Welt-Paket): links zuerst, im Vorspiel und bei 0,3 s noch keiner
+    expect(icicle(-1, ritualGlow({ tick: 99, ritual: 100 }))).toBe(icicle(-1, 0));
+    expect(icicle(-1, ritualGlow({ tick: 103, ritual: 100 }))).toBe(icicle(-1, 0));
+    expect(icicle(-1, ritualGlow({ tick: 112, ritual: 100 }))).not.toBe(icicle(-1, 0));
+  });
+
+  it('Umriss füllt sich im Vorspiel langsam, aber nicht vor der Zeit; die Eiszapfen leuchten erst im Ritual', () => {
+    const fill = (k: number) => ritualGlow({ tick: 100 + k, ritual: 100 }); // `k` Takte nach Beginn des Rituals
+    const rows = GUEST_OUTLINE.length;
+    expect(PRE_SPAN).toBe(35); // so lang wie das längste Vorspiel (Süd)
+    let last = 0;
+    for (let k = -PRE_SPAN; k < RITUAL; k++) {
+      // im Vorspiel und im Ritual nur wachsend, ganz erst, wenn die Flügel aufschwingen (1,2 s ins Ritual)
+      expect(fill(k), `Takt ${k}`).toBeGreaterThanOrEqual(last);
+      expect(fill(k) === 1, `Takt ${k}`).toBe(k >= 12);
+      expect(iceGlow(fill(k)) > 0, `Takt ${k}`).toBe(k > 3); // Eiszapfen erst, wenn die Kamera vorn ist
+      if (k < 0) {
+        expect(fill(k)).toBeLessThanOrEqual(PRE_FILL); // im Vorspiel höchstens die Füße und etwas mehr
+        expect(Math.round(fill(k) * 20)).toBeCloseTo(fill(k) * 20); // in Zwanzigsteln: selten neu bauen
+      }
+      last = fill(k);
+    }
+    expect(fill(-PRE_SPAN)).toBe(0); // das lange Vorspiel beginnt leer …
+    expect(fill(-1)).toBe(PRE_FILL); // … und endet mit gefüllten Füßen
+    expect(guestPixel(rows - 2, 3, fill(-1))).toEqual(GUEST_COLORS.y); // Füße orange
+    expect(guestPixel(rows - 6, 2, fill(-1))).toEqual(GUEST_COLORS.o); // weiter oben noch leer
   });
 
   it('der Umriss füllt sich von unten mit den Farben des Pinguins, der Goldrahmen bleibt', () => {

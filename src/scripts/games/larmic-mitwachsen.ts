@@ -52,7 +52,6 @@ const SAVE_EVERY_MS = 10_000; // Position regelmäßig sichern
 const SIT_MS = 2500; // so lange setzt sich die müde Figur hin (Laufen geht in der Zeit nicht)
 const INFO_KEY = 'larmic.games.mitwachsen.info'; // Hinweis für Eltern schon gesehen
 const SPEED = (1000 / STEP_MS) * 1.1; // Felder pro Sekunde beim Gleiten: etwas schneller als der Takt, also weich
-const DOOR_MS = 1200; // geht das Eistor mit dem Pinguin auf, schwingen die Türflügel erst nach dem Eiszapfen-Lied auf
 
 const noop = () => {};
 
@@ -86,7 +85,9 @@ class LarmicMitwachsen extends HTMLElement {
   private size = { w: 0, h: 0, zoom: 1, dpr: 1 };
   private bodies = new Map<string, Body>();
   private hops = new Map<string, number>(); // Zeitpunkt des letzten Sing-Hüpfers je Wesen
-  private gates = new Map<string, number>(); // Zeitpunkt, an dem ein Tor aufging (0 = schon offen)
+  // Takt der Regeln, an dem die Flügel eines Tors aufschwingen (0 = schon offen): Ruht der Takt (Menü, Hinweis, Tab
+  // verborgen), warten sie mit, wie Vorspiel und Ritual des Eistors
+  private gates = new Map<string, number>();
   private floats: (Float & { born: number; who?: string })[] = [];
   private particles: Particle[] = [];
   // seit wann die Figur schläft (performance.now): für die Überblendung und App-Updates. Solange ein Welt-Paket lädt,
@@ -503,9 +504,11 @@ class LarmicMitwachsen extends HTMLElement {
         case 'ready':
           this.sfx.pling();
           break;
-        case 'gate': // das Eistor geht mit dem Pinguin auf: Eiszapfen-Lied, dann Türflügel, Rumms und Akkord
-          this.sfx.score(this.packs.get('eis')?.view?.sky.gateScore() ?? []); // Töne aus dem Welt-Paket
-          this.gates.set(e.id, now + DOOR_MS);
+        // das Eistor geht mit dem Pinguin auf: nach dem Vorspiel Eiszapfen-Lied, Türflügel, Rumms und Akkord, wenn die
+        // Kamera vorn ist (`at` in Takten, worlds/eis/mitwachsen-ritual.ts); die Flügel im Takt der Regeln
+        case 'gate':
+          this.sfx.score(this.packs.get('eis')?.view?.sky.gateScore(e.at) ?? []); // Töne aus dem Welt-Paket
+          this.gates.set(e.id, this.state.tick + e.at);
           persist = true;
           break;
         case 'call':
@@ -731,7 +734,9 @@ class LarmicMitwachsen extends HTMLElement {
     this.particles = fly(this.particles, dt);
 
     const gates = new Map<string, number>();
-    for (const [id, since] of this.gates) gates.set(id, since === 0 ? 1 : Math.max(0, fade(since, 900)));
+    // in Takten seit dem Aufschwingen (Schritte von 0,1 s; die 3D-Ansicht baut ohnehin nur in Zehnteln neu)
+    for (const [id, at] of this.gates)
+      gates.set(id, at ? Math.max(0, fade(t - (this.state.tick - at) * TICK_MS, 900)) : 1);
 
     const { dpr, w, h, zoom } = this.size;
     const mood = this.world.climate(Math.round(player.x), Math.round(player.y));

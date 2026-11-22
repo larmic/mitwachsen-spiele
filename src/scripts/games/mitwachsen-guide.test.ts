@@ -34,7 +34,18 @@ import {
 } from './mitwachsen-guide';
 import * as rules from './worlds/eis/mitwachsen-lead';
 import { COME, toGate } from './worlds/eis/mitwachsen-lead';
-import { BREATH, HOP_AGAIN, OPEN_TICKS, SLIDE_PACE, mouth, toMeadow } from './worlds/eis/mitwachsen-ritual';
+import {
+  BREATH,
+  HOP_AGAIN,
+  OPEN_TICKS,
+  SLIDE_PACE,
+  WINGS,
+  mouth,
+  preTicks,
+  shut,
+  toMeadow,
+} from './worlds/eis/mitwachsen-ritual';
+import { lageOf, leadTicks, type Lage } from './mitwachsen-turn-pace';
 import { BESIDE, BOB_EVERY, NET, bay, inBay, plateRow } from './worlds/eis/mitwachsen-bay';
 import { plateMid } from './mitwachsen-plate';
 import { canStep, createWorld, standHeight, type World } from './mitwachsen-world';
@@ -62,6 +73,9 @@ function run(s: State, world: World, ...cmds: (Cmd | Dir)[]) {
 }
 const ticks = (n: number): Cmd[] => Array.from({ length: n }, () => TICK);
 const guideOf = (s: State) => s.animals.find((a) => a.id === GUIDE);
+/** Vorspiel des Eistors dieser Welt in Takten (je Torlage) und das Ereignis, wenn es aufgeht (Flügel danach) */
+const leadOf = (world: World) => leadTicks(lageOf(world.gates.get('eis')!.out));
+const gateEvent = (world: World) => ({ type: 'gate', id: 'eis', at: leadOf(world) + WINGS });
 /** Schritte bis zum Platz des Pinguins neben der Torplatte (Weg der Wegfindung) */
 const dist = (world: World, a: { x: number; y: number }) => toGate(world).get(`${a.x},${a.y}`) ?? Infinity;
 /** Nächstes Feld auf dem Weg zum Tor */
@@ -280,7 +294,7 @@ describe('Der Pinguin holt dich ab: Führen', () => {
     const opened = run(s, world, ...ticks(OPEN_TICKS));
     s = opened.s;
     expect(s.openGates).toEqual(['eis']);
-    expect(opened.events).toContainEqual({ type: 'gate', id: 'eis' });
+    expect(opened.events).toContainEqual(gateEvent(world));
     g = guideOf(s)!;
     expect(inBay.has(key([g.x, g.y]))).toBe(true);
   });
@@ -496,6 +510,8 @@ describe('Das Eistor geht mit dem Pinguin auf', () => {
   /** Figur mitten auf der Torplatte (seit 0,3 s), Pinguin vor der Tür in der Bucht: Der nächste Takt öffnet das Tor */
   const atDoor = (extra: Animal[] = []) => ({ ...leading(world, row2, front, extra), still: OPEN_TICKS - 1 });
   const opened = () => run(atDoor(), world, TICK);
+  /** Das Vorspiel ist um, das Ritual beginnt genau jetzt */
+  const begun = () => run(opened().s, world, ...ticks(leadOf(world)));
   const ice = (x: number, y: number) => world.realm(x, y) === 'eis';
 
   it('Pinguin öffnet das Eistor: Steht die Figur auf der Platte, er in der Bucht, geht es für immer auf; andere Tiere nicht', () => {
@@ -503,8 +519,8 @@ describe('Das Eistor geht mit dem Pinguin auf', () => {
     expect(onPlate(...row2)).toBe(true);
     const r = opened();
     expect(r.s.openGates).toEqual(['eis']);
-    expect(r.s.ritual).toBe(r.s.tick);
-    expect(r.events).toContainEqual({ type: 'gate', id: 'eis' });
+    expect(r.s.ritual).toBe(r.s.tick + leadOf(world)); // erst das Vorspiel
+    expect(r.events).toContainEqual(gateEvent(world));
     expect(r.events).toContainEqual({ type: 'peep', id: GUIDE, species: 'pinguin' }); // er hüpft mit seinem Ton
     expect([guideOf(r.s)!.x, guideOf(r.s)!.y]).toEqual([...front]); // vor der Tür
     for (const [x, y] of door.cells) expect(standHeight(world, r.s.openGates, x, y)).not.toBeNull();
@@ -564,9 +580,9 @@ describe('Das Eistor geht mit dem Pinguin auf', () => {
     expect(r.s.openGates).toEqual([]);
     r = run(r.s, world, TICK);
     expect(r.s.openGates).toEqual(['eis']);
-    expect(r.s.ritual).toBe(r.s.tick); // ab jetzt sperrt das Ritual
-    expect(r.events).toContainEqual({ type: 'gate', id: 'eis' });
-    expect(run(r.s, world, toDoor).events).toEqual([{ type: 'hop' }]);
+    expect(r.s.ritual).toBe(r.s.tick + leadOf(world)); // nach dem Vorspiel sperrt das Ritual
+    expect(r.events).toContainEqual(gateEvent(world));
+    expect(run(run(r.s, world, ...ticks(leadOf(world))).s, world, toDoor).events).toEqual([{ type: 'hop' }]);
   });
 
   it('Drüberlaufen öffnet nie: mit gehaltener Taste (ein Schritt alle 260 ms) längs und quer über die Platte', () => {
@@ -642,7 +658,7 @@ describe('Das Eistor geht mit dem Pinguin auf', () => {
     const r = run(s, world, toDoor);
     expect(types(r.events)).toContain('bump');
     expect(r.s.openGates).toEqual(['eis']);
-    expect(r.events).toContainEqual({ type: 'gate', id: 'eis' });
+    expect(r.events).toContainEqual(gateEvent(world));
     // der Pinguin noch weit weg: Die Tür bleibt zu
     const far = run(leading(world, along(-1, 1), onPath(world, 12)), world, toDoor);
     expect(types(far.events)).toEqual(['bump']);
@@ -677,7 +693,8 @@ describe('Das Eistor geht mit dem Pinguin auf', () => {
   });
 
   it('Ritual: 3 s lang lassen Pfeile die Figur nur hüpfen, danach gibt der nächste Pfeil sie frei', () => {
-    let { s } = opened();
+    let { s } = begun();
+    expect(s.tick).toBe(s.ritual);
     const at = [s.player.x, s.player.y];
     const all: GameEvent[] = [];
     for (let t = 1; t < RITUAL; t++) {
@@ -700,10 +717,103 @@ describe('Das Eistor geht mit dem Pinguin auf', () => {
     expect(types(free.events)).toEqual(['step']);
   });
 
+  it('Vorspiel je Torlage (6/12/35 Takte), ohne Sperre; Sperre genau RITUAL Takte; Wegglaufen im Vorspiel öffnet trotzdem', () => {
+    const LAGEN: Lage[] = ['N', 'O', 'S', 'W'];
+    expect(LAGEN.map(leadTicks)).toEqual([6, 12, 35, 12]);
+    const OUTS: Point[] = [
+      [0, -1],
+      [1, 0],
+      [0, 1],
+      [-1, 0],
+    ];
+    expect(OUTS.map(lageOf)).toEqual(LAGEN);
+    expect(OUTS.map(preTicks)).toEqual(LAGEN.map(leadTicks)); // doppelt im Paket, gleich wie die Drehung
+    const at = opened().s;
+    for (const l of LAGEN) {
+      // dasselbe Öffnen, nur mit dem Vorspiel dieser Lage: gesperrt sind genau die Takte des Rituals danach
+      const lead = leadTicks(l);
+      const locked: number[] = [];
+      for (let k = 0; k < lead + RITUAL + 10; k++) {
+        const s = { ...at, ritual: at.tick + lead, tick: at.tick + k };
+        if (rules.hold(s, [])) locked.push(k);
+        if (k < lead + SLIDE) expect(guideGate(s), `${l} Takt ${k}`).toBe('eis'); // Umriss, solange er vor der Tür ist
+      }
+      expect(locked, l).toEqual(Array.from({ length: RITUAL }, (_, i) => lead + i));
+      expect(locked.length * TICK_MS, l).toBe(3000); // Gesamtsperre 3 s in jeder Lage
+    }
+    // in dieser Welt: Im Vorspiel läuft die Figur weg (ein Schritt, kein Hüpfen), das Tor geht trotzdem auf
+    const r = opened();
+    expect(r.s.ritual - r.s.tick).toBe(leadOf(world));
+    const away = dirTo([0, 0], [-door.out[0], -door.out[1]]);
+    let s = run(r.s, world, away).s;
+    expect([s.player.x, s.player.y]).toEqual([row2[0] - door.out[0], row2[1] - door.out[1]]);
+    const rest = run(s, world, ...ticks(leadOf(world) + SLIDE));
+    s = rest.s;
+    expect(s.openGates).toEqual(['eis']);
+    expect(types(rest.events)).toContain('bob'); // er hüpft im Vorspiel vor der Tür
+    expect(rest.events).toContainEqual({ type: 'slide', id: GUIDE, species: 'pinguin' }); // und rutscht hinein
+    expect([guideOf(s)!.x, guideOf(s)!.y]).toEqual([...mouth(world)!]);
+  });
+
+  it('im Vorspiel zur Tür: hüpft, betritt die Tür nicht; Pinguin bleibt vor der Tür', () => {
+    // wie im Spiel mit den Regeln der Eis-Welt (`rules.bump` aus dem Paket, darin `shut`)
+    const go = (s: State, ...cmds: (Cmd | Dir)[]) => {
+      const events: GameEvent[] = [];
+      for (const c of cmds) {
+        const r = step(s, world, typeof c === 'string' ? { type: 'move', dir: c } : c, undefined, rules, PACKS);
+        s = r.state;
+        events.push(...r.events);
+      }
+      return { s, events };
+    };
+    const where = (s: State) => [s.player.x, s.player.y];
+    // mitten auf der Platte, er direkt vor der Tür: in ihn hinein (er singt), er rutscht nicht durch die Tür
+    let r = go(opened().s, toDoor, toDoor);
+    expect(where(r.s)).toEqual([...row2]);
+    expect([guideOf(r.s)!.x, guideOf(r.s)!.y]).toEqual([...front]);
+    expect(types(r.events)).not.toContain('slide');
+    // vom Seitenfeld der Platte: ein Schritt vor die Tür, dann hüpft sie nur, die Flügel sind noch zu
+    const side = opened().s;
+    r = go({ ...side, player: { ...side.player, x: along(1, 2)[0], y: along(1, 2)[1] } }, toDoor);
+    expect(where(r.s)).toEqual([...along(1, 1)]);
+    r = go(r.s, toDoor, toDoor);
+    expect(where(r.s)).toEqual([...along(1, 1)]);
+    expect(r.events).toEqual([{ type: 'hop' }, { type: 'hop' }]);
+    expect(world.cell(...along(1, 0)).gate).toBe('eis');
+    // nach Vorspiel und Ritual sind die Flügel offen: Jetzt geht es hinein
+    r = go(r.s, ...ticks(leadOf(world) + RITUAL), toDoor);
+    expect(where(r.s)).toEqual([...along(1, 0)]);
+    // je Torlage: nur im Vorspiel, nur an der Tür des Eistors, sonst nichts
+    const gateCell = world.cell(...along(1, 0));
+    const ground = world.cell(...along(1, 1));
+    for (const pre of [6, 12, 35]) {
+      for (let k = -pre; k < RITUAL; k++) {
+        const s = { ...opened().s, ritual: 100, tick: 100 + k };
+        const ev: GameEvent[] = [];
+        expect(shut(s, gateCell, 0, 0, ev, { here: ground, walks: true }), `${pre} ${k}`).toBe(k < 0);
+        expect(shut(s, ground, 0, 0, ev, { here: ground, walks: true })).toBe(false);
+      }
+    }
+    const later = { ...opened().s, ritual: -1 }; // nach dem Laden: frei
+    expect(shut(later, gateCell, 0, 0, [], { here: ground, walks: true })).toBe(false);
+  });
+
+  it('nach dem Laden im Vorspiel ist das Tor offen, ohne Sperre, und der Pinguin wartet hinter der Gangmündung', () => {
+    const r = opened();
+    expect(r.s.tick).toBeLessThan(r.s.ritual); // mitten im Vorspiel gespeichert
+    let s = initialState(world, { ...progressOf(r.s), garden: everyone() });
+    expect(s.openGates).toEqual(['eis']);
+    expect(s.ritual).toBe(-1); // nicht gespeichert
+    s = { ...s, sleeping: false, wokeAt: -100 };
+    const t = run(s, world, TICK);
+    expect([guideOf(t.s)!.x, guideOf(t.s)!.y]).toEqual([...mouth(world)!]);
+    expect(rules.hold(t.s, [])).toBe(false);
+  });
+
   it('nach 2,4 s rutscht der Pinguin durch den Gang hinter die Mündung und wartet dort; Umriss und Bucht verschwinden', () => {
     let { s } = opened();
-    expect(guideGate(s)).toBe('eis'); // während das Tor aufgeht, noch Umriss und Bucht
-    s = run(s, world, ...ticks(SLIDE - 1)).s;
+    expect(guideGate(s)).toBe('eis'); // im Vorspiel und während das Tor aufgeht, noch Umriss und Bucht
+    s = run(s, world, ...ticks(leadOf(world) + SLIDE - 1)).s;
     expect(guideGate(s)).toBe('eis');
     s = run(s, world, TICK).s;
     const g = guideOf(s)!;

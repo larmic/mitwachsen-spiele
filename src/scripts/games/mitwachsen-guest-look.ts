@@ -1,7 +1,8 @@
 // Der verlaufene Pinguin am Tor, solange er die Figur dorthin führt (mitwachsen-guide.ts): sein Umriss mit Goldrahmen
-// auf der Tür und der golden pulsierende Rand der Torplatte davor (`plateGold`, in 2D und 3D). Geht das Eistor mit ihm auf, füllt sich der Umriss mit seinen Farben,
-// die Eiszapfen leuchten (`ritualGlow`), und es erklingen Eiszapfen-Lied, Rumms und Akkord (`gateScore`). Den Umriss
-// bauen 2D (hier) und 3D (mitwachsen-gatehouse.ts) aus denselben Pixeln. Die 2D-Ansicht lädt dieses Bild mit dem Wetter
+// auf der Tür und der golden pulsierende Rand der Torplatte davor (`plateGold`, in 2D und 3D). Geht das Eistor mit ihm
+// auf, füllt sich der Umriss mit seinen Farben (`ritualGlow`, langsam schon im Vorspiel), die Eiszapfen leuchten
+// (`iceGlow`, worlds/eis/view-3d-gate.ts), und es erklingen Eiszapfen-Lied, Rumms und Akkord (`gateScore`). Den Umriss bauen 2D (hier) und 3D
+// (mitwachsen-gatehouse.ts) aus denselben Pixeln. Die 2D-Ansicht lädt dieses Bild mit dem Wetter
 // der Eis-Welt erst nach, wenn er da ist (mitwachsen-ice-sky.ts), nie mit der Spielseite.
 // Spezifikation: docs/specs/mitwachsen.md („Der Pinguin holt dich ab“, Regel 8a, „Was angezeigt wird“: Große Tore)
 
@@ -55,15 +56,23 @@ export const GUEST_COLORS = {
   w: { side: '#f4f6f8', top: '#ffffff' },
   y: { side: '#f08a3c', top: '#f6a05a' },
 } as const;
-const FILL_FROM = 3; // so viele Takte nach dem Öffnen beginnt das Eistor zu leuchten (0,3 s) …
-const FILL_TAKES = 9; // … und braucht so lange, bis es ganz leuchtet (bei 1,2 s schwingen die Flügel auf)
+const FILL_FROM = 3; // so viele Takte nach Beginn des Rituals beginnen die Eiszapfen zu leuchten (0,3 s) …
+const FILL_TAKES = 9; // … und brauchen so lange, bis sie ganz leuchten (bei 1,2 s schwingen die Flügel auf)
+export const PRE_FILL = 0.25; // so weit füllt sich der Umriss schon im Vorspiel (die Füße und etwas mehr) …
+export const PRE_SPAN = 35; // … langsam über so viele Takte (das längste Vorspiel, Süd; kürzere beginnen weiter oben)
 
 /**
- * Wie weit das Eistor gerade leuchtet (0 … 1), solange es mit dem Pinguin aufgeht: Ab 0,3 s leuchten die Eiszapfen
- * nacheinander eisblau, und der Umriss füllt sich von unten mit seinen Farben, bis 1,2 s ganz. Sonst 0.
+ * Wie weit das Eistor gerade leuchtet (0 … 1), solange es mit dem Pinguin aufgeht, sonst 0: So weit ist der Umriss von
+ * unten gefüllt, so hell die Krone. Im Vorspiel langsam bis `PRE_FILL` (in Zwanzigsteln, damit die 3D-Ansicht die Tür
+ * nur selten neu baut); im Ritual ab 0,3 s weiter bis ganz bei 1,2 s, wenn die Flügel aufschwingen. Die Eiszapfen
+ * leuchten erst über `PRE_FILL` (`iceGlow` in worlds/eis/view-3d-gate.ts), also erst im Ritual, wenn die Kamera vorn ist
  */
-export const ritualGlow = (s: { tick: number; ritual: number }) =>
-  opening(s, RITUAL) ? Math.max(0, Math.min(1, (s.tick - s.ritual - FILL_FROM) / FILL_TAKES)) : 0;
+export const ritualGlow = (s: { tick: number; ritual: number }) => {
+  const t = s.tick - s.ritual;
+  if (!opening(s, RITUAL)) return 0;
+  if (t < 0) return Math.max(0, Math.round((1 + t / PRE_SPAN) * PRE_FILL * 20)) / 20;
+  return PRE_FILL + (1 - PRE_FILL) * Math.max(0, Math.min(1, (t - FILL_FROM) / FILL_TAKES));
+};
 
 /** Farbe eines Pixels des Umrisses (Zeile `r`, Spalte `c`): Bis `lit` (0 … 1) sind die Zeilen von unten gefüllt */
 export function guestPixel(r: number, c: number, lit: number) {
@@ -130,19 +139,21 @@ export function doorOutline(
 }
 
 /**
- * Töne, wenn das Eistor mit dem Pinguin aufgeht: Ab 0,3 s spielen die Eiszapfen die Eis-Melodie des Klangsteins, ab
- * 1,2 s (die Flügel schwingen auf) ein tiefes, weiches Rumms (C2) und ein heller Akkord C5–E5–G5–C6; zusammen höchstens
- * 6 Stimmen und unter 5 s
+ * Töne, wenn das Eistor mit dem Pinguin aufgeht: Wenn die Eiszapfen zu leuchten beginnen (0,9 s vor den Flügeln, nach dem
+ * Vorspiel), spielen sie die Eis-Melodie des Klangsteins, wenn die Flügel aufschwingen (nach `wingTicks` Takten zu 0,1 s, ohne Vorspiel 1,2 s)
+ * ein tiefes, weiches Rumms (C2) und ein heller Akkord C5–E5–G5–C6; zusammen höchstens 6 Stimmen und unter 5 s nach den
+ * Flügeln. Im Vorspiel klingt nur der Pinguin (`peep`, sofort)
  */
-export function gateScore(): Scored[] {
+export function gateScore(wingTicks = 12): Scored[] {
   const m = STORIES.eis.melody;
-  let at = 0.3;
+  const wings = wingTicks / 10;
+  let at = wings - 0.9;
   const out: Scored[] = m.notes.map(([freq, len, gain]) => {
     const note: Scored = [freq, len, m.wave, gain ?? 0.1, 1, at];
     at += len + m.gap;
     return note;
   });
-  out.push([65.41, 0.9, 'sine', 0.22, 0.7, 1.2]);
-  for (const f of [523.25, 659.25, 783.99, 1046.5]) out.push([f, 1.4, 'triangle', 0.05, 1, 1.2]);
+  out.push([65.41, 0.9, 'sine', 0.22, 0.7, wings]);
+  for (const f of [523.25, 659.25, 783.99, 1046.5]) out.push([f, 1.4, 'triangle', 0.05, 1, wings]);
   return out;
 }

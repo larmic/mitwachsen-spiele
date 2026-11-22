@@ -9,7 +9,7 @@ import { THEME_COLORS } from '../../../../data/games/mitwachsen';
 import { ICE_FLOE } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import type { GateLook } from '../../mitwachsen-gate-kit';
 import { W, leaves, onLeaf, wings, type Leaf, type Wing } from '../../mitwachsen-gatehouse';
-import { GUEST_OUTLINE, GUEST_PX, GUEST_Y, guestPixel } from '../../mitwachsen-guest-look';
+import { GUEST_OUTLINE, GUEST_PX, GUEST_Y, PRE_FILL, guestPixel } from '../../mitwachsen-guest-look';
 
 const ICE_GLOW = '#7fd6ff'; // eisblau leuchtende Eiszapfen, wenn das Eistor aufgeht
 const ICICLE = '#d4f1ff'; // Eiszapfen ohne Ritual
@@ -74,8 +74,14 @@ function penguinOutline(left: Leaf, right: Leaf, lit: number) {
   });
 }
 
-/** Farbe eines Eiszapfens am Bogen bei `x`: Geht das Eistor auf, leuchten sie bis `lit` von links nach rechts eisblau */
-export const icicle = (x: number, lit: number) => ((x + W) / (2 * W) < lit ? ICE_GLOW : ICICLE);
+/** Wie weit die Eiszapfen leuchten (0 … 1, darunter nichts) bei `lit` aus `ritualGlow`: erst ab 0,3 s im Ritual */
+export const iceGlow = (lit: number) => (lit - PRE_FILL) / (1 - PRE_FILL);
+
+/**
+ * Farbe eines Eiszapfens am Bogen bei `x`: Geht das Eistor auf, leuchten sie von links nach rechts eisblau, bis
+ * `iceGlow(lit)` (im Vorspiel noch keiner)
+ */
+export const icicle = (x: number, lit: number) => ((x + W) / (2 * W) < iceGlow(lit) ? ICE_GLOW : ICICLE);
 
 /** Was die Eis-Welt zum Eistor beiträgt (Haken `look` der Zugänge, mitwachsen-gate-kit.ts) */
 export const gateLook: GateLook = {

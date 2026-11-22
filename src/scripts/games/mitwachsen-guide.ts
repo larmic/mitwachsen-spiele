@@ -33,8 +33,9 @@ export const PEEP_EVERY = 40; // höchstens so oft piept er (4 s), damit es nich
 // Takte je Schritt, beim Ankommen, Führen und Einholen: etwas schneller als die Figur mit gehaltener Taste (ein Schritt
 // alle 260 ms), damit sie ihm folgen kann, ohne in ihn hineinzulaufen, und er sie einholt
 export const PACE = { lead: 2, chase: 2 };
-// Das Eistor geht auf (worlds/eis/mitwachsen-ritual.ts): So viele Takte nach dem Öffnen rutscht der Pinguin durch den Gang hinter
-// das Tor (2,4 s); so lange dauert das Ritual, in dem jeder Pfeil die Figur nur hüpfen lässt (3 s)
+// Das Eistor geht auf (worlds/eis/mitwachsen-ritual.ts): Nach dem Vorspiel (die Kamera dreht zur Front, ohne Sperre;
+// `leadTicks` in mitwachsen-turn-pace.ts) beginnt das Ritual. So viele Takte danach rutscht der Pinguin durch den Gang
+// hinter das Tor (2,4 s); so lange dauert das Ritual, in dem jeder Pfeil die Figur nur hüpfen lässt (3 s, in jeder Lage)
 export const SLIDE = 24;
 export const RITUAL = 30;
 
@@ -69,7 +70,7 @@ export type Guided = Omit<Crowd, 'player' | 'animals' | 'openGates'> & {
   followers: string[];
   day: number;
   calm: number; // Tag, an dem der Pinguin eingezogen ist: an ihm kein Pustewind
-  ritual: number; // Takt, an dem das Eistor mit ihm aufging (-1: noch nicht)
+  ritual: number; // Takt, an dem das Ritual am Eistor beginnt, nach dem Vorspiel (-1: noch nicht)
   still: number; // Takte, die die Figur schon auf demselben Feld steht (jeder Schritt: 0; nicht gespeichert)
   // Takt, ab dem er auftaucht; ist er da, der Takt seines Auftauchens, solange er erst zur Figur watschelt (-1: weder
   // fällig noch unterwegs zur Figur; nicht gespeichert)
@@ -79,7 +80,9 @@ type Swap = { type: 'swap'; id: string };
 /** Ereignisse eines Befehls: Die Regeln des Pinguins lesen sie und hängen ihre an */
 export type GuideEvents = { readonly type: string; readonly id?: string }[] & {
   push(
-    ...e: (GuideEvent | Swap | { type: 'home'; id: string; species: SpeciesId } | { type: 'gate'; id: GateId })[]
+    ...e: (
+      GuideEvent | Swap | { type: 'home'; id: string; species: SpeciesId } | { type: 'gate'; id: GateId; at: number }
+    )[]
   ): unknown;
 };
 /**
@@ -155,13 +158,16 @@ export const pending = (s: Pick<Guided, 'openGates' | 'garden'>) =>
 /** Der Pinguin, wenn er da ist: Er führt zum Tor bzw. ist nach dem Öffnen auf dem Weg zum Schneebett */
 export const leader = <A extends { mode: Mode }>(s: { animals: readonly A[] }): A | undefined =>
   s.animals.find((a) => a.mode === 'lead');
-/** Geht das Eistor gerade auf? (höchstens `span` Takte, seit es mit dem Pinguin aufging) */
+/**
+ * Geht das Eistor gerade auf? Im Vorspiel und höchstens `span` Takte, seit das Ritual begann. Die Sperre gilt erst ab
+ * Beginn des Rituals (`hold` in worlds/eis/mitwachsen-ritual.ts, die Kamera vorn in mitwachsen-turn-3d.ts)
+ */
 export const opening = (s: { tick: number; ritual: number }, span = RITUAL) =>
   s.ritual >= 0 && s.tick - s.ritual < span;
 type Shown = { animals: readonly { mode: Mode }[]; openGates: readonly GateId[]; tick: number; ritual: number };
 /**
- * Tor, zu dem er führt, solange er da ist und das Tor zu ist oder gerade aufgeht, bis er hindurchrutscht (für die
- * Ansicht: Umriss auf der Tür, goldener Rand der Torplatte, Gast-Platz auf der Leiste, Pfeil der Karte)
+ * Tor, zu dem er führt, solange er da ist und das Tor zu ist oder gerade aufgeht (samt Vorspiel), bis er hindurchrutscht
+ * (für die Ansicht: Umriss auf der Tür, goldener Rand der Torplatte, Gast-Platz auf der Leiste, Pfeil der Karte)
  */
 export const guideGate = (s: Shown): GateId | null =>
   leader(s) && (!s.openGates.includes(GUIDE_GATE) || opening(s, SLIDE)) ? GUIDE_GATE : null;

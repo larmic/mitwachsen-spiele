@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   BACK_FACTOR,
   BLINK_FROM_DEG,
@@ -43,6 +43,10 @@ import {
 import { STEP_MS } from './input-pace';
 import { CALM_KEY } from './mitwachsen-menu';
 import { OPEN_TICKS } from './worlds/eis/mitwachsen-ritual';
+import { GUIDE_GATE, RITUAL } from './mitwachsen-guide';
+import { PlateTurn } from './mitwachsen-turn-3d';
+import type { State } from './mitwachsen-state';
+import type { World } from './mitwachsen-world';
 
 const DT = 1 / 60; // ein Bild
 const LAGEN: Lage[] = ['N', 'O', 'S', 'W'];
@@ -259,6 +263,68 @@ describe('Drehung zur Torfront (mitwachsen-turn.ts)', () => {
     expect(lead.p).toBe(1);
     const back = run(lead, { lage: 'S', ...STAND, mode: 'back' }, CAMERA_BACK_S + 0.02);
     expect(back.p).toBe(0);
+  });
+
+  it('Kamera vor den Flügeln: Stehzeit und Vorspiel drehen ohne 350 ms hin (`ready`), Ritual hält vorn, am Ende zurück', () => {
+    for (const lage of LAGEN) {
+      const ready = { lage, ...STAND, ready: true };
+      // Stehzeit bis zum Öffnen und Vorspiel: Beim Beginn des Rituals (die Flügel folgen 1,2 s später) ist sie vorn
+      let st = run(TURN_REST, ready, ((OPEN_TICKS + leadTicks(lage)) * RULE_TICK_MS) / 1000);
+      expect(st.p, lage).toBeGreaterThan(0.97);
+      st = run(st, { lage, ...STAND, mode: 'lead' }, (RITUAL * RULE_TICK_MS) / 1000 - CAMERA_BACK_S);
+      expect(st.p, lage).toBe(1);
+      st = run(st, { lage, ...STAND, mode: 'back' }, CAMERA_BACK_S);
+      expect(st.p, lage).toBe(0); // danach ist die Figur frei, die Pfeile stimmen
+      // auch der Winkel samt Feder: Ohne Blinzeln (Nord, Ost, West) hängt die Feder (0,25 s) etwas nach, bleibt aber
+      // unter 45°, also blinzelt kein Pfeil, und kurz danach ist sie ganz zurück (Süd blinzelt am Ende auf 0°)
+      if (backNeedsBlink(lage)) continue;
+      expect(Math.abs(turnView(st).yaw), lage).toBeLessThan(BLINK_FROM_DEG);
+      expect(Math.abs(turnView(run(st, { lage, ...STAND }, 0.5)).yaw), lage).toBeLessThan(2);
+    }
+    // läuft die Figur im Vorspiel weg, dreht es zurück (die Logik öffnet das Tor trotzdem)
+    const half = run(TURN_REST, { lage: 'S', ...STAND, ready: true }, 1.5);
+    const away = run(half, { lage: 'S', ...OFF, ready: true }, 2.5);
+    expect(away.p).toBe(0);
+  });
+
+  it('Blinzeln im Vorspiel: im Ritual keine neue Drehung, kein zweites Blinzeln', () => {
+    // Südtor (am weitesten gedreht), die Figur steht auf seiner Platte; nur Tore und Zustand, die die Drehung liest
+    const gate = { id: GUIDE_GATE, mid: [0, 0], out: OUT.S, cells: [] };
+    const world = { gates: new Map([[GUIDE_GATE, gate]]) } as unknown as World;
+    const pre = leadTicks('S');
+    let now = 0;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const turn = new PlateTurn(null);
+    const at = (tick: number, still: number) =>
+      ({
+        tick,
+        ritual: pre,
+        still,
+        sleeping: false,
+        player: { x: 0, y: -2 },
+        openGates: [GUIDE_GATE],
+        animals: [],
+      }) as unknown as State;
+    const sc = () => ({
+      now,
+      reduced: false,
+      plate: { id: GUIDE_GATE, since: 0, on: true },
+      bodies: new Map([['player', { x: 0, y: -2 }]]),
+    });
+    let steps = 0;
+    let pressed = -1; // Takt, an dem das Kind im Vorspiel einen Pfeil drückt (über 45°: Blinzeln, dann Anstoßen)
+    for (; now < (pre + RITUAL) * RULE_TICK_MS; now += DT * 1000) {
+      const tick = Math.floor(now / RULE_TICK_MS);
+      const yaw = turn.frame(world, at(tick, pressed < 0 ? tick + 10 : tick - pressed), sc()).yaw;
+      if (pressed < 0 && Math.abs(yaw) > BLINK_FROM_DEG) {
+        expect(turn.blink(() => steps++)).toBe(true);
+        pressed = tick;
+      }
+      if (tick >= pre) expect(Math.abs(yaw), `Takt ${tick}`).toBeLessThan(0.01); // im Ritual bleibt sie im Süden
+    }
+    expect(pressed).toBeGreaterThan(0);
+    expect(pressed).toBeLessThan(pre);
+    clock.mockRestore();
   });
 
   it('Rückfahrt: Süd blinzelt zurück, Nord, Ost und West fahren', () => {

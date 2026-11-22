@@ -53,8 +53,8 @@ export const TURN_REST: Turn = Object.freeze({ p: 0, yaw: 0, v: 0, still: 0, swa
 /**
  * Eingabe je Bild: Lage des Tors, ob die Figur auf der Platte steht (`onPlate`), gerade einen Schritt macht
  * (`moving`), ein Pfeil gedrückt ist (`held`), die Bedingung des Tors erfüllt und das Tor noch zu ist (`ready`: dann
- * ohne Startverzögerung; bei offenem Tor nie setzen), reduzierte Bewegung (`reduce`). `mode`: 'lead' dreht im Vorspiel
- * und weiter im Ritual bis zur Rückfahrt sicher hin, 'back' fährt am Ende in `CAMERA_BACK_S` zurück (Süd blinzelt
+ * ohne Startverzögerung; bei offenem Tor nur im Vorspiel des Rituals), reduzierte Bewegung (`reduce`). `mode`: 'lead'
+ * dreht im Ritual bis zur Rückfahrt sicher hin, 'back' fährt am Ende in `CAMERA_BACK_S` zurück (Süd blinzelt
  * stattdessen, `backNeedsBlink`), 'blink' hält die Drehung an, solange geblinzelt wird. Nach 'lead' oder 'back' wächst
  * `p` erst wieder, wenn die Figur die Platte verlassen hat und neu draufsteht
  */
