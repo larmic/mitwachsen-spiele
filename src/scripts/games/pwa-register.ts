@@ -92,12 +92,14 @@ function watchUpdates(reg: ServiceWorkerRegistration) {
     reg.update().then(tryApply, () => {});
   };
 
-  reg.addEventListener('updatefound', () => {
-    const next = reg.installing;
+  /** Ist die Version, die gerade lädt, fertig, zählt sie noch, solange das Fenster nach einem Auslöser offen ist */
+  const watch = (next: ServiceWorker | null) =>
     next?.addEventListener('statechange', () => {
       if (next.state === 'installed') tryApply();
     });
-  });
+  // Lädt beim Anmelden schon eine (der Browser fragt beim Aufruf der Seite selbst nach), kam ihr updatefound vor uns
+  watch(reg.installing);
+  reg.addEventListener('updatefound', () => watch(reg.installing));
   // Nur wenn die Seite selbst darum gebeten hat: Beim allerersten Besuch übernimmt clients.claim() die Seite auch
   // Zwischen Bitte und Übernahme kann das Kind die Figur geweckt haben: dann noch nicht, erst beim nächsten Auslöser
   navigator.serviceWorker.addEventListener('controllerchange', () => {
