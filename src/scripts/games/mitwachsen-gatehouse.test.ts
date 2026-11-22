@@ -36,31 +36,49 @@ function faces(g: BufferGeometry, part: string): Face[] {
   return out;
 }
 
-/** Paare von Flächen, die in derselben Ebene in dieselbe Richtung schauen und sich überdecken: Sie flackern (Z-Fighting) */
-function fighting(p: Parts, extra: [string, BufferGeometry][] = []): string[] {
-  const all = [
-    ...Object.entries(p).flatMap(([name, geo]) => (geo.empty ? [] : faces(geo.build(), name))),
-    ...extra.flatMap(([name, g]) => faces(g, name)),
-  ];
-  // nur Flächen in derselben Ebene mit derselben Richtung können sich überdecken
+/** Achsenparallele Flächen aller Teile, dazu fertig gebaute Geometrie (`extra`) */
+const facesOf = (p: Parts, extra: [string, BufferGeometry][] = []): Face[] => [
+  ...Object.entries(p).flatMap(([name, geo]) => (geo.empty ? [] : faces(geo.build(), name))),
+  ...extra.flatMap(([name, g]) => faces(g, name)),
+];
+
+/** Flächen nach Ebene: nur Flächen in derselben Ebene mit derselben Richtung können sich überdecken */
+function byPlane(all: Face[]): Map<string, Face[]> {
   const planes = new Map<string, Face[]>();
   for (const f of all) {
     const k = `${f.axis},${f.dir},${Math.round(f.at * 1e3)}`;
-    planes.set(k, [...(planes.get(k) ?? []), f]);
+    const list = planes.get(k);
+    if (list) list.push(f);
+    else planes.set(k, [f]);
   }
+  return planes;
+}
+
+/** Überdecken sich zwei Flächen derselben Ebene? Dann flackern sie (Z-Fighting) */
+function clash(a: Face, b: Face, found: string[]) {
+  if (Math.abs(a.at - b.at) > 1e-4) return;
+  const du = Math.min(a.max[0], b.max[0]) - Math.max(a.min[0], b.min[0]);
+  const dw = Math.min(a.max[1], b.max[1]) - Math.max(a.min[1], b.min[1]);
+  if (du > 1e-3 && dw > 1e-3) found.push(`${a.part}/${b.part} Achse ${'xyz'[a.axis]} bei ${a.at.toFixed(2)}`);
+}
+
+/** Alle Paare innerhalb der Flächen, die sich überdecken */
+function fightingFaces(all: Face[]): string[] {
   const found: string[] = [];
-  for (const list of planes.values())
-    for (let i = 0; i < list.length; i++)
-      for (let j = i + 1; j < list.length; j++) {
-        const a = list[i]!,
-          b = list[j]!;
-        if (Math.abs(a.at - b.at) > 1e-4) continue;
-        const du = Math.min(a.max[0], b.max[0]) - Math.max(a.min[0], b.min[0]);
-        const dw = Math.min(a.max[1], b.max[1]) - Math.max(a.min[1], b.min[1]);
-        if (du > 1e-3 && dw > 1e-3) found.push(`${a.part}/${b.part} Achse ${'xyz'[a.axis]} bei ${a.at.toFixed(2)}`);
-      }
+  for (const list of byPlane(all).values())
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) clash(list[i]!, list[j]!, found);
   return found;
 }
+
+/** Zu den Paaren innerhalb von `moving` die Paare zwischen `moving` und dem schon geordneten Raster `fixed` */
+function fightingWith(fixed: Map<string, Face[]>, moving: Face[]): string[] {
+  const found = fightingFaces(moving);
+  for (const [k, list] of byPlane(moving)) for (const a of list) for (const b of fixed.get(k) ?? []) clash(b, a, found);
+  return found;
+}
+
+/** Paare von Flächen, die in derselben Ebene in dieselbe Richtung schauen und sich überdecken: Sie flackern (Z-Fighting) */
+const fighting = (p: Parts, extra: [string, BufferGeometry][] = []): string[] => fightingFaces(facesOf(p, extra));
 
 /**
  * Ein Torhaus samt Türflügeln, so wie die 3D-Ansicht sie aufstellt: jeder Flügel um seine Angel gedreht. Liefert die
@@ -99,16 +117,19 @@ describe('Torhäuser und Portal-Plattformen flackern nicht', () => {
     });
     if (moves(g.id))
       it(`${g.id}: bewegte Teile in jedem Takt ebenso, auch zusammen mit dem festen Raster`, () => {
-        for (const open of [0, 0.5, 1])
+        for (const open of [0, 0.5, 1]) {
+          // Das feste Raster ist in jedem Takt dasselbe: einmal bauen, nach Ebenen ordnen und für sich prüfen; je Takt
+          // dann nur noch die bewegten Teile unter sich und gegen das Raster (zusammen dieselben Paare wie alle auf einmal)
+          const fixed = facesOf(house(g.id, open, false).p);
+          expect(fightingFaces(fixed), `offen ${open}`).toEqual([]);
+          const planes = byPlane(fixed);
           for (let beat = 0; beat < BEATS; beat++) {
-            const { p } = house(g.id, open, false);
             const m = parts();
             motion(m, g.id, beat, open);
-            const moving = Object.entries(m).flatMap(([name, geo]): [string, BufferGeometry][] =>
-              geo.empty ? [] : [[`Takt ${name}`, geo.build()]],
-            );
-            expect(fighting(p, moving), `offen ${open}, Takt ${beat}`).toEqual([]);
+            const moving = facesOf(m).map((f) => ({ ...f, part: `Takt ${f.part}` }));
+            expect(fightingWith(planes, moving), `offen ${open}, Takt ${beat}`).toEqual([]);
           }
+        }
       });
     it(`${g.id}: mit Umriss des Pinguins und goldener Bucht ebenso, auch wenn er sich füllt und die Eiszapfen leuchten`, () => {
       for (const open of [0, 0.5, 1])

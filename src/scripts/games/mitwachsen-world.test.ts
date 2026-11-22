@@ -51,6 +51,17 @@ const lichtung = REGIONS[0];
 const LICHTUNG = worldOf(1).homes.lichtung;
 const START = LICHTUNG.wake[0]!;
 const SEEDS = [1, 42, 2026, 7, 99, 123456, 15838, 23757, 55433, 95028];
+// Die Welten der Tests einmal vorab bauen (Frist der Hooks: vitest.config.ts): Sonst zahlt der erste Test je Seed den Bau (`worldOf`)
+beforeAll(() => [...SEEDS, 3, 4, 5, 11, 77].forEach(worldOf));
+/**
+ * Seeds 1 bis `total` in Abschnitten zu je `size` (für `it.each`): Schwere Eigenschafts-Tests prüfen alle Seeds, aber
+ * jeder Abschnitt ist ein eigener Test und bleibt so im Zeitbudget (vitest.config.ts)
+ */
+const seedRanges = (total: number, size: number) =>
+  Array.from({ length: Math.ceil(total / size) }, (_, i) => ({
+    from: i * size + 1,
+    to: Math.min(total, (i + 1) * size),
+  }));
 /** Die acht Nachbarfelder und das Feld selbst */
 const RING_1 = [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => [dx, dy] as const));
 
@@ -372,33 +383,46 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
     ([dx, dy]) => Math.hypot(dx, dy) < 12,
   );
 
-  it('liegt ganz hinter dem Felsring, berührt weder die Lichtung noch einen anderen Gang oder ein Torhaus und bleibt 12 Felder von jedem fremden Gangausgang (500 Seeds)', () => {
-    // Ein `expect` je Seed statt je Feld: sonst dauert der Lauf mit Abdeckung in der Pipeline zu lange
-    const key = (x: number, y: number) => x * 4096 + y;
-    for (let seed = 1; seed <= 500; seed++) {
-      const { cells, bed } = kesselPlace(seed, EIS_PACK);
-      const kessel = new Set(cells.map(([x, y]) => key(x, y)));
-      expect(kessel.has(key(...bed)), `Seed ${seed}`).toBe(true);
-      const wrong: string[] = cells.filter(([x, y]) => !beyondRing(x, y)).map(([x, y]) => `${x},${y} vor dem Felsring`);
-      for (const g of gatePlaces(seed).values()) {
-        // Den eigenen Gang berührt er an dessen Ende (dort geht es hinein), aber er liegt nicht darauf
-        const near: readonly (readonly [number, number])[] = g.id === 'eis' ? [[0, 0]] : RING_1;
-        const gang = gangCells(g.mid, g.out);
-        for (const [x, y] of gang)
-          if (near.some(([dx, dy]) => kessel.has(key(x + dx, y + dy)))) wrong.push(`Gang ${g.id} bei ${x},${y}`);
-        if (g.id === 'eis') continue;
-        // Ausgang eines fremden Gangs (seine letzte Reihe, schon ganz hinter dem Felsring): weniger als 12 Felder?
-        for (const [x, y] of gang.slice(-(2 * span + 1)))
-          if (DISC_12.some(([dx, dy]) => kessel.has(key(x + dx, y + dy)))) wrong.push(`Ausgang ${g.id} bei ${x},${y}`);
+  // 500 Seeds in vier Abschnitten: Fast die ganze Zeit kosten `kesselPlace` und `gatePlaces` (Torplätze aus dem Rauschen)
+  it.each(seedRanges(500, 125))(
+    'liegt ganz hinter dem Felsring, berührt weder die Lichtung noch einen anderen Gang oder ein Torhaus und bleibt 12 Felder von jedem fremden Gangausgang (Seeds $from–$to)',
+    ({ from, to }) => {
+      // Ein `expect` je Seed statt je Feld: sonst dauert der Lauf mit Abdeckung in der Pipeline zu lange
+      const key = (x: number, y: number) => x * 4096 + y;
+      for (let seed = from; seed <= to; seed++) {
+        const { cells, bed } = kesselPlace(seed, EIS_PACK);
+        const kessel = new Set(cells.map(([x, y]) => key(x, y)));
+        expect(kessel.has(key(...bed)), `Seed ${seed}`).toBe(true);
+        // Rahmen um den Kessel: Felder weiter als `r` davon weg brauchen keinen Blick in die Menge (gleiches Ergebnis, schneller)
+        const xs = cells.map(([x]) => x),
+          ys = cells.map(([, y]) => y);
+        const [bx0, bx1, by0, by1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+        const far = (x: number, y: number, r: number) => x < bx0 - r || x > bx1 + r || y < by0 - r || y > by1 + r;
+        const wrong: string[] = cells
+          .filter(([x, y]) => !beyondRing(x, y))
+          .map(([x, y]) => `${x},${y} vor dem Felsring`);
+        for (const g of gatePlaces(seed).values()) {
+          // Den eigenen Gang berührt er an dessen Ende (dort geht es hinein), aber er liegt nicht darauf
+          const near: readonly (readonly [number, number])[] = g.id === 'eis' ? [[0, 0]] : RING_1;
+          const gang = gangCells(g.mid, g.out);
+          for (const [x, y] of gang)
+            if (!far(x, y, 1) && near.some(([dx, dy]) => kessel.has(key(x + dx, y + dy))))
+              wrong.push(`Gang ${g.id} bei ${x},${y}`);
+          if (g.id === 'eis') continue;
+          // Ausgang eines fremden Gangs (seine letzte Reihe, schon ganz hinter dem Felsring): weniger als 12 Felder?
+          for (const [x, y] of gang.slice(-(2 * span + 1)))
+            if (!far(x, y, 12) && DISC_12.some(([dx, dy]) => kessel.has(key(x + dx, y + dy))))
+              wrong.push(`Ausgang ${g.id} bei ${x},${y}`);
+        }
+        expect(wrong, `Seed ${seed}`).toEqual([]);
       }
-      expect(wrong, `Seed ${seed}`).toEqual([]);
-    }
-  });
+    },
+  );
 
   /** Seeds der Tal-Tests: Eine Welt zu bauen kostet etwa 0,15 s, darum teilen sich die Tests dieselben 20 (`worldOf`) */
   const VALLEY_SEEDS = Array.from({ length: 20 }, (_, i) => 121 + i);
-  // einmal vorab bauen, mit eigener Frist: In der Pipeline (mit Abdeckung) dauert das länger als ein einzelner Test darf
-  beforeAll(() => VALLEY_SEEDS.forEach(worldOf), 120_000);
+  // einmal vorab bauen (Frist der Hooks: vitest.config.ts): Das dauert länger als ein einzelner Test darf
+  beforeAll(() => VALLEY_SEEDS.forEach(worldOf));
 
   it('Jedes begehbare Feld im Tal ist vom Schneebett aus erreichbar (20 Seeds)', () => {
     // über den Felsring und die Gangausgänge prüfen die 500 Seeds oben
@@ -1326,29 +1350,36 @@ describe('Portal-Plattformen', () => {
     });
   }
 
-  it('im Ring um das Bett: keine Plattform berührt eine andere, die Wiese, das Bett, Tröge, Unterstand oder Klangstein (viele Seeds)', () => {
-    const fixed: (readonly [number, number])[] = [
-      LICHTUNG.bed,
-      LICHTUNG.food,
-      LICHTUNG.water,
-      LICHTUNG.shelterStem,
-      BED_STONE,
-    ];
-    const { x0, y0, x1, y1 } = LICHTUNG.shelter;
-    for (let seed = 1; seed <= 3000; seed++) {
-      const homes = [...portalPlaces(seed).values()].map((p) => p.home);
-      for (const a of homes) {
-        for (const b of homes) if (a !== b) expect(cheb(a, b), `Seed ${seed}`).toBeGreaterThanOrEqual(4);
-        for (const { x, y } of platformCells(a)) {
-          const [dx, dy] = [x - LICHTUNG.bed[0], y - LICHTUNG.bed[1]];
-          expect(Math.hypot(dx, dy), `Seed ${seed}: nicht auf der Wiese`).toBeGreaterThan(LICHTUNG.meadow + 0.5);
-          expect(x >= x0 && x <= x1 && y >= y0 && y <= y1, `Seed ${seed}: Unterstand`).toBe(false);
+  // 3000 Seeds in sechs Abschnitten: Fast die ganze Zeit kostet `portalPlaces` (Torplätze aus dem Rauschen)
+  it.each(seedRanges(3000, 500))(
+    'im Ring um das Bett: keine Plattform berührt eine andere, die Wiese, das Bett, Tröge, Unterstand oder Klangstein (Seeds $from–$to)',
+    ({ from, to }) => {
+      const fixed: (readonly [number, number])[] = [
+        LICHTUNG.bed,
+        LICHTUNG.food,
+        LICHTUNG.water,
+        LICHTUNG.shelterStem,
+        BED_STONE,
+      ];
+      const { x0, y0, x1, y1 } = LICHTUNG.shelter;
+      // Fehler sammeln, ein `expect` je Seed statt je Feld
+      for (let seed = from; seed <= to; seed++) {
+        const homes = [...portalPlaces(seed).values()].map((p) => p.home);
+        const wrong: string[] = [];
+        for (const a of homes) {
+          for (const b of homes) if (a !== b && cheb(a, b) < 4) wrong.push(`${a.join()} zu nah an ${b.join()}`);
+          for (const { x, y } of platformCells(a)) {
+            const [dx, dy] = [x - LICHTUNG.bed[0], y - LICHTUNG.bed[1]];
+            if (Math.hypot(dx, dy) <= LICHTUNG.meadow + 0.5) wrong.push(`${x},${y} auf der Wiese`);
+            if (x >= x0 && x <= x1 && y >= y0 && y <= y1) wrong.push(`${x},${y} im Unterstand`);
+          }
+          // auch der freie Ring um die Plattform liegt nicht auf Bett, Trog, Pilzstiel oder Klangstein
+          for (const f of fixed) if (cheb(a, f) <= 2) wrong.push(`${a.join()} zu nah an ${f.join()}`);
         }
-        // auch der freie Ring um die Plattform liegt nicht auf Bett, Trog, Pilzstiel oder Klangstein
-        for (const f of fixed) expect(cheb(a, f), `Seed ${seed}`).toBeGreaterThan(2);
+        expect(wrong, `Seed ${seed}`).toEqual([]);
       }
-    }
-  });
+    },
+  );
 
   it('auf der Plattform steht man etwas höher: auf dem Rand der Sockel, auf der Mitte das Bild', () => {
     const w = worldOf(1);
@@ -1361,7 +1392,7 @@ describe('Portal-Plattformen', () => {
 
 describe('Klangsteine', () => {
   for (const seed of [1, 42, 2026]) {
-    const w = createWorld(seed, PACKS);
+    const w = worldOf(seed);
     it(`Seed ${seed}: einer am Bett, einer vor jedem Tor, einer am Schneebett; fest, erreichbar, der Weg zum Tor bleibt frei`, () => {
       expect([...w.stones.keys()].sort()).toEqual(['bett', ...GATES.map((g) => g.id), 'eis-offen'].sort());
       // die der Lichtung bei geschlossenen Toren; der am Schneebett liegt im Gletscherkessel: erreichbar, sobald das Eistor offen ist
