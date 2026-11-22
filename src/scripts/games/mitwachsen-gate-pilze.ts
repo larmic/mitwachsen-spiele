@@ -61,12 +61,15 @@ const wakeAt = (t: number) => (t <= 0.2 ? 0 : seg(t, 0.2, 0.4) * 1.15);
 const hatY = (t: number) => 3.32 + 0.15 * curl(t);
 
 const SIX = [1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1];
+/** alle Richtungen außer nach unten (die Kamera schaut immer schräg von oben) */
+const FIVE = [1, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1];
 /**
  * Körper aus einer Formfunktion (Voxelmitte → Farbe) im Quader [x0, y0, z0, x1, y1, z1]: gesetzt wird nur die Hülle
  * (Voxel mit einem leeren Nachbarn), unter dem Boden zählt als voll. So kostet das Innere keine Voxel. Nichts bei z ≥ 0,5.
- * Mit `cam` fällt auch weg, was nur nach unten oder von der Kamera weg frei liegt (die Kamera schaut immer schräg von oben).
+ * Mit `cam` fällt auch weg, was nur nach unten oder von der Kamera weg frei liegt (die Kamera schaut immer schräg von oben),
+ * mit `all` nur, was nach unten frei liegt (Zugang zur Front gebaut: die Kamera kann von jeder Seite kommen).
  */
-function shell(v: Vox, box: readonly number[], f: Shape, cam?: Cam) {
+function shell(v: Vox, box: readonly number[], f: Shape, cam?: Cam, all = false) {
   const [x0 = 0, y0 = 0, z0 = 0, x1 = 0, y1 = 0, z1 = 0] = box;
   const [i0, j0, k0] = [vx(x0), Math.max(0, vx(y0)), vx(z0)];
   const [ni, nj, nk] = [Math.ceil(x1 * VOX) - i0, Math.ceil(y1 * VOX) - j0, Math.min(Math.ceil(z1 * VOX), BAY_K) - k0];
@@ -80,17 +83,21 @@ function shell(v: Vox, box: readonly number[], f: Shape, cam?: Cam) {
     i >= i0 && i < i0 + ni && j >= j0 && j < j0 + nj && k >= k0 && k < k0 + nk;
   const full = (i: number, j: number, k: number) => j < 0 || (inside(i, j, k) && grid[at(i, j, k)] != null);
   // mit `cam` nur, was die Kamera sehen kann: oben, zur Kamera hin und quer dazu
-  const dirs = cam ? [0, 1, 0, cam[0], 0, cam[1], cam[1], 0, -cam[0], -cam[1], 0, cam[0]] : SIX;
-  const free = (i: number, j: number, k: number) => {
+  const seen = cam ? [0, 1, 0, cam[0], 0, cam[1], cam[1], 0, -cam[0], -cam[1], 0, cam[0]] : SIX;
+  const free = (i: number, j: number, k: number, dirs: number[]) => {
     for (let d = 0; d < dirs.length; d += 3)
       if (!full(i + (dirs[d] ?? 0), j + (dirs[d + 1] ?? 0), k + (dirs[d + 2] ?? 0))) return true;
     return false;
   };
+  // mit `all` kommt nur dazu, was ohne fehlt; es übermalt nichts (Moos): So sieht der Zugang genauso aus
+  const keep = all
+    ? (i: number, j: number, k: number) => free(i, j, k, FIVE) && (!v.has(i, j, k) || free(i, j, k, seen))
+    : (i: number, j: number, k: number) => free(i, j, k, seen);
   for (let k = k0; k < k0 + nk; k++)
     for (let j = j0; j < j0 + nj; j++)
       for (let i = i0; i < i0 + ni; i++) {
         const p = grid[at(i, j, k)];
-        if (!p || !free(i, j, k)) continue;
+        if (!p || !keep(i, j, k)) continue;
         if (typeof p === 'string') v.set(i, j, k, p);
         else v.set(i, j, k, p.c, 'bright');
       }
@@ -143,12 +150,12 @@ function socketPaint(cx: number, x: number, y: number, z: number, i: number, j: 
   return h < 0.2 ? MOOS[2] : h < 0.45 ? MOOS[1] : h < 0.85 ? MOOS[0] : MOOS[4];
 }
 
-function giant(v: Vox, side: number, t: number, cam: Cam) {
+function giant(v: Vox, side: number, t: number, cam: Cam, all?: boolean) {
   const [cx, hy] = [side * PX, hatY(t)];
   const box = [cx - HAT.R1 - 0.1, 0, HZ - HAT.R2 - 0.1, cx + HAT.R1 + 0.1, hy + HAT.H + 0.2, HZ + HAT.R2 + 0.2];
   const paint: Shape = (x, y, z, i, j, k) =>
     hatPaint(cx, hy, x, y, z) ?? socketPaint(cx, x, y, z, i, j, k) ?? stemPaint(cx, x, y, z);
-  shell(v, box, paint, cam);
+  shell(v, box, paint, cam, all);
 }
 
 /** Ranken um den Stiel: ein welliges Band rundherum, mit Leuchtspitzen, Moos und flachen Hütchen als Konsolen */
@@ -269,12 +276,12 @@ function moss(v: Vox) {
 }
 
 /** alle festen Voxel des Zugangs bei Öffnung `g.open` (0 zu … 1 offen) */
-export function pilzVox(g: Pick<GateCtx, 'open' | 'cam'>): Vox {
+export function pilzVox(g: Pick<GateCtx, 'open' | 'cam' | 'all'>): Vox {
   const t = Math.min(1, Math.max(0, g.open));
   const v = new Vox();
   moss(v);
   for (const side of [-1, 1]) {
-    giant(v, side, t, g.cam);
+    giant(v, side, t, g.cam, g.all); // mit `all` die ganze Hülle (außer nach unten)
     stemVines(v, side);
     rimVines(v, side, t);
   }
@@ -446,8 +453,8 @@ function firefly(pen: Pen, g: number, beat: number) {
 
 /** festes Raster je Öffnung und Lage, einmal gebaut (motion fragt es in jedem Takt) */
 const fixed = new Map<string, Vox>();
-function fixedVox(g: Pick<GateCtx, 'open' | 'cam'>) {
-  const key = `${g.open},${g.cam[0]},${g.cam[1]}`;
+function fixedVox(g: Pick<GateCtx, 'open' | 'cam' | 'all'>) {
+  const key = `${g.open},${g.cam[0]},${g.cam[1]},${!!g.all}`;
   let v = fixed.get(key);
   if (!v) {
     if (fixed.size > 40) fixed.clear();
@@ -458,7 +465,7 @@ function fixedVox(g: Pick<GateCtx, 'open' | 'cam'>) {
 }
 
 /** alle bewegten Voxel im Takt `beat` (Ranken, Girlande, Glühwürmchen); keiner liegt in einer festen Zelle */
-export function motionVox(g: Pick<GateCtx, 'open' | 'cam'>, beat: number): Vox {
+export function motionVox(g: Pick<GateCtx, 'open' | 'cam' | 'all'>, beat: number): Vox {
   const t = Math.min(1, Math.max(0, g.open));
   const solid = fixedVox(g);
   const v = new Vox();

@@ -4,6 +4,8 @@ import { ACTION_MS, ENCOUNTERS, HOLD_MS, InputPace, STEP_MS, stops } from './inp
 import { initialState, step, type State } from './mitwachsen-state';
 import { plateMid } from './mitwachsen-plate';
 import { worldOf } from './test-worlds';
+import { Blink } from './mitwachsen-turn';
+import { BLINK_MS } from './mitwachsen-turn-pace';
 
 /** Simuliert `ms` Millisekunden mit einem Bild alle 16 ms und zählt die Schritte */
 function steps(pace: InputPace, from: number, ms: number, taps: number[] = [], dir: Dir = 'e') {
@@ -193,6 +195,64 @@ describe('Ruhiger Takt der Eingabe', () => {
     pace.press('w', 1000);
     pace.clear();
     expect(pace.held()).toBe(false);
+  });
+
+  it('Blinzeln verzögert den Schritt um 300 ms, ohne ihn zu verlieren (Pfeile bleiben weltbezogen)', () => {
+    // wie die Web Component: jeder Schritt des Takts fragt erst die 3D-Ansicht (`blink`); gedreht wartet er
+    const pace = new InputPace();
+    const blink = new Blink();
+    const yaw = -155; // vor dem Südtor ganz zur Front gedreht
+    const done: [number, Dir][] = [];
+    let now = 0;
+    const move = (dir: Dir) => {
+      const go = () => done.push([now, dir]);
+      if (!blink.ask(done.length ? 0 : yaw, now, go)) go(); // nach dem Blinzeln steht die Ansicht wieder bei 0°
+    };
+    const go = pace.press('n', 0);
+    expect(go).toBe('n');
+    move(go!);
+    pace.release('n');
+    for (now = 16; now < 1000; now += 16) {
+      if (now === 96) {
+        const tap = pace.press('e', now); // zweiter Tipp während des Blinzelns: wird im Takt gemerkt …
+        pace.release('e');
+        if (tap) move(tap);
+      }
+      blink.frame(now);
+      const next = pace.poll(now);
+      if (next) move(next); // … und verfällt, solange es blinzelt (wie ein zweiter gemerkter Tipp)
+    }
+    expect(done).toHaveLength(1);
+    expect(done[0]![1]).toBe('n'); // derselbe Pfeil, nicht umgerechnet
+    expect(done[0]![0]).toBeGreaterThanOrEqual(BLINK_MS);
+    expect(done[0]![0]).toBeLessThan(BLINK_MS + 16);
+    // danach läuft alles wie gewohnt: ein neuer Druck geht sofort
+    expect(pace.press('n', 1000)).toBe('n');
+  });
+
+  it('nach dem Blinzeln läuft ein gehaltener Pfeil erst nach der Wartezeit weiter, nie schneller als im Takt', () => {
+    // wie die Web Component: der verzögerte Schritt setzt den Takt zurück (`halt`), wie nach einem frischen Druck
+    const pace = new InputPace();
+    const blink = new Blink();
+    const done: number[] = [];
+    let [now, yaw] = [0, -155];
+    const move = () => {
+      const late = () => {
+        pace.halt('pause', now); // nur der verzögerte Schritt
+        done.push(now);
+        yaw = 0; // geschnitten: die Ansicht steht wieder bei 0°
+      };
+      if (!blink.ask(yaw, now, late)) done.push(now);
+    };
+    if (pace.press('n', 0)) move(); // gehalten, nicht losgelassen
+    for (now = 16; now < 2000; now += 16) {
+      blink.frame(now);
+      if (pace.poll(now)) move();
+    }
+    expect(done[0]).toBeGreaterThanOrEqual(BLINK_MS);
+    expect(done[1]! - done[0]!).toBeGreaterThanOrEqual(HOLD_MS); // nicht gleich hinterher
+    for (let i = 2; i < done.length; i++) expect(done[i]! - done[i - 1]!).toBeGreaterThanOrEqual(STEP_MS);
+    expect(done.length).toBeGreaterThan(4); // und dann läuft sie gleichmäßig weiter
   });
 
   it('Aktionen zählen höchstens im eigenen Takt', () => {

@@ -6,6 +6,8 @@
 // Öffnen und ist über Menü und Sprechblase wieder zu öffnen. Was das Spiel ohne Bild sagt („Noch nicht“ am Eistor),
 // meldet eine unsichtbare Live-Region (`mw-say`). Steht die Figur eine Sekunde auf einer Torplatte, blendet oben eine
 // Postkarte mit der Front des Tors ein (`mw-card`, nur Bild, unter Kopf, Menü und Steuerkreuz; nicht bei Toren im Norden).
+// Dreht in 3D stattdessen die Kamera zur Front, zeigt die genordete Karte einen Blickfächer (`--mw-look`, `--mw-fan`),
+// und das Blinzeln zurück dunkelt das Bild kurz ab (`--mw-blink`); beides setzt die 3D-Ansicht (mitwachsen-turn-3d.ts).
 // Logik: src/scripts/games/ · Konzept: docs/games/mitwachsen.md
 import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
 ---
@@ -22,7 +24,9 @@ import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
       </svg>
     </button>
     <div class="mw-name"></div>
-    <canvas class="mw-map pxbox" role="img" aria-label="Karte mit dem Weg nach Hause"></canvas>
+    <div class="mw-mapbox">
+      <canvas class="mw-map pxbox" role="img" aria-label="Karte mit dem Weg nach Hause"></canvas>
+    </div>
   </div>
 
   <canvas class="mw-canvas3d" aria-hidden="true"></canvas>
@@ -193,6 +197,15 @@ import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
   .mw.three .mw-canvas3d {
     visibility: visible;
   }
+  /* Blinzeln zurück zur gewohnten Ansicht (300 ms, 3D): das Bild dunkelt ab und wieder auf; Kopf und Menü bleiben */
+  .mw::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--ink);
+    opacity: var(--mw-blink, 0);
+    pointer-events: none;
+  }
   /* Postkarte der Torfront: oben mittig unter dem Namen, klein (30 % der Breite, im Querformat flacher), weich ein und aus;
      über der Spielfläche, unter Kopf, Steuerkreuz und Menü (`z-index: 1`) */
   .mw-card {
@@ -229,10 +242,26 @@ import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
     padding: 0 14px;
   }
   .mw-map {
+    display: block;
     width: 168px;
     height: 168px;
     image-rendering: pixelated;
     background: #e4edf3;
+  }
+  /* Blickfächer: Die Karte bleibt genordet; dreht die 3D-Kamera zur Torfront, zeigt ein Fächer im Ton der Rahmen um
+     den Punkt der Figur, wohin sie schaut (`--mw-look` im Uhrzeigersinn von oben); auf Schnee und Gras gleich gut zu sehen */
+  .mw-mapbox {
+    position: relative;
+  }
+  .mw-mapbox::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: conic-gradient(from calc(var(--mw-look, 0deg) - 25deg), var(--ink) 0 50deg, transparent 0);
+    -webkit-mask: radial-gradient(circle, transparent 0 9px, #000 10px 32px, transparent 33px); /* Safari vor 15.4 */
+    mask: radial-gradient(circle, transparent 0 9px, #000 10px 32px, transparent 33px);
+    opacity: calc(var(--mw-fan, 0) * 0.35);
+    pointer-events: none;
   }
   /* Steuerung für Touch: nur auf Geräten ohne Maus (oder nach der ersten Berührung) */
   .mw-touch {

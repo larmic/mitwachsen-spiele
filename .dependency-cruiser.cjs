@@ -104,9 +104,9 @@ module.exports = {
       name: 'turn-lives-in-3d',
       severity: 'error',
       comment:
-        'Die Drehung zur Torfront (mitwachsen-turn.ts: Feder, Pendeln, Heranrücken) braucht nur die 3D-Ansicht und liegt in ihrem Chunk, nie im Kern. Kern und Welt-Pakete nutzen nur den winzigen Takt mitwachsen-turn-pace.ts.',
-      from: { pathNot: ['^src/scripts/games/mitwachsen-3d\\.ts$', '\\.test\\.ts$'] },
-      to: { path: '^src/scripts/games/mitwachsen-turn\\.ts$' },
+        'Die Drehung zur Torfront (mitwachsen-turn.ts: Feder, Pendeln, Heranrücken, Blinzeln; eingebaut in mitwachsen-turn-3d.ts) braucht nur die 3D-Ansicht und liegt in einem eigenen Chunk, den sie nachlädt (mitwachsen-turn-3d.<hash>.js), nie im Kern. Kern und Welt-Pakete nutzen nur den winzigen Takt mitwachsen-turn-pace.ts; was sie von der Drehung wissen müssen (Blinzeln, angekommen), fragen sie die 3D-Ansicht.',
+      from: { pathNot: ['^src/scripts/games/mitwachsen-(3d|turn-3d)\\.ts$', '\\.test\\.ts$'] },
+      to: { path: '^src/scripts/games/mitwachsen-turn(-3d)?\\.ts$' },
     },
     {
       name: 'no-test-in-production',

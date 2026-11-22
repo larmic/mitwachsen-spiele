@@ -29,6 +29,7 @@ type Moving = {
   at: readonly [number, number];
   open: number;
   cam: readonly [number, number];
+  all: boolean;
   beats: Group;
   built: Map<number, Mesh[]>;
   shown: number;
@@ -44,10 +45,10 @@ export class MovingGates {
   /** `draw` zeichnet die bewegten Teile eines Zugangs im Takt (in der 3D-Ansicht die Baupläne der Welten) */
   constructor(private draw: typeof motion = motion) {}
 
-  /** Die Torhäuser werden neu gebaut: Ihre Gruppen räumt der Aufrufer weg (samt den Meshes aller Takte) */
-  clear() {
-    this.list = [];
-    this.wings = [];
+  /** Das Torhaus `house` wird weggeräumt: Seine Takte und Flügel gehören nicht mehr dazu (die Meshes räumt der Aufrufer) */
+  drop(house: Group) {
+    this.list = this.list.filter((m) => m.beats.parent !== house);
+    this.wings = this.wings.filter(([, w]) => w.parent !== house);
   }
 
   /** Ein Flügel des Tors `id` (Gruppe an seiner Angel, gebaut aus `w`): wackelt, wenn das Tor „noch nicht“ zeigt */
@@ -55,11 +56,30 @@ export class MovingGates {
     this.wings.push([id, group, w.angle, Math.sign(w.hinge[0])]);
   }
 
-  /** Zugang `id` bewegt sich: liefert die Gruppe für seine Takte, die der Aufrufer ins Torhaus hängt */
-  add(id: GateId, at: readonly [number, number], open: number, cam: readonly [number, number]) {
+  /** Zugang `id` bewegt sich: liefert die Gruppe für seine Takte, die der Aufrufer ins Torhaus hängt (`all`: wie `gate`) */
+  add(id: GateId, at: readonly [number, number], open: number, cam: readonly [number, number], all = false) {
     const beats = new Group();
-    this.list.push({ id, at, open, cam, beats, built: new Map(), shown: -1 });
+    this.list.push({ id, at, open, cam, all, beats, built: new Map(), shown: -1 });
     return beats;
+  }
+
+  /** Alle Takte des Zugangs mit der Gruppe `beats` gleich bauen (zur Front, im Leerlauf, damit später nichts ruckelt) */
+  fill(beats: Group, meshes: (p: Parts) => Mesh[]) {
+    const m = this.list.find((n) => n.beats === beats);
+    for (let b = 0; m && b < BEATS; b++) this.beat(m, b, meshes).forEach((o) => (o.visible = false));
+  }
+
+  /** Meshes des Takts `beat`, beim ersten Mal gebaut */
+  private beat(m: Moving, beat: number, meshes: (p: Parts) => Mesh[]) {
+    let shown = m.built.get(beat);
+    if (!shown) {
+      const p = parts();
+      this.draw(p, m.id, beat, m.open, m.cam, m.all);
+      shown = meshes(p);
+      m.built.set(beat, shown);
+      if (shown.length) m.beats.add(...shown);
+    }
+    return shown;
   }
 
   /**
@@ -75,16 +95,11 @@ export class MovingGates {
     const beat = beatAt(sc.now, sc.reduced);
     for (const m of this.list) {
       if (m.shown === beat) continue;
+      // weit weg oder in einem Torhaus, das gerade nicht zu sehen ist (zur Front gebaut, im Leerlauf vorbereitet)
       if (m.shown >= 0 && Math.hypot(m.at[0] - sc.cam.x, m.at[1] - sc.cam.y) > RANGE) continue;
+      if (m.beats.parent?.visible === false) continue;
       for (const o of m.built.get(m.shown) ?? []) o.visible = false;
-      let shown = m.built.get(beat);
-      if (!shown) {
-        const p = parts();
-        this.draw(p, m.id, beat, m.open, m.cam);
-        shown = meshes(p);
-        m.built.set(beat, shown);
-        if (shown.length) m.beats.add(...shown);
-      }
+      const shown = this.beat(m, beat, meshes);
       for (const o of shown) o.visible = true;
       m.shown = beat;
     }

@@ -21,7 +21,8 @@ const MOTION: Partial<Record<GateTheme, GateMotion>> = { wasser: wasserMotion, l
  * Ein Zugang: Geometrie in `p`, dazu seine Türflügel (nur das Eistor hat welche). `open` 0 zu … 1 offen, `outline` der
  * Umriss des verlaufenen Tiers, `lit` wie weit dessen Ritual leuchtet, `cam` die Richtung zur Kamera in
  * Torhaus-Koordinaten (x, z): Danach richtet jeder Zugang sein Schild aus. `look`: was das Welt-Paket hinter dem Tor
- * beiträgt (Eis-Welt: Tür, Eiszapfen), solange es lädt nichts.
+ * beiträgt (Eis-Welt: Tür, Eiszapfen), solange es lädt nichts. `all`: alle Flächen, auch die von der Kamera weg
+ * (Zugang vor der Torplatte, solange die Kamera zur Front dreht)
  */
 export function gate(
   p: Parts,
@@ -31,14 +32,22 @@ export function gate(
   lit = 0,
   cam: readonly [number, number] = [0, 1],
   look?: GateLook,
+  all = false,
 ): Wing[] {
-  return BUILD[theme](p, { open, outline, lit, cam, look });
+  return BUILD[theme](p, { open, outline, lit, cam, look, all });
 }
 
 /** Ob ein Zugang bewegte Teile hat (dann zeichnet `motion` sie je Takt) */
 export const moves = (theme: GateTheme) => theme in MOTION;
 
-/** Bewegte Teile eines Zugangs im Takt `beat` in `p` (gleiche Bedeutung von `open` und `cam` wie bei `gate`) */
-export function motion(p: Parts, theme: GateTheme, beat: number, open = 0, cam: readonly [number, number] = [0, 1]) {
-  MOTION[theme]?.(p, { open, outline: false, lit: 0, cam }, beat);
+/** Bewegte Teile eines Zugangs im Takt `beat` in `p` (gleiche Bedeutung von `open`, `cam` und `all` wie bei `gate`) */
+export function motion(
+  p: Parts,
+  theme: GateTheme,
+  beat: number,
+  open = 0,
+  cam: readonly [number, number] = [0, 1],
+  all = false,
+) {
+  MOTION[theme]?.(p, { open, outline: false, lit: 0, cam, all }, beat);
 }

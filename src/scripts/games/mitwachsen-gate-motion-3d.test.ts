@@ -64,20 +64,46 @@ describe('Bewegte Teile der Zugänge', () => {
     expect(calls.n).toBe(2); // Takt 0 gab es schon
   });
 
-  it('nach clear bewegt sich nichts mehr, bis die Zugänge neu angelegt sind', () => {
+  it('nach drop bewegt sich dieses Torhaus nicht mehr, bis es neu angelegt ist; die anderen bleiben', () => {
     const m = new MovingGates(draw);
-    m.add('lava', [0, 0], 0, [0, 1]);
-    m.clear();
+    const [lava, wasser] = [new Group(), new Group()];
+    lava.add(m.add('lava', [0, 0], 0, [0, 1]));
+    m.drop(lava);
     const { calls, meshes } = counter();
     m.sync(at(0), meshes);
     expect(calls.n).toBe(0);
+    m.add('lava', [0, 0], 0, [0, 1], true); // zur Front gebaut, mit allen Flächen
+    wasser.add(m.add('wasser', [0, 0], 0, [0, 1]));
+    m.drop(wasser);
+    m.sync(at(0), meshes);
+    expect(calls.n).toBe(1);
+  });
+
+  it('zur Front im Leerlauf: alle Takte gleich gebaut, versteckt; ein verstecktes Torhaus zeigt keinen Takt', () => {
+    const m = new MovingGates(draw);
+    const house = new Group();
+    const beats = m.add('pilze', [0, 0], 0, [0, 1], true);
+    house.add(beats);
+    const { calls, meshes } = counter();
+    m.fill(beats, meshes);
+    expect(calls.n).toBe(BEATS);
+    expect(visible(beats)).toBe(0);
+    house.visible = false;
+    m.sync(at(0), meshes);
+    expect(visible(beats)).toBe(0); // noch nicht zu sehen: nichts zu tun
+    house.visible = true;
+    m.sync(at(BEAT_MS * 3), meshes);
+    expect(calls.n).toBe(BEATS); // nichts neu gebaut
+    expect(visible(beats)).toBeGreaterThan(0);
   });
 
   it('„noch nicht“: Die Flügel des Tors wackeln zweimal kurz nach innen (2 Voxel), nicht bei reduzierter Bewegung', () => {
     const m = new MovingGates(draw);
     const { meshes } = counter();
+    const house = new Group();
     const ws = leaves(0).map((l) => {
       const g = new Group();
+      house.add(g);
       g.rotation.y = l.angle;
       m.wing('eis', g, l);
       return [g, l] as const;
@@ -100,7 +126,7 @@ describe('Bewegte Teile der Zugänge', () => {
     expect(angles(1950).map(Math.abs)).toEqual([+SHAKE.toFixed(4), +SHAKE.toFixed(4)]); // zum zweiten Mal
     expect(angles(2700)).toEqual([0, 0]); // vorbei
     expect(angles(1150, true)).toEqual([0, 0]); // reduzierte Bewegung: kein Wackeln
-    m.clear();
+    m.drop(house);
     ws[0]![0].rotation.y = 0.5;
     angles(1150);
     expect(ws[0]![0].rotation.y).toBe(0.5); // neu gebaut: die alten Flügel gehören nicht mehr dazu

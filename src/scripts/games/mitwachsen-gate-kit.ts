@@ -24,14 +24,20 @@ export type Wing = { parts: Parts; hinge: readonly [number, number]; angle: numb
 /**
  * Was ein Zugang zum Bauen weiß: `open` wie weit er offen ist (0 zu … 1 offen, dazwischen der Übergang), `outline`
  * ob der Umriss des verlaufenen Tiers daran steht, `lit` wie weit dessen Ritual leuchtet (0 … 1) und `cam` die
- * Richtung zur Kamera in Torhaus-Koordinaten (x, z), eine der vier Achsen. Die Kamera dreht sich nie; liegt der Zugang
- * im Westen, Osten oder Süden der Lichtung, sieht sie ihn von der Seite oder von hinten.
+ * Richtung zur Kamera in Torhaus-Koordinaten (x, z), eine der vier Achsen: Danach richten sich Schilder und was nur
+ * eine Seite zeigt, und Flächen, die von der Kamera weg schauen, fallen weg. Meist steht die Kamera im Süden; liegt
+ * der Zugang im Westen, Osten oder Süden der Lichtung, sieht sie ihn von der Seite oder von hinten. Steht die Figur in
+ * seiner Bucht, dreht die Kamera zur Front (mitwachsen-turn-3d.ts): Dann ist der Zugang mit `all` gebaut (alle
+ * Flächen, die Kamera kann von jeder Seite kommen), erst mit `cam` wie im Süden und, sobald sie mehr als halb gedreht
+ * ist, mit `cam` [0, 1] (mitwachsen-gatehouses-3d.ts). `all` fügt nur hinzu, es übermalt nichts.
  */
 export type GateCtx = {
   open: number;
   outline: boolean;
   lit: number;
   cam: readonly [number, number];
+  /** alle Flächen, auch die von `cam` weg (Zugang vor der Torplatte, solange die Kamera zur Front dreht) */
+  all?: boolean;
   /** Was das Welt-Paket hinter diesem Tor zum Zugang beiträgt (Eis-Welt: Tür, Eiszapfen); fehlt, solange es lädt */
   look?: GateLook;
 };

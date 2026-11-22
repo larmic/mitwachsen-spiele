@@ -110,9 +110,9 @@ class LarmicMitwachsen extends HTMLElement {
   private live = ''; // Welt, zu der `state` gehört; solange sie nicht `opening` ist, ruhen Takt und Speichern
   private card?: ReturnType<typeof postcardView> | null; // Postkarte der Torfront, nachgeladen mit der ersten
   private plates = plateToy(this.sfx, (at, colors) => this.burst('', colors, 6, at, true)); // Torplatten
-  // „noch nicht“ am Eistor (Haken im Welt-Paket): Steht die Figur dort ohne Pinguin?
-  private hint = (now: number) =>
-    this.packs.get('eis')?.view?.hint?.(this.state, this.world, now, this.reduced.matches, this.sfx, this.lift) ?? null;
+  // „noch nicht“ am Eistor (Haken im Welt-Paket): Steht die Figur dort ohne Pinguin? In 3D, wenn die Kamera vorn ist
+  private hint = (now: number, eis = this.packs.get('eis')?.view) =>
+    eis?.hint?.(this.state, this.world, now, this.reduced.matches, this.sfx, this.lift, this.r3d) ?? null;
 
   connectedCallback() {
     this.canvas = this.querySelector('canvas.mw-canvas')!;
@@ -162,14 +162,13 @@ class LarmicMitwachsen extends HTMLElement {
       this.classList.add('three');
       this.measure();
       // Verliert das Gerät den Kontext (App-Wechsel, Speicherdruck), springt die 2D-Ansicht ein, bis er zurück ist
-      const signal = this.globals.signal;
       canvas.addEventListener(
         'webglcontextlost',
         () => {
           this.r3d = null;
           this.classList.remove('three');
         },
-        { signal },
+        { signal: this.globals.signal },
       );
       canvas.addEventListener(
         'webglcontextrestored',
@@ -178,7 +177,7 @@ class LarmicMitwachsen extends HTMLElement {
           this.classList.add('three');
           this.measure();
         },
-        { signal },
+        { signal: this.globals.signal },
       );
     } catch {
       this.r3d = null; // 2D reicht
@@ -290,7 +289,8 @@ class LarmicMitwachsen extends HTMLElement {
   private apply(cmd: Cmd) {
     if (this.opening !== this.live) return; // die alte Welt ruht, bis die neue steht
     if (cmd.type !== 'tick') this.lastInput = performance.now(); // jemand spielt
-    if (cmd.type === 'move' && performance.now() < this.sitUntil) return; // die müde Figur sitzt kurz
+    const go = () => (this.pace.halt('pause', performance.now()), this.apply(cmd)); // nach Blinzeln: Takt frisch
+    if (cmd.type === 'move' && (performance.now() < this.sitUntil || this.r3d?.blink(go))) return; // müde, gedreht
     const { state, events } = step(this.state, this.world, cmd, this.seen, this.guide, this.packs.loaded);
     this.state = state;
     // Ist die Leiste der Lichtung voll, gelten die Regeln des Pinguins aus dem Paket der Eis-Welt (bis er im Kessel wohnt)
@@ -876,7 +876,7 @@ class LarmicMitwachsen extends HTMLElement {
         else this.sfx.unlock();
         void this.renderMenu();
         break;
-      case 'motion': // Elternschalter „Kamera bewegen“ (im Menü-Modul; noch ohne Wirkung, die Postkarte kommt überall)
+      case 'motion': // Elternschalter „Kamera bewegen“ (im Menü-Modul, an der Spielfläche für die 3D-Ansicht)
         void this.renderMenu(true);
         break;
       case 'fullscreen':

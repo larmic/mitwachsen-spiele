@@ -16,8 +16,18 @@ import {
   type Lage,
 } from './mitwachsen-turn-pace';
 import { readFileSync } from 'node:fs';
+import { PerspectiveCamera, Vector3 } from 'three';
+import { CAM_REST, DIST, TILT_DEG, camPose } from './mitwachsen-camera';
+import { plateMid } from './mitwachsen-plate';
+import { worldOf } from './test-worlds';
 import {
   BACK_BLINK_FROM_DEG,
+  BAY_ROWS,
+  Blink,
+  FAN_FROM_DEG,
+  bayOf,
+  fanDeg,
+  sunYaw,
   CAMERA_BACK_S,
   SWAY_DEG,
   SWAY_PERIOD_S,
@@ -31,6 +41,7 @@ import {
   type TurnInput,
 } from './mitwachsen-turn';
 import { STEP_MS } from './input-pace';
+import { CALM_KEY } from './mitwachsen-menu';
 import { OPEN_TICKS } from './worlds/eis/mitwachsen-ritual';
 
 const DT = 1 / 60; // ein Bild
@@ -81,10 +92,11 @@ describe('Takt der Drehung (mitwachsen-turn-pace.ts)', () => {
       expect(Math.abs((leadTicks(l) + OPEN_TICKS) * RULE_TICK_MS - turnSeconds(l) * 1000)).toBeLessThanOrEqual(50);
   });
 
-  it('Doppelte Werte bleiben gleich: Takt wie larmic-mitwachsen.ts, Stehzeit wie das Ritual, Sonne wie die 3D-Ansicht', () => {
+  it('Doppelte Werte bleiben gleich: Takt wie larmic-mitwachsen.ts, Stehzeit wie das Ritual, Sonne wie die 3D-Ansicht, Elternschalter wie das Menü', () => {
     expect(OPEN_MS).toBe(OPEN_TICKS * RULE_TICK_MS);
     const src = (f: string) => readFileSync(new URL(f, import.meta.url), 'utf8');
     expect(src('./larmic-mitwachsen.ts')).toContain(`const TICK_MS = ${RULE_TICK_MS};`);
+    expect(src('./mitwachsen-turn-3d.ts')).toContain(`const CALM_STORE = '${CALM_KEY}';`);
     expect(src('./mitwachsen-3d.ts')).toContain(`const SUN_OFFSET = new Vector3(${SUN_XZ[0]}, 22, ${SUN_XZ[1]});`);
   });
 
@@ -286,5 +298,153 @@ describe('Drehung zur Torfront (mitwachsen-turn.ts)', () => {
 
   it('smoothstep: 0, ½, 1 und außerhalb begrenzt', () => {
     expect([smooth(-1), smooth(0), smooth(0.5), smooth(1), smooth(2)]).toEqual([0, 0, 0.5, 1, 1]);
+  });
+});
+
+/** Steht `s` Sekunden auf der Platte vor einem Tor der Lage `lage` (Bedingung erfüllt: ohne Verzögerung) */
+const stood = (lage: Lage, s = 5) => run(TURN_REST, { lage, ...STAND, ready: true }, s);
+
+describe('Kamera aus der Drehung (mitwachsen-camera.ts)', () => {
+  const at = [10.5, 1, 20.5] as const; // Figur (x, Höhe, z)
+
+  it('bei p = 0 genau wie bisher: 55° von oben aus Süden, 18 Felder (im Hochformat bis 1,8-fach), Blick auf die Figur', () => {
+    expect(turnView(TURN_REST)).toEqual(CAM_REST);
+    expect([TILT_DEG[0], DIST[0]]).toEqual([55, 18]);
+    const PITCH = (55 * Math.PI) / 180; // so stand es fest in mitwachsen-3d.ts
+    for (const k of [1, 1.4, 1.8]) {
+      const dist = 18 * k;
+      const { eye, look } = camPose(at, CAM_REST, k, [0, -1]);
+      expect(eye).toEqual([at[0], at[1] + dist * Math.sin(PITCH), at[2] + dist * Math.cos(PITCH)]);
+      expect(look).toEqual([...at]);
+    }
+    // auch nach einer Drehung, sobald sie ganz zurück ist
+    const back = run(stood('S'), { lage: 'S', ...OFF }, 6);
+    expect(back.p).toBe(0);
+    expect(camPose(at, turnView({ ...back, yaw: 0, v: 0 }), 1, [0, 1])).toEqual(camPose(at, CAM_REST, 1, [0, 1]));
+  });
+
+  it('an der Front: Figur im unteren Drittel (im Hochformat in der unteren Hälfte), Tor in der Mitte darüber', () => {
+    for (const lage of LAGEN) {
+      const v = turnView(stood(lage));
+      for (const aspect of [16 / 9, 4 / 3, 0.5]) {
+        const k = Math.min(1.8, Math.max(1, 0.95 / aspect));
+        const { eye, look } = camPose(at, v, k, OUT[lage]);
+        const cam = new PerspectiveCamera(34, aspect, 0.5, 140);
+        cam.position.set(...eye);
+        cam.lookAt(...look);
+        cam.updateMatrixWorld();
+        const p = new Vector3(...at).project(cam);
+        const down = (1 - p.y) / 2; // 0 oben, 1 unten
+        expect(down).toBeGreaterThan(aspect < 1 ? 0.55 : 2 / 3);
+        expect(down).toBeLessThan(0.85);
+        expect(Math.abs(p.x)).toBeLessThan(0.3);
+        // die Tür (drei Felder vor der Figur, zur Lage hin, auf Höhe 2) liegt über der Figur im Bild
+        const door = new Vector3(at[0] + 3 * OUT[lage][0], 3, at[2] + 3 * OUT[lage][1]).project(cam);
+        expect(door.y).toBeGreaterThan(p.y);
+      }
+    }
+  });
+
+  it('die Kamera steht in allen vier Lagen über der Lichtung, nie über Fels oder hinter dem Tor', () => {
+    const w = worldOf(1);
+    const lagen = new Set<Lage>();
+    for (const g of w.gates.values()) {
+      const lage = lageOf(g.out);
+      lagen.add(lage);
+      const [x, y] = plateMid(g);
+      for (const st of [stood(lage), run(stood(lage), { lage, ...STAND, ready: true }, SWAY_PERIOD_S / 4)]) {
+        const { eye } = camPose([x + 0.5, 1, y + 0.5], turnView(st), 1, OUT[lage]);
+        const c = w.cell(Math.floor(eye[0]), Math.floor(eye[2]));
+        expect(c.region, `${g.id}`).toBe('lichtung');
+        expect(c.solid, `${g.id}`).toBeFalsy();
+        expect(eye[1]).toBeGreaterThan(c.h + 8);
+      }
+    }
+    expect(lagen.size).toBe(4);
+  });
+
+  it('die Sonne dreht mit, aber ohne Pendeln und gerastet: Steht die Figur, steht auch die Sonne (Schatten flimmern nicht)', () => {
+    expect(sunYaw(TURN_REST)).toBe(0);
+    const top = stood('O', 8);
+    expect(sunYaw(top)).toBeCloseTo((-65 * Math.PI) / 180, 6);
+    const suns = new Set<number>();
+    run(top, { lage: 'O', ...STAND, ready: true }, SWAY_PERIOD_S, (t) => suns.add(sunYaw(t)));
+    expect(suns.size).toBe(1); // das Bild pendelt, die Sonne nicht
+  });
+
+  it('Blickfächer der Karte nur, wenn gedreht: Richtung im Uhrzeigersinn von oben', () => {
+    expect(fanDeg(0)).toBeNull();
+    expect(fanDeg(FAN_FROM_DEG / 2)).toBeNull();
+    expect(fanDeg(25)).toBe(-25); // Kamera südöstlich, Blick nach Nordnordwest
+    expect(fanDeg(-155)).toBe(155);
+    expect(Math.abs(fanDeg(turnView(stood('W')).yaw)! + 65)).toBeLessThanOrEqual(SWAY_DEG); // samt Pendeln
+  });
+
+  it('Bucht für die Ansicht: Reihen 1 bis 4 vor der Tür, quer ±5; nicht das Torhaus selbst, nicht weiter weg', () => {
+    const w = worldOf(1);
+    const gates = [...w.gates.values()];
+    for (const g of gates) {
+      const [px, py] = plateMid(g);
+      expect(bayOf(gates, px, py)?.id).toBe(g.id);
+      const ahead = (r: number, u = 0) =>
+        bayOf(gates, g.mid[0] - g.out[0] * r - g.out[1] * u, g.mid[1] - g.out[1] * r + g.out[0] * u);
+      expect(ahead(1, 5)?.id).toBe(g.id);
+      expect(ahead(BAY_ROWS)?.id).toBe(g.id);
+      expect(ahead(BAY_ROWS + 1)).toBeUndefined();
+      expect(ahead(2, 6)).toBeUndefined();
+      expect(ahead(0)).toBeUndefined();
+    }
+  });
+});
+
+describe('Blinzeln zurück (Blink in mitwachsen-turn.ts)', () => {
+  /** Bilder alle 16 ms von `from` bis `to`: wann geschnitten wurde, wie dunkel es war */
+  function frames(b: Blink, from: number, to: number) {
+    const cuts: number[] = [];
+    let darkest = 0;
+    for (let t = from; t <= to; t += 16) {
+      const f = b.frame(t);
+      if (f.cut) cuts.push(t);
+      darkest = Math.max(darkest, f.dark);
+    }
+    return { cuts, darkest };
+  }
+
+  it('unter 45° kein Blinzeln: Der Schritt geht sofort', () => {
+    const b = new Blink();
+    let steps = 0;
+    expect(b.ask(BLINK_FROM_DEG, 0, () => steps++)).toBe(false);
+    expect(b.ask(-30, 0, () => steps++)).toBe(false);
+    expect(b.busy).toBe(false);
+    expect(b.frame(500)).toEqual({ dark: 0, cut: false });
+    expect(steps).toBe(0);
+  });
+
+  it('über 45°: abdunkeln, in der Mitte einmal schneiden, nach 300 ms genau ein Schritt; weitere Pfeile verfallen', () => {
+    const b = new Blink();
+    let steps = 0;
+    expect(b.ask(-155, 1000, () => steps++)).toBe(true);
+    expect(b.busy).toBe(true);
+    expect(b.ask(-155, 1100, () => (steps += 10))).toBe(true); // zweiter Tipp: wartet nicht zusätzlich
+    const early = frames(b, 1000, 1000 + BLINK_MS - 1);
+    expect(steps).toBe(0);
+    expect(early.cuts).toHaveLength(1);
+    expect(early.cuts[0]).toBeGreaterThanOrEqual(1000 + BLINK_MS / 2);
+    expect(early.darkest).toBeGreaterThan(0.95);
+    frames(b, 1000 + BLINK_MS, 2000);
+    expect(steps).toBe(1);
+    expect(b.busy).toBe(false);
+  });
+
+  it('ein einziges langes Bild schneidet trotzdem und lässt den Schritt laufen; ein verpasster (Hintergrund) verfällt', () => {
+    const b = new Blink();
+    let steps = 0;
+    b.ask(65, 0, () => steps++);
+    expect(b.frame(BLINK_MS + 50)).toEqual({ dark: 0, cut: true });
+    expect(steps).toBe(1);
+    b.ask(65, 0, () => steps++);
+    expect(b.frame(60_000).cut).toBe(true);
+    expect(steps).toBe(1);
+    expect(b.busy).toBe(false);
   });
 });

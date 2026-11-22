@@ -3,7 +3,9 @@
 // und Speichern bleiben unverändert. Kann der Browser kein WebGL, bleibt die 2D-Ansicht (mitwachsen-render.ts).
 //
 // Koordinaten: Welt-x → x, Welt-y (nach vorn/unten) → z, Höhe → y. Ein Feld ist eine Einheit.
-// Die Kamera schaut schräg von oben (PITCH) aus Süden auf die Figur; ↑ läuft also vom Betrachter weg.
+// Die Kamera schaut schräg von oben (55°, `TILT_DEG` in mitwachsen-camera.ts) aus Süden auf die Figur; ↑ läuft also vom Betrachter weg. Bleibt die Figur
+// auf einer Torplatte stehen, dreht sie weich zur Front des Tors und die Sonne mit (mitwachsen-turn-3d.ts); die Pfeile
+// bleiben dabei, wie sie sind (weltbezogen).
 // Die Welt wird in Stücken zu einem Mesh gebaut: Boden, Zierde und Wasser, alles mit einer Textur-Kachel.
 // Was nur eine Welt hinter einem Tor zeigt (Eis-Welt: Iglu, Fischkisten, Kessel, Tür und Eiszapfen des Eistors), baut
 // der 3D-Teil ihres Welt-Pakets (`View3D`, mitwachsen-view-3d.ts), nachgeladen, sobald das Paket an der Welt hängt
@@ -33,7 +35,6 @@ import {
 } from 'three';
 import { CHUNK, chunkOf, fromKey, withNeighbours } from '../../lib/games/chunks';
 import type { Dir, Part, Projection } from '../../lib/games/front';
-import { cycle, hash } from '../../lib/games/rng';
 import {
   GAME_COLORS,
   GATES,
@@ -52,11 +53,8 @@ import {
 import { FISH_PARTS } from '../../data/games/mitwachsen-eis';
 import { Geo, atlas, snapToShadowTexel, type Tile, type V3 } from './mitwachsen-geo';
 import { grown } from './mitwachsen-growth';
-import { parts, type Parts } from './mitwachsen-gatehouse';
-import { gate, moves } from './mitwachsen-gates-3d';
-import { MovingGates } from './mitwachsen-gate-motion-3d';
-import { GUIDE_GATE, guideGate } from './mitwachsen-guide';
-import { ritualGlow } from './mitwachsen-guest-look';
+import type { Parts } from './mitwachsen-gatehouse';
+import { GateHouses } from './mitwachsen-gatehouses-3d';
 import { Platforms3D } from './mitwachsen-platform-3d';
 import { frontShot } from './mitwachsen-card-3d';
 import { fogMask } from './mitwachsen-fog-3d';
@@ -64,13 +62,15 @@ import { StoneNotes, stoneInto } from './mitwachsen-story-3d';
 import type { LoadedPack } from './mitwachsen-packs';
 import type { Scene } from './mitwachsen-render';
 import type { State } from './mitwachsen-state';
-import type { Cell, TreeKind, World } from './mitwachsen-world';
+import type { Cell, World } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
 import { turnHead } from './mitwachsen-air';
 import { drawDeco, type DecoAt } from './mitwachsen-view';
 import { Views3D } from './mitwachsen-view-3d';
+import { tree, tufts } from './mitwachsen-trees-3d';
+import type { PlateTurn } from './mitwachsen-turn-3d';
+import { CAM_REST, camPose } from './mitwachsen-camera';
 
-export const PITCH = (55 * Math.PI) / 180; // Neigung der Kamera: 90° wäre senkrecht von oben
 /** Beeren am Busch: [x, Höhe, z] im Feld; oben auf der Kuppe und an der Vorderseite (zur Kamera) */
 const BERRIES = [
   [0.3, 0.66, 0.34],
@@ -82,8 +82,9 @@ const BERRIES = [
   [0.05, 0.22, 0.5],
   [0.88, 0.26, 0.4],
 ] as const;
-const DISTANCE = 18; // Abstand der Kamera zur Figur
-const SUN_OFFSET = new Vector3(-9, 22, 7); // Sonne von links oben vorn, vom Ziel aus
+const SUN_OFFSET = new Vector3(-9, 22, 7); // Sonne von links oben vorn, vom Ziel aus (dreht mit der Kamera)
+const UP = new Vector3(0, 1, 0);
+const NEAR_GATE = 14; // so nah (Felder, waagrecht und senkrecht) an einem Tor lädt die Drehung zur Torfront nach
 const SHADOW_TEXEL = 36 / 2048; // Schattenkamera ±18 Felder auf 2048 Pixeln
 const RADIUS = 2; // Stücke um die Figur, die als Mesh vorliegen (5 × 5 = 80 × 80 Felder)
 const BUILD_PER_FRAME = 2; // neue Stücke je Bild, damit nichts ruckelt
@@ -99,18 +100,6 @@ const YAW: Record<Dir, number> = { e: 0, s: -Math.PI / 2, w: Math.PI, n: Math.PI
 
 // ---------- Die 3D-Welt ----------
 
-const LEAF: Record<TreeKind, string> = {
-  oak: '#4fa84a',
-  birch: '#7cbf48',
-  autumn: '#e8823a',
-  red: '#c8452e',
-  blossom: '#f0a8c8',
-  winter: '#e3ecf1', // Krone voll Schnee
-  pine: '#2f6f3a',
-  snowpine: '#2f6f3a',
-  palm: '#4fa84a',
-  dead: '#5d3e21',
-};
 /** Kacheln der Böden: Oberseite, oberste Seitenkachel, Seiten darunter */
 const GROUND_TILES: Record<Exclude<Cell['ground'], 'water' | 'lava' | 'sky'>, [Tile, Tile, Tile]> = {
   grass: ['grassTop', 'grassSide', 'dirt'],
@@ -164,7 +153,6 @@ export class World3D {
   private dark = new MeshLambertMaterial({ color: GAME_COLORS.silhouette }); // verlorene Tiere auf den Tafeln
   private lava!: MeshLambertMaterial; // leuchtet auch nachts
   private canopy!: MeshLambertMaterial;
-  private gateGroup = new Group(); // Torhäuser
   private gateSolid!: MeshLambertMaterial; // Mauerwerk der Torhäuser und Portale: vor der Figur durchsichtig
   private bright!: MeshBasicMaterial; // leuchtet aus sich selbst: Kristalle, Zeichen, Wasserfälle
   private glow!: MeshBasicMaterial; // leuchtet, so hell das Welt-Paket sagt: Eiskristalle beim Polarlicht (`View3D.glow`)
@@ -175,8 +163,7 @@ export class World3D {
   private day = 0; // Tag der Welt: bestimmt, was nachgewachsen ist
   private opened: readonly GateId[] = []; // offene Tore: danach glänzt z. B. die Rutschspur zum Schneebett
   private views = new Views3D(); // 3D-Teile der Welt-Pakete, sobald geladen
-  private gatesKey = ''; // wie die Torhäuser gebaut sind: Öffnung je Tor und wohin der Pinguin führt
-  private moving = new MovingGates(); // bewegte Teile der Zugänge (fließende Wand, wiegende Ranken), je Takt gebaut
+  private houses!: GateHouses; // Torhäuser samt bewegten Teilen, je Tor neu gebaut, wenn sich dort etwas ändert
   private models = new Map<string, BufferGeometry>();
   private bodies = new Map<string, Mesh>();
   private signs = new Group();
@@ -186,6 +173,8 @@ export class World3D {
   private notes = new StoneNotes(); // Noten über den Klangsteinen
   private size = { w: 1, h: 1 };
   private world: World | null = null;
+  private turn: PlateTurn | null = null; // Drehung zur Torfront (nachgeladen, sobald die Figur einem Tor nah ist)
+  private turnAsked = false;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -220,6 +209,11 @@ export class World3D {
       return m;
     });
     this.scene.add(this.platforms.group);
+    this.houses = new GateHouses(
+      (p) => this.meshes(p),
+      this.platforms.plates,
+      (id) => this.views.look(id),
+    );
     this.scene.background = SKY.clone();
     this.scene.fog = new Fog(SKY.clone(), 26, 58);
     this.sun.castShadow = true;
@@ -228,7 +222,7 @@ export class World3D {
     Object.assign(sc, { left: -18, right: 18, top: 18, bottom: -18, near: 1, far: 60 });
     this.sun.shadow.bias = -0.0008;
     this.sun.shadow.normalBias = 0.03; // gegen Streifen auf Wänden, die die Sonne schräg trifft (Shadow Acne)
-    this.scene.add(this.sun, this.sun.target, this.hemi, this.signs, this.sleeper, this.gateGroup, this.notes.group);
+    this.scene.add(this.sun, this.sun.target, this.hemi, this.signs, this.sleeper, this.houses.group, this.notes.group);
   }
 
   /**
@@ -347,20 +341,26 @@ export class World3D {
     const tx = cam.x + 0.5,
       tz = cam.y + 0.5;
     const ty = sc.bodies.get('player')?.z ?? 1;
-    // Im Hochformat (Handy) weiter weg, damit links und rechts genug Welt zu sehen ist; der Nebel rückt mit
-    const dist = DISTANCE * Math.min(1.8, Math.max(1, 0.95 / this.camera.aspect));
+    // Im Hochformat (Handy) weiter weg, damit links und rechts genug Welt zu sehen ist; der Nebel rückt mit. Auf einer
+    // Torplatte dreht die Kamera zur Front, neigt sich, rückt heran und schaut etwas höher (bei p = 0 wie immer)
+    const k = Math.min(1.8, Math.max(1, 0.95 / this.camera.aspect));
+    this.wantTurn(world, cam, sc.reduced);
+    const view = this.turn?.frame(world, state, sc) ?? CAM_REST;
+    const { eye, look, dist } = camPose([tx, ty, tz], view, k, this.turn?.to ?? [0, 0]);
     const fog = this.scene.fog as Fog;
     fog.near = dist + 8;
     fog.far = dist + 40;
-    this.camera.position.set(tx, ty + dist * Math.sin(PITCH), tz + dist * Math.cos(PITCH));
-    this.camera.lookAt(tx, ty, tz);
+    this.camera.position.set(...eye);
+    this.camera.lookAt(...look);
     this.fogUniforms.mwEye.value.copy(this.camera.position);
     this.fogUniforms.mwTarget.value.set(tx, ty + 0.9, tz);
     this.fogUniforms.mwTime.value = sc.now / 1000;
     this.fogUniforms.mwWind.value = sc.wind;
-    // Sonne von links oben vorn; Schatten folgen der Figur
-    const target = snapToShadowTexel(new Vector3(tx, ty, tz), SUN_OFFSET, SHADOW_TEXEL);
-    this.sun.position.copy(target).add(SUN_OFFSET);
+    // Sonne von links oben vorn, dreht mit der Kamera (ohne Pendeln); Schatten folgen dem Blick, im Lichtraum auf
+    // ganze Pixel der Schattenkarte gerastet
+    const sunAt = SUN_OFFSET.clone().applyAxisAngle(UP, this.turn?.sun ?? 0);
+    const target = snapToShadowTexel(new Vector3(...look), sunAt, SHADOW_TEXEL);
+    this.sun.position.copy(target).add(sunAt);
     this.sun.target.position.copy(target);
     const day = 1 - sc.night * 0.75;
     const cloud = sc.weather.cloud;
@@ -380,11 +380,11 @@ export class World3D {
     fog.color.copy(sky);
 
     this.updateFog(cam.x, cam.y);
-    this.syncGates(world, state, sc);
-    this.moving.sync(sc, (p) => this.meshes(p)); // auch: Die Flügel eines Tors wackeln bei „noch nicht“
+    this.houses.sync(world, state, sc, this.turn); // auch: Die Flügel eines Tors wackeln bei „noch nicht“
     this.syncChunks(world, cam.x, cam.y);
-    this.syncBodies(state, sc);
-    this.syncSigns(state);
+    const facing = YAW.s + (view.yaw * Math.PI) / 180; // zur Kamera, auch wenn sie dreht
+    this.syncBodies(state, sc, facing);
+    this.syncSigns(state, facing);
     this.syncSleeper(state);
     this.platforms.sync(state, sc);
     this.notes.update(state, sc.now, sc.reduced);
@@ -396,6 +396,42 @@ export class World3D {
   /** Postkarte: die Front des Tors `id` als Standbild in `out` (mitwachsen-card-3d.ts); vor `render` rufen */
   postcard(world: World, id: GateId, out: HTMLCanvasElement) {
     frontShot(this.renderer, this.scene, this.fogUniforms, world, id, out, this.size);
+  }
+
+  /**
+   * Ein Pfeil kommt (Kern, vor dem Schritt): Ist die Ansicht über 45° zur Torfront gedreht, blinzelt sie zurück und
+   * liefert true; der Schritt `go` kommt dann nach 300 ms (`Blink` in mitwachsen-turn.ts). Die Pfeile bleiben weltbezogen
+   */
+  blink(go: () => void): boolean {
+    return !!this.turn?.blink(go);
+  }
+
+  /** Dreht die Kamera auf der Torplatte (nicht bei reduzierter Bewegung, nicht mit „Kamera bewegen: aus“)? */
+  turns(): boolean {
+    return !!this.turn?.turns();
+  }
+
+  /** Ist die Kamera an der Torfront angekommen (oder dreht gar nicht)? Erst dann zeigt ein Tor „noch nicht“ */
+  arrived(): boolean {
+    return this.turn?.arrived() ?? true;
+  }
+
+  /**
+   * Drehung zur Torfront nachladen, sobald die Figur einem Tor nah ist (nicht bei reduzierter Bewegung, dort dreht
+   * nichts); einmal je Seite. Scheitert es (ohne Netz und nicht gespeichert), bleibt die Kamera im Süden, die Postkarte
+   * kommt
+   */
+  private wantTurn(world: World, at: { x: number; y: number }, reduced: boolean) {
+    if (this.turnAsked || reduced) return;
+    const near = (g: { mid: readonly [number, number] }) =>
+      Math.max(Math.abs(g.mid[0] - at.x), Math.abs(g.mid[1] - at.y)) <= NEAR_GATE;
+    if (![...world.gates.values()].some(near)) return;
+    this.turnAsked = true;
+    const host = this.renderer.domElement.parentElement;
+    void import('./mitwachsen-turn-3d').then(
+      (m) => (this.turn = new m.PlateTurn(host)),
+      () => undefined,
+    );
   }
 
   /** Der Nebel hat sich gelichtet: Maske im nächsten Bild neu berechnen (die Stücke selbst bleiben) */
@@ -421,7 +457,7 @@ export class World3D {
     this.world = world;
     this.platforms.build(world);
     this.notes.build(world);
-    this.gatesKey = '';
+    this.houses.reset();
     this.fogDirty = true;
     this.rebuild(withNeighbours(chunks));
   }
@@ -433,7 +469,7 @@ export class World3D {
    */
   use(pack: Pick<LoadedPack, 'id' | 'view3d'>) {
     void this.views.use(pack, () => {
-      this.gatesKey = '';
+      this.houses.reset();
       for (const k of this.chunks.keys()) this.stale.add(k);
     });
   }
@@ -441,7 +477,7 @@ export class World3D {
   private reset(world: World) {
     this.world = world;
     this.fogDirty = true;
-    this.gatesKey = '';
+    this.houses.reset();
     this.platforms.build(world);
     this.notes.build(world);
     for (const c of this.chunks.values())
@@ -470,63 +506,6 @@ export class World3D {
       out.push(m);
     }
     return out;
-  }
-
-  /** Gruppe an der Mitte eines Feldes, gedreht so, dass ihr +z in Richtung `facing` (Welt-x, Welt-y) schaut */
-  private place(group: Group, x: number, y: number, h: number, facing: readonly [number, number]) {
-    group.position.set(x + 0.5, h, y + 0.5);
-    group.rotation.y = Math.atan2(facing[0], facing[1]);
-    return group;
-  }
-
-  private clear(group: Group) {
-    group.traverse((o) => {
-      if (o instanceof Mesh) (o.geometry as BufferGeometry).dispose();
-    });
-    group.clear();
-  }
-
-  /** Torhäuser neu bauen, wenn sich die Öffnung eines Tors ändert oder der Pinguin zu führen beginnt bzw. aufhört */
-  private syncGates(world: World, state: State, sc: Scene) {
-    const guest = guideGate(state);
-    const lit = ritualGlow(state); // das Eistor geht auf: Eiszapfen und Umriss leuchten
-    // Öffnung in Zehnteln: Beim Aufschwingen werden die Torhäuser höchstens zehnmal neu gebaut, nicht in jedem Bild
-    const open = (id: GateId) => Math.round((sc.gates.get(id) ?? 0) * 10) / 10;
-    const shut = !!guest && !state.openGates.includes(guest); // Goldrand der Platte, bis das Tor aufgeht (wie in 2D)
-    const key = `${guest}|${shut}|${lit}|${[...sc.gates.keys()].map((id) => `${id}:${open(id)}`).join()}`;
-    if (key === this.gatesKey) return;
-    this.gatesKey = key;
-    this.buildGates(world, open, guest, lit, shut);
-  }
-
-  /**
-   * Die großen Tore: mächtige Torhäuser im Felsring, je Welt geschmückt, zur Lichtung schauend. `open` sagt je Tor, wie
-   * weit die Tür offen ist (die Flügel stehen an ihrer Angel und sind gedreht); am Tor `guest` (dorthin führt der
-   * verlaufene Pinguin) steht sein Umriss auf der Tür, und der Rand der Torplatte davor pulsiert golden, solange es zu
-   * ist (`shut`). Geht das Eistor mit ihm auf, leuchten bis `lit` seine Eiszapfen, und der Umriss füllt sich mit den Farben des Pinguins.
-   */
-  private buildGates(world: World, open: (id: GateId) => number, guest: GateId | null, lit: number, shut: boolean) {
-    this.clear(this.gateGroup);
-    this.moving.clear();
-    for (const g of world.gates.values()) {
-      const p = parts();
-      const [[mx, my], [fx, fy]] = [g.mid, [-g.out[0], -g.out[1]]];
-      const look = this.views.look(g.id); // aus dem Welt-Paket hinter dem Tor
-      // Richtung zur Kamera (sie steht immer im Süden) in Torhaus-Koordinaten: danach richtet sich das Schild
-      const wings = gate(p, g.id, open(g.id), g.id === guest, g.id === GUIDE_GATE ? lit : 0, [-fx || 0, fy || 0], look);
-      const group = this.place(new Group(), mx, my, world.cell(mx, my).h, [fx, fy]);
-      group.add(...this.meshes(p), this.platforms.plates.of(g.id, look?.plate, g.id === guest && shut)); // Torhaus und Torplatte davor
-      if (moves(g.id)) group.add(this.moving.add(g.id, [mx + 0.5, my + 0.5], open(g.id), [-fx || 0, fy || 0]));
-      for (const w of wings) {
-        const wing = new Group();
-        wing.position.set(w.hinge[0], 0, w.hinge[1]);
-        wing.rotation.y = w.angle;
-        wing.add(...this.meshes(w.parts));
-        this.moving.wing(g.id, wing, w); // wackelt, wenn sein Tor „noch nicht“ zeigt
-        group.add(wing);
-      }
-      this.gateGroup.add(group);
-    }
   }
 
   // ---------- Stücke der Welt ----------
@@ -685,10 +664,10 @@ export class World3D {
 
   private decoration(g: Geo, blades: Geo, canopy: Geo, bright: Geo, c: Cell, x: number, y: number) {
     const h = c.h;
-    if (c.tufts) this.tufts(blades, x, y, h, c.tufts);
+    if (c.tufts) tufts(blades, x, y, h, c.tufts);
     switch (c.deco) {
       case 'tree':
-        this.tree(g, canopy, x, y, h, c.tree ?? 'oak');
+        tree(g, canopy, x, y, h, c.tree ?? 'oak');
         break;
       case 'bush':
         // Beerenbusch: niedrig und rund (zwei Stufen), rote Beeren oben und vorn – kein Baumwipfel
@@ -819,103 +798,6 @@ export class World3D {
     }
   }
 
-  private tufts(blades: Geo, x: number, y: number, h: number, n: number) {
-    // Normale nach oben: Halme sind von beiden Seiten gleich hell und nicht schwarz von hinten
-    const greens = ['#4f9a3c', '#5fae45', '#6dbd47', '#468f37'].map((c) => new Color(c));
-    for (let i = 0; i < n; i++) {
-      const r = hash(3, x, y, i);
-      const cx = x + 0.15 + (r % 70) / 100,
-        cz = y + 0.15 + ((r >>> 8) % 70) / 100;
-      const bh = 0.22 + ((r >>> 16) % 8) / 40;
-      const s = 0.09;
-      const c = cycle(greens, r);
-      // zwei gekreuzte Halm-Flächen, von beiden Seiten sichtbar
-      blades.quad(
-        [cx - s, h, cz - s],
-        [cx + s, h, cz + s],
-        [cx + s, h + bh, cz + s],
-        [cx - s, h + bh, cz - s],
-        [0, 1, 0],
-        'white',
-        c,
-      );
-      blades.quad(
-        [cx - s, h, cz + s],
-        [cx + s, h, cz - s],
-        [cx + s, h + bh * 0.85, cz - s],
-        [cx - s, h + bh * 0.85, cz + s],
-        [0, 1, 0],
-        'white',
-        c,
-      );
-    }
-  }
-
-  private tree(g: Geo, canopy: Geo, x: number, y: number, h: number, kind: TreeKind) {
-    const leaf = new Color(LEAF[kind]);
-    const top = leaf.clone().lerp(new Color('#ffffff'), 0.18);
-    if (kind === 'pine' || kind === 'snowpine') {
-      // Tanne: drei Stufen, oben schmaler; die Schneetanne mit weißen Hauben
-      g.box(x + 0.4, h, y + 0.4, 0.2, 0.7, 0.2, '#7a5432', '#93683f', 'log', 'logTop');
-      const layers = [
-        [-0.25, 0.5, 1.5],
-        [0.0, 1.2, 1.0],
-        [0.2, 1.8, 0.6],
-      ] as const;
-      for (const [o, yy, w] of layers) {
-        canopy.box(x + o, h + yy, y + o, w, 0.6, w, leaf, top, 'leaves');
-        if (kind === 'snowpine')
-          canopy.box(x + o + 0.05, h + yy + 0.6, y + o + 0.05, w - 0.1, 0.12, w - 0.1, '#ffffff');
-      }
-      return;
-    }
-    if (kind === 'palm') {
-      // Palme: leicht schräger Stamm aus Stücken, oben Wedel im Kreuz und Kokosnüsse
-      for (let i = 0; i < 5; i++)
-        g.box(x + 0.38 + i * 0.04, h + i * 0.42, y + 0.38, 0.22, 0.42, 0.22, '#a77c46', '#c9a066', 'log', 'logTop');
-      const tx = x + 0.58,
-        ty = h + 2.1;
-      canopy.box(tx - 1.1, ty, y + 0.38, 2.4, 0.14, 0.32, leaf, top, 'leaves');
-      canopy.box(tx - 0.08, ty, y - 0.62, 0.32, 0.14, 2.3, leaf, top, 'leaves');
-      canopy.box(tx - 0.3, ty + 0.12, y + 0.18, 0.76, 0.2, 0.72, leaf, top, 'leaves');
-      // Wedelspitzen hängen nach unten
-      canopy.box(tx - 1.3, ty - 0.3, y + 0.4, 0.3, 0.32, 0.28, leaf, top, 'leaves');
-      canopy.box(tx + 1.25, ty - 0.3, y + 0.4, 0.3, 0.32, 0.28, leaf, top, 'leaves');
-      canopy.box(tx - 0.06, ty - 0.3, y - 0.85, 0.28, 0.32, 0.3, leaf, top, 'leaves');
-      canopy.box(tx - 0.06, ty - 0.3, y + 1.65, 0.28, 0.32, 0.3, leaf, top, 'leaves');
-      g.box(tx - 0.12, ty - 0.2, y + 0.42, 0.16, 0.16, 0.16, '#6b4423');
-      g.box(tx + 0.12, ty - 0.2, y + 0.58, 0.16, 0.16, 0.16, '#6b4423');
-      return;
-    }
-    if (kind === 'dead') {
-      // kahler Baum in den Lavabergen
-      g.box(x + 0.4, h, y + 0.4, 0.2, 1.5, 0.2, '#4a3426', '#5d3e21');
-      g.box(x + 0.15, h + 0.9, y + 0.45, 0.3, 0.1, 0.1, '#4a3426');
-      g.box(x + 0.6, h + 1.15, y + 0.45, 0.3, 0.1, 0.1, '#4a3426');
-      g.box(x + 0.15, h + 0.9, y + 0.45, 0.1, 0.4, 0.1, '#4a3426');
-      return;
-    }
-    if (kind === 'birch') {
-      g.box(x + 0.4, h, y + 0.4, 0.2, 1.6, 0.2, '#e8e4d8', '#f3efe6');
-      for (const z of [0.3, 0.75, 1.15]) g.box(x + 0.39, h + z, y + 0.53, 0.22, 0.06, 0.08, '#3a3a44');
-      canopy.box(x + 0.05, h + 1.35, y + 0.05, 0.9, 0.95, 0.9, leaf, top, 'leaves');
-      canopy.box(x + 0.2, h + 2.3, y + 0.2, 0.6, 0.45, 0.6, leaf, top, 'leaves');
-      return;
-    }
-    g.box(x + 0.36, h, y + 0.36, 0.28, 1.3, 0.28, '#7a5432', '#93683f', 'log', 'logTop');
-    // runde Krone: Mitte am breitesten, oben kleiner
-    canopy.box(x - 0.1, h + 1.05, y - 0.1, 1.2, 0.55, 1.2, leaf, top, 'leaves');
-    canopy.box(x - 0.4, h + 1.45, y - 0.4, 1.8, 0.8, 1.8, leaf, top, 'leaves');
-    canopy.box(x - 0.15, h + 2.25, y - 0.15, 1.3, 0.55, 1.3, leaf, top, 'leaves');
-    canopy.box(x + 0.15, h + 2.8, y + 0.15, 0.7, 0.35, 0.7, leaf, top, 'leaves');
-    if (kind === 'blossom')
-      for (let i = 0; i < 8; i++) {
-        const r = hash(17, x, y, i);
-        canopy.box(x - 0.35 + (r % 170) / 100, h + 1.5 + ((r >>> 8) % 66) / 100, y + 1.41, 0.09, 0.09, 0.02, '#ffffff');
-      }
-  }
-
-  /** Großes Tor im Felsen: Holzflügel mit Eisenbändern, oben ein Steinsturz; in der Mitte das Schloss */
   /**
    * Riesenpilz auf der Wiese als Unterstand: dicker cremefarbener Stiel mit Kragen in der Mitte, darüber ein
    * hoher, breiter roter Hut mit weißen Tupfen (Laub-Material: vor der Figur wird er durchsichtig). Der Hut sitzt so
@@ -976,7 +858,8 @@ export class World3D {
     return g;
   }
 
-  private syncBodies(state: State, sc: Scene) {
+  /** Wesen an ihren Platz; `facing`: zur Kamera (die lesende Figur schaut zum Betrachter) */
+  private syncBodies(state: State, sc: Scene, facing: number) {
     const seen = new Set<string>();
     const place = (id: string, geo: BufferGeometry, scale: number, dir: Dir) => {
       const b = sc.bodies.get(id);
@@ -992,7 +875,7 @@ export class World3D {
       m.geometry = geo;
       m.scale.setScalar(scale * (b.puff ?? 1)); // Haltung im Iglu: aufgeplustert oder eingerollt
       m.position.set(b.x + 0.5, b.z + b.hop, b.y + 0.5);
-      m.rotation.y = YAW[dir];
+      m.rotation.y = id === 'player' && sc.pose !== 'stand' ? facing : YAW[dir];
     };
     if (!state.sleeping) {
       // Korb auf dem Rücken, Eimer und Netz in den Händen, Buch beim Lesen; beim Lesen schaut die Figur zum Betrachter
@@ -1023,7 +906,8 @@ export class World3D {
   }
 
   /** Tiere auf den Tafeln: gefundene in Farbe, verlorene als dunkle Umrisse (neu gebaut, wenn sich etwas ändert) */
-  private syncSigns(state: State) {
+  private syncSigns(state: State, facing: number) {
+    for (const m of this.signs.children) m.rotation.y = facing; // schauen zur Kamera, auch wenn sie dreht
     const key = state.met.join(',');
     if (key === this.signKey) return;
     this.signKey = key;
@@ -1038,7 +922,7 @@ export class World3D {
         const sp = SPECIES[a.species];
         const m = new Mesh(this.model(a.species, sp.parts), met ? this.entity : this.dark);
         m.scale.setScalar(sp.scale * 0.45);
-        m.rotation.y = YAW.s;
+        m.rotation.y = facing;
         m.position.set(sign[0] + 0.5 + (i - (n - 1) / 2) * 0.42, 2.1, sign[1] + 0.5);
         this.signs.add(m);
       });

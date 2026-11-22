@@ -14,8 +14,8 @@ export const CALM_KEY = 'larmic.games.calm';
 export const calm = (store: Store) => store.getItem(CALM_KEY) === '1';
 
 /**
- * Elternschalter „Kamera bewegen“ umlegen und merken (geht das nicht, bleibt er, wie er war). Noch ohne Wirkung im
- * Spiel: Die Postkarte der Torfront kommt ohnehin überall, die Drehung kommt erst
+ * Elternschalter „Kamera bewegen“ umlegen und merken (geht das nicht, bleibt er, wie er war). Aus: Die 3D-Ansicht dreht
+ * auf der Torplatte nicht zur Front, die Postkarte kommt stattdessen (wie in 2D und bei reduzierter Bewegung)
  */
 export function toggleCalm(store: Store) {
   try {
@@ -81,6 +81,8 @@ export function renderMenu(menu: HTMLElement, store: Store, saved: SavedWorld, m
   toggle(menu, 'sound', !muted, muted ? 'Ton ist aus' : 'Ton ist an');
   const off = calm(store);
   toggle(menu, 'motion', !off, `Kamera bewegen: ${off ? 'aus' : 'an'}`);
+  // an der Spielfläche für die 3D-Ansicht (mitwachsen-turn-3d.ts), auch wenn der Speicher gesperrt ist
+  menu.closest<HTMLElement>('.mw')?.setAttribute('data-calm', off ? '1' : '0');
 }
 
 /** Schalter im Menü (`data-act`): gedrückt heißt an, das Etikett sagt es auch */

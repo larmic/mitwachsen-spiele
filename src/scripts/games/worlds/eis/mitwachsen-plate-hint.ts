@@ -18,7 +18,8 @@ import type { World } from '../../mitwachsen-world';
  * nicht gespeichert; sie wird mit dem Spiel vorab gespeichert), bleibt es bis zum nächsten Laden der Seite still, nur
  * der Nebel lichtet sich und die Flügel wackeln. Verlässt die Figur die Platte vorher, kommt nichts nach. Läuft der
  * Takt zurück (eine andere Welt öffnet, sie beginnt bei Takt 0), zählt das letzte Mal nicht mehr, sonst schwiege das
- * Tor dort, bis ihr Takt den alten eingeholt hat.
+ * Tor dort, bis ihr Takt den alten eingeholt hat. Dreht die 3D-Ansicht zur Torfront (`r3d`), zeigt es erst, wenn sie
+ * angekommen ist (p = 1); vorher zählt das Stehen nicht als gezeigt, so kommt es beim Ankommen gleich.
  */
 export function plateHint() {
   let shown: Hint & { t: number } = { t: -1e9 }; // t: Takt, an dem das Tor zuletzt zeigte, was fehlt
@@ -32,6 +33,7 @@ export function plateHint() {
     reduced: boolean,
     sfx: Pick<Sfx, 'score'>,
     lift: (peek: true) => void,
+    r3d?: { arrived(): boolean } | null,
   ): Hint => {
     const on = world.cell(state.player.x, state.player.y).plate === GUIDE_GATE;
     if (on && !asked) {
@@ -41,7 +43,7 @@ export function plateHint() {
         () => (look = null),
       );
     }
-    const sp = hint(state, world, state.tick < shown.t ? -1e9 : shown.t);
+    const sp = r3d?.arrived() === false ? undefined : hint(state, world, state.tick < shown.t ? -1e9 : shown.t);
     if (sp) shown = { t: state.tick };
     due = on ? (sp ?? due) : undefined;
     if (due && look !== undefined) {

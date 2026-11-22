@@ -37,9 +37,11 @@ const DIST = 'dist';
  * Blinzeln, Kamera vor den Flügeln, Elternschalter, Platten der anderen Welten). Reicht das nicht, bewusst und
  * begründet anheben. Mit der Postkarte der Torfront (nachgeladene 2D-Zeichnung mitwachsen-postcard.<hash>.js,
  * Standbild in der 3D-Ansicht) und dem Elternschalter 1023,6 KiB: Das Budget reicht noch, es bleibt; 0,4 KiB
- * Luft. Die Drehung in 3D wird es bewusst und knapp anheben müssen.
+ * Luft. Die Drehung in 3D wird es bewusst und knapp anheben müssen: Mit ihr (Drehregler und Einbau in der nachgeladenen
+ * Datei mitwachsen-turn-3d.<hash>.js, Kamera, Sonne und Zugang zur Front in der 3D-Ansicht) 1029,8 KiB, darum bewusst
+ * auf 1032 KiB angehoben; gut 2 KiB Luft für die Kamera vor den Flügeln und die Platten der anderen Welten.
  */
-const PRECACHE_BUDGET = 1024 * 1024;
+const PRECACHE_BUDGET = 1032 * 1024;
 const OPTS: PwaOptions = { origin: SITE.url, manifest: '/manifest.webmanifest', sw: SERVICE_WORKER };
 
 const filesIn = (dir: string): string[] =>

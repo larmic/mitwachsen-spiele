@@ -101,7 +101,8 @@ export type View2D = {
   /**
    * „Noch nicht“ am Tor dieser Welt, je Bild gefragt (Eis-Welt: worlds/eis/mitwachsen-plate-hint.ts): Steht die Figur
    * auf seiner Torplatte und fehlt noch etwas, zeigt es das in Bild und Ton (`now` ms, reduzierte Bewegung) und lichtet
-   * den Nebel im Gang bis zur Mündung (`lift(true)`); liefert, was das Bild zeigt
+   * den Nebel im Gang bis zur Mündung (`lift(true)`); liefert, was das Bild zeigt. Dreht die 3D-Ansicht (`r3d`) zur
+   * Torfront, wartet es, bis sie angekommen ist
    */
   hint?(
     state: State,
@@ -110,6 +111,7 @@ export type View2D = {
     reduced: boolean,
     sfx: Pick<Sfx, 'score'>,
     lift: (peek: true) => void,
+    r3d?: { arrived(): boolean } | null,
   ): Hint;
 };
 

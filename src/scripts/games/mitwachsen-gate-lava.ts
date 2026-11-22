@@ -255,8 +255,9 @@ const basalt = (b: Body) =>
 type Tree = { x: number; z: number; y: number; h: number; k: number };
 /**
  * Lage des Baums: neben dem Gang auf dem Säulenbasalt, auf Höhe des Teichs (Stamm bei |x| ≥ 3, die Krone erst ab
- * gut 4 Feldern Höhe). Die Kamera dreht sich nie, ein Zugang sieht sie also immer aus derselben Richtung: Liegt er
- * hinten, steht der Baum links (rechts oben im Bild liegt die Karte), sonst rechts, wo ihn die Kamera ganz im Bild hat.
+ * gut 4 Feldern Höhe). Ein Zugang sieht die Kamera aus der Richtung `cam` (meist von Süden; vor der Torplatte zur
+ * Front gebaut, [0, 1]): Liegt er hinten, steht der Baum links (rechts oben im Bild liegt die Karte), sonst rechts, wo
+ * ihn die Kamera ganz im Bild hat.
  */
 export const treeAt = (cam: readonly [number, number]): Tree => ({
   x: cam[1] > 0 ? -3 : 3,

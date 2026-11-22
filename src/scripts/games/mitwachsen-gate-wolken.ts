@@ -150,8 +150,11 @@ function fillPuff(p: Puff, id: number, at: (i: number, j: number, k: number) => 
       }
 }
 
-/** Die Wolke in das Raster: nur Voxel, deren Oberseite, Seite zur Kamera oder Seiten links und rechts frei sind */
-function cloud(vox: Vox, list: readonly Puff[], cam: Cam) {
+/**
+ * Die Wolke in das Raster: nur Voxel, deren Oberseite, Seite zur Kamera oder Seiten links und rechts frei sind (mit
+ * `all` auch die Rückseite)
+ */
+function cloud(vox: Vox, list: readonly Puff[], cam: Cam, all = false) {
   const { get, box } = occupancy(list);
   const [i0, i1, j0, j1, k0, k1] = box;
   const free = (i: number, j: number, k: number) => j >= 0 && get(i, j, k) === 0;
@@ -162,7 +165,11 @@ function cloud(vox: Vox, list: readonly Puff[], cam: Cam) {
         const id = get(i, j, k);
         if (!id) continue;
         const seen =
-          free(i, j + 1, k) || free(i + cam[0], j, k + cam[1]) || free(i + rx, j, k + rz) || free(i - rx, j, k - rz);
+          free(i, j + 1, k) ||
+          free(i + cam[0], j, k + cam[1]) ||
+          free(i + rx, j, k + rz) ||
+          free(i - rx, j, k - rz) ||
+          (all && free(i - cam[0], j, k - cam[1]));
         if (!seen) continue;
         const p = list[id - 1];
         const low = p !== undefined && (j + 0.5) / VOX < p[1] - p[4] * 0.42;
@@ -256,7 +263,7 @@ const BOW_PAL: Record<string, string> = Object.fromEntries(RAINBOW.map((c, i) =>
 export function voxels(g: GateCtx) {
   const vox = new Vox();
   const list = puffs(g);
-  cloud(vox, list, g.cam);
+  cloud(vox, list, g.cam, g.all);
   const head = list[3];
   if (head) face(vox, head, g);
   const { rb } = phases(g.open);

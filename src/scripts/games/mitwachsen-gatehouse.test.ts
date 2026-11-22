@@ -6,7 +6,7 @@ import { DIP, plateParts } from './mitwachsen-plate-3d';
 import { PLATE_LEN, PLATE_STONE, PLATE_VOX, SINK, plateSink, plateVoxel } from './mitwachsen-plate';
 import { parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
 import { gate as gatehouse, motion, moves } from './mitwachsen-gates-3d';
-import { BEATS } from './mitwachsen-gate-kit';
+import { BEATS, type Vox } from './mitwachsen-gate-kit';
 import { gateLook } from './worlds/eis/view-3d-gate';
 import { GOLD } from '../../data/games/mitwachsen-portals';
 import {
@@ -19,6 +19,9 @@ import {
   ritualGlow,
 } from './mitwachsen-guest-look';
 import { RITUAL } from './mitwachsen-guide';
+import { sandGate } from './mitwachsen-gate-sand';
+import { pilzVox } from './mitwachsen-gate-pilze';
+import { voxels as wolkenVox } from './mitwachsen-gate-wolken';
 
 type Face = { axis: number; dir: number; at: number; min: [number, number]; max: [number, number]; part: string };
 
@@ -80,10 +83,17 @@ function fighting(p: Parts, extra: [string, BufferGeometry][] = []): string[] {
  * der Test jeden Flügel für sich (ungedreht) und das Haus ohne sie, denn schräge Flächen liegen nie in einer Ebene mit
  * achsenparallelen (und ihre Ränder taugen nicht für den Vergleich in `fighting`).
  */
-function house(theme: (typeof GATES)[number]['id'], open: number, outline: boolean, lit = 0, packed = true) {
+function house(
+  theme: (typeof GATES)[number]['id'],
+  open: number,
+  outline: boolean,
+  lit = 0,
+  packed = true,
+  all = false,
+) {
   const p = parts();
   const look = packed && theme === 'eis' ? gateLook : undefined; // Tür und Eiszapfen aus dem Welt-Paket
-  const wings = gatehouse(p, theme, open, outline, lit, [0, 1], look);
+  const wings = gatehouse(p, theme, open, outline, lit, [0, 1], look, all);
   const placed = wings.flatMap((w, i) =>
     Object.entries(w.parts).flatMap(([name, geo]): [string, BufferGeometry][] =>
       geo.empty ? [] : [[`Flügel ${i} ${name}`, geo.build().rotateY(w.angle).translate(w.hinge[0], 0, w.hinge[1])]],
@@ -128,6 +138,23 @@ describe('Torhäuser und Portal-Plattformen flackern nicht', () => {
           expect(fighting(p, open === 0.5 ? [] : placed), `offen ${open}, leuchtet ${lit}`).toEqual([]);
           for (const w of wings) expect(fighting(w.parts), `Flügel bei ${open}, leuchtet ${lit}`).toEqual([]);
         }
+    });
+    it(`${g.id}: zur Front gebaut (Figur in der Bucht, cam [0, 1], alle Flächen) ebenso, auch die bewegten Teile`, () => {
+      // so baut die 3D-Ansicht den Zugang vor der Platte in jeder Lage (N, O, S, W): Die Kamera dreht zur Front
+      for (const open of [0, 0.5, 1]) {
+        const { p, wings, placed } = house(g.id, open, g.id === 'eis', 0, true, true);
+        expect(fighting(p, open === 0.5 ? [] : placed), `offen ${open}`).toEqual([]);
+        for (const w of wings) expect(fighting(w.parts), `Flügel bei ${open}`).toEqual([]);
+        if (!moves(g.id)) continue;
+        for (let beat = 0; beat < BEATS; beat += 5) {
+          const m = parts();
+          motion(m, g.id, beat, open, [0, 1], true);
+          const moving = Object.entries(m).flatMap(([name, geo]): [string, BufferGeometry][] =>
+            geo.empty ? [] : [[`Takt ${name}`, geo.build()]],
+          );
+          expect(fighting(p, moving), `offen ${open}, Takt ${beat}`).toEqual([]);
+        }
+      }
     });
     it(`${g.id}: Portal-Plattform in jedem Zustand ebenso (am Tor und am Bett)`, () => {
       for (const side of ['gate', 'home'] as const) {
@@ -343,5 +370,54 @@ describe('Torplatte vor jedem Tor (3D)', () => {
     const [, [, top]] = bounds([p.solid.build(), p.bright.build()]);
     expect(top - DIP).toBeGreaterThan(0.04); // der Boden liegt bei 0: Abstand wie eine Markierung 0,02 darüber
     expect(DIP).toBeGreaterThan(SINK / 2); // sichtbar eingesunken
+  });
+});
+
+describe('Zugang vor der Torplatte zur Front gebaut (mitwachsen-gatehouses-3d.ts)', () => {
+  type Ctx = Parameters<typeof sandGate>[0];
+  const rasters: Record<string, (g: Ctx) => Vox> = { sand: sandGate, pilze: pilzVox, wolken: wolkenVox };
+  /** alle Voxel eines Rasters mit Farbe und Teil (nur im Test: der Baukasten gibt sie sonst nicht heraus) */
+  const cells = (v: Vox) => {
+    const all = (v as unknown as { cells: Map<number, { c: string; part: string }> }).cells;
+    return new Map([...all].map(([k, c]) => [k, `${c.c}|${c.part}`]));
+  };
+  /**
+   * Gemessen in der Spec: zur Front gebaut höchstens 6561 Voxel (Sand), knapp 10 ms je Torhaus. Mehr als die 6000 eines
+   * Zugangs für die Kamera im Süden, bewusst: Die Fassungen zur Front entstehen im Leerlauf, nie in einem Bild
+   */
+  const FRONT_VOX = 6600;
+
+  it('mit allen Flächen: Sand, Pilze und Wolken behalten auch die Hülle, die von der Front weg schaut', () => {
+    // sonst fehlten Voxel der Rückseite, und dreht die Kamera nach Süden, bevor der Zugang zurückgebaut ist, sähe sie
+    // durch die Löcher ins hohle Innere
+    for (const open of [0, 0.5, 1])
+      for (const cam of [
+        [0, 1],
+        [0, -1],
+        [1, 0],
+      ] as const) {
+        const ctx = { open, outline: false, lit: 0, cam };
+        for (const [id, raster] of Object.entries(rasters)) {
+          const [cut, all] = [raster(ctx), raster({ ...ctx, all: true })];
+          expect(all.size, id).toBeGreaterThan(cut.size);
+          expect(all.size, `${id} ${open} ${cam.join()}`).toBeLessThanOrEqual(FRONT_VOX);
+        }
+      }
+  });
+
+  it('beim Betreten der Bucht springt nichts um: Fassung 1 hat jeden Voxel der Fassung für den Süden, gleich gefärbt', () => {
+    // Schild, Flocke, Wasserwand, Glutbaum und Wolkengesicht richten sich weiter nach der Kamera im Süden; erst mehr als
+    // halb gedreht kommt die Fassung zur Front (cam [0, 1])
+    for (const cam of [
+      [0, -1],
+      [1, 0],
+      [-1, 0],
+    ] as const) {
+      const ctx = { open: 0, outline: false, lit: 0, cam };
+      for (const [id, raster] of Object.entries(rasters)) {
+        const all = cells(raster({ ...ctx, all: true }));
+        for (const [k, c] of cells(raster(ctx))) expect(all.get(k), `${id} ${cam.join()}`).toBe(c);
+      }
+    }
   });
 });

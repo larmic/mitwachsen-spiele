@@ -4,7 +4,8 @@
 // Die 3D-Ansicht (samt Three.js, im Build _astro/three.<hash>.js) misst eine eigene Regel und enthält nichts, was nur
 // eine Welt hinter einem Tor braucht. Jedes Welt-Paket (src/scripts/games/worlds/, im Build _astro/welt-<welt>.<hash>.js)
 // und sein 3D-Teil (_astro/welt-<welt>-3d.<hash>.js) messen je eine eigene Regel, ebenso „noch nicht“ am Tor
-// (_astro/mitwachsen-hint-look.<hash>.js, nachgeladen).
+// (_astro/mitwachsen-hint-look.<hash>.js, nachgeladen) und die Drehung zur Torfront (_astro/mitwachsen-turn-3d.<hash>.js,
+// nachgeladen von der 3D-Ansicht).
 // Logik und Tests: scripts/bundles.ts, scripts/bundles.test.ts
 
 import { readFileSync, readdirSync } from 'node:fs';
@@ -54,7 +55,12 @@ export const RULES: Rule[] = [
     // 2D-Zeichnung mitwachsen-postcard.ts), das Standbild in 3D liegt in der 3D-Ansicht (mitwachsen-card-3d.ts),
     // Schalter und Speichern im nachgeladenen Menü (mitwachsen-menu.ts); im Kern nur der Klick darauf. Gemessen
     // 129 895 Bytes, also 153 Bytes Luft; was die nächsten Schritte der Torplatte im Kern brauchen (Blinzeln, Kamera
-    // vor den Flügeln, Wirkung des Schalters, „noch nicht“ an den anderen Toren), muss dort erst Platz machen
+    // vor den Flügeln, Wirkung des Schalters, „noch nicht“ an den anderen Toren), muss dort erst Platz machen. Mit der
+    // Drehung zur Torfront unverändert 127,0 KB (gemessen 130 002 Bytes, 46 Bytes Luft): Im Kern steht nur die Frage
+    // an die 3D-Ansicht vor jedem Schritt (`blink`, danach der Takt wie nach einem frischen Druck) und die 3D-Ansicht
+    // als Argument für „noch nicht“ (wartet, bis die Kamera vorn ist). Abdunkeln und Blickfächer setzt die 3D-Ansicht
+    // als CSS-Variablen, den Schalter liest sie selbst. Kamera vor den Flügeln und „noch nicht“ an den anderen Toren
+    // brauchen im Kern Platz: dafür die bewusste Anhebung um höchstens 1 KB aus dem Konzept „Torplatte“
     budget: 127 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
@@ -104,7 +110,13 @@ export const RULES: Rule[] = [
     // Wasserwand, Glutkaskade, wiegende Pilzranken je Takt); 597,0 KB mit den Torplatten (mitwachsen-plate-3d.ts);
     // 596,8 KB mit ihrem goldenen, pulsierenden Rand statt der goldenen Bucht; 597,1 KB, seit die Flügel eines Tors bei
     // „noch nicht“ wackeln (`MovingGates.wing`, `hintShake`; bewusst für alle Tore gleich, kein Sonderfall einer Welt);
-    // dazu knapp 4 KB Luft
+    // 600,0 KB mit der Drehung zur Torfront: Kamera aus Winkel, Neigung, Abstand und Blickhöhe (mitwachsen-camera.ts),
+    // Sonne dreht mit, Zugang vor der Platte zur Front mit allen Flächen (`all`), Tiere auf den Tafeln und die lesende
+    // Figur schauen zur Kamera, Nachladen der Drehung nah am Tor, Torhäuser je Tor neu gebaut statt alle
+    // zusammen (mitwachsen-gatehouses-3d.ts). Der Drehregler selbst samt Blinzeln und Fächer kommt
+    // erst dann (Regel „Drehung zur Torfront“ unten), sonst wäre die Grenze um 1,4 KB überschritten. 600,9 KB (615 310
+    // Bytes), seit die Fassungen zur Front im Leerlauf entstehen und beim Betreten der Bucht nichts umspringt (zwei
+    // Fassungen je Tor, alle Takte der bewegten Teile vorab, `MovingGates.fill`); 114 Bytes Luft
     budget: 601 * 1024,
     // Probe: Das Leuchten der Eiszapfen gibt es nur im 3D-Teil der Eis-Welt (ICE_GLOW in worlds/eis/view-3d-gate.ts)
     forbidden: /#7fd6ff/,
@@ -118,6 +130,18 @@ export const RULES: Rule[] = [
     // Eistors tritt (`import()` aus dem Paket der Eis-Welt, worlds/eis/mitwachsen-plate-hint.ts), nie mit der
     // Spielseite: gemessen 1,6 KB
     budget: 2 * 1024,
+    forbidden: /WebGLRenderer|three\.module/,
+  },
+  {
+    name: 'Drehung zur Torfront',
+    pages: /^spielen\/index\.html$/,
+    chunks: /\/mitwachsen-turn-3d\.[\w-]+\.js$/,
+    // kommt erst nach der 3D-Ansicht, wenn die Figur einem Tor nah ist (`NEAR_GATE` in mitwachsen-3d.ts)
+    after: /\/mitwachsen-3d\.[\w-]+\.js$/,
+    // Drehregler (mitwachsen-turn.ts: Fortschritt, Feder, Pendeln, Heranrücken, Blinzeln, Bucht) und sein Einbau
+    // (mitwachsen-turn-3d.ts: Platte, Schritt und Pfeile je Bild, Elternschalter, Abdunkeln und Blickfächer als
+    // CSS-Variablen, welcher Zugang zur Front gebaut ist, ob mehr als halb gedreht): gemessen 3,9 KB (3951 Bytes)
+    budget: 4 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

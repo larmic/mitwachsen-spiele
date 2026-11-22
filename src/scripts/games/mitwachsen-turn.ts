@@ -3,10 +3,21 @@
 // steht. Fortschritt `p` statt einmal gestarteter Fahrt: Ziel = Δ · smoothstep(p), der gezeigte Winkel folgt über eine
 // kritisch gedämpfte Feder, so kehrt die Drehung an jeder Stelle ohne Sprung um. Drüberlaufen dreht nicht. Bei
 // reduzierter Bewegung (oder Elternschalter aus) gar nicht. Die Spiellogik liest nie die Kamera. Werte aus der Demo des
-// Konzepts „Torplatte“ (update() in demo.js); nur die 3D-Ansicht importiert dieses Modul (Regel in .dependency-cruiser.cjs).
+// Konzepts „Torplatte“ (update() in demo.js); nur die Drehung der 3D-Ansicht (mitwachsen-turn-3d.ts, nachgeladen)
+// importiert dieses Modul (Regel in .dependency-cruiser.cjs). Wo die Kamera daraus steht, rechnet mitwachsen-camera.ts.
 // Spezifikation: docs/specs/mitwachsen.md (Begriff „Drehung zur Torfront“)
 
-import { BACK_FACTOR, BLINK_FROM_DEG, TARGET_DEG, TURN_DELAY_MS, turnSeconds, type Lage } from './mitwachsen-turn-pace';
+import type { GateId, Point } from '../../data/games/mitwachsen';
+import {
+  BACK_FACTOR,
+  BLINK_FROM_DEG,
+  BLINK_MS,
+  TARGET_DEG,
+  TURN_DELAY_MS,
+  turnSeconds,
+  type Lage,
+} from './mitwachsen-turn-pace';
+import { DIST, LOOK_SHIFT, LOOK_Y, TILT_DEG, type CamView } from './mitwachsen-camera';
 
 /** Gedämpfte Feder (SmoothDamp) zwischen Ziel und gezeigtem Winkel, in Sekunden */
 export const SPRING_S = 0.25;
@@ -21,14 +32,6 @@ export const CAMERA_BACK_S = 0.6;
  * kurzer Rückschwung zur gewohnten Ansicht) fahren wie in der Demo
  */
 export const BACK_BLINK_FROM_DEG = 65;
-/**
- * Heranrücken mit p: Neigung 55° → 45°, Abstand 18 → 16 Felder, Blickhöhe 0,6 → 2,7 (damit das ganze Tor samt Spitze
- * ins Bild passt und die Figur im unteren Drittel bleibt), Blickpunkt bis 1,5 Felder zum Tor
- */
-export const TILT_DEG = [55, 45] as const;
-export const DIST = [18, 16] as const;
-export const LOOK_Y = [0.6, 2.7] as const;
-export const LOOK_SHIFT = 1.5;
 
 /**
  * Zustand der Drehung: Fortschritt `p` (0 … 1), gezeigter Winkel `yaw` in Grad und seine Geschwindigkeit `v` (Feder),
@@ -123,7 +126,7 @@ export const swayDeg = (st: Turn): number => st.sway * SWAY_DEG * Math.sin((st.p
  * Kamera aus dem Zustand: Winkel samt Pendeln (Grad), Neigung (Grad), Abstand und Blickhöhe (Felder), wie weit der
  * Blickpunkt zum Tor rückt (Felder)
  */
-export function turnView(st: Turn): { yaw: number; tilt: number; dist: number; lookY: number; shift: number } {
+export function turnView(st: Turn): CamView {
   const ep = smooth(st.p);
   return {
     yaw: st.yaw + swayDeg(st),
@@ -132,4 +135,71 @@ export function turnView(st: Turn): { yaw: number; tilt: number; dist: number; l
     lookY: lerp(LOOK_Y[0], LOOK_Y[1], ep),
     shift: LOOK_SHIFT * ep,
   };
+}
+
+const rad = (deg: number) => (deg * Math.PI) / 180;
+
+/**
+ * Winkel der Sonne um die Hochachse (Bogenmaß): Sie dreht mit der Kamera, damit keine Front im Gegenlicht liegt, aber
+ * ohne das Pendeln und auf ¼° gerastet: So steht sie still, solange die Figur steht, und die Schatten flimmern nicht
+ */
+export const sunYaw = (st: Turn): number => rad(Math.round(st.yaw * 4) / 4);
+
+/** Ab so viel Grad zeigt die Karte den Blickfächer (sie bleibt genordet) */
+export const FAN_FROM_DEG = 2;
+/** Blickfächer der Karte: Blickrichtung im Uhrzeigersinn von oben (Grad), null ohne Drehung */
+export const fanDeg = (yaw: number): number | null => (Math.abs(yaw) < FAN_FROM_DEG ? null : -yaw);
+
+/** Bucht vor einem Tor für die Ansicht: so viele Reihen vor der Torreihe und so weit quer zur Mitte */
+export const BAY_ROWS = 4;
+export const BAY_HALF = 5;
+/** Das Tor, in dessen Bucht (x, y) liegt, sonst undefined */
+export function bayOf<G extends { id: GateId; mid: Point; out: Point }>(gates: Iterable<G>, x: number, y: number) {
+  for (const g of gates) {
+    const [dx, dy] = [x - g.mid[0], y - g.mid[1]];
+    const ahead = -(dx * g.out[0] + dy * g.out[1]);
+    if (ahead >= 1 && ahead <= BAY_ROWS && Math.abs(dx * g.out[1] - dy * g.out[0]) <= BAY_HALF) return g;
+  }
+  return undefined;
+}
+
+/** Ein so lange verpasster Schritt (Bilder standen still, etwa im Hintergrund) kommt nicht mehr */
+const BLINK_STALE_MS = 1000;
+
+/**
+ * Blinzeln zurück zur gewohnten Ansicht: Kommt über `BLINK_FROM_DEG` ein Pfeil (`ask`), wartet sein Schritt `BLINK_MS`;
+ * das Bild dunkelt in einem Bogen ab und wieder auf, in der Mitte schneidet es auf 0° (`cut`), am Ende kommt der
+ * Schritt (`go`), genau einmal. Weitere Pfeile in der Zwischenzeit verfallen, wie ein zweiter Tipp im Takt
+ * (input-pace.ts). Rein, ohne DOM; die Ansicht ruft `frame` in jedem Bild
+ */
+export class Blink {
+  private at = 0;
+  private go: (() => void) | null = null;
+  private cutDone = false;
+
+  /** Blinzelt es gerade? */
+  get busy() {
+    return !!this.go;
+  }
+
+  /** Ein Pfeil bei Winkel `yaw` (Grad) zur Zeit `now` (ms): true, wenn sein Schritt `go` warten muss */
+  ask(yaw: number, now: number, go: () => void): boolean {
+    if (this.go) return true;
+    if (!needsBlink(yaw)) return false;
+    [this.at, this.go, this.cutDone] = [now, go, false];
+    return true;
+  }
+
+  /** Je Bild: wie dunkel das Bild ist (0 … 1) und ob jetzt auf 0° geschnitten wird; nach `BLINK_MS` kommt der Schritt */
+  frame(now: number): { dark: number; cut: boolean } {
+    if (!this.go) return { dark: 0, cut: false };
+    const e = now - this.at;
+    const cut = !this.cutDone && e >= BLINK_MS / 2;
+    if (cut) this.cutDone = true;
+    if (e < BLINK_MS) return { dark: Math.sin((Math.max(0, e) / BLINK_MS) * Math.PI), cut };
+    const go = this.go;
+    this.go = null;
+    if (e < BLINK_MS + BLINK_STALE_MS) go();
+    return { dark: 0, cut };
+  }
 }

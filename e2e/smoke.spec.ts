@@ -1187,12 +1187,15 @@ test('Menü für Eltern: Schalter „Kamera bewegen“ ist an, lässt sich umleg
   expect(errors).toEqual([]);
 });
 
-for (const mode of ['3D', '2D mit reduzierter Bewegung'] as const)
+for (const mode of ['3D mit „Kamera bewegen: aus“', '2D mit reduzierter Bewegung'] as const)
   test(`Postkarte der Torfront (${mode}): nach 1 s auf der Torplatte oben die Front, herunter blendet sie aus`, async ({
     page,
   }) => {
     test.setTimeout(90_000);
-    if (mode !== '3D') await page.emulateMedia({ reducedMotion: 'reduce' });
+    const three = mode.startsWith('3D');
+    if (three)
+      await page.addInitScript(() => localStorage.setItem('larmic.games.calm', '1')); // Elternschalter aus
+    else await page.emulateMedia({ reducedMotion: 'reduce' });
     const errors = watchErrors(page);
     await page.goto('/spielen/');
     await page.getByRole('button', { name: /Verstanden/ }).click();
@@ -1205,7 +1208,7 @@ for (const mode of ['3D', '2D mit reduzierter Bewegung'] as const)
       lift(): void;
     };
     const webgl = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
-    if (mode === '3D' && webgl) await expect(game).toHaveClass(/three/);
+    if (three && webgl) await expect(game).toHaveClass(/three/);
     // Tore im Norden zeigt die Kamera von Süden ohnehin von vorn: dort keine Postkarte
     const [front, north] = await game.evaluate((node) => {
       const gates = [...(node as unknown as Game).world.gates.entries()];
@@ -1222,7 +1225,7 @@ for (const mode of ['3D', '2D mit reduzierter Bewegung'] as const)
           el.state = { ...el.state, player, sleeping: false, wokeAt: -100 };
           el.lift();
         },
-        [row, mode !== '3D', id] as const,
+        [row, !three, id] as const,
       );
     const card = page.locator('canvas.mw-card');
     await expect(card).toHaveAttribute('aria-hidden', 'true');
@@ -1270,6 +1273,107 @@ for (const mode of ['3D', '2D mit reduzierter Bewegung'] as const)
     }
     expect(errors).toEqual([]);
   });
+
+test('Drehung zur Torfront (3D): Stehen auf der Platte schwenkt zur Front, Fächer auf der Karte, ein Pfeil blinzelt zurück', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await page.goto('/spielen/');
+  await page.getByRole('button', { name: /Verstanden/ }).click();
+  const game = page.locator('larmic-mitwachsen');
+  await expect(game).toHaveClass(/ready/);
+  const webgl = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
+  test.skip(!webgl, 'ohne WebGL gibt es keine 3D-Ansicht (dort kommt die Postkarte, Test oben)');
+  await expect(game).toHaveClass(/three/);
+  type Game = {
+    world: { gates: Map<string, { mid: [number, number]; out: [number, number] }> };
+    state: { player: { x: number; y: number; dir: string }; sleeping: boolean; wokeAt: number };
+    gl3d: { turn: { view: { yaw: number }; front: string | null } | null };
+    lift(): void;
+  };
+  // ein Tor im Süden: Dort ist der Weg am weitesten (−155°), also blinzelt der erste Pfeil zurück
+  const south = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const [id, g] = [...el.world.gates.entries()].find(([, gate]) => gate.out[1] === 1)!;
+    const player = { x: g.mid[0], y: g.mid[1] - 2, dir: 's' }; // mitten auf der Torplatte
+    el.state = { ...el.state, player, sleeping: false, wokeAt: -100 };
+    el.lift();
+    return { id, y: player.y };
+  });
+  const yaw = () => game.evaluate((node) => (node as unknown as Game).gl3d.turn?.view.yaw ?? 0);
+  const css = (name: string) => game.evaluate((node, n) => (node as HTMLElement).style.getPropertyValue(n), name);
+  // nachgeladen, zur Front gebaut, dann weich hin: im Schnitt 40°/s, also gut 4 s bis −155°
+  await expect
+    .poll(() => game.evaluate((node) => (node as unknown as Game).gl3d.turn?.front), { timeout: 20_000 })
+    .toBe(south.id);
+  await expect.poll(yaw, { timeout: 30_000 }).toBeLessThan(-140);
+  await expect(page.locator('canvas.mw-card')).not.toHaveClass(/on/); // mit Bewegung keine Postkarte
+  expect(await css('--mw-fan')).toBe('1'); // die genordete Karte zeigt, wohin die Kamera schaut
+  expect(Number.parseFloat(await css('--mw-look'))).toBeGreaterThan(140);
+  // Schatten flimmern beim Pendeln nicht: Die Sonne pendelt nicht mit, und das Ziel der Schattenkamera liegt in jedem
+  // Bild auf dem Raster der Schattenkarte, quer zum Licht in ganzen Pixeln (snapToShadowTexel im Lichtraum der
+  // gedrehten Sonne); so verschiebt ein kleiner Kameraschritt die Schatten nur um ganze Pixel, also gleiche Pixel.
+  // Erst wenn sie angekommen ist (bis dahin dreht die Sonne mit): Fortschritt 1, Winkel ohne Pendeln am Ziel
+  const settled = () =>
+    game.evaluate((node) => {
+      const st = (node as unknown as { gl3d: { turn: { st: { p: number; yaw: number } } | null } }).gl3d.turn?.st;
+      return !!st && st.p === 1 && Math.abs(st.yaw + 155) < 0.05;
+    });
+  await expect.poll(settled, { timeout: 20_000 }).toBe(true);
+  const sway = await game.evaluate(
+    (node) =>
+      new Promise<{ yaws: number[]; dirs: string[]; off: number }>((done) => {
+        type V = { x: number; y: number; z: number };
+        type Sun = { position: V; target: { position: V } };
+        const el = node as unknown as Game & { gl3d: { sun: Sun } };
+        const texel = 36 / 2048; // SHADOW_TEXEL in mitwachsen-3d.ts
+        const [yaws, dirs] = [[] as number[], [] as string[]];
+        let off = 0;
+        const look = () => {
+          const { position: p, target } = el.gl3d.sun;
+          const t = target.position;
+          // Lichtraum wie Matrix4.lookAt(offset, 0, oben): z zur Sonne, x = oben × z, y = z × x
+          const o = [p.x - t.x, p.y - t.y, p.z - t.z];
+          const n = Math.hypot(...o);
+          const z = o.map((c) => c / n) as [number, number, number];
+          const xl = Math.hypot(z[2], z[0]);
+          const x = [z[2] / xl, 0, -z[0] / xl];
+          const y = [z[1] * x[2]! - z[2] * x[1]!, z[2] * x[0]! - z[0] * x[2]!, z[0] * x[1]! - z[1] * x[0]!];
+          for (const a of [x, y]) {
+            const v = (t.x * a[0]! + t.y * a[1]! + t.z * a[2]!) / texel;
+            off = Math.max(off, Math.abs(v - Math.round(v)));
+          }
+          dirs.push(z.map((c) => c.toFixed(4)).join());
+          yaws.push(el.gl3d.turn?.view.yaw ?? 0);
+          if (yaws.length < 60) requestAnimationFrame(look);
+          else done({ yaws, dirs, off });
+        };
+        requestAnimationFrame(look);
+      }),
+  );
+  expect(Math.max(...sway.yaws) - Math.min(...sway.yaws)).toBeGreaterThan(0.05); // die Kamera bewegt sich
+  expect(new Set(sway.dirs).size).toBe(1); // die Sonne nicht
+  expect(sway.off).toBeLessThan(1e-3); // ganze Pixel der Schattenkarte
+  // erster Pfeil: erst blinzeln (abdunkeln), dann läuft die Figur, die Pfeile bleiben, wie sie sind (↑ ist Norden)
+  const waited = await game.evaluate(
+    (node, y) =>
+      new Promise<number>((done) => {
+        const el = node as unknown as Game;
+        const t0 = performance.now();
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+        document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowUp', bubbles: true }));
+        const look = () => (el.state.player.y !== y ? done(performance.now() - t0) : requestAnimationFrame(look));
+        requestAnimationFrame(look);
+      }),
+    south.y,
+  );
+  expect(waited).toBeGreaterThanOrEqual(290); // der Schritt wartet aufs Blinzeln (300 ms), er geht nicht verloren
+  await expect.poll(() => game.evaluate((node) => (node as unknown as Game).state.player.y)).toBe(south.y - 1);
+  expect(Math.abs(await yaw())).toBeLessThan(5);
+  await expect.poll(() => css('--mw-fan')).toBe('0');
+  expect(errors).toEqual([]);
+});
 
 test.describe('ohne JavaScript', () => {
   test.use({ javaScriptEnabled: false });

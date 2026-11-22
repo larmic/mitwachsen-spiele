@@ -22,7 +22,7 @@ describe('„Noch nicht“ am Eistor in der Ansicht', () => {
     tick,
     still,
   });
-  function setup(reduced = false) {
+  function setup(reduced = false, r3d: { arrived(): boolean } | null = null) {
     vi.useFakeTimers();
     const played: Scored[][] = [];
     let peeks = 0;
@@ -30,7 +30,7 @@ describe('„Noch nicht“ am Eistor in der Ansicht', () => {
     vi.stubGlobal('document', { querySelector: () => say }); // Live-Region des Spiels
     const show = plateHint();
     const sfx = { score: (n: readonly Scored[]) => void played.push([...n]) };
-    const ask = (s: State, now: number) => show(s, w, now, reduced, sfx, () => peeks++);
+    const ask = (s: State, now: number) => show(s, w, now, reduced, sfx, () => peeks++, r3d);
     return { ask, played, say, peeks: () => peeks };
   }
   afterEach(() => {
@@ -91,5 +91,18 @@ describe('„Noch nicht“ am Eistor in der Ansicht', () => {
     await vi.dynamicImportSettled();
     expect(other.ask(at(320, HINT_AFTER - 1), 4000).at).toBeUndefined();
     expect([other.played.length, other.peeks()]).toEqual([0, 0]);
+  });
+
+  it('in 3D erst, wenn die Kamera an der Front angekommen ist (p = 1); das Stehen davor zählt nicht als gezeigt', async () => {
+    let arrived = false;
+    const { ask, played, peeks } = setup(false, { arrived: () => arrived });
+    ask(at(400, 0), 1000); // betreten: Das Bild wird geholt
+    await vi.dynamicImportSettled();
+    for (let t = 0; t < 10; t++)
+      expect(ask(at(401 + HINT_AFTER + t, HINT_AFTER + t), 2000 + t * 100).at).toBeUndefined();
+    expect([played.length, peeks()]).toEqual([0, 0]);
+    arrived = true; // die Kamera ist vorn: gleich im nächsten Bild alles zugleich
+    expect(ask(at(411 + HINT_AFTER, HINT_AFTER + 10), 3000)).toMatchObject({ id: 'eis', at: 3000 });
+    expect([played.length, peeks()]).toEqual([1, 1]);
   });
 });

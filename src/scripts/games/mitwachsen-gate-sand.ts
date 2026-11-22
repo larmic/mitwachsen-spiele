@@ -59,21 +59,21 @@ function pillar(i: number, j: number, k: number, a: number) {
   return !(corner && hash3(i, j, k) < 0.4);
 }
 
-/** Richtungen, in denen eine Außenfläche zählt: nie nach unten, nie von der Kamera weg (die sieht keiner) */
-function seen(cam: GateCtx['cam']): [number, number, number][] {
-  const all: [number, number, number][] = [
+/** Richtungen, in denen eine Außenfläche zählt: nie nach unten, nie von der Kamera weg (die sieht keiner; mit `all` doch) */
+function seen(cam: GateCtx['cam'], every = false): [number, number, number][] {
+  const dirs: [number, number, number][] = [
     [0, 1, 0],
     [1, 0, 0],
     [-1, 0, 0],
     [0, 0, 1],
     [0, 0, -1],
   ];
-  return all.filter(([x, y, z]) => y === 1 || x !== -cam[0] || z !== -cam[1]);
+  return dirs.filter(([x, y, z]) => every || y === 1 || x !== -cam[0] || z !== -cam[1]);
 }
 
 /** Bogen und Pfeiler als Schale: nur Voxel, die eine sichtbare Außenseite haben (spart Voxel, innen ist es hohl) */
-function arch(v: Vox, cam: GateCtx['cam']) {
-  const dirs = seen(cam);
+function arch(v: Vox, cam: GateCtx['cam'], all?: boolean) {
+  const dirs = seen(cam, all);
   for (let j = 0; j < TOP; j++)
     for (let k = K0; k < K1; k++)
       for (let i = -P_OUT; i < P_OUT; i++) {
@@ -244,7 +244,7 @@ const waterLevel = (open: number) => (open >= 1 ? 3 : open >= 0.8 ? 2 : open >= 
 /** Das Voxel-Raster des Zugangs in einem Zustand (auch für Tests) */
 export function sandGate(g: GateCtx): Vox {
   const v = new Vox();
-  arch(v, g.cam);
+  arch(v, g.cam, g.all);
   mulde(v, waterLevel(g.open));
   const u = 1.1 * ease(seg(g.open, 0.2, 0.73)); // die Düne versickert, nachdem die Fäden abgerissen sind
   if (g.open >= 0.5) plates(v);

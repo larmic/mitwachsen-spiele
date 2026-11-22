@@ -30,4 +30,22 @@ describe('Schatten rasten ein', () => {
     expect(jumps.length).toBeLessThan(10);
     expect(jumps.length).toBeGreaterThan(0);
   });
+
+  it('mit der Kamera gedrehte Sonne: eingerastet im Lichtraum der gedrehten Sonne, gleiche Pixel bei kleinem Schritt', () => {
+    for (const deg of [25, -65, 65, -155]) {
+      const turned = offset.clone().applyAxisAngle(new Vector3(0, 1, 0), (deg * Math.PI) / 180);
+      const b = new Matrix4().lookAt(turned, new Vector3(), new Vector3(0, 1, 0)); // so schaut die Schattenkamera
+      const ax = (i: number) => new Vector3().setFromMatrixColumn(b, i);
+      const s = snapToShadowTexel(new Vector3(12.34, 1, -7.89), turned, texel);
+      for (const i of [0, 1]) {
+        const k = s.dot(ax(i)) / texel;
+        expect(Math.abs(k - Math.round(k))).toBeLessThan(1e-6);
+      }
+      // ein kleiner Schritt der Kamera (ein Zehntel Pixel quer zum Licht, von der Mitte eines Pixels aus): dieselben
+      // Pixel, das Raster steht
+      const near = snapToShadowTexel(s.clone().addScaledVector(ax(0), texel / 10), turned, texel);
+      const across = (v: Vector3) => [v.dot(ax(0)), v.dot(ax(1))].map((c) => Math.round(c / texel));
+      expect(across(near)).toEqual(across(s));
+    }
+  });
 });
