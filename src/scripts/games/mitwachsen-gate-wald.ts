@@ -10,6 +10,7 @@
 // alles Feine (Tür, Bogenrand, Moos, Spechtloch, Specht, Schild) liegt in einem Voxel-Raster davor.
 
 import { Vox, ease, hash3, seg, type GateBuild, type GateCtx, type Parts } from './mitwachsen-gate-kit';
+import type { PlateLook } from './mitwachsen-plate';
 
 const F = {
   bark: '#dccbb6', // Tönung der Rindentextur
@@ -310,3 +311,7 @@ export const build: GateBuild = (p, g) => {
   raster(g).emit(p);
   return [];
 };
+
+/** Torplatte vor dem Zugang (mitwachsen-plate-3d.ts, Zeichen in Farben aus `PALETTE`): Baumscheibe: Rinde außen, helle Jahresringe innen (klopft hohl, sfx.ts) */
+const RINGS = ['...wwwwwwwwww...', '.ww..........ww.', 'w...wwwTTwww...w'] as const;
+export const plate: PlateLook = { face: [F.rinde, '#93683f'], mark: [...RINGS, ...[...RINGS].reverse()] };

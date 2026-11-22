@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BEATS, VOX, parts, type Vox } from './mitwachsen-gate-kit';
-import { SIGN_AT, build, motion, motionVox, pilzVox } from './mitwachsen-gate-pilze';
+import { SIGN_AT, build, motion, motionVox, pilzVox, plate } from './mitwachsen-gate-pilze';
+import { checkPlate } from './test-plates';
+import { GLOW } from '../../data/games/mitwachsen-portals';
 
 const CAMS = [
   [0, 1],
@@ -116,5 +118,13 @@ describe('Zugang zum Pilzwald: das verwachsene Pilztor', () => {
       expect(v.has(ci + cam[1] * 5, j, ck - cam[0] * 5)).toBe(true);
       expect(v.has(ci - cam[0], j, ck - cam[1])).toBe(false);
     }
+  });
+});
+
+describe('Torplatte vor dem Zugang (pilze)', () => {
+  it('flacher Pilzhut, der von unten glimmt (eine leuchtende Lage darunter, sinkt darum zwei Voxel ein, die Füße stecken nicht darin); flackert nicht, liegt in der Bucht, höchstens so viele Voxel', () => {
+    expect(checkPlate('pilze', plate)).toBeLessThanOrEqual(352);
+    expect([plate.under, plate.deep, plate.bob]).toEqual(['F', true, undefined]);
+    expect(GLOW.has('F')).toBe(true);
   });
 });

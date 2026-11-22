@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BEATS, VOX, parts, type GateCtx } from './mitwachsen-gate-kit';
-import { SIGN_D, SIGN_Y, bands, build, flow, motion, treeAt, voxels } from './mitwachsen-gate-lava';
+import { SIGN_D, SIGN_Y, bands, build, flow, motion, treeAt, voxels, plate } from './mitwachsen-gate-lava';
+import { checkPlate } from './test-plates';
+import { GLOW, PALETTE } from '../../data/games/mitwachsen-portals';
 
 const CAMS: readonly (readonly [number, number])[] = [
   [0, 1],
@@ -123,5 +125,15 @@ describe('Zugang der Lavaberge: Glutkaskade über Basaltstufen', () => {
       expect(Math.abs(t.x)).toBeGreaterThanOrEqual(3);
       expect(Math.max(...corners(ctx(0, cam)).map((c) => c.y))).toBeGreaterThan(6.5);
     }
+  });
+});
+
+describe('Torplatte vor dem Zugang (lava)', () => {
+  it('Basalt mit warm glimmenden Rissen in Orange und Gelb der Glut, kein Rot; flackert nicht, liegt in der Bucht, höchstens so viele Voxel', () => {
+    expect(checkPlate('lava', plate)).toBeLessThanOrEqual(176);
+    const cracks = new Set(plate.mark.join('').replace(/\./g, ''));
+    expect([...cracks].sort()).toEqual(['R', 'r']);
+    for (const c of cracks) expect(GLOW.has(c)).toBe(true); // sie glimmen
+    expect([PALETTE.r, PALETTE.R]).toEqual(['#ff7a1a', '#ffd34d']); // warmes Orange und Gelb wie die Glut
   });
 });

@@ -29,6 +29,7 @@ import {
   leader,
   lost,
   missing,
+  nope,
   pending,
   wanted,
 } from './mitwachsen-guide';
@@ -1024,6 +1025,86 @@ describe('„Noch nicht“ am Eistor', () => {
     quiet(alone(along(0, 1))); // vor der Tür
     const sand = world.gates.get('sand')!; // die Platte eines anderen Tors (ohne Schlüssel)
     quiet(alone(plateMid(sand)));
+  });
+});
+
+describe('„Noch nicht“ an den Toren, die nie aufgehen', () => {
+  const world = worldOf(1);
+  const never = GATES.filter((g) => g.opens === 'never');
+  /** Wache Figur auf `at`, alle Tiere der Lichtung zu Hause, keine Tiere unterwegs */
+  const alone = (at: Point): State => ({
+    ...initialState(world, { garden: everyone() }),
+    sleeping: false,
+    wokeAt: -100,
+    player: { x: at[0], y: at[1], dir: 'n' },
+    animals: [],
+  });
+  /** Wie die Ansicht (mitwachsen-hint-look.ts, `never`): nach jedem Befehl `nope` fragen; Takte und Tore, an denen es zeigte */
+  function shown(s: State, cmds: (Cmd | Dir)[]) {
+    let last = -Infinity;
+    const out: [tick: number, id: string][] = [];
+    const events: GameEvent[] = [];
+    for (const c of cmds) {
+      const r = run(s, world, c);
+      s = r.s;
+      events.push(...r.events);
+      const id = nope(s, world, last);
+      if (id) {
+        last = s.tick;
+        out.push([s.tick, id]);
+      }
+    }
+    return { s, out, events };
+  }
+
+  it('auf ihrer Platte nach 1 s Stehen das Zeichen, je Stehen einmal; die Platte öffnet nie', () => {
+    expect(never.map((g) => g.id)).toEqual(['sand', 'wasser', 'lava', 'hoehle', 'wald', 'wolken', 'pilze']);
+    for (const g of never) {
+      const at = plateMid(world.gates.get(g.id)!);
+      expect(world.cell(...at).plate).toBe(g.id);
+      const on = alone(at);
+      const stand = shown(on, ticks(300)); // 30 s
+      expect(stand.out, g.id).toEqual([[on.tick + HINT_AFTER, g.id]]);
+      expect(stand.s.openGates, g.id).toEqual([]);
+      expect(types(stand.events), g.id).not.toContain('gate');
+      expect(types(stand.events), g.id).not.toContain('hop'); // nichts sperrt
+      expect(shown(on, ticks(HINT_AFTER - 1)).out, g.id).toEqual([]);
+      expect(shown(on, Array<Cmd>(3 * HINT_AFTER).fill(HELD)).out, g.id).toEqual([]); // Pfeil gedrückt: Sie steht nicht
+    }
+  });
+
+  it('rauf und runter: höchstens alle 5 s, aber immer wieder; nie ein anderes Tor', () => {
+    for (const g of never) {
+      const door = world.gates.get(g.id)!;
+      const toDoor = dirTo([0, 0], door.out);
+      const away = dirTo([0, 0], [-door.out[0], -door.out[1]]);
+      const updown: (Cmd | Dir)[] = [];
+      for (let i = 0; i < 20; i++) updown.push(away, ...ticks(3), toDoor, ...ticks(12));
+      const r = shown(alone(plateMid(door)), updown);
+      expect(r.out.length, g.id).toBeGreaterThanOrEqual(5);
+      for (let i = 1; i < r.out.length; i++) expect(r.out[i]![0] - r.out[i - 1]![0]).toBeGreaterThanOrEqual(HINT_EVERY);
+      expect(new Set(r.out.map(([, id]) => id)), g.id).toEqual(new Set([g.id]));
+      expect(r.s.openGates, g.id).toEqual([]);
+    }
+  });
+
+  it('nie am Eistor, nie neben der Platte; auch mit führendem Pinguin öffnet die Platte eines anderen Tors nichts', () => {
+    const eis = world.gates.get('eis')!;
+    expect(shown(alone(plateMid(eis)), ticks(300)).out).toEqual([]); // das Eistor zeigt, was fehlt (`hint`)
+    const sand = world.gates.get('sand')!;
+    expect(shown(alone(sand.mid), ticks(300)).out).toEqual([]); // vor der Tür, nicht auf der Platte
+    for (const g of never) {
+      const at = plateMid(world.gates.get(g.id)!);
+      const r = run({ ...leading(world, at, plateMid(eis)), still: 0 }, world, ...ticks(300));
+      expect(
+        r.s.openGates.filter((id) => id !== 'eis'),
+        g.id,
+      ).toEqual([]);
+      expect(
+        r.events.filter((e) => e.type === 'gate' && e.id !== 'eis'),
+        g.id,
+      ).toEqual([]);
+    }
   });
 });
 

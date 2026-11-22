@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BEATS, parts, type Parts } from './mitwachsen-gate-kit';
-import { build, level, model, motion, moving, wallTop } from './mitwachsen-gate-wasser';
+import { build, level, model, motion, moving, wallTop, plate } from './mitwachsen-gate-wasser';
+import { checkPlate } from './test-plates';
+import { GLOW } from '../../data/games/mitwachsen-portals';
 
 const CAMS = [
   [0, 1],
@@ -110,5 +112,14 @@ describe('Zugang zur Wasserwelt: Muschelbogen mit fließender Wasserwand', () =>
       const area = (fs: Quad[]) => fs.reduce((s, f) => s + (f.max[0]! - f.min[0]! + f.max[2]! - f.min[2]!), 0);
       expect(area(toward)).toBeGreaterThan(5);
     }
+  });
+});
+
+describe('Torplatte vor dem Zugang (wasser)', () => {
+  it('Stegplanke mit Welle, die leuchtet wie Wasser; wippt leicht, sinkt einen Voxel ein; flackert nicht, liegt in der Bucht, höchstens so viele Voxel', () => {
+    expect(checkPlate('wasser', plate)).toBeLessThanOrEqual(176); // eine Lage
+    expect([plate.bob, plate.deep, plate.under]).toEqual([true, undefined, undefined]);
+    expect(plate.mark.join('').replace(/\./g, '')).toMatch(/^v+$/); // die Welle
+    expect(GLOW.has('v')).toBe(true);
   });
 });

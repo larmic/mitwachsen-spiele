@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { parts, VOX } from './mitwachsen-gate-kit';
-import { build, hoehleVox, openTop, stoneX } from './mitwachsen-gate-hoehle';
+import { build, hoehleVox, openTop, stoneX, plate } from './mitwachsen-gate-hoehle';
+import { checkPlate } from './test-plates';
+import { GLOW } from '../../data/games/mitwachsen-portals';
 
 const CAMS = [
   [0, 1],
@@ -67,5 +69,17 @@ describe('Zugang zur Höhlenwelt: Höhlenmund mit Rollstein', () => {
     };
     expect(at([0, 1])).toBe(false);
     for (const cam of CAMS.slice(1)) expect(at(cam)).toBe(true);
+  });
+});
+
+describe('Torplatte vor dem Zugang (hoehle)', () => {
+  it('Schienenende: zwei Schienen auf Schwellen, am Ende ein Prellbock mit Kristall-Lampe; flackert nicht, liegt in der Bucht, höchstens so viele Voxel', () => {
+    expect(checkPlate('hoehle', plate)).toBeLessThanOrEqual(176);
+    const [rail, sleepers] = [plate.mark[0]!, plate.mark[1]!];
+    expect([plate.mark[3], plate.mark[2]]).toEqual([rail, sleepers]); // zwei Schienen, dazwischen die Schwellen
+    expect(rail.slice(2)).toMatch(/^V+$/);
+    expect(plate.mark.map((r) => r[0])).toEqual(['T', 'T', 'T', 'T']); // der Prellbock schließt sie ab
+    expect(sleepers[1]).toBe('h'); // seine Lampe leuchtet
+    expect(GLOW.has('h')).toBe(true);
   });
 });

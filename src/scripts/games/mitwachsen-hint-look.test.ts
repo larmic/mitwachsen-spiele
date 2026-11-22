@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { REGIONS, SPECIES, type SpeciesId } from '../../data/games/mitwachsen';
-import { TILE_W, projection } from '../../lib/games/front';
+import { TILE_W, projection, type Projection } from '../../lib/games/front';
 import { hintShake } from './mitwachsen-gate-motion-3d';
 import {
   HINT_MS,
@@ -12,10 +12,17 @@ import {
   SIL,
   hintGlow,
   hintOutline,
+  never,
   notYet,
   showHint,
+  signOutline,
   silhouette,
 } from './mitwachsen-hint-look';
+import { GATES } from '../../data/games/mitwachsen';
+import { GOLD } from '../../data/games/mitwachsen-portals';
+import { HINT_AFTER, HINT_EVERY } from './mitwachsen-guide';
+import { plateMid } from './mitwachsen-plate';
+import { initialState, type State } from './mitwachsen-state';
 import { worldOf } from './test-worlds'; // trägt auch die Modelle der Eis-Tiere ein (den Pinguin)
 
 const LICHTUNG = REGIONS[0].animals.map((a) => a.species);
@@ -160,5 +167,111 @@ describe('„Noch nicht“: Umriss dessen, was fehlt', () => {
       return r.rects.length;
     };
     expect([at(1000), at(1400) > 0, at(2600)]).toEqual([0, true, 0]);
+  });
+});
+
+describe('„Noch nicht“ an den Toren, die nie aufgehen: das Zeichen ihrer Welt', () => {
+  const NEVER = GATES.filter((g) => g.opens === 'never').map((g) => g.id);
+
+  it('Umriss des Bilds ihrer Portal-Plattform: 16 × 16, nur der Rand, je Welt verschieden, kein Tier', () => {
+    const rows = NEVER.map(signOutline);
+    expect(new Set(rows.map((r) => r.join())).size).toBe(NEVER.length);
+    for (const [i, r] of rows.entries()) {
+      expect(r, NEVER[i]).toHaveLength(SIL);
+      for (const row of r) expect(row).toMatch(/^[o.]{16}$/);
+      const on = (c: number, k: number) => r[k]?.[c] === 'o';
+      const n = r.join('').split('o').length - 1;
+      expect(n, NEVER[i]).toBeGreaterThan(12); // gut zu sehen
+      expect(n, NEVER[i]).toBeLessThan(SIL * SIL * 0.6); // ein Umriss, keine Fläche
+      // kein Pixel ganz innen: Jedes hat einen leeren Nachbarn (oder liegt am Rand des Bilds)
+      for (let k = 1; k < SIL - 1; k++)
+        for (let c = 1; c < SIL - 1; c++)
+          if (on(c, k)) expect([on(c - 1, k), on(c + 1, k), on(c, k - 1), on(c, k + 1)].every(Boolean)).toBe(false);
+    }
+  });
+
+  it('in 3D zur Front gedreht: entlang der Tür, volle Breite und von vorn richtig herum, an jeder Torlage', () => {
+    const world = worldOf(1);
+    const K = 40;
+    for (const id of ['eis', 'hoehle', 'sand', 'lava'] as const) {
+      const g = world.gates.get(id)!;
+      // Kamera auf der Platte, Blick nach außen (`out`): rechts im Bild liegt (−out.y, out.x)
+      const P: Projection = (x, y, z) => [
+        200 + (x * -g.out[1] + y * g.out[0]) * K,
+        300 - z * K - (x * g.out[0] + y * g.out[1]) * 4,
+      ];
+      const rows = signOutline(id);
+      const { ctx, rects } = recorder();
+      hintOutline(ctx, world, P, id, rows, 400);
+      const golds = rects.filter((r) => r.color === GOLD.light);
+      const left = Math.min(...golds.map((r) => r.x));
+      const right = Math.max(...golds.map((r) => r.x + r.w));
+      const used = rows.flatMap((r) => [...r].flatMap((c, x) => (c === 'o' ? [x] : [])));
+      expect(right - left, id).toBeCloseTo((Math.max(...used) - Math.min(...used) + 1) * HINT_PX * K); // nicht gestaucht
+      expect(
+        golds.every((r) => r.w > 0),
+        id,
+      ).toBe(true); // nicht gespiegelt
+      const top = Math.min(...golds.map((r) => r.y));
+      const px = HINT_PX * K;
+      const drawn = new Set(
+        golds.map((r) => `${Math.round((r.x - left) / px) + Math.min(...used)},${Math.round((r.y - top) / px)}`),
+      );
+      const first = rows.findIndex((r) => r.includes('o'));
+      const want = new Set(rows.flatMap((r, y) => [...r].flatMap((c, x) => (c === 'o' ? [`${x},${y - first}`] : []))));
+      expect(drawn, id).toEqual(want); // jedes Pixel an seinem Platz, wie von vorn gelesen
+    }
+  });
+
+  it('auf der Platte nach 1 s: „hm-hm?“, „Noch nicht.“, goldener Umriss am Tor zweimal, dann nichts; höchstens alle 5 s', () => {
+    vi.useFakeTimers();
+    const world = worldOf(1);
+    const say = { textContent: '' };
+    vi.stubGlobal('document', { querySelector: (q: string) => (q === '.mw-say' ? say : null) });
+    const at = plateMid(world.gates.get('sand')!);
+    const base = initialState(world, {});
+    const on = (tick: number, still: number): State => ({
+      ...base,
+      sleeping: false,
+      player: { x: at[0], y: at[1], dir: 'n' },
+      tick,
+      still,
+    });
+    const played: unknown[] = [];
+    const sfx = { score: (n: unknown) => void played.push(n) };
+    const ask = never();
+    expect(ask(on(50, HINT_AFTER - 1), world, 1000, false, sfx)).toBeNull(); // noch keine Sekunde
+    expect(ask(on(51, HINT_AFTER), world, 1000, false, sfx, undefined, { arrived: () => false })).toBeNull(); // Kamera dreht noch
+    const h = ask(on(52, HINT_AFTER + 1), world, 1100, false, sfx, undefined, { arrived: () => true });
+    expect(h?.id).toBe('sand');
+    expect(played).toEqual([notYet('sand', true)]); // ohne Riegel: Das Tor hat keine Flügel
+    vi.advanceTimersByTime(150);
+    expect(say.textContent).toBe('Noch nicht.');
+    const P = projection(0, 0, 400, 300, 1);
+    const draw = (now: number) => {
+      const r = recorder();
+      h!.draw!(r.ctx, world, P, now);
+      return r.rects;
+    };
+    expect(draw(1100)).toEqual([]);
+    const lit = draw(1500);
+    expect(lit.length).toBeGreaterThan(0);
+    expect(new Set(lit.map((r) => r.color))).toEqual(new Set([GOLD.side, GOLD.light])); // nur Gold, nie Rot
+    expect(draw(1100 + HINT_MS)).toEqual([]);
+    // dasselbe Stehen: nichts Neues, nach 1,6 s ist es vorbei
+    expect(ask(on(60, HINT_AFTER + 9), world, 1200, false, sfx)).toBe(h);
+    expect(ask(on(60 + HINT_EVERY, HINT_AFTER + 9 + HINT_EVERY), world, 1100 + HINT_MS, false, sfx)).toBeNull();
+    expect(played).toHaveLength(1);
+    // neues Stehen nach mehr als 5 s: wieder, auch bei reduzierter Bewegung gleich
+    expect(ask(on(52 + HINT_EVERY, HINT_AFTER), world, 9000, true, sfx)?.id).toBe('sand');
+    expect(played.at(-1)).toEqual(notYet('sand', true));
+    // neue Welt (der Takt läuft zurück): Das letzte Mal zählt nicht mehr
+    expect(ask(on(HINT_AFTER, HINT_AFTER), world, 20000, false, sfx)?.id).toBe('sand');
+    // am Eistor nichts (dort zeigt es, was fehlt)
+    const eis = plateMid(world.gates.get('eis')!);
+    const ice = { ...on(900, 300), player: { x: eis[0], y: eis[1], dir: 'n' as const } };
+    expect(never()(ice, world, 30000, false, sfx)).toBeNull();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 });

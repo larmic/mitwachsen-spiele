@@ -111,9 +111,9 @@ module.exports = {
     {
       name: 'no-test-in-production',
       severity: 'error',
-      comment: 'Tests und ihre Helfer werden nur von Tests importiert.',
+      comment: 'Tests und ihre Helfer (test-worlds.ts, test-plates.ts) werden nur von Tests importiert.',
       from: { pathNot: '\\.test\\.ts$' },
-      to: { path: '(\\.test\\.ts|/test-worlds\\.ts)$' },
+      to: { path: '(\\.test\\.ts|/test-(worlds|plates)\\.ts)$' },
     },
     {
       name: 'not-to-unresolvable',

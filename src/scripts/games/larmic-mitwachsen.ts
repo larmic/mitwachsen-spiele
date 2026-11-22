@@ -112,9 +112,16 @@ class LarmicMitwachsen extends HTMLElement {
   // Postkarte der Torfront, nachgeladen mit der ersten
   private card = later(() => import('./mitwachsen-card').then((m) => m.postcardView(this.querySelector('.mw-card')!)));
   private plates = plateToy(this.sfx, (at, colors) => this.burst('', colors, 6, at, true)); // Torplatten
-  // „noch nicht“ am Eistor (Haken im Welt-Paket): Steht die Figur dort ohne Pinguin? In 3D, wenn die Kamera vorn ist
-  private hint = (now: number, eis = this.packs.get('eis')?.view) =>
-    eis?.hint?.(this.state, this.world, now, this.reduced.matches, this.sfx, this.lift, this.r3d) ?? null;
+  // „noch nicht“ an den Toren, die nie aufgehen: Bild und Ton nachgeladen mit dem ersten Schritt auf eine Torplatte
+  private never = later(() => import('./mitwachsen-hint-look').then((m) => m.never()));
+  /**
+   * „Noch nicht“: am Eistor (Haken im Welt-Paket), steht die Figur dort ohne Pinguin; an den Toren, die nie aufgehen,
+   * zeigen sie das Zeichen ihrer Welt (mitwachsen-hint-look.ts). In 3D, wenn die Kamera vorn ist
+   */
+  private hint = (now: number, eis = this.packs.get('eis')?.view, { state, world } = this) => {
+    const a = [state, world, now, this.reduced.matches, this.sfx, this.lift, this.r3d] as const;
+    return this.never(world.cell(state.player.x, state.player.y).plate)?.(...a) ?? eis?.hint?.(...a) ?? null;
+  };
 
   connectedCallback() {
     this.canvas = this.querySelector('canvas.mw-canvas')!;
@@ -769,7 +776,7 @@ class LarmicMitwachsen extends HTMLElement {
       explored: this.seen,
       // Torplatte unter den Füßen (wo der Körper gerade ist, nicht das Ziel des Schritts): Ton, einsinken
       plate: this.plates(this.world, player, this.state.sleeping, this.packs.loaded, t),
-      hint: this.hint(t), // „noch nicht“ am Eistor
+      hint: this.hint(t), // „noch nicht“ an den Toren
     };
     this.postcard(postcard(scene.plate, t, this.world.gates), gates);
     if (this.r3d) {

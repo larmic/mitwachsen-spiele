@@ -5,6 +5,7 @@
 // liegen Bretter über dem Becken und der Bogen ist frei. Gehört zur 3D-Ansicht und wird nur mit ihr nachgeladen (Three.js).
 
 import { type GateBuild, type GateCtx, type GateMotion, Vox, VOX, ease, hash3, seg } from './mitwachsen-gate-kit';
+import type { PlateLook } from './mitwachsen-plate';
 
 const C = {
   rosa: '#f4a7b9',
@@ -353,4 +354,11 @@ export const motion: GateMotion = (p, g, beat) => {
   const v = new Vox();
   for (const [i, j, k, c] of moving(g, beat)) v.set(i, j, k, c, 'bright');
   v.emit(p);
+};
+
+/** Torplatte vor dem Zugang (mitwachsen-plate-3d.ts, Zeichen in Farben aus `PALETTE`): Planke eines Stegs mit einer Welle (leuchtet wie Wasser), sie wippt leicht, solange die Figur darauf steht */
+export const plate: PlateLook = {
+  face: ['#8a6238', '#b48d58'],
+  mark: ['..vv....vv....vv.', '.v..v..v..v..v..v', 'v....vv....vv....'],
+  bob: true,
 };

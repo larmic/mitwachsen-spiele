@@ -9,7 +9,7 @@ import { Group, Mesh, type BufferGeometry } from 'three';
 import type { GateId } from '../../data/games/mitwachsen';
 import { parts, type GateLook, type Parts } from './mitwachsen-gate-kit';
 import { MovingGates } from './mitwachsen-gate-motion-3d';
-import { gate, moves } from './mitwachsen-gates-3d';
+import { gate, moves, plate } from './mitwachsen-gates-3d';
 import { ritualGlow } from './mitwachsen-guest-look';
 import { GUIDE_GATE, guideGate } from './mitwachsen-guide';
 import type { Plates3D } from './mitwachsen-plate-3d';
@@ -160,7 +160,7 @@ export class GateHouses {
     const house = new Group(); // an der Mitte des Tors, sein +z schaut zur Lichtung
     house.position.set(mx + 0.5, world.cell(mx, my).h, my + 0.5);
     house.rotation.y = Math.atan2(fx, fy);
-    house.add(...this.meshes(p), this.plates.of(g.id, look?.plate, guest && shut)); // Torhaus und Torplatte davor
+    house.add(...this.meshes(p), this.plates.of(g.id, look?.plate ?? plate(g.id), guest && shut)); // Torhaus und Torplatte davor
     const beats = moves(g.id) ? this.moving.add(g.id, [mx + 0.5, my + 0.5], open, cam, all) : undefined;
     if (beats) house.add(beats);
     for (const w of wings) {

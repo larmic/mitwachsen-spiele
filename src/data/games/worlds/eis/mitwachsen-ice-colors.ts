@@ -21,10 +21,13 @@ export const ICE_COLORS = {
   moss: ['#5f8f3a', '#7aa84a'], // Moosbüschel am Rand der Eisschale (nur Bild)
 } as const;
 
-/** Torplatte vor dem Eistor als Eisscholle (Seite, Oberseite) mit eingelegter Schneeflocke (Zeilen quer zur Platte) */
+/**
+ * Torplatte vor dem Eistor als Eisscholle (Seite, Oberseite) mit eingelegter Schneeflocke (Zeilen quer zur Platte, in
+ * Schneeweiß `s` aus `PALETTE` in mitwachsen-portals.ts; leuchtet nicht, anders als die Zeichen der anderen Platten)
+ */
 export const ICE_FLOE = {
   face: ICE_COLORS.ice,
-  mark: ['.x.x.x.', '..xxx..', 'xxx.xxx', '..xxx..', '.x.x.x.'],
+  mark: ['.s.s.s.', '..sss..', 'sss.sss', '..sss..', '.s.s.s.'],
 } as const;
 
 /**

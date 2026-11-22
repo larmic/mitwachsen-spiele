@@ -30,8 +30,8 @@ export const GRID = SUB * 3;
 /** Höhe einer Lage (in Feldern) */
 export const LAYER = 1 / SUB;
 
-/** Farben der Zeichen in den Rastern */
-const PALETTE: Record<string, string> = {
+/** Farben der Zeichen in den Rastern (auch die Zeichen der Torplatten, mitwachsen-plate.ts) */
+export const PALETTE: Record<string, string> = {
   '1': '#e8504a',
   '2': '#f39a3d',
   '3': '#f2d14b',
@@ -86,8 +86,8 @@ const PALETTE: Record<string, string> = {
 /** Gold der Plattform (Aktionsfarbe): oben Gold, an den Seiten die dunkle Kante, hell im Lauflicht */
 export const GOLD = { top: '#f0a531', side: '#b46a0c', light: '#ffd47e' } as const;
 
-/** Diese Zeichen leuchten aus sich selbst, sobald die Plattform wach ist */
-const GLOW = new Set('GWejyuvrRhmnkLF123456');
+/** Diese Zeichen leuchten aus sich selbst, sobald die Plattform wach ist (auf einer Torplatte in 3D immer) */
+export const GLOW = new Set('GWejyuvrRhmnkLF123456');
 
 /**
  * Aussehen einer Welt: Material des Rands (`edge`) und der Fläche (`surf`), gestreute helle Körner (`speck`), das Bild

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { parts } from './mitwachsen-gate-kit';
-import { build, sandGate } from './mitwachsen-gate-sand';
+import { build, sandGate, plate } from './mitwachsen-gate-sand';
+import { checkPlate } from './test-plates';
+import { GLOW } from '../../data/games/mitwachsen-portals';
 
 const CAMS = [
   [0, 1],
@@ -65,5 +67,14 @@ describe('Zugang zur Sandwelt (Sandsteinbogen)', () => {
     const water = (open: number) => sandGate(ctx(open)).has(-25, 1, 1);
     expect(water(0)).toBe(false);
     expect(water(1)).toBe(true);
+  });
+});
+
+describe('Torplatte vor dem Zugang (sand)', () => {
+  it('Sandsteinfliese mit leuchtender Sonne in der Mitte; flackert nicht, liegt in der Bucht, höchstens so viele Voxel', () => {
+    expect(checkPlate('sand', plate)).toBeLessThanOrEqual(176);
+    expect(plate.mark.length).toBe(5);
+    expect(plate.mark[2]![3]).toBe('3'); // Mitte der Sonne
+    for (const c of plate.mark.join('').replace(/\./g, '')) expect(GLOW.has(c)).toBe(true);
   });
 });

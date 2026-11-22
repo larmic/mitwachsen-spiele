@@ -19,6 +19,7 @@ import {
   type GateMotion,
   type Part,
 } from './mitwachsen-gate-kit';
+import type { PlateLook } from './mitwachsen-plate';
 
 /* ---------- Farben ---------- */
 const RIM = '#2a2b30'; // Fugen im Basalt, Rand am Fuß
@@ -356,4 +357,10 @@ export function voxels(g: GateCtx): Vox {
 export const build: GateBuild = (p, g) => {
   voxels(g).emit(p);
   return [];
+};
+
+/** Torplatte vor dem Zugang (mitwachsen-plate-3d.ts, Zeichen in Farben aus `PALETTE`): Basalt mit warm glimmenden Rissen (Orange und Gelb der Glut, kein Rot) */
+export const plate: PlateLook = {
+  face: [STONE, STONE_TOP],
+  mark: ['...r.........r....', '....rr......r.....', '......rRr..rr....r', '.rr......rR....rr.', 'r..........r......'],
 };

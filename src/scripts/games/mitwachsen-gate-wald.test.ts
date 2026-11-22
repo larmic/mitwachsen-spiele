@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { parts } from './mitwachsen-gate-kit';
-import { build, inArch, raster } from './mitwachsen-gate-wald';
+import { build, inArch, raster, plate } from './mitwachsen-gate-wald';
+import { checkPlate } from './test-plates';
+import { GLOW } from '../../data/games/mitwachsen-portals';
 
 const CAMS = [
   [0, 1],
@@ -62,5 +64,14 @@ describe('Zugang zum Wald: der Spechtbaum', () => {
       }[cam.join(',')]!;
       expect(v.has(at[0]!, at[1]!, at[2]!), cam.join(',')).toBe(true);
     }
+  });
+});
+
+describe('Torplatte vor dem Zugang (wald)', () => {
+  it('Baumscheibe mit hellen Jahresringen, die sich spiegeln wie in einem echten Stamm; flackert nicht, liegt in der Bucht, höchstens so viele Voxel', () => {
+    expect(checkPlate('wald', plate)).toBeLessThanOrEqual(176);
+    expect(plate.mark).toEqual([...plate.mark].reverse());
+    expect(plate.mark.map((r) => [...r].reverse().join(''))).toEqual(plate.mark);
+    expect(GLOW.has('w')).toBe(false); // Holz leuchtet nicht
   });
 });

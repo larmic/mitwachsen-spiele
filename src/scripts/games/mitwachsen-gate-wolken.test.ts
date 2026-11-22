@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { VOX, parts } from './mitwachsen-gate-kit';
-import { BOW_Y, build, rainbowRows, voxels } from './mitwachsen-gate-wolken';
+import { BOW_Y, build, rainbowRows, voxels, plate } from './mitwachsen-gate-wolken';
+import { checkPlate } from './test-plates';
 
 const CAMS = [
   [0, 1],
@@ -77,5 +78,12 @@ describe('Zugang der Wolkenwelt: die schlafende Riesenwolke', () => {
         }
         expect(toCam, `${cam.join()} offen ${o}`).toBeGreaterThan(0);
       }
+  });
+});
+
+describe('Torplatte vor dem Zugang (wolken)', () => {
+  it('Wolkenkissen, zwei Voxel dick, federt zwei Voxel tief statt einen; flackert nicht, liegt in der Bucht, höchstens so viele Voxel', () => {
+    expect(checkPlate('wolken', plate)).toBeLessThanOrEqual(352); // zwei Lagen
+    expect([plate.deep, plate.under, plate.bob]).toEqual([true, 'D', undefined]);
   });
 });

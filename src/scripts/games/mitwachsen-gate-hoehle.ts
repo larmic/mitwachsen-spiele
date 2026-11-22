@@ -10,6 +10,7 @@
 
 import type { Geo } from './mitwachsen-geo';
 import { VOX, Vox, ease, hash3, seg, type GateBuild, type GateCtx, type Part, type Parts } from './mitwachsen-gate-kit';
+import type { PlateLook } from './mitwachsen-plate';
 
 const FRONT = 0.375; // Vorderseite der Felswand (davor bis 0,5 nur Simse, Moos, Kristalle)
 const BACK = -1.625; // Rückseite der Wand über dem Mund
@@ -392,3 +393,8 @@ export const build: GateBuild = (p: Parts, g) => {
   v.emit(p);
   return [];
 };
+
+/** Torplatte vor dem Zugang (mitwachsen-plate-3d.ts, Zeichen in Farben aus `PALETTE`): Schienenende: zwei Schienen auf Schwellen, am Ende ein Prellbock mit Kristall-Lampe */
+const RAIL = 'TTVVVVVVVVVVVVVVV';
+const SLEEPERS = 'Th.t..t..t..t..t.';
+export const plate: PlateLook = { face: [RIM, LEDGE], mark: [RAIL, SLEEPERS, SLEEPERS, RAIL] };

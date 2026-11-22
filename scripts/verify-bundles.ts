@@ -3,7 +3,7 @@
 // Die Spielseite lädt beim Start nur ihren eigenen Code (den Kern); Three.js darf nur nachträglich (import()) kommen.
 // Die 3D-Ansicht (samt Three.js, im Build _astro/three.<hash>.js) misst eine eigene Regel und enthält nichts, was nur
 // eine Welt hinter einem Tor braucht. Jedes Welt-Paket (src/scripts/games/worlds/, im Build _astro/welt-<welt>.<hash>.js)
-// und sein 3D-Teil (_astro/welt-<welt>-3d.<hash>.js) messen je eine eigene Regel, ebenso „noch nicht“ am Tor
+// und sein 3D-Teil (_astro/welt-<welt>-3d.<hash>.js) messen je eine eigene Regel, ebenso „noch nicht“ an den Toren
 // (_astro/mitwachsen-hint-look.<hash>.js, nachgeladen) und die Drehung zur Torfront (_astro/mitwachsen-turn-3d.<hash>.js,
 // nachgeladen von der 3D-Ansicht).
 // Logik und Tests: scripts/bundles.ts, scripts/bundles.test.ts
@@ -66,7 +66,11 @@ export const RULES: Rule[] = [
     // 130 033 Bytes, 15 Bytes Luft. Eine Taktuhr als eigene Klasse kostete gut 0,2 KB und passte nicht. Platz ohne
     // Anheben für die Platten der anderen Welten: Die Anmeldung des Service Workers wartet ohnehin aufs Laden der
     // Seite und kommt nachgeladen (pwa-register.ts), die Postkarte holt das generische `later` (lib/games/later.ts):
-    // 128 462 Bytes, 1586 Bytes Luft
+    // 128 462 Bytes, 1586 Bytes Luft. 126,3 KB (129 347 Bytes) mit den Platten der anderen Welten: Klang je Welt
+    // (`PLATE_SOUND` mit Pentatonik je Welt in sfx.ts, eine kleine Tabelle), in 2D das Bild der Portal-Plattform als
+    // Zeichen der Platte (keine neue Grafik; aufrecht und ohne Rot, `plateSign`), wann ein Tor, das nie aufgeht, „noch
+    // nicht“ zeigt (`nope` in mitwachsen-guide.ts) und das Nachladen von Bild und Ton dazu (mitwachsen-hint-look.ts):
+    // knapp 0,9 KB; 701 Bytes Luft
     budget: 127 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
@@ -133,8 +137,12 @@ export const RULES: Rule[] = [
     // Bytes), seit die Fassungen zur Front im Leerlauf entstehen und beim Betreten der Bucht nichts umspringt (zwei
     // Fassungen je Tor, alle Takte der bewegten Teile vorab, `MovingGates.fill`); 114 Bytes Luft. 615 400 Bytes mit dem
     // Eistor von vorn (Umriss füllt sich schon im Vorspiel, `ritualGlow`; wann die Eiszapfen leuchten, `iceGlow`, liegt
-    // im 3D-Teil der Eis-Welt), 24 Bytes Luft
-    budget: 601 * 1024,
+    // im 3D-Teil der Eis-Welt), 24 Bytes Luft. 602 KB mit den Platten der anderen Welten: bewusst um 1 KB angehoben,
+    // wie im Konzept „Torplatte“ vereinbart. Ihr Aussehen (Fläche, Zeichen aus `PALETTE`, Lage darunter, Federn,
+    // Wippen) gehört zum Bauplan ihres Zugangs (`plate` in mitwachsen-gate-<welt>.ts), es gibt für diese Welten noch
+    // kein Welt-Paket, in das es ausweichen könnte. Sieben kleine Raster (doppelte Zeilen geteilt) und das Bauen
+    // in mitwachsen-plate-3d.ts kosten knapp 1 KB; gemessen 616 428 Bytes, 20 Bytes Luft
+    budget: 602 * 1024,
     // Probe: Das Leuchten der Eiszapfen gibt es nur im 3D-Teil der Eis-Welt (ICE_GLOW in worlds/eis/view-3d-gate.ts)
     forbidden: /#7fd6ff/,
   },
@@ -145,8 +153,11 @@ export const RULES: Rule[] = [
     // Bild, Ton und Live-Region, wenn ein Tor zeigt, was noch fehlt: leerer goldener Umriss aus dem Modell der Art
     // gerastert, Puls, „hm-hm?“ mit Riegel und Klangstein. Kommt erst, wenn die Figur das erste Mal auf die Platte des
     // Eistors tritt (`import()` aus dem Paket der Eis-Welt, worlds/eis/mitwachsen-plate-hint.ts), nie mit der
-    // Spielseite: gemessen 1,6 KB
-    budget: 2 * 1024,
+    // Spielseite: gemessen 1,6 KB. 2,2 KB, seit auch die Tore, die nie aufgehen, „noch nicht“ zeigen (`never`: das
+    // Zeichen ihrer Welt als goldener Umriss aus dem Bild ihrer Portal-Plattform, „Noch nicht.“ in der Live-Region);
+    // die Spielseite lädt es beim ersten Schritt auf eine Torplatte; in 3D liegt der Umriss entlang der Tür, von vorn
+    // richtig herum. Liegt hier statt im Kern, bewusst knapp angehoben: gemessen 2241 Bytes, 11 Bytes Luft
+    budget: 2.2 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

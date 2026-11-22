@@ -23,10 +23,20 @@ export const RISE_MS = 120;
 /** Stein der Torplatte: Seite und Oberseite; der Rand hat die Farbe der Welt */
 export const PLATE_STONE = ['#7f7a71', '#a9a49a'] as const;
 /**
- * Schmuck der Torplatte aus dem Welt-Paket (Eis: Scholle mit Schneeflocke): Fläche (Seite, Oberseite) und eingelegtes
- * Zeichen in Weiß (Zeilen quer zur Platte, `plateVoxel`), gleich in 2D und 3D
+ * Schmuck einer Torplatte (Eis: Scholle mit Schneeflocke aus dem Welt-Paket; die anderen Welten in 3D aus ihrem Bauplan
+ * mitwachsen-gate-<welt>.ts): Fläche (Seite, Oberseite) und eingelegtes Zeichen (Zeilen quer zur Platte, `plateVoxel`;
+ * jedes Zeichen außer '.' ist eine Farbe aus `PALETTE` in mitwachsen-portals.ts, in 3D leuchten die aus `GLOW`). Nur 3D:
+ * `under` legt eine zweite Lage in dieser Farbe darunter (die Platte ist dann zwei Voxel dick: Wolkenkissen, Pilzhut,
+ * der von unten glimmt), `deep` lässt sie zwei Voxel tief einsinken (sie federt), `bob` wippt sie leicht, solange die
+ * Figur darauf steht (Stegplanke); bei reduzierter Bewegung beides nicht
  */
-export type PlateLook = { face: readonly [side: string, top: string]; mark: readonly string[] };
+export type PlateLook = {
+  face: readonly [side: string, top: string];
+  mark: readonly string[];
+  under?: string;
+  deep?: true;
+  bob?: true;
+};
 
 /** Betreten oder Verlassen der Platte des Tors `id` zur Zeit `since` (ms); `on`: die Figur steht darauf */
 export type PlateFx = { id: GateId; since: number; on: boolean };
@@ -38,10 +48,10 @@ export const plateMid = (g: { mid: Point; out: Point }): Point => [
 ];
 
 /**
- * Voxel (i entlang der Platte 0 … 23, k quer 0 … 7): Rand, Zeichen (aus `mark`, Zeilen quer, mittig; jedes Zeichen außer
- * '.'), Fläche oder nichts (die Ecken fehlen, so wirkt sie oval)
+ * Voxel (i entlang der Platte 0 … 23, k quer 0 … 7): Rand ('rim'), Zeichen (aus `mark`, Zeilen quer, mittig: das Zeichen
+ * selbst, ein Buchstabe; '.' ist keines), Fläche ('face') oder nichts (die Ecken fehlen, so wirkt sie oval)
  */
-export function plateVoxel(i: number, k: number, mark: readonly string[] = []): 'rim' | 'mark' | 'face' | null {
+export function plateVoxel(i: number, k: number, mark: readonly string[] = []): string | null {
   const inside = (a: number, b: number) => {
     const end = Math.min(a, PLATE_LEN - 1 - a);
     const edge = Math.min(b, PLATE_VOX - 1 - b);
@@ -51,7 +61,7 @@ export function plateVoxel(i: number, k: number, mark: readonly string[] = []): 
   if (!inside(i - 1, k) || !inside(i + 1, k) || !inside(i, k - 1) || !inside(i, k + 1)) return 'rim';
   const row = mark[k - ((PLATE_VOX - mark.length) >> 1)] ?? '';
   const ch = row[i - ((PLATE_LEN - row.length) >> 1)];
-  return ch && ch !== '.' ? 'mark' : 'face';
+  return ch && ch !== '.' ? ch : 'face';
 }
 
 /**

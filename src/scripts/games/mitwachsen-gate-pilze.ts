@@ -23,6 +23,7 @@ import {
   type GateCtx,
   type GateMotion,
 } from './mitwachsen-gate-kit';
+import type { PlateLook } from './mitwachsen-plate';
 
 type Cam = GateCtx['cam'];
 type Pair = readonly [string, string];
@@ -484,4 +485,12 @@ export function motionVox(g: Pick<GateCtx, 'open' | 'cam' | 'all'>, beat: number
 
 export const motion: GateMotion = (p, g, beat) => {
   motionVox(g, beat).emit(p);
+};
+
+/** Torplatte vor dem Zugang (mitwachsen-plate-3d.ts, Zeichen in Farben aus `PALETTE`): flacher, blauer Pilzhut mit hellen Tupfen, der von unten glimmt (leuchtende Lamellen darunter) */
+export const plate: PlateLook = {
+  face: [BLAU[1], BLAU[0]],
+  mark: ['.d....d....d.', '....d....d...', '..d....d....d'],
+  under: 'F',
+  deep: true, // zwei Voxel dick: sinkt einen Voxel tiefer, sonst steckten die Füße im Hut
 };

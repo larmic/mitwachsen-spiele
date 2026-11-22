@@ -8,6 +8,7 @@
 // kann (Oberseite, zur Kamera, zu den Seiten), damit die große Wolke unter der Grenze von etwa 6000 Voxeln bleibt.
 
 import { Vox, ease, hash3, seg, VOX, type GateBuild, type GateCtx } from './mitwachsen-gate-kit';
+import type { PlateLook } from './mitwachsen-plate';
 
 /** Ein Bausch: Mitte (x, y, z), Halbachsen (rx, ry, rz) in Feldern, p Rundung (2 rund, 4–5 kissenförmig) */
 export type Puff = readonly [x: number, y: number, z: number, rx: number, ry: number, rz: number, p: number];
@@ -277,4 +278,12 @@ export function voxels(g: GateCtx) {
 export const build: GateBuild = (p, g) => {
   voxels(g).emit(p);
   return [];
+};
+
+/** Torplatte vor dem Zugang (mitwachsen-plate-3d.ts, Zeichen in Farben aus `PALETTE`): Wolkenkissen, zwei Voxel dick, mit bunten Knöpfen; es federt zwei Voxel tief statt einen */
+export const plate: PlateLook = {
+  face: [SIDE, TOP],
+  mark: ['D...D...D...D', '..3...4...5..', 'D...D...D...D'], // Steppnähte und Knöpfe
+  under: 'D',
+  deep: true,
 };

@@ -6,6 +6,7 @@
 // Gehört zur 3D-Ansicht und wird nur mit ihr nachgeladen (Three.js).
 
 import { Vox, ease, hash3, seg, type GateBuild, type GateCtx } from './mitwachsen-gate-kit';
+import type { PlateLook } from './mitwachsen-plate';
 
 const SST = ['#b9965c', '#d1b273', '#e2c78e'] as const; // Sandstein dunkel, mittel, hell
 const SST_TOP = '#ead29a';
@@ -261,4 +262,10 @@ export function sandGate(g: GateCtx): Vox {
 export const build: GateBuild = (p, g) => {
   sandGate(g).emit(p);
   return [];
+};
+
+/** Torplatte vor dem Zugang (mitwachsen-plate-3d.ts, Zeichen in Farben aus `PALETTE`): Fliese aus Sandstein mit leuchtender Sonne */
+export const plate: PlateLook = {
+  face: [SST[1], SST[2]],
+  mark: ['R..R..R', '.RRRRR.', 'RRR3RRR', '.RRRRR.', 'R..R..R'],
 };

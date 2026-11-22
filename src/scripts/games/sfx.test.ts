@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { STORIES } from '../../data/games/mitwachsen-stories';
 import { gateScore } from './mitwachsen-guest-look';
-import { GATES } from '../../data/games/mitwachsen';
-import { PLATE_KEY, PLATE_TUNE, Sfx, plateTones, plopp, type Scored } from './sfx';
+import { GATES, type GateId } from '../../data/games/mitwachsen';
+import { PENTA, PLATE_SOUND, PLATE_TUNE, Sfx, plateHz, plateNote, plateTones, plopp, type Scored } from './sfx';
 import { notYet } from './mitwachsen-hint-look';
 import { view } from './worlds/eis/view-2d';
 
@@ -54,18 +54,35 @@ describe('Töne der Torplatte', () => {
       ),
     );
 
-  it('Betreten: dumpfes Klonk in der Tonart der Welt (tief, fällt) und ein Ton des Motivs; höchstens 3 Stimmen, kurz', () => {
+  /** Tonart der Welt (Halbton über C) und die Halbtöne ihrer Pentatonik (0 … 11) */
+  const key = (id: GateId) => PLATE_SOUND[id][0];
+  const scale = (id: GateId) => [...PENTA[PLATE_SOUND[id][1]]!];
+
+  it('Betreten: Klonk in der Tonart der Welt (tief, nie wie das Anstoßen) und ein Ton des Motivs; höchstens 3 Stimmen, kurz', () => {
     for (const { id } of GATES) {
       const [klonk, tone] = plateTones(id, 0);
-      expect(klonk![0], id).toBeLessThan(400); // tief, aber über 120 Hz auch am Ende: Tablets spielen es noch
-      expect(klonk![0] * klonk![4], id).toBeGreaterThan(110);
-      expect(klonk![4], id).toBeLessThan(1); // fällt
-      expect(pitch(klonk![0]), id).toBe((PLATE_KEY[id] + 12) % 12);
+      const [hz, len, , , slide] = klonk!;
+      expect(hz, id).toBeLessThan(400); // tief, aber über 110 Hz auch am Ende: Tablets spielen es noch
+      expect(hz * slide, id).toBeGreaterThan(110);
+      expect(scale(id), id).toContain((((pitch(hz) - key(id)) % 12) + 12) % 12); // Grundton, Quarte oder Quinte darunter
+      // Anstoßen (Fehler-Familie: 300 Hz, 0,22 s, fällt um die Hälfte): Fällt ein Klonk deutlich, ist er kurz
+      expect(slide < 0.8 && len >= 0.15, id).toBe(false);
       expect(tone![0], id).toBeGreaterThan(300);
       expect(voices(plateTones(id, 3))).toBeLessThanOrEqual(3);
-      expect(Math.max(...plateTones(id, 4).map(([, len, , , , at]) => at + len))).toBeLessThan(0.5);
+      expect(Math.max(...plateTones(id, 4).map(([, l, , , , at]) => at + l))).toBeLessThan(0.5);
     }
-    expect(plateTones('sand', 0)[0]![0]).not.toBe(plateTones('lava', 0)[0]![0]); // jede Welt klingt anders
+  });
+
+  it('jede Welt klingt anders: Planke, Fliese, Basalt, Schiene, Holz, Wolke und Pilzhut je mit eigenem Klonk und eigener Melodie', () => {
+    const klonks = GATES.map(({ id }) => plateTones(id, 0)[0]!.slice(0, 5).join());
+    expect(new Set(klonks).size).toBe(GATES.length);
+    const tunes = GATES.map(({ id }) => PLATE_TUNE.map((_, n) => plateTones(id, n).at(-1)![0]).join());
+    expect(new Set(tunes).size).toBe(GATES.length);
+    // die Wolke macht ein weiches „puff“ nach oben, die Schiene klingt am längsten nach, das Holz ist am kürzesten
+    expect(plateTones('wolken', 0)[0]![4]).toBeGreaterThan(1);
+    const lens = GATES.map(({ id }) => plateTones(id, 0)[0]![1]);
+    expect(plateTones('hoehle', 0)[0]![1]).toBe(Math.max(...lens));
+    expect(plateTones('wald', 0)[0]![1]).toBe(Math.min(...lens));
   });
 
   it('Eis: Klirren aus dem Welt-Paket statt Klonk, hell und in der Pentatonik C–D–E–G–A', () => {
@@ -77,14 +94,17 @@ describe('Töne der Torplatte', () => {
     expect(voices(notes)).toBeLessThanOrEqual(3);
   });
 
-  it('fünfmal rauf und runter ergibt das Motiv E G A G C in der Tonart der Welt, danach beginnt es von vorn', () => {
+  it('fünfmal rauf und runter ergibt das Motiv in der Pentatonik der Welt (Dur: E G A G C), danach beginnt es von vorn', () => {
     for (const { id } of GATES) {
       const tune = [0, 1, 2, 3, 4, 5].map((n) => plateTones(id, n).at(-1)![0]);
-      expect(tune.map((hz) => pitch(hz))).toEqual(
-        [...PLATE_TUNE, PLATE_TUNE[0]!].map((st) => (((st + PLATE_KEY[id]) % 12) + 12) % 12),
-      );
-      expect(tune[4]! / tune[0]!).toBeCloseTo(2 ** (8 / 12)); // von E hinauf zum hohen C
+      for (const hz of tune) expect(scale(id), id).toContain((((pitch(hz) - key(id)) % 12) + 12) % 12);
+      expect(tune[5]).toBe(tune[0]);
+      expect(tune[4]).toBeCloseTo(plateHz(id, 12)); // endet auf dem hohen Grundton
+      expect(tune[1]).toBeCloseTo(tune[3]!);
     }
+    expect(PLATE_TUNE.map((_, n) => plateNote('eis', n))).toEqual([4, 7, 9, 7, 12]);
+    // keine Pentatonik hat einen Halbtonschritt (nichts reibt)
+    for (const s of PENTA) for (let i = 1; i < s.length; i++) expect(s[i]! - s[i - 1]!).toBeGreaterThan(1);
   });
 
   it('Verlassen: ein leises, kurzes Plopp nach oben, eine Stimme', () => {
@@ -119,7 +139,8 @@ describe('„Noch nicht“ am Tor', () => {
         for (const a of now) for (const b of now) expect([0, 4, 5, 7]).toContain(interval(a[0], b[0]));
       }
       // alles in der Pentatonik der Welt
-      for (const [hz] of notes) expect([0, 2, 4, 7, 9], id).toContain(interval(261.63 * 2 ** (PLATE_KEY[id] / 12), hz));
+      const scale = [...PENTA[PLATE_SOUND[id][1]]!];
+      for (const [hz] of notes) expect(scale, id).toContain(interval(261.63 * 2 ** (PLATE_SOUND[id][0] / 12), hz));
       // Fehler-Familie: Anstoßen (fällt tief ab) – hier fällt nichts, nichts ist laut, nichts tief und brummig
       for (const [hz, , , gain, slide] of notes)
         expect([slide >= 1, gain <= 0.1, hz > 150], id).toEqual([true, true, true]);
@@ -130,7 +151,9 @@ describe('„Noch nicht“ am Tor', () => {
   it('der Klangstein summt das Motiv der Torplatte, eine Oktave tiefer; der Riegel klappert mit jedem Wackeln', () => {
     const notes = notYet('eis');
     const hum = notes.slice(-PLATE_TUNE.length);
-    expect(hum.map(([hz]) => Math.round(12 * Math.log2(hz / 261.63)))).toEqual(PLATE_TUNE);
+    expect(hum.map(([hz]) => Math.round(12 * Math.log2(hz / 261.63)))).toEqual(
+      PLATE_TUNE.map((_, n) => plateNote('eis', n)),
+    );
     const latch = notes.filter(([, len]) => len < 0.05);
     expect(latch.map(([, , , , , at]) => at)).toEqual([0, 0.8]);
     // reduzierte Bewegung: Die Tür wackelt nicht, also klappert auch kein Riegel; sonst klingt alles gleich

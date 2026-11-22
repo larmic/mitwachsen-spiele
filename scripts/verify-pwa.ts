@@ -41,9 +41,12 @@ const DIST = 'dist';
  * Datei mitwachsen-turn-3d.<hash>.js, Kamera, Sonne und Zugang zur Front in der 3D-Ansicht) 1029,8 KiB, darum bewusst
  * auf 1032 KiB angehoben; gut 2 KiB Luft für die Kamera vor den Flügeln und die Platten der anderen Welten. Die
  * nachgeladene Anmeldung des Service Workers (eigene Datei pwa-register.<hash>.js, macht im Kern Platz für die Platten)
- * kostet mit den Importen zwischen den Dateien knapp 0,1 KiB: 1032,03 KiB, darum bewusst auf 1033 KiB angehoben.
+ * kostet mit den Importen zwischen den Dateien knapp 0,1 KiB: 1032,03 KiB, darum bewusst auf 1033 KiB angehoben. Mit
+ * den Platten der anderen Welten (sieben Platten in der 3D-Ansicht, „noch nicht“ an den Toren, die nie aufgehen, in
+ * der nachgeladenen Datei mitwachsen-hint-look.<hash>.js, Klang und Zeichen je Welt im Kern) 1034,5 KiB: bewusst und
+ * knapp auf 1035 KiB angehoben; 0,5 KiB Luft.
  */
-const PRECACHE_BUDGET = 1033 * 1024;
+const PRECACHE_BUDGET = 1035 * 1024;
 const OPTS: PwaOptions = { origin: SITE.url, manifest: '/manifest.webmanifest', sw: SERVICE_WORKER };
 
 const filesIn = (dir: string): string[] =>

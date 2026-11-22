@@ -4,11 +4,12 @@ import { GATES, THEME_COLORS } from '../../data/games/mitwachsen';
 import { col } from './mitwachsen-geo';
 import { DIP, plateParts } from './mitwachsen-plate-3d';
 import { PLATE_LEN, PLATE_STONE, PLATE_VOX, SINK, plateSink, plateVoxel } from './mitwachsen-plate';
-import { parts, platformParts, platformSets, type Parts } from './mitwachsen-gatehouse';
-import { gate as gatehouse, motion, moves } from './mitwachsen-gates-3d';
+import { parts, platformParts, platformSets } from './mitwachsen-gatehouse';
+import { gate as gatehouse, motion, moves, plate } from './mitwachsen-gates-3d';
 import { BEATS, type Vox } from './mitwachsen-gate-kit';
 import { gateLook, iceGlow, icicle } from './worlds/eis/view-3d-gate';
-import { GOLD } from '../../data/games/mitwachsen-portals';
+import { GLOW, GOLD, LOOKS, PALETTE } from '../../data/games/mitwachsen-portals';
+import { plateSign } from './mitwachsen-platform-2d';
 import {
   GUEST_COLORS,
   GUEST_FILLED,
@@ -21,63 +22,10 @@ import {
   ritualGlow,
 } from './mitwachsen-guest-look';
 import { RITUAL } from './mitwachsen-guide';
+import { bounds, checkPlate, fighting } from './test-plates';
 import { sandGate } from './mitwachsen-gate-sand';
 import { pilzVox } from './mitwachsen-gate-pilze';
 import { voxels as wolkenVox } from './mitwachsen-gate-wolken';
-
-type Face = { axis: number; dir: number; at: number; min: [number, number]; max: [number, number]; part: string };
-
-/**
- * Achsenparallele Flächen einer Geometrie (je vier Ecken hintereinander, wie Geo sie anlegt). Schräge Flächen (halb
- * offene Türflügel) liegen nie in einer Ebene mit achsenparallelen und fallen weg.
- */
-function faces(g: BufferGeometry, part: string): Face[] {
-  const pos = g.getAttribute('position').array;
-  const nor = g.getAttribute('normal').array;
-  const out: Face[] = [];
-  for (let v = 0; v < pos.length / 3; v += 4) {
-    const n = [nor[v * 3]!, nor[v * 3 + 1]!, nor[v * 3 + 2]!];
-    const axis = n.findIndex((c) => Math.abs(c) > 0.99);
-    if (axis < 0) continue;
-    const [u, w] = [0, 1, 2].filter((k) => k !== axis) as [number, number];
-    const pts = [0, 1, 2, 3].map((k) => [pos[(v + k) * 3]!, pos[(v + k) * 3 + 1]!, pos[(v + k) * 3 + 2]!]);
-    out.push({
-      axis,
-      dir: Math.sign(n[axis]!),
-      at: pts[0]![axis]!,
-      min: [Math.min(...pts.map((p) => p[u]!)), Math.min(...pts.map((p) => p[w]!))],
-      max: [Math.max(...pts.map((p) => p[u]!)), Math.max(...pts.map((p) => p[w]!))],
-      part,
-    });
-  }
-  return out;
-}
-
-/** Paare von Flächen, die in derselben Ebene in dieselbe Richtung schauen und sich überdecken: Sie flackern (Z-Fighting) */
-function fighting(p: Parts, extra: [string, BufferGeometry][] = []): string[] {
-  const all = [
-    ...Object.entries(p).flatMap(([name, geo]) => (geo.empty ? [] : faces(geo.build(), name))),
-    ...extra.flatMap(([name, g]) => faces(g, name)),
-  ];
-  // nur Flächen in derselben Ebene mit derselben Richtung können sich überdecken
-  const planes = new Map<string, Face[]>();
-  for (const f of all) {
-    const k = `${f.axis},${f.dir},${Math.round(f.at * 1e3)}`;
-    planes.set(k, [...(planes.get(k) ?? []), f]);
-  }
-  const found: string[] = [];
-  for (const list of planes.values())
-    for (let i = 0; i < list.length; i++)
-      for (let j = i + 1; j < list.length; j++) {
-        const a = list[i]!,
-          b = list[j]!;
-        if (Math.abs(a.at - b.at) > 1e-4) continue;
-        const du = Math.min(a.max[0], b.max[0]) - Math.max(a.min[0], b.min[0]);
-        const dw = Math.min(a.max[1], b.max[1]) - Math.max(a.min[1], b.min[1]);
-        if (du > 1e-3 && dw > 1e-3) found.push(`${a.part}/${b.part} Achse ${'xyz'[a.axis]} bei ${a.at.toFixed(2)}`);
-      }
-  return found;
-}
 
 /**
  * Ein Torhaus samt Türflügeln, so wie die 3D-Ansicht sie aufstellt: jeder Flügel um seine Angel gedreht. Liefert die
@@ -103,14 +51,6 @@ function house(
   );
   return { p, wings, placed };
 }
-/** Grenzen einer Geometrie (min, max je Achse) */
-const bounds = (gs: BufferGeometry[]) => {
-  const pts = gs.flatMap((g) => [...g.getAttribute('position').array]);
-  const axis = (k: number) => pts.filter((_, i) => i % 3 === k);
-  const span = (k: number) => [Math.min(...axis(k)), Math.max(...axis(k))] as const;
-  return [span(0), span(1), span(2)] as const;
-};
-
 describe('Torhäuser und Portal-Plattformen flackern nicht', () => {
   for (const g of GATES) {
     it(`${g.id}: keine zwei Flächen liegen deckungsgleich in einer Ebene (Tür zu, halb und ganz offen)`, () => {
@@ -296,34 +236,69 @@ describe('Torplatte vor jedem Tor (3D)', () => {
   const hex = (c: string) => `#${col(c).getHexString()}`;
 
   for (const g of GATES) {
-    const look = g.id === 'eis' ? gateLook.plate : undefined;
-    it(`${g.id}: flackert nicht, auch mit Torhaus und goldenem Rand; flach in Reihe 2 der Bucht, 3 × 1 Felder, einen Voxel dick`, () => {
+    const look = g.id === 'eis' ? gateLook.plate : plate(g.id); // Eis aus dem Welt-Paket, die anderen aus ihrem Bauplan
+    it(`${g.id}: flackert nicht, auch mit Torhaus und goldenem Rand; flach in Reihe 2 der Bucht, 3 × 1 Felder`, () => {
       const { p } = house(g.id, 0, g.id === 'eis');
-      plateParts(p, g.id, look, g.id === 'eis');
-      expect(fighting(p)).toEqual([]);
+      checkPlate(g.id, look, p);
+      checkPlate(g.id, undefined, house(g.id, 0, false, 0, false).p); // schlicht (Eis, solange das Paket lädt)
       const solo = parts();
       plateParts(solo, g.id, look);
-      const [x, y, z] = bounds([solo.solid.build(), solo.bright.build()]);
-      for (const [[lo, hi], [a, b]] of [
-        [x, [-1.5, 1.5]],
-        [y, [0, 1 / 8]],
-        [z, [1.5, 2.5]], // Reihe 2 der Bucht (die Torreihe liegt bei z −0,5 … 0,5)
-      ] as const) {
-        expect(lo).toBeCloseTo(a, 2);
-        expect(hi).toBeCloseTo(b, 2);
-      }
-      // Rand in der Farbe der Welt, er leuchtet (eigenes Material, `bright`)
-      expect([...colors(solo.bright.build())]).toEqual([hex(THEME_COLORS[g.id].portal)]);
+      // Rand in der Farbe der Welt, er leuchtet (eigenes Material, `bright`), mit ihm nur die leuchtenden Zeichen
+      const glow = [...(look?.mark ?? []).join(''), look?.under ?? ''].filter((c) => GLOW.has(c));
+      expect([...colors(solo.bright.build())].sort()).toEqual(
+        [...new Set([hex(THEME_COLORS[g.id].portal), ...glow.map((c) => hex(PALETTE[c]!))])].sort(),
+      );
       // Führt der Pinguin zu diesem Tor, ist der Rand golden (an derselben Stelle), Fläche und Zeichen bleiben
       const gold = parts();
       plateParts(gold, g.id, look, true);
-      expect([...colors(gold.bright.build())]).toEqual([hex(GOLD.top)]);
+      expect(colors(gold.bright.build()).has(hex(GOLD.top))).toBe(true);
+      expect(colors(gold.bright.build()).has(hex(THEME_COLORS[g.id].portal))).toBe(
+        glow.some((c) => PALETTE[c] === THEME_COLORS[g.id].portal),
+      );
       expect(gold.bright.build().getAttribute('position').array).toEqual(
         solo.bright.build().getAttribute('position').array,
       );
       expect(gold.solid.build().getAttribute('color').array).toEqual(solo.solid.build().getAttribute('color').array);
     });
   }
+
+  it('jede Welt hat ihre eigene Platte: andere Fläche und anderes Zeichen, nie Rot', () => {
+    const looks = GATES.map((g) => (g.id === 'eis' ? gateLook.plate : plate(g.id))!);
+    expect(new Set(looks.map((l) => l.face.join())).size).toBe(GATES.length);
+    expect(new Set(looks.map((l) => l.mark.join())).size).toBe(GATES.length);
+    const red = (c: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)) as [number, number, number];
+      return r > 150 && g < 90 && b < 90;
+    };
+    for (const l of looks) {
+      const all = [...l.face, ...[...l.mark.join(''), l.under ?? ''].flatMap((c) => PALETTE[c] ?? [])];
+      for (const c of all) expect(red(c), c).toBe(false);
+    }
+    // 2D: das Bild der Portal-Plattform, ohne Rot (Fliegenpilz, Regenbogen), aufrecht auch an Toren im Osten und Westen
+    for (const g of GATES)
+      for (const along of [true, false]) {
+        const sign = plateSign(g.id, along);
+        expect(sign, g.id).toHaveLength(PLATE_VOX);
+        for (const ch of sign.join('')) expect(red(PALETTE[ch]!), `${g.id} ${ch}`).toBe(false);
+        // ohne Rot: dieselben Pixel, Rot wird Orange ('2'); entlang die Reihen des Bilds, quer (Osten, Westen) seine
+        // Spalten, so steht es von oben gesehen aufrecht; zu sehen sind 6 aufeinanderfolgende
+        const pic = LOOKS[g.id].picture.map((r) => r.replace(/[1BH]/g, '2'));
+        const lines = along ? pic : [...pic[0]!].map((_, c) => pic.map((r) => r[c]).join(''));
+        const shown = sign.slice(1, 7).join();
+        expect(
+          [0, 1, 2].some((w) => lines.slice(w, w + 6).join() === shown),
+          `${g.id} ${along}`,
+        ).toBe(true);
+      }
+    // es fällt weg, was am wenigsten Bild hat: Wasser verliert die leere Reihe unten und die doppelte Spitze oben, nicht
+    // den Fuß des Tropfens; an Toren im Osten und Westen ist das ganze Bild hoch zu sehen (entlang 22 Voxel)
+    expect(plateSign('wasser', true).slice(1, 7)).toEqual(LOOKS.wasser.picture.slice(1, 7));
+    expect(
+      plateSign('wasser', false)
+        .slice(1, 7)
+        .map((r) => r[0]),
+    ).toEqual([...'uuWWuu']); // Reihe 0 des Bilds samt Spitze
+  });
 
   it('goldener Rand pulsiert weich (1,2 s je Puls), bei reduzierter Bewegung ruhig ganz golden', () => {
     expect(PULSE_MS).toBe(1200);
@@ -351,7 +326,7 @@ describe('Torplatte vor jedem Tor (3D)', () => {
     for (let i = 0; i < PLATE_LEN; i++)
       for (let k = 0; k < PLATE_VOX; k++) {
         const kind = plateVoxel(i, k, mark);
-        if (kind !== 'mark') continue;
+        if (kind === 'rim' || kind === 'face' || !kind) continue;
         marks++;
         expect(Math.abs(i + 0.5 - PLATE_LEN / 2), `${i},${k}`).toBeLessThan(4); // mittig
       }
@@ -371,14 +346,14 @@ describe('Torplatte vor jedem Tor (3D)', () => {
       }
   });
 
-  it('Eis mit Schmuck: Scholle in Eisfarbe mit weißer Schneeflocke; ohne Paket schlicht: Stein ohne Zeichen', () => {
+  it('Eis mit Schmuck: Scholle in Eisfarbe mit schneeweißer Schneeflocke; ohne Paket schlicht: Stein ohne Zeichen', () => {
     const [ice, plain] = [gateLook.plate, undefined].map((look) => {
       const p = parts();
       plateParts(p, 'eis', look);
       return colors(p.solid.build());
     });
-    expect(ice!.has(hex('#ffffff'))).toBe(true);
-    expect([...ice!].sort()).toEqual([...gateLook.plate!.face, '#ffffff'].map(hex).sort());
+    expect(ice!.has(hex(PALETTE.s!))).toBe(true);
+    expect([...ice!].sort()).toEqual([...gateLook.plate!.face, PALETTE.s!].map(hex).sort());
     expect(ice!.has(hex(PLATE_STONE[1]))).toBe(false);
     expect([...plain!].sort()).toEqual(PLATE_STONE.map(hex).sort());
   });

@@ -4,18 +4,35 @@
 
 import type { GateTheme } from '../../data/games/mitwachsen';
 import type { GateBuild, GateLook, GateMotion, Parts, Wing } from './mitwachsen-gate-kit';
+import type { PlateLook } from './mitwachsen-plate';
 import { build as eis } from './mitwachsen-gate-eis';
-import { build as sand } from './mitwachsen-gate-sand';
-import { build as wasser, motion as wasserMotion } from './mitwachsen-gate-wasser';
-import { build as lava, motion as lavaMotion } from './mitwachsen-gate-lava';
-import { build as hoehle } from './mitwachsen-gate-hoehle';
-import { build as wald } from './mitwachsen-gate-wald';
-import { build as wolken } from './mitwachsen-gate-wolken';
-import { build as pilze, motion as pilzeMotion } from './mitwachsen-gate-pilze';
+import { build as sand, plate as sandPlate } from './mitwachsen-gate-sand';
+import { build as wasser, motion as wasserMotion, plate as wasserPlate } from './mitwachsen-gate-wasser';
+import { build as lava, motion as lavaMotion, plate as lavaPlate } from './mitwachsen-gate-lava';
+import { build as hoehle, plate as hoehlePlate } from './mitwachsen-gate-hoehle';
+import { build as wald, plate as waldPlate } from './mitwachsen-gate-wald';
+import { build as wolken, plate as wolkenPlate } from './mitwachsen-gate-wolken';
+import { build as pilze, motion as pilzeMotion, plate as pilzePlate } from './mitwachsen-gate-pilze';
 
 const BUILD: Record<GateTheme, GateBuild> = { eis, sand, wasser, lava, hoehle, wald, wolken, pilze };
 // Zugänge mit bewegten Teilen: die fließende Wasserwand, die Glutkaskade, die wiegenden Pilzranken
 const MOTION: Partial<Record<GateTheme, GateMotion>> = { wasser: wasserMotion, lava: lavaMotion, pilze: pilzeMotion };
+// Schmuck der Torplatte je Zugang (die Eisscholle bringt das Welt-Paket der Eis-Welt, `GateLook.plate`)
+const PLATE: Partial<Record<GateTheme, PlateLook>> = {
+  sand: sandPlate,
+  wasser: wasserPlate,
+  lava: lavaPlate,
+  hoehle: hoehlePlate,
+  wald: waldPlate,
+  wolken: wolkenPlate,
+  pilze: pilzePlate,
+};
+
+/**
+ * Schmuck der Torplatte vor einem Zugang aus seinem Bauplan (Stegplanke, Schienenende, Basalt, Sandsteinfliese,
+ * Baumscheibe, Wolkenkissen, Pilzhut); für das Eistor keiner, das bringt sein Welt-Paket (solange es lädt: Stein)
+ */
+export const plate = (theme: GateTheme): PlateLook | undefined => PLATE[theme];
 
 /**
  * Ein Zugang: Geometrie in `p`, dazu seine Türflügel (nur das Eistor hat welche). `open` 0 zu … 1 offen, `outline` der

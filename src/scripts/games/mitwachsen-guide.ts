@@ -129,6 +129,9 @@ export type Hint = { id?: GateId; at?: number; draw?: HintDraw };
 export type HintDraw = (ctx: CanvasRenderingContext2D, world: World, P: Projection, now: number) => void;
 export const HINT_AFTER = 10; // „noch nicht“: so lange (1 s) steht die Figur auf der Torplatte, dann zeigt das Tor, was fehlt …
 export const HINT_EVERY = 50; // … höchstens alle 5 s, und je Stehen einmal
+/** Steht die Figur seit `HINT_AFTER` Takten, ist es ein neues Stehen und sind seit `last` `HINT_EVERY` Takte um? */
+const ripe = (s: Pick<Guided, 'still' | 'tick'>, last: number) =>
+  s.still >= HINT_AFTER && s.tick - last >= HINT_EVERY && s.tick - s.still > last;
 /**
  * „Noch nicht“ am Eistor (rein, ändert nichts, öffnet nichts): Steht die Figur seit `HINT_AFTER` Takten auf seiner
  * Torplatte (nur Stehen zählt, `still`; eine schlafende liegt im Bett), ist es zu und führt kein Pinguin (er ist auch
@@ -138,15 +141,23 @@ export const HINT_EVERY = 50; // … höchstens alle 5 s, und je Stehen einmal
  * Stehen nach, sobald 5 s um sind. Liefert die fehlende Art, sonst undefined. Bild und Ton macht die Ansicht.
  */
 export const hint = (s: Guided, world: World, last: number): SpeciesId | undefined =>
-  s.still >= HINT_AFTER &&
-  s.tick - last >= HINT_EVERY &&
-  s.tick - s.still > last &&
+  ripe(s, last) &&
   keyed(s.openGates) &&
   s.guideDue < 0 &&
   !leader(s) &&
   world.cell(s.player.x, s.player.y).plate === GUIDE_GATE
     ? missing(s)
     : undefined;
+/**
+ * „Noch nicht“ an einem Tor, das nie aufgeht (`opens: 'never'`, rein, ändert nichts, öffnet nichts): Steht die Figur
+ * seit `HINT_AFTER` Takten auf seiner Torplatte, zeigt es freundlich das Zeichen seiner Welt, getaktet wie am Eistor (je
+ * Stehen einmal, höchstens alle `HINT_EVERY` Takte; `last` wie bei `hint`). Keine Bedingung, kein Tier: Es fehlt
+ * nichts, was das Kind tun könnte. Liefert das Tor, sonst undefined; Bild und Ton macht mitwachsen-hint-look.ts
+ */
+export const nope = (s: Guided, world: World, last: number): GateId | undefined => {
+  const id = world.cell(s.player.x, s.player.y).plate;
+  return ripe(s, last) && GATES.some((g) => g.id === id && g.opens === 'never') ? id : undefined;
+};
 
 /**
  * Braucht es die Regeln des Pinguins (worlds/eis/mitwachsen-lead.ts)? Solange er fällig ist und nach dem Öffnen, bis er auf der

@@ -218,29 +218,53 @@ export class Sfx {
 /** Ein eingeplanter Ton: Hz, Länge (s), Welle, Lautstärke, Gleiten, Beginn (s) */
 export type Scored = [freq: number, len: number, wave: OscillatorType, gain: number, slide: number, delay: number];
 
-/** Tonart der Torplatte je Welt: Halbtöne über C (Eis in C wie die Eiszapfen); so klingt jede Platte anders */
-export const PLATE_KEY: Record<GateId, number> = {
-  eis: 0,
-  sand: 2,
-  wasser: 5,
-  lava: -3,
-  hoehle: -5,
-  wald: -1,
-  wolken: 4,
-  pilze: -2,
-};
-/** Motiv der Torplatte in Halbtönen über dem Grundton: E G A G C, alles aus der Pentatonik (kein falscher Ton) */
-export const PLATE_TUNE = [4, 7, 9, 7, 12];
-/** Ton in der Tonart der Torplatte `id`, `semis` Halbtöne über ihrem Grundton (um C5) */
-export const plateHz = (id: GateId, semis: number) => 523.25 * 2 ** ((PLATE_KEY[id] + semis) / 12);
 /**
- * Auf die Torplatte getreten (das `n`-te Mal): ein dumpfes Klonk in der Tonart der Welt (oder ihr Klang aus dem
- * Welt-Paket, `clink`, Eis: Klirren) und der nächste Ton des Motivs; fünfmal ergibt die kleine Melodie
+ * Klang der Torplatte je Welt, damit jede anders klingt: Tonart (Halbtöne über C; Eis in C wie die Eiszapfen),
+ * Pentatonik ihrer Melodie (Index in `PENTA`) und ihr Klonk: Welle (0 Sinus, 1 Dreieck), Länge (s), Gleiten und wie
+ * weit er unter dem Grundton liegt (Halbtöne). Planke dumpf, Fliese kurz und hart, Basalt tief, Schiene klingt nach,
+ * Holz hohl und kurz, Wolke ein weiches „puff“ nach oben, Pilzhut ein „boing“. Keiner klingt wie das Anstoßen (`bump`:
+ * Sinus, fällt in 0,22 s auf die Hälfte): Was deutlich fällt, ist kurz
  */
-export const plateTones = (id: GateId, n: number, clink?: readonly Scored[]): Scored[] => [
-  ...(clink ?? [[plateHz(id, -12), 0.18, 'sine', 0.2, 0.6, 0] as Scored]), // nicht tiefer: Tablets spielen es sonst kaum
-  [plateHz(id, PLATE_TUNE[n % PLATE_TUNE.length]!), 0.25, 'triangle', 0.08, 1, 0.06],
-];
+export const PLATE_SOUND: Record<
+  GateId,
+  readonly [key: number, scale: number, wave: number, len: number, slide: number, low: number]
+> = {
+  eis: [0, 0, 0, 0.14, 0.6, 12],
+  sand: [2, 2, 1, 0.1, 0.9, 12],
+  wasser: [5, 0, 0, 0.13, 0.75, 12],
+  lava: [-3, 3, 1, 0.16, 0.85, 12],
+  hoehle: [-5, 1, 1, 0.3, 1, 7],
+  wald: [-1, 3, 1, 0.07, 1.3, 5],
+  wolken: [4, 0, 0, 0.3, 1.8, 12],
+  pilze: [-2, 2, 0, 0.2, 2.2, 7],
+};
+/** Pentatoniken (Halbtöne über dem Grundton): Dur, Moll, schwebend (ohne Terz), Dur mit Quarte; keine hat einen Halbton */
+export const PENTA = [
+  [0, 2, 4, 7, 9],
+  [0, 3, 5, 7, 10],
+  [0, 2, 5, 7, 10],
+  [0, 2, 5, 7, 9],
+] as const;
+/** Motiv der Torplatte in Stufen der Pentatonik ihrer Welt (5 ist die Oktave): in Dur E G A G C */
+export const PLATE_TUNE = [2, 3, 4, 3, 5];
+/** Ton in der Tonart der Torplatte `id`, `semis` Halbtöne über ihrem Grundton (um C5) */
+export const plateHz = (id: GateId, semis: number) => 523.25 * 2 ** ((PLATE_SOUND[id][0] + semis) / 12);
+/** `n`-ter Ton des Motivs der Torplatte `id` in Halbtönen über ihrem Grundton */
+export const plateNote = (id: GateId, n: number) => {
+  const d = PLATE_TUNE[n % PLATE_TUNE.length]!;
+  return PENTA[PLATE_SOUND[id][1]]![d % 5]! + (d > 4 ? 12 : 0);
+};
+/**
+ * Auf die Torplatte getreten (das `n`-te Mal): der Klonk ihrer Welt (oder ihr Klang aus dem Welt-Paket, `clink`, Eis:
+ * Klirren) und der nächste Ton des Motivs; fünfmal ergibt die kleine Melodie
+ */
+export const plateTones = (id: GateId, n: number, clink?: readonly Scored[]): Scored[] => {
+  const [, , wave, len, slide, low] = PLATE_SOUND[id];
+  return [
+    ...(clink ?? [[plateHz(id, -low), len, wave ? 'triangle' : 'sine', 0.2, slide, 0] as Scored]), // nicht tiefer: Tablets spielen es sonst kaum
+    [plateHz(id, plateNote(id, n)), 0.25, 'triangle', 0.08, 1, 0.06],
+  ];
+};
 /** Von der Torplatte gegangen: ein leises Plopp in der Tonart der Welt */
 export const plopp = (id: GateId): Scored[] => [[plateHz(id, -5), 0.09, 'sine', 0.07, 1.8, 0]];
 
