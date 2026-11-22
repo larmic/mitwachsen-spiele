@@ -2,16 +2,8 @@
 // Jede Seite muss ohne Fehler in der Konsole laden (pageerror und console.error).
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { SCALE } from '../src/scripts/games/worlds/eis/mitwachsen-chime-look';
-
-/** Sammelt Fehler der Seite; am Ende des Tests muss die Liste leer sein */
-function watchErrors(page: Page) {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('console', (m) => {
-    if (m.type() === 'error') errors.push(`console: ${m.text()}`);
-  });
-  return errors;
-}
+import { needsBlink } from '../src/scripts/games/mitwachsen-turn';
+import { drawn, openGame, openMenu, reloadGame, settled, watchErrors } from './helpers';
 
 /**
  * Zeichnen abwarten: so lange, wie `n` Bilder bei 60 Hz dauern, und mindestens zwei Bilder. Nicht `n` Bilder: Die
@@ -99,6 +91,7 @@ test('Unbekannte Adresse zeigt die 404-Seite', async ({ page }) => {
 test('Spiel: Hinweis für Eltern beim ersten Mal, eine Pfeiltaste weckt die Figur', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/spielen/');
+  await settled(page);
   const info = page.locator('dialog.mw-info');
   await expect(info).toHaveJSProperty('open', true);
   await page.getByRole('button', { name: /Verstanden/ }).click();
@@ -116,9 +109,7 @@ test('Spiel: Portal-Plattform erwacht beim Herangehen, die Mitte bringt zum Bett
   page,
 }) => {
   const errors = watchErrors(page);
-  await page.goto('/spielen/');
-  await page.getByRole('button', { name: /Verstanden/ }).click();
-  const game = page.locator('larmic-mitwachsen');
+  const game = await openGame(page);
   await page.keyboard.press('ArrowDown');
   await expect
     .poll(() => game.evaluate((el) => (el as unknown as { state: { sleeping: boolean } }).state.sleeping))
@@ -165,10 +156,7 @@ test('Spiel: Gletscherkessel hinter dem Eistor wird gezeichnet (Tor im Test offe
   // Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte: Jedes Bild und jeder Aufruf in die Seite dauert dort lange
   test.setTimeout(180_000);
   const errors = watchErrors(page);
-  await page.goto('/spielen/');
-  await page.getByRole('button', { name: /Verstanden/ }).click();
-  const game = page.locator('larmic-mitwachsen');
-  await expect(game).toHaveClass(/ready/);
+  const game = await openGame(page);
   const webgl = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
   if (webgl) await expect(game).toHaveClass(/three/); // gezeichnet wird in 3D
   await withIce(game);
@@ -334,10 +322,7 @@ test('Spiel: Schneemann bauen im Gletschertal (Tor im Test offen): dreimal hinei
   // Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte: Jedes Bild und jeder Aufruf in die Seite dauert dort lange
   test.setTimeout(180_000);
   const errors = watchErrors(page);
-  await page.goto('/spielen/');
-  await page.getByRole('button', { name: /Verstanden/ }).click();
-  const game = page.locator('larmic-mitwachsen');
-  await expect(game).toHaveClass(/ready/);
+  const game = await openGame(page);
   await withIce(game);
   type Game = {
     world: { homes: { eis: { bed: [number, number] } }; cell(x: number, y: number): { deco: string | null } };
@@ -384,8 +369,7 @@ test('Spiel: Schneemann bauen im Gletschertal (Tor im Test offen): dreimal hinei
   await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 'n' }));
   expect(await stage(heap!)).toBe(3);
   // Neu laden: Der Schneemann steht noch da (gespeichert, sobald er gewachsen ist) und wird gezeichnet
-  await page.reload();
-  await expect(game).toHaveClass(/ready/);
+  await reloadGame(page);
   expect(await stage(heap!)).toBe(3);
   await stand(heap!);
   await waitFrames(page, 30);
@@ -442,10 +426,7 @@ test('Spiel: Eiszapfen-Glockenspiel im Gletschertal (Tor im Test offen): die Rei
   // Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte: Jedes Bild und jeder Aufruf in die Seite dauert dort lange
   test.setTimeout(180_000);
   const errors = watchErrors(page);
-  await page.goto('/spielen/');
-  await page.getByRole('button', { name: /Verstanden/ }).click();
-  const game = page.locator('larmic-mitwachsen');
-  await expect(game).toHaveClass(/ready/);
+  const game = await openGame(page);
   await withIce(game);
   type Drawn = { decos: Record<string, ((...a: unknown[]) => unknown[][] | null) | undefined> } | null | undefined;
   type Game = {
@@ -572,10 +553,7 @@ test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten
   // Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte: Jedes Bild und jeder Aufruf in die Seite dauert dort lange
   test.setTimeout(180_000);
   const errors = watchErrors(page);
-  await page.goto('/spielen/');
-  await page.getByRole('button', { name: /Verstanden/ }).click();
-  const game = page.locator('larmic-mitwachsen');
-  await expect(game).toHaveClass(/ready/);
+  const game = await openGame(page);
   type Game = {
     world: {
       gates: Map<string, { mid: [number, number]; out: [number, number] }>;
@@ -662,10 +640,7 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
   // Auf den CI-Rechnern zeichnet WebGL ohne Grafikkarte: Jedes Bild und jeder Aufruf in die Seite dauert dort lange
   test.setTimeout(180_000);
   const errors = watchErrors(page);
-  await page.goto('/spielen/');
-  await page.getByRole('button', { name: /Verstanden/ }).click();
-  const game = page.locator('larmic-mitwachsen');
-  await expect(game).toHaveClass(/ready/);
+  const game = await openGame(page);
   type Animal = { id: string; species: string; realm: string; mode: string; x: number; y: number };
   type Game = {
     world: {
@@ -686,11 +661,14 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
       garden: { id: string; species: string }[];
     };
     saved: { id: string };
+    timer: number | undefined;
+    start(): void;
     apply(cmd: { type: 'move'; dir: string } | { type: 'tick' }): void;
     lift(): void;
     save(): void;
     openWorld(id: string): Promise<void>;
     renderer: { album: { turn: { shown?: string } } };
+    r3d: { turn?: { view: { yaw: number } } | null } | null; // Drehung zur Torfront, nachgeladen
   };
   const frames = (n: number) => waitFrames(page, n);
   const penguin = () =>
@@ -707,6 +685,13 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
     el.state = { ...el.state, garden: lichtung.map((a) => ({ id: a.id, species: a.species })) };
     el.save();
     return el.openWorld(el.saved.id); // die Leiste ist voll: Der Pinguin ist fällig, die Welt wartet auf sein Paket
+  });
+  // Takt der Seite anhalten, das Bild läuft weiter: Ab hier spielt nur der Test Takte ab. Unter Last mischten sich die
+  // Takte der Seite sonst zwischen die des Tests, und das Ritual wäre weiter (oder weniger weit), als der Test denkt
+  await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    clearInterval(el.timer);
+    el.timer = undefined;
   });
   expect(await penguin()).toBe('fehlt'); // verlaufen: Er wohnt nicht im Kessel
   // Aufwachen: Die Regeln des Pinguins (Welt-Paket Eis) greifen, gut 2 s später taucht er neben ihr auf und führt
@@ -747,7 +732,7 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
   );
   expect(stored).toEqual([['eis']]);
   // Erst das Vorspiel (ohne Sperre, die Kamera dreht zur Front), dann das Ritual: Während es läuft, hüpft die Figur nur
-  await frames(10);
+  await drawn(page);
   await game.evaluate((node) => {
     const el = node as unknown as Game;
     while (el.state.tick < el.state.ritual) el.apply({ type: 'tick' });
@@ -758,7 +743,9 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
     x: before.x,
     y: before.y,
   });
-  await frames(30); // Türflügel, Eiszapfen, Umriss werden gezeichnet
+  // Türflügel, Eiszapfen, Umriss werden gezeichnet (die Flügel schwingen im Takt der Regeln)
+  await ticks(5);
+  await drawn(page);
   // Nach 2,4 s rutscht er durch den Gang hinter die Mündung (in der Eis-Welt) und wartet dort; nach 3 s ist es vorbei
   await ticks(30);
   expect(
@@ -768,7 +755,11 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
       return el.world.realm(g.x, g.y);
     }),
   ).toBe('eis');
-  await frames(30);
+  // Die Kamera fährt nach dem Ritual je Bild zurück (höchstens 50 ms Drehung je Bild, auf dem Runner also über viele
+  // Bilder). Steht sie noch weit zur Front gedreht, wartet der erste Schritt aufs Blinzeln (300 ms) und die übrigen
+  // Pfeile im selben Zug verfallen: erst gehen, wenn kein Blinzeln mehr nötig ist
+  const yaw = () => game.evaluate((el) => (el as unknown as Game).r3d?.turn?.view.yaw ?? 0);
+  await expect.poll(async () => needsBlink(await yaw())).toBe(false);
   // Durch den Gang in den Kessel: Er rutscht voraus zum Schneebett und zieht als erstes Tier ein
   const realm = await game.evaluate((node) => {
     const el = node as unknown as Game;
@@ -781,6 +772,7 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
   expect(realm).toBe('eis');
   await ticks(200);
   expect(await penguin()).toBe('home');
+  await game.evaluate((el) => (el as unknown as Game).start()); // der Takt der Seite läuft wieder
   // Am Schneebett erwacht das Eis-Portal; die Leiste zeigt die Eis-Welt
   await game.evaluate((node) => {
     const el = node as unknown as Game;
@@ -793,8 +785,7 @@ test('Spiel: Der Pinguin holt die Figur ab, das Eistor geht auf, er zieht im Kes
   await frames(60);
   expect(await game.evaluate((el) => (el as unknown as Game).renderer.album.turn.shown)).toBe('eis');
   // Nach dem Neuladen ist das Tor offen, der Pinguin wohnt auf der Schneewiese, die Figur wacht am Schneebett auf
-  await page.reload();
-  await expect(game).toHaveClass(/ready/);
+  await reloadGame(page);
   const after = await game.evaluate((node) => {
     const el = node as unknown as Game;
     return {
@@ -817,10 +808,7 @@ test.describe('ohne Welt-Paket', () => {
   }) => {
     test.setTimeout(120_000);
     const errors = watchErrors(page);
-    await page.goto('/spielen/');
-    await page.getByRole('button', { name: /Verstanden/ }).click();
-    const game = page.locator('larmic-mitwachsen');
-    await expect(game).toHaveClass(/ready/);
+    const game = await openGame(page);
     type Game = {
       world: {
         homes: { eis: { wake: [number, number][] }; lichtung: { bed: [number, number] } };
@@ -853,8 +841,7 @@ test.describe('ohne Welt-Paket', () => {
     });
     // Das Paket lädt nicht (Netz kaputt): Das Spiel startet trotzdem, ohne Kessel
     await page.route(/\/welt-eis\.[\w-]+\.js$/, (r) => r.abort());
-    await page.reload();
-    await expect(game).toHaveClass(/ready/);
+    await reloadGame(page);
     const bare = await game.evaluate((node) => {
       const el = node as unknown as Game;
       return {
@@ -906,10 +893,7 @@ test.describe('Welt-Paket nur bei Bedarf', () => {
     page.on('request', (r) => {
       if (/\/welt-eis\.[\w-]+\.js$/.test(r.url())) fetched.push(r.url());
     });
-    await page.goto('/spielen/');
-    await page.getByRole('button', { name: /Verstanden/ }).click();
-    const game = page.locator('larmic-mitwachsen');
-    await expect(game).toHaveClass(/ready/);
+    const game = await openGame(page);
     type Game = {
       world: {
         gates: Map<string, { mid: [number, number]; out: [number, number] }>;
@@ -955,8 +939,7 @@ test.describe('Welt-Paket nur bei Bedarf', () => {
       el.save();
     });
     fetched.length = 0;
-    await page.reload();
-    await expect(game).toHaveClass(/ready/);
+    await reloadGame(page);
     expect(fetched).toHaveLength(1);
     expect(await ice()).toEqual({ pack: true, kessel: true, portal: true, animals: 50 });
     await waitFrames(page, 30);
@@ -969,10 +952,7 @@ test.describe('Welt-Paket nur bei Bedarf', () => {
     test.setTimeout(120_000);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const errors = watchErrors(page);
-    await page.goto('/spielen/');
-    await page.getByRole('button', { name: /Verstanden/ }).click();
-    const game = page.locator('larmic-mitwachsen');
-    await expect(game).toHaveClass(/ready/);
+    const game = await openGame(page);
     await withIce(game);
     type Game = {
       world: {
@@ -1093,18 +1073,16 @@ test.describe('Welt-Paket nur bei Bedarf', () => {
       await held;
       await route.continue();
     });
-    await page.goto('/spielen/');
-    await page.getByRole('button', { name: /Verstanden/ }).click();
-    const game = page.locator('larmic-mitwachsen');
-    await expect(game).toHaveClass(/ready/);
+    const game = await openGame(page);
     type Game = {
       saved: { id: string };
       state: { openGates: string[] };
       opening: string;
       live: string;
-      packs: { get(id: string): unknown };
+      packs: { get(id: string): unknown; waitMs: number };
       world: { spotsOf(realm: string): unknown[] };
       save(): void;
+      apply(cmd: { type: 'tick' }): void;
       removeWorld(button: HTMLElement, id: string): Promise<void>;
     };
     const index = () =>
@@ -1126,23 +1104,28 @@ test.describe('Welt-Paket nur bei Bedarf', () => {
     await expect.poll(() => game.evaluate((el) => (el as unknown as Game).live)).not.toBe(a);
     const b = await game.evaluate((el) => (el as unknown as Game).saved.id);
     expect((await index()).worlds.map((w) => w.id).sort()).toEqual([a, b].sort());
-    // B löschen (bestätigt): A öffnet und wartet auf das hängende Paket, B ruht
+    // B löschen (bestätigt): A öffnet und wartet auf das hängende Paket, B ruht. Der Start wartet sonst höchstens
+    // PACK_WAIT_MS und öffnete A ohne Paket; hier wartet er, bis der Test das Paket freigibt, auch auf langsamen Rechnern
     await game.evaluate((node, id) => {
       const el = node as unknown as Game;
+      el.packs.waitMs = 10 * 60_000;
       const button = document.createElement('button');
       button.dataset.armed = '1'; // zweiter Klick der Rückfrage
       void el.removeWorld(button, id);
     }, b);
     await expect.poll(() => game.evaluate((el) => (el as unknown as Game).opening)).toBe(a);
-    // Speichern in dieser Zeit (Seite verlassen, Takt, Menü) bringt B nicht zurück
-    await game.evaluate((node) => {
-      (node as unknown as Game).save();
+    // Speichern in dieser Zeit (Seite verlassen, Takt, Menü) bringt B nicht zurück; in einem Zug geprüft
+    const waiting = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      el.save();
       window.dispatchEvent(new Event('pagehide'));
       document.dispatchEvent(new Event('visibilitychange'));
+      for (let i = 0; i < 10; i++) el.apply({ type: 'tick' });
+      const index = JSON.parse(localStorage.getItem('larmic.games.index') ?? '{}') as unknown;
+      return { live: el.live, index };
     });
-    await waitFrames(page, 10); // ein paar Takte, aber kürzer als PACK_WAIT_MS
-    expect(await game.evaluate((el) => (el as unknown as Game).live)).toBe(b); // A wartet noch
-    expect(await index()).toMatchObject({ current: a, worlds: [{ id: a }] });
+    // A wartet noch, B ist weg
+    expect(waiting).toMatchObject({ live: b, index: { current: a, worlds: [{ id: a }] } });
     // Das Paket kommt an: A steht mit Kessel, B bleibt weg
     release();
     await expect.poll(() => game.evaluate((el) => (el as unknown as Game).live)).toBe(a);
@@ -1154,19 +1137,16 @@ test.describe('Welt-Paket nur bei Bedarf', () => {
   });
 });
 
-test('Menü für Eltern: Schalter „Kamera bewegen“ ist an, lässt sich umlegen und bleibt nach dem Neuladen', async ({
+// Zwei Tests mit je einem Laden statt einem mit zweien: Jeder Schritt in der Seite wartet auf Bilder, und die zeichnet
+// die Pipeline ohne Grafikkarte; zwei Ladevorgänge samt Menü sprengten dort die 30 s eines Tests
+test('Menü für Eltern: Schalter „Kamera bewegen“ ist an und lässt sich umlegen, ohne neues Format des Spielstands', async ({
   page,
 }) => {
   const errors = watchErrors(page);
-  await page.goto('/spielen/');
-  await page.getByRole('button', { name: /Verstanden/ }).click();
-  const game = page.locator('larmic-mitwachsen');
-  await expect(game).toHaveClass(/ready/);
-  const menu = page.locator('dialog.mw-settings');
+  await openGame(page);
+  const menu = await openMenu(page);
   const motion = menu.getByRole('button', { name: /^Kamera bewegen/ });
   const sound = menu.getByRole('button', { name: /^Ton ist/ });
-  await page.getByRole('button', { name: 'Menü für Eltern' }).click();
-  await expect(menu).toHaveJSProperty('open', true);
   // Ohne Eintrag im Speicher ist er an, neben dem Ton
   await expect(motion).toHaveText('Kamera bewegen: an');
   await expect(motion).toHaveAttribute('aria-pressed', 'true');
@@ -1174,18 +1154,27 @@ test('Menü für Eltern: Schalter „Kamera bewegen“ ist an, lässt sich umleg
   await expect(motion).toHaveText('Kamera bewegen: aus');
   await expect(motion).toHaveAttribute('aria-pressed', 'false');
   await expect(sound).toHaveAttribute('aria-pressed', 'true'); // der Ton bleibt, wie er war
-  expect(await page.evaluate(() => localStorage.getItem('larmic.games.calm'))).toBe('1');
-  // Kein neues Format des Spielstands: Die Welt speichert ihn nicht
-  const worlds = await page.evaluate(() =>
-    Object.keys(localStorage)
+  // Gespeichert unter eigenem Schlüssel, kein neues Format des Spielstands: Die Welt speichert ihn nicht
+  const stored = await page.evaluate(() => ({
+    calm: localStorage.getItem('larmic.games.calm'),
+    worlds: Object.keys(localStorage)
       .filter((k) => k.startsWith('larmic.games.world.'))
       .map((k) => localStorage.getItem(k) ?? ''),
-  );
-  expect(worlds.some((w) => w.includes('calm'))).toBe(false);
-  await page.reload();
-  await expect(game).toHaveClass(/ready/);
-  await page.getByRole('button', { name: 'Menü für Eltern' }).click();
-  await expect(menu).toHaveJSProperty('open', true);
+  }));
+  expect(stored.calm).toBe('1');
+  expect(stored.worlds.some((w) => w.includes('calm'))).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('Menü für Eltern: Schalter „Kamera bewegen“ bleibt nach dem Neuladen aus und lässt sich wieder anlegen', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  // Wie nach dem Umlegen im Test davor und neu geladen: Der Speicher sagt „aus“
+  await page.addInitScript(() => localStorage.setItem('larmic.games.calm', '1'));
+  await openGame(page);
+  const menu = await openMenu(page);
+  const motion = menu.getByRole('button', { name: /^Kamera bewegen/ });
   await expect(motion).toHaveText('Kamera bewegen: aus');
   await expect(motion).toHaveAttribute('aria-pressed', 'false');
   await motion.click(); // wieder an
@@ -1204,10 +1193,7 @@ for (const mode of ['3D mit „Kamera bewegen: aus“', '2D mit reduzierter Bewe
       await page.addInitScript(() => localStorage.setItem('larmic.games.calm', '1')); // Elternschalter aus
     else await page.emulateMedia({ reducedMotion: 'reduce' });
     const errors = watchErrors(page);
-    await page.goto('/spielen/');
-    await page.getByRole('button', { name: /Verstanden/ }).click();
-    const game = page.locator('larmic-mitwachsen');
-    await expect(game).toHaveClass(/ready/);
+    const game = await openGame(page);
     type Game = {
       world: { gates: Map<string, { mid: [number, number]; out: [number, number] }> };
       state: { player: { x: number; y: number; dir: string }; sleeping: boolean; wokeAt: number };
@@ -1286,10 +1272,7 @@ test('Drehung zur Torfront (3D): Stehen auf der Platte schwenkt zur Front, Fäch
 }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
-  await page.goto('/spielen/');
-  await page.getByRole('button', { name: /Verstanden/ }).click();
-  const game = page.locator('larmic-mitwachsen');
-  await expect(game).toHaveClass(/ready/);
+  const game = await openGame(page);
   const webgl = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
   test.skip(!webgl, 'ohne WebGL gibt es keine 3D-Ansicht (dort kommt die Postkarte, Test oben)');
   await expect(game).toHaveClass(/three/);

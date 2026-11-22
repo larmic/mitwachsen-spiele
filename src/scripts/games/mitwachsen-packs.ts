@@ -39,6 +39,8 @@ export class Packs {
   private ready: LoadedPack[] = [];
   private loading: Promise<unknown> | null = null;
   private failedAt = -Infinity;
+  /** Höchstens so lange wartet `wait`; ein Test setzt es hoch, wenn er den wartenden Start prüft (langsame Pipeline) */
+  waitMs = PACK_WAIT_MS;
 
   /** `arrive`: ein Paket ist angekommen (einbauen), `load` holt es (im Test ersetzbar) */
   constructor(
@@ -73,8 +75,8 @@ export class Packs {
     return (this.loading ?? Promise.resolve()).then(noop);
   }
 
-  /** Wie `want`, aber höchstens `PACK_WAIT_MS` warten (Öffnen einer Welt: das Netz kann beim ersten Besuch hängen) */
-  wait(need: Need, gates: ReadonlyMap<GateId, { mid: Point }>, ms = PACK_WAIT_MS): Promise<void> {
+  /** Wie `want`, aber höchstens `waitMs` warten (Öffnen einer Welt: das Netz kann beim ersten Besuch hängen) */
+  wait(need: Need, gates: ReadonlyMap<GateId, { mid: Point }>, ms = this.waitMs): Promise<void> {
     return Promise.race([this.want(need, gates), new Promise<void>((done) => setTimeout(done, ms))]);
   }
 }

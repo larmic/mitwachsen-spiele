@@ -5,21 +5,13 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseServiceWorker } from '../scripts/pwa.ts';
+import { SLEEP_LOCK } from '../src/scripts/games/mitwachsen-state.ts';
+import { openGame, reloadGame, settled, watchErrors } from './helpers.ts';
 import { CHUNK, VERSIONS } from './versions-dirs.ts';
 
 // Diese Tests warten echte Abläufe ab (Ritual, Installation einer Fassung, Neuladen mit 3D) und brauchen schon allein
 // auf einem Runner mit 2 CPUs gut 20 s; parallel zu anderen Tests reichen die üblichen 30 s nicht
 test.describe.configure({ timeout: 120_000 });
-
-/** Sammelt Fehler der Seite; am Ende des Tests muss die Liste leer sein */
-function watchErrors(page: Page) {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('console', (m) => {
-    if (m.type() === 'error') errors.push(`console: ${m.text()}`);
-  });
-  return errors;
-}
 
 /** Cache-Name und 3D-Datei (Pfad, Größe) einer Fassung, aus ihrem Service Worker gelesen */
 function version(n: '1' | '2') {
@@ -32,14 +24,12 @@ function version(n: '1' | '2') {
 
 type GameEl = { state: { sleeping: boolean }; apply(cmd: { type: string }): void };
 
-/** Spiel öffnen, warten, bis es läuft, Hinweis schließen, warten, bis der Service Worker die Seite steuert */
-async function openGame(page: Page, firstTime = true) {
-  const game = page.locator('larmic-mitwachsen');
-  await page.goto('/spielen/');
-  // Tasten hört das Spiel erst, wenn es läuft (`ready`, in `begin`). Steuert der Service Worker die Seite schon vorher
-  // (zweiter Tab), ginge ein Druck davor verloren und die Figur schliefe weiter
-  await expect(game).toHaveClass(/ready/, { timeout: 30_000 });
-  if (firstTime) await page.getByRole('button', { name: /Verstanden/ }).click();
+/**
+ * Spiel öffnen, bis es steht (Tasten kommen an), Hinweis schließen, warten, bis der Service Worker die Seite steuert.
+ * `firstTime: false`: zweiter Tab, der Hinweis ist schon gesehen
+ */
+async function openApp(page: Page, firstTime = true) {
+  const game = await openGame(page, { info: firstTime });
   // Angemeldet wird erst nach dem Laden (samt 3D); auf langsamen Runnern dauert das
   await expect
     .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null), { timeout: 30_000 })
@@ -93,7 +83,7 @@ test('Zwei Fassungen: die offene alte Seite läuft weiter, die neue wartet und g
   expect(v2.chunk).not.toBe(v1.chunk);
   const errors = watchErrors(page);
   // (a) Fassung 1 steuert die Seite
-  const a = await openGame(page);
+  const a = await openApp(page);
   await expect.poll(() => cacheNames(page)).toEqual([v1.cache]);
   await page.evaluate(() => {
     (window as unknown as { first: unknown }).first = navigator.serviceWorker.controller;
@@ -120,7 +110,7 @@ test('Zwei Fassungen: die offene alte Seite läuft weiter, die neue wartet und g
   await page.close();
   const next = await context.newPage();
   const nextErrors = watchErrors(next);
-  await openGame(next, false);
+  await openApp(next, false);
   await expect.poll(() => registration(next)).toEqual({ waiting: null, active: 'activated' });
   await expect.poll(() => cacheNames(next)).toEqual([v2.cache]);
   expect(await fetchBytes(next, v2.chunk)).toBe(v2.chunkBytes);
@@ -133,7 +123,7 @@ test('App-Update: nach dem Gute-Nacht-Ritual kommt die wartende Fassung, einmal 
 }) => {
   const v2 = version('2');
   const errors = watchErrors(page);
-  const { game, sleeping, loads } = await openGame(page);
+  const { game, sleeping, loads } = await openApp(page);
   await page.keyboard.press('ArrowDown');
   await expect.poll(sleeping).toBe(false);
   await goLive(context);
@@ -144,7 +134,7 @@ test('App-Update: nach dem Gute-Nacht-Ritual kommt die wartende Fassung, einmal 
   await game.evaluate((el) => (el as unknown as GameEl).apply({ type: 'action' }));
   await expect.poll(sleeping).toBe(true);
   await expect.poll(loads, { timeout: 30_000 }).toBe(1);
-  await expect(game).toHaveClass(/ready/);
+  await settled(page); // die neu geladene Seite
   expect(await sleeping()).toBe(true);
   await expect(page.locator('dialog.mw-info')).not.toHaveAttribute('open');
   // Fassung 2 aktiv, alter Cache weg (keine andere Spielseite offen)
@@ -177,7 +167,7 @@ test('App-Update: weckt das Kind die Figur zwischen Bitte und Übernahme, wird e
   });
   const [v1, v2] = [version('1'), version('2')];
   const errors = watchErrors(page);
-  const { game, sleeping, loads } = await openGame(page);
+  const { game, sleeping, loads } = await openApp(page);
   await page.keyboard.press('ArrowDown');
   await expect.poll(sleeping).toBe(false);
   await goLive(context);
@@ -192,16 +182,13 @@ test('App-Update: weckt das Kind die Figur zwischen Bitte und Übernahme, wird e
     })
     .toBe(true);
   // Kurz nach dem Einschlafen weckt Drücken noch nicht (SLEEP_LOCK zählt Spiel-Takte, die auf langsamen Rechnern
-  // länger dauern): drücken, bis die Figur wach ist
-  await expect
-    .poll(
-      async () => {
-        await page.keyboard.press('ArrowDown');
-        return sleeping();
-      },
-      { timeout: 30_000 },
-    )
-    .toBe(false);
+  // weit länger dauern als 100 ms): die Takte der Sperre gleich hier abspielen, dann weckt ein Druck sicher
+  await game.evaluate((el, lock) => {
+    const g = el as unknown as GameEl & { state: { tick: number; sleptAt: number } };
+    while (g.state.tick - g.state.sleptAt < lock) g.apply({ type: 'tick' });
+  }, SLEEP_LOCK);
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(sleeping).toBe(false);
   await page.evaluate(() => (window as unknown as { releaseSkip: () => void }).releaseSkip());
   await expect.poll(() => registration(page)).toEqual({ waiting: null, active: 'activated' });
   await page.waitForTimeout(3000);
@@ -216,7 +203,7 @@ test('App-Update: weckt das Kind die Figur zwischen Bitte und Übernahme, wird e
   await game.evaluate((el) => (el as unknown as GameEl).apply({ type: 'action' }));
   await expect.poll(sleeping).toBe(true);
   await expect.poll(loads, { timeout: 30_000 }).toBe(1);
-  await expect(game).toHaveClass(/ready/);
+  await settled(page); // die neu geladene Seite
   expect(await sleeping()).toBe(true);
   await expect.poll(() => cacheNames(page)).toEqual([v2.cache]);
   await page.waitForTimeout(6000);
@@ -230,7 +217,7 @@ test('App-Update: zurück nach langer Pause, das Spiel schläft noch – die neu
 }) => {
   const v2 = version('2');
   const errors = watchErrors(page);
-  const { sleeping, loads } = await openGame(page);
+  const { sleeping, loads } = await openApp(page);
   await goLive(context);
   await page.waitForTimeout(4500); // die Figur schläft seit dem Laden länger als das Ritual
   await longPause(page);
@@ -246,7 +233,7 @@ test('App-Update: neu laden von Hand (Cmd+R, Strg+R, F5) bringt die wartende Fas
 }) => {
   const v2 = version('2');
   const errors = watchErrors(page);
-  const { sleeping, loads } = await openGame(page);
+  const { sleeping, loads } = await openApp(page);
   await page.keyboard.press('ArrowDown'); // gespielt …
   await expect.poll(sleeping).toBe(false);
   await goLive(context);
@@ -254,15 +241,16 @@ test('App-Update: neu laden von Hand (Cmd+R, Strg+R, F5) bringt die wartende Fas
   await expect.poll(() => registration(page)).toEqual({ waiting: 'installed', active: 'activated' });
   await page.reload(); // … dann von Hand neu geladen: Die Seite übernimmt die wartende Fassung und lädt einmal neu
   await expect.poll(loads, { timeout: 30_000 }).toBe(2);
-  await expect.poll(() => registration(page)).toEqual({ waiting: null, active: 'activated' });
+  await expect.poll(() => registration(page), { timeout: 30_000 }).toEqual({ waiting: null, active: 'activated' });
   await expect.poll(() => cacheNames(page)).toEqual([v2.cache]);
+  await settled(page);
   expect(await sleeping()).toBe(true);
   expect(errors).toEqual([]);
 });
 
 test('App-Update: mitten im Spiel wird nie neu geladen, die neue Fassung wartet', async ({ page, context }) => {
   const errors = watchErrors(page);
-  const { sleeping, loads } = await openGame(page);
+  const { sleeping, loads } = await openApp(page);
   await page.keyboard.press('ArrowDown');
   await expect.poll(sleeping).toBe(false);
   await goLive(context);
@@ -284,10 +272,10 @@ test('App-Update: ein zweiter, alter Tab spielt ungestört weiter und bekommt se
 }) => {
   const [v1, v2] = [version('1'), version('2')];
   const errors = watchErrors(page);
-  const a = await openGame(page);
+  const a = await openApp(page);
   const other = await context.newPage();
   const otherErrors = watchErrors(other);
-  const b = await openGame(other, false);
+  const b = await openApp(other, false);
   await other.keyboard.press('ArrowDown');
   await expect.poll(b.sleeping).toBe(false);
   await page.keyboard.press('ArrowDown');
@@ -306,7 +294,7 @@ test('App-Update: ein zweiter, alter Tab spielt ungestört weiter und bekommt se
   await context.setOffline(false);
   // … und geht, sobald eine Spielseite allein offen ist und sich meldet
   await other.close();
-  await page.reload();
+  await reloadGame(page);
   await expect.poll(() => cacheNames(page)).toEqual([v2.cache]);
   expect([...errors, ...otherErrors]).toEqual([]);
 });

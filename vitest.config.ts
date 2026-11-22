@@ -35,7 +35,7 @@ export default defineConfig({
         'src/scripts/games/{input-pace,pwa-update}.ts',
         'src/scripts/games/mitwachsen-{air,behind,border,camera,chores,fog,free,gait,growth,guide,hint-look,home,meadow,pack,packs,plate,plate-toy,portal,postcard,save,scatter,spawns,state,tired,travel,turn,turn-pace,view,view-3d,weather,wild,world}.ts',
         'src/scripts/games/worlds/*/*.ts',
-        'scripts/{bundles,dist,pwa,test-budget}.ts',
+        'scripts/{bundles,dist,flaky,pwa,test-budget}.ts',
       ],
       // Zeichnen auf dem Canvas in den Welt-Paketen (Wetter, Bild der Weltgrenze) prüft der Browser-Test
       exclude: ['src/scripts/games/worlds/*/mitwachsen-{ice-sky,border-view}.ts'],

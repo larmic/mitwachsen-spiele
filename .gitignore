@@ -11,3 +11,6 @@ test-results/
 .e2e/
 playwright-report/
 coverage/
+
+# Grüner Lauf von npm run gates:ci (Tree-Hash des geprüften Stands, für .githooks/pre-push)
+.ci-local-ok

@@ -3,6 +3,7 @@
 // Geprüft wird die ruhende Seite (reduzierte Bewegung): Mitten im Einblenden misst axe Mischfarben als Kontrast.
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { openGame, openMenu, settled } from './helpers';
 
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
 
@@ -23,22 +24,25 @@ for (const path of ['/', '/datenschutz/', '/gibt-es-nicht/'])
 
 test('Barrierefrei: Spiel mit Hinweis für Eltern und danach', async ({ page }) => {
   await page.goto('/spielen/');
+  await settled(page);
   await expect(page.locator('dialog.mw-info')).toHaveJSProperty('open', true);
   expect(await violations(page)).toEqual([]);
   await page.getByRole('button', { name: /Verstanden/ }).click();
-  await expect(page.locator('larmic-mitwachsen')).toHaveClass(/ready/);
+  await expect(page.locator('dialog.mw-info')).toHaveJSProperty('open', false);
   expect(await violations(page)).toEqual([]);
 });
 
+// Je Zustand des Schalters ein Test: Laden, Menü und zwei Prüfungen mit axe sprengten auf dem Runner die 30 s eines Tests
 test('Barrierefrei: Menü für Eltern mit den Schaltern für Ton und Kamera', async ({ page }) => {
-  await page.goto('/spielen/');
-  await page.getByRole('button', { name: /Verstanden/ }).click();
-  await expect(page.locator('larmic-mitwachsen')).toHaveClass(/ready/);
-  await page.getByRole('button', { name: 'Menü für Eltern' }).click();
-  const menu = page.locator('dialog.mw-settings');
-  await expect(menu).toHaveJSProperty('open', true);
+  await openGame(page);
+  const menu = await openMenu(page);
   await expect(menu.getByRole('button', { name: 'Kamera bewegen: an' })).toHaveAttribute('aria-pressed', 'true');
   expect(await violations(page)).toEqual([]);
+});
+
+test('Barrierefrei: Menü für Eltern, Schalter „Kamera bewegen“ umgelegt', async ({ page }) => {
+  await openGame(page);
+  const menu = await openMenu(page);
   await menu.getByRole('button', { name: 'Kamera bewegen: an' }).click();
   await expect(menu.getByRole('button', { name: 'Kamera bewegen: aus' })).toHaveAttribute('aria-pressed', 'false');
   expect(await violations(page)).toEqual([]);
@@ -57,10 +61,7 @@ test('Barrierefrei: „Noch nicht“ am Eistor sagt die Live-Region, was fehlt',
     apply(cmd: { type: 'tick' }): void;
     lift(): void;
   };
-  await page.goto('/spielen/');
-  await page.getByRole('button', { name: /Verstanden/ }).click();
-  const game = page.locator('larmic-mitwachsen');
-  await expect(game).toHaveClass(/ready/);
+  const game = await openGame(page);
   const say = page.locator('.mw-say');
   await expect(say).toHaveAttribute('role', 'status');
   await expect(say).toHaveText('');

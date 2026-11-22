@@ -1,16 +1,7 @@
 // Das Spiel als App: installierbar von der Startseite und vom Spiel aus, der Service Worker steuert nur das Spiel,
 // und ohne Netz startet es trotzdem. Installierbar laut Chromium: e2e/installable.spec.ts, Updates: e2e/pwa-update.spec.ts. Spec: docs/specs/mitwachsen.md („App“).
-import { expect, test, type Page } from '@playwright/test';
-
-/** Sammelt Fehler der Seite; am Ende des Tests muss die Liste leer sein */
-function watchErrors(page: Page) {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('console', (m) => {
-    if (m.type() === 'error') errors.push(`console: ${m.text()}`);
-  });
-  return errors;
-}
+import { expect, test } from '@playwright/test';
+import { reloadGame, watchErrors } from './helpers';
 
 type Manifest = { start_url: string; scope: string; display: string; orientation?: string; icons: { src: string }[] };
 
@@ -45,8 +36,12 @@ test('Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotz
   context,
 }) => {
   const errors = watchErrors(page);
+  // Hinweis für Eltern schon gesehen: Bis zum Neuladen ohne Netz drückt und klickt der Test nichts im Spiel, darum reicht
+  // dort `ready` (Spielstand da), ohne auf das erste 3D-Bild zu warten; zwei Ladevorgänge passen so in die 30 s
+  await page.addInitScript(() => localStorage.setItem('larmic.games.mitwachsen.info', '1'));
   await page.goto('/spielen/');
-  await page.getByRole('button', { name: /Verstanden/ }).click();
+  const game = page.locator('larmic-mitwachsen');
+  await expect(game).toHaveClass(/ready/);
   // Bereit heißt: alles gespeichert (install) und aktiv; clients.claim() übernimmt die offene Seite
   const reg = await page.evaluate(() =>
     navigator.serviceWorker.ready.then((r) => ({ scope: r.scope, updateViaCache: r.updateViaCache })),
@@ -59,7 +54,7 @@ test('Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotz
     .toMatch(/\/spielen\/sw\.js$/);
   const webgl = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
   // Spielstand mit offenem Eistor: Beim nächsten Start braucht die Welt das Paket der Eis-Welt gleich
-  await page.locator('larmic-mitwachsen').evaluate((node) => {
+  await game.evaluate((node) => {
     const el = node as unknown as { state: { openGates: string[] }; save(): void };
     el.state = { ...el.state, openGates: ['eis'] };
     el.save();
@@ -70,9 +65,7 @@ test('Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotz
   page.on('response', (r) => {
     if (r.fromServiceWorker()) fromSw.push(new URL(r.url()).pathname);
   });
-  await page.reload();
-  const game = page.locator('larmic-mitwachsen');
-  await expect(game).toHaveClass(/ready/);
+  await reloadGame(page);
   // Auch das nachträglich geladene Three.js kommt ohne Netz aus dem Speicher
   if (webgl) await expect(game).toHaveClass(/three/);
   expect(fromSw).toContain('/spielen/');

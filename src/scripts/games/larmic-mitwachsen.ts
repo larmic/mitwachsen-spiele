@@ -148,7 +148,8 @@ class LarmicMitwachsen extends HTMLElement {
     this.measure();
     this.classList.add('ready');
     this.start();
-    void this.load3d();
+    // `settled`: das erste Bild der endgültigen Ansicht ist gezeichnet (3D, sonst 2D); darauf warten die Browser-Tests
+    void this.load3d().then(() => requestAnimationFrame(() => this.classList.add('settled')));
     // Beim ersten Öffnen: erst der Hinweis für Eltern, dann geht es los
     if (this.store.getItem(INFO_KEY) !== '1') this.openInfo();
   }

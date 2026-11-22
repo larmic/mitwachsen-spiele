@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SPECIES } from '../../data/games/mitwachsen';
 import { ICE_MODELS } from '../../data/games/worlds/eis/mitwachsen-ice-models';
-import { Packs, RETRY_MS, type LoadedPack } from './mitwachsen-packs';
+import { PACK_WAIT_MS, Packs, RETRY_MS, type LoadedPack } from './mitwachsen-packs';
 import type { Need } from './mitwachsen-pack';
 import { gatePlaces } from './mitwachsen-world';
 import { EIS_PACK } from './test-worlds';
@@ -54,6 +54,45 @@ describe('Welt-Pakete laden (Packs)', () => {
     await packs.wait(open, gates, 30);
     expect(performance.now() - t).toBeLessThan(1000);
     expect(packs.loaded).toEqual([]);
+  });
+
+  describe('wait mit Uhr unter Kontrolle', () => {
+    afterEach(() => vi.useRealTimers());
+    const hangs = () =>
+      new Packs(
+        () => {},
+        () => new Promise<LoadedPack>(() => {}),
+      ); // Netz hängt
+    /** Erfüllt `wait` nach `ms` Millisekunden? */
+    async function doneAfter(packs: Packs, ms: number) {
+      let done = false;
+      void packs.wait(open, gates).then(() => (done = true));
+      await vi.advanceTimersByTimeAsync(ms);
+      return done;
+    }
+
+    it('innerhalb von waitMs wartet der Start noch', async () => {
+      vi.useFakeTimers();
+      const packs = hangs();
+      expect(packs.waitMs).toBe(PACK_WAIT_MS);
+      expect(await doneAfter(packs, PACK_WAIT_MS - 1)).toBe(false);
+    });
+
+    it('nach waitMs geht es ohne das Paket los', async () => {
+      vi.useFakeTimers();
+      const packs = hangs();
+      expect(await doneAfter(packs, PACK_WAIT_MS)).toBe(true);
+      expect(packs.loaded).toEqual([]);
+    });
+
+    it('ein geändertes waitMs gilt (der Browser-Test setzt es hoch, die Pipeline ist langsam)', async () => {
+      vi.useFakeTimers();
+      const packs = hangs();
+      packs.waitMs = 60_000;
+      expect(await doneAfter(packs, PACK_WAIT_MS + 1)).toBe(false);
+      packs.waitMs = 10;
+      expect(await doneAfter(packs, 10)).toBe(true);
+    });
   });
 
   it('ohne eigenen Lader kommt das echte Paket der Eis-Welt (import())', async () => {
