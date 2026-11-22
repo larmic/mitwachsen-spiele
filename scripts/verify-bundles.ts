@@ -63,7 +63,10 @@ export const RULES: Rule[] = [
     // brauchen im Kern Platz: dafür die bewusste Anhebung um höchstens 1 KB aus dem Konzept „Torplatte“. Mit dem
     // Eistor von vorn (`opening` zählt das Vorspiel mit, so gilt auch der Umriss in `guideGate`; die Flügel nach `at`
     // aus dem Ereignis `gate`, in Takten der Regeln statt nach der Uhr, damit sie bei offenem Menü mitwarten)
-    // 130 033 Bytes, 15 Bytes Luft. Eine Taktuhr als eigene Klasse kostete gut 0,2 KB und passte nicht
+    // 130 033 Bytes, 15 Bytes Luft. Eine Taktuhr als eigene Klasse kostete gut 0,2 KB und passte nicht. Platz ohne
+    // Anheben für die Platten der anderen Welten: Die Anmeldung des Service Workers wartet ohnehin aufs Laden der
+    // Seite und kommt nachgeladen (pwa-register.ts), die Postkarte holt das generische `later` (lib/games/later.ts):
+    // 128 462 Bytes, 1586 Bytes Luft
     budget: 127 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },

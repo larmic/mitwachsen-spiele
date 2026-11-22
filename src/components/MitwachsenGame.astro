@@ -582,6 +582,9 @@ import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
 
 <script>
   import '../scripts/games/larmic-mitwachsen';
-  import { registerServiceWorker } from '../scripts/games/pwa-register';
-  registerServiceWorker();
+  // Die Anmeldung des Service Workers wartet ohnehin aufs Laden der Seite; sie kommt nachgeladen, so bleibt der Kern klein
+  void import('../scripts/games/pwa-register').then(
+    (m) => m.registerServiceWorker(),
+    () => {},
+  );
 </script>

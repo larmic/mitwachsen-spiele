@@ -39,9 +39,11 @@ const DIST = 'dist';
  * Standbild in der 3D-Ansicht) und dem Elternschalter 1023,6 KiB: Das Budget reicht noch, es bleibt; 0,4 KiB
  * Luft. Die Drehung in 3D wird es bewusst und knapp anheben müssen: Mit ihr (Drehregler und Einbau in der nachgeladenen
  * Datei mitwachsen-turn-3d.<hash>.js, Kamera, Sonne und Zugang zur Front in der 3D-Ansicht) 1029,8 KiB, darum bewusst
- * auf 1032 KiB angehoben; gut 2 KiB Luft für die Kamera vor den Flügeln und die Platten der anderen Welten.
+ * auf 1032 KiB angehoben; gut 2 KiB Luft für die Kamera vor den Flügeln und die Platten der anderen Welten. Die
+ * nachgeladene Anmeldung des Service Workers (eigene Datei pwa-register.<hash>.js, macht im Kern Platz für die Platten)
+ * kostet mit den Importen zwischen den Dateien knapp 0,1 KiB: 1032,03 KiB, darum bewusst auf 1033 KiB angehoben.
  */
-const PRECACHE_BUDGET = 1032 * 1024;
+const PRECACHE_BUDGET = 1033 * 1024;
 const OPTS: PwaOptions = { origin: SITE.url, manifest: '/manifest.webmanifest', sw: SERVICE_WORKER };
 
 const filesIn = (dir: string): string[] =>

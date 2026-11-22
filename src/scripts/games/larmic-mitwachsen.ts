@@ -4,10 +4,10 @@
 // Spiel nach einem Seitenwechsel (View Transitions) niemanden.
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md
 
+import { later } from '../../lib/games/later';
 import { chunkOf } from '../../lib/games/chunks';
 import { projection } from '../../lib/games/front';
 import type { World3D as World3DType } from './mitwachsen-3d';
-import type { postcardView } from './mitwachsen-card';
 import { GAME_COLORS, LOOK, SPECIES, TIRED_TALK, realmOfAnimal, type GateId } from '../../data/games/mitwachsen';
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
 import { SPARKS, fly, glints, sparks } from './mitwachsen-glyphs';
@@ -109,7 +109,8 @@ class LarmicMitwachsen extends HTMLElement {
   private packs = new Packs((pack) => this.arrive(pack)); // Welt-Pakete (worlds/), geladen erst bei Bedarf
   private opening = ''; // Welt, die gerade öffnet (wartet vielleicht auf ein Paket)
   private live = ''; // Welt, zu der `state` gehört; solange sie nicht `opening` ist, ruhen Takt und Speichern
-  private card?: ReturnType<typeof postcardView> | null; // Postkarte der Torfront, nachgeladen mit der ersten
+  // Postkarte der Torfront, nachgeladen mit der ersten
+  private card = later(() => import('./mitwachsen-card').then((m) => m.postcardView(this.querySelector('.mw-card')!)));
   private plates = plateToy(this.sfx, (at, colors) => this.burst('', colors, 6, at, true)); // Torplatten
   // „noch nicht“ am Eistor (Haken im Welt-Paket): Steht die Figur dort ohne Pinguin? In 3D, wenn die Kamera vorn ist
   private hint = (now: number, eis = this.packs.get('eis')?.view) =>
@@ -792,11 +793,7 @@ class LarmicMitwachsen extends HTMLElement {
    * mitwachsen-card.ts lädt erst mit der ersten Postkarte nach
    */
   private postcard(id: GateId | null, open: Map<string, number>) {
-    if (id && this.card === undefined) {
-      this.card = null;
-      void import('./mitwachsen-card').then((m) => (this.card = m.postcardView(this.querySelector('.mw-card')!)), noop);
-    }
-    this.card?.(id, this.world, this.state, this.r3d, open, this.renderer.view);
+    this.card(id)?.(id, this.world, this.state, this.r3d, open, this.renderer.view);
   }
 
   // ---------- Kopf und Menü ----------
