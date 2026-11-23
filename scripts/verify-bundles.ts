@@ -60,13 +60,13 @@ export const RULES: Rule[] = [
     name: 'Welt-Paket Eis',
     pages: /^spielen\/index\.html$/, // nur die Spielseite lädt Welt-Pakete
     parts: [
-      // Gletscherkessel, Regeln des Pinguins, Zeichenteile der 2D-Ansicht und Modelle der Eis-Tiere
+      // Gletscherkessel, Regeln des Pinguins und des Schlittens, Zeichenteile der 2D-Ansicht und Modelle der Eis-Tiere
       { chunks: /\/welt-eis\.[\w-]+\.js$/ },
       // 3D-Teil: kommt erst nach der 3D-Ansicht (Three.js, Baukasten der Zugänge) und dem Paket der Welt
       { chunks: /\/welt-eis-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-eis)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 47 896 Bytes (46,8 KB)
-    budget: 51.5 * 1024,
+    // Gemessen 68 836 Bytes (67,2 KB)
+    budget: 74 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

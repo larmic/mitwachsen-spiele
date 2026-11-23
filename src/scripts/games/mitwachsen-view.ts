@@ -7,7 +7,8 @@
 import { box, type Projection } from '../../lib/games/front';
 import type { RegionId } from '../../data/games/mitwachsen';
 import type { Deco } from './mitwachsen-cell';
-import type { PackEvent } from './mitwachsen-pack-types';
+import type { PackEvent, RideEvent } from './mitwachsen-pack-types';
+import type { RideAt, RideBody, RideFx } from './mitwachsen-ride-view';
 import type { Guest } from './mitwachsen-guest-look';
 import { mapColor } from './mitwachsen-map';
 import type { SkyScene } from './mitwachsen-sky';
@@ -113,6 +114,14 @@ export type View2D = {
     lift: (peek: true) => void,
     r3d?: { arrived(): boolean } | null,
   ): Hint;
+  /**
+   * Fahrzeug dieser Welt (Eis-Welt: Schlitten, worlds/eis/mitwachsen-sled-look.ts; Haken in mitwachsen-ride-view.ts),
+   * gleich für 2D und 3D: Körper je Bild (Fahrzeug samt sitzender Figur, Zugtier, Schuppen), flache Marken am Boden
+   * (Spur, Fleck am Halt) und Ton, Hüpfer, Herz und Funken zu jedem seiner Ereignisse
+   */
+  bodies?(state: State, world: World, at: RideAt): readonly RideBody[];
+  marks?(state: State, world: World): readonly Box[];
+  rideFx?(e: RideEvent, state: State): RideFx;
 };
 
 /** Deko-Arten, die nur ein Welt-Paket zeichnet: Ohne seine Zeichnung steht dort ein einfacher Block */

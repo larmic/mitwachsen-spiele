@@ -7,6 +7,7 @@
 
 import type { Dir, Part } from '../../lib/games/front';
 import type { GateId, Point, SpeciesId } from '../../data/games/mitwachsen';
+import type { RideId } from '../../data/games/mitwachsen-rides';
 import type { Cell } from './mitwachsen-cell';
 import type { Portal, PortalId } from './mitwachsen-portal';
 
@@ -56,12 +57,68 @@ export type Ruled = {
 };
 
 /**
+ * Eine Fahrt mit einem Fahrzeug (nicht gespeichert; Regeln im Welt-Paket, worlds/eis/mitwachsen-ride.ts): `phase`
+ * eingestiegen (`seated`, gleich geht es los), unterwegs (`go`), hält vor einem Hindernis (`stop`), angekommen (`arrive`,
+ * gleich steigt die Figur aus); `at` Takt, an dem die Phase begann; `pos` Fortschritt auf der Strecke in Feldern,
+ * `speed` Felder je Takt; `to` Halt, zu dem es fährt: sein Zuhause am Schuppen in der Welt (`home`) oder der Halt auf der
+ * Lichtung (`out`; für das Kind die Heimfahrt); `feast` die Festfahrt (erste Heimfahrt);
+ * `jingleAt` Takt des letzten Bimmelns; `greeted` Tiere, die auf der Festfahrt schon gewinkt haben
+ */
+export type Ride = {
+  id: RideId;
+  phase: 'seated' | 'go' | 'stop' | 'arrive';
+  at: number;
+  pos: number;
+  speed: number;
+  to: 'home' | 'out';
+  feast: boolean;
+  jingleAt: number;
+  greeted: string[];
+};
+
+/**
+ * Ereignis eines Fahrzeugs (ein Typ, Unterart `what`): erscheint (`appear`, mit `persist` gespeichert), trabt herbei
+ * (`come`), schnaubt (`snort`), stößt sanft an (`nudge`), Figur steigt ein (`board`) oder gleich wieder aus (`leave`),
+ * fährt los (`go`), Figur winkt im Sitz (`wave`), hält vor einem Hindernis (`stop`), Tier hüpft beiseite (`shoo`, `who`),
+ * kommt an (`arrive`), Figur steigt aus (`alight`), Fest nach der ersten Heimfahrt (`feast`, gespeichert), ein Tier
+ * winkt am Weg (`cheer`, `who`), der Pinguin winkt zum Abschied (`farewell`). `from`: Feld, von dem es herbeitrabt
+ * (`appear`); `ring`: das Fahrzeug bimmelt dazu (`wave`, höchstens alle 1,5 s)
+ */
+export type RideEvent = {
+  type: 'ride';
+  what:
+    | 'appear'
+    | 'come'
+    | 'snort'
+    | 'nudge'
+    | 'board'
+    | 'leave'
+    | 'go'
+    | 'wave'
+    | 'stop'
+    | 'shoo'
+    | 'arrive'
+    | 'alight'
+    | 'feast'
+    | 'cheer'
+    | 'farewell';
+  id: RideId;
+  x: number;
+  y: number;
+  who?: string;
+  from?: Point;
+  ring?: true;
+  persist?: true;
+};
+
+/**
  * Regeln einer Welt aus ihrem Paket (Eis-Welt: Schneemänner bauen, Glockenspiel). `step` bekommt sie hereingereicht,
  * sobald das Paket da ist. `bump`: Die Figur läuft in das Feld (x, y) mit dem Inhalt `c`; `move` sagt, auf welchem
  * Feld sie steht (`here`) und ob der Schritt ginge (`walks`). true, wenn der Zug damit erledigt ist (sie bleibt stehen),
- * sonst geht es weiter wie immer (auch nach einem Ereignis, etwa dem Ton eines Eiszapfens).
+ * sonst geht es weiter wie immer (auch nach einem Ereignis, etwa dem Ton eines Eiszapfens). `ride`: Regeln eines
+ * Fahrzeugs (`RideRules` in mitwachsen-rider.ts; hier nur als Parameter, weil die Welt diese Datei kennt).
  */
-export type WorldRules = {
+export type WorldRules<Ride = never> = {
   bump(
     s: Ruled,
     c: Cell,
@@ -70,6 +127,7 @@ export type WorldRules = {
     events: { push(e: PackEvent | { type: 'hop' }): unknown }, // `hop`: Die Figur hüpft nur (Eistor im Vorspiel)
     move: { here: Cell; walks: boolean },
   ): boolean;
+  ride?: Ride;
 };
 
 /** Liegt ein Feld ganz hinter dem Felsring der Lichtung? */
@@ -82,9 +140,9 @@ export type Beyond = (x: number, y: number) => boolean;
  * Zeichenteile für die Ansicht (Eis-Welt: `View2D` aus mitwachsen-view.ts, Wetter und Bild der Weltgrenze). `view3d`:
  * lädt ihren 3D-Teil nach (`View3D` aus mitwachsen-view-3d.ts; braucht Three.js, darum ein eigener `import()`, erst wenn
  * die 3D-Ansicht da ist). `models`: Modelle der Tiere dieser Welt (`addModels`). `rules`: Regeln, die nur in dieser
- * Welt gelten (Eis-Welt: Schneehaufen wachsen zu Schneemännern), `step` hereingereicht.
+ * Welt gelten (Eis-Welt: Schneehaufen wachsen zu Schneemännern, `ride`: Fahrzeug), `step` hereingereicht.
  */
-export type WorldPack<Rules = unknown, View = unknown, View3 = unknown> = {
+export type WorldPack<Rules = unknown, View = unknown, View3 = unknown, Ride = unknown> = {
   id: 'eis';
   gate: GateId;
   build(
@@ -96,7 +154,7 @@ export type WorldPack<Rules = unknown, View = unknown, View3 = unknown> = {
   ): Kessel;
   place(seed: number, gang: Gang, beyond: Beyond): KesselPlace;
   lead?: Rules;
-  rules?: WorldRules;
+  rules?: WorldRules<Ride>;
   view?: View;
   view3d?: () => Promise<View3>;
   models?: Partial<Record<SpeciesId, readonly Part[]>>;

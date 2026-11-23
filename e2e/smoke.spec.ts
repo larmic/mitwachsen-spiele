@@ -1462,3 +1462,282 @@ test(
     expect(errors).toEqual([]);
   },
 );
+
+// ---------- Der Schlitten (Welt-Paket der Eis-Welt, Spec „Der Schlitten“) ----------
+
+/** Körper eines Fahrzeugs in diesem Bild (`rides` der Komponente, aus `View2D.bodies`) */
+type RideBody = { id: string; x: number; y: number; z: number };
+/** Was die Schlitten-Tests an der Komponente nutzen */
+type SledGame = {
+  world: {
+    homes: { eis: { bed: [number, number]; wake: [number, number][] } };
+    cell(x: number, y: number): { solid: boolean; ground: string; h: number; gate?: string };
+    realm(x: number, y: number): string;
+  };
+  state: {
+    player: { x: number; y: number; dir: string };
+    openGates: string[];
+    portals: string[];
+    sleeping: boolean;
+    wokeAt: number;
+    tick: number;
+    rideDue: number;
+    ride?: { phase: string };
+    packs: Record<string, unknown> & { fahrt?: { schlitten?: { stage: string } } };
+    animals: { id: string; species: string; realm: string; x: number; y: number }[];
+    garden: { id: string; species: string }[];
+  };
+  saved: { id: string };
+  rides: readonly RideBody[];
+  r3d: { bodies: Map<string, unknown> } | null;
+  save(): void;
+  lift(): void;
+  openWorld(id: string): Promise<void>;
+  project(x: number, y: number, z: number): [number, number];
+};
+const SLED = 'ride:schlitten';
+
+/**
+ * Eistor offen, Eis-Portal wach, die Leiste der Eis-Welt voll (je Eis-Art ein Tier auf der Schneewiese), die Figur wach
+ * neben dem Schneebett. `stage`: Der Schlitten ist schon da (sonst erscheint er erst, `DUE` Takte später)
+ */
+const iceAtHome = (game: Locator, stage?: 'bereit' | 'fest') =>
+  game.evaluate((node, st) => {
+    const el = node as unknown as SledGame;
+    const species = [...new Set(el.state.animals.filter((a) => a.realm === 'eis').map((a) => a.species)), 'pinguin'];
+    const garden = [...el.state.garden, ...species.map((s) => ({ id: `eis:${s}`, species: s }))];
+    const [x, y] = el.world.homes.eis.wake.find(([wx, wy]) => !el.state.animals.some((a) => a.x === wx && a.y === wy))!;
+    const packs = st ? { ...el.state.packs, fahrt: { schlitten: { stage: st } } } : el.state.packs;
+    el.state = {
+      ...el.state,
+      openGates: ['eis'],
+      portals: [...new Set([...el.state.portals, 'eiskessel'])],
+      garden,
+      packs,
+      sleeping: false,
+      wokeAt: -100,
+      player: { x, y, dir: 's' },
+    };
+    el.lift();
+  }, stage);
+
+/** Stufe des Schlittens im Spielstand der Komponente */
+const sledStage = (game: Locator) =>
+  game.evaluate((el) => (el as unknown as SledGame).state.packs.fahrt?.schlitten?.stage ?? 'fehlt');
+
+/**
+ * Die Figur wach `gap` Felder neben den Sitz des Schlittens stellen (quer zur Strecke, nicht aufs Zugtier und nicht in
+ * den Schuppen dahinter), auf freie, begehbare Felder, von denen sie Schritt für Schritt zum Sitz kommt. Liefert die
+ * Pfeiltaste zum Sitz und die zurück (null: kein Platz, dann scheitert der Test mit dem Seed)
+ */
+const besideSeat = (page: Page, game: Locator, gap: 1 | 2) =>
+  render(page).then(() =>
+    game.evaluate(
+      (node, [n, id]) => {
+        const el = node as unknown as SledGame;
+        const seat = el.rides.find((r) => r.id === id);
+        const pull = el.rides.find((r) => r.id === `${id}:rentier`);
+        if (!seat || !pull) return null;
+        const [sx, sy, px, py] = [seat.x, seat.y, pull.x, pull.y].map(Math.round) as [number, number, number, number];
+        const stand = (x: number, y: number) => {
+          const c = el.world.cell(x, y);
+          if (c.gate) return el.state.openGates.includes(c.gate) ? 1 : null;
+          return c.solid || ['water', 'lava', 'sky'].includes(c.ground) ? null : c.h;
+        };
+        const free = (x: number, y: number) =>
+          stand(x, y) !== null && !el.state.animals.some((a) => a.x === x && a.y === y);
+        const step = (fx: number, fy: number, tx: number, ty: number) => {
+          const [a, b] = [stand(fx, fy), stand(tx, ty)];
+          return a !== null && b !== null && b - a <= 1;
+        };
+        const keys: Record<string, string> = {
+          '0,-1': 'ArrowUp',
+          '0,1': 'ArrowDown',
+          '-1,0': 'ArrowLeft',
+          '1,0': 'ArrowRight',
+        };
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ] as const) {
+          if ((sx + dx === px && sy + dy === py) || (sx - dx === px && sy - dy === py)) continue; // längs der Strecke
+          const cells = Array.from({ length: n }, (_, i) => [sx + dx * (i + 1), sy + dy * (i + 1)] as const);
+          if (!cells.every(([x, y]) => free(x, y))) continue;
+          const chain = [...cells].reverse().concat([[sx, sy] as const]);
+          if (!chain.every((c, i) => i === 0 || step(...chain[i - 1]!, ...c))) continue;
+          const [x, y] = cells.at(-1)!;
+          el.state = { ...el.state, sleeping: false, wokeAt: -100, player: { x, y, dir: 's' } };
+          el.lift();
+          return { to: keys[`${-dx},${-dy}`]!, back: keys[`${dx},${dy}`]! };
+        }
+        return null;
+      },
+      [gap, SLED] as const,
+    ),
+  );
+
+/**
+ * Test-Uhr: fahren lassen, bis die Figur am Ziel ausgestiegen ist (eine Fahrt dauert 15–20 s, dazu 2 s bis zur Abfahrt
+ * und 1 s Aussteigen). Abfahrt und erste Strecke wie die Seite (Takt und Bild), danach Takte mit wenigen Bildern: Die
+ * Fahrt läuft im Takt der Regeln, jedes Bild kostet in der Pipeline ohne Grafikkarte ein Vielfaches
+ */
+const rideToEnd = async (page: Page, game: Locator) => {
+  await play(page, 3000);
+  await expect
+    .poll(async () => {
+      await ticks(page, 50);
+      await render(page, 2);
+      return game.evaluate((el) => !!(el as unknown as SledGame).state.ride);
+    })
+    .toBe(false);
+};
+
+/** Wo die Figur steht: Gegend und Abstand (Schachbrett) zum Sitz des Schlittens */
+const whereRider = (page: Page, game: Locator) =>
+  render(page).then(() =>
+    game.evaluate((node, id) => {
+      const el = node as unknown as SledGame;
+      const { x, y } = el.state.player;
+      const seat = el.rides.find((r) => r.id === id);
+      const near = seat ? Math.max(Math.abs(Math.round(seat.x) - x), Math.abs(Math.round(seat.y) - y)) : -1;
+      return { realm: el.world.realm(x, y), near };
+    }, SLED),
+  );
+
+test('Spiel: Schlitten bringt heim – erscheint am Schneebett, Fest bei der ersten Fahrt, zurück und mit Antippen, ohne Fehler', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  const game = await openGame(page, { clock: true });
+  await withIce(game);
+  // Gespeichert wie nach vielen Abenden: Eistor offen, alle Eis-Tiere zu Hause, die Figur am Schneebett; die Welt öffnet neu
+  await iceAtHome(game);
+  await game.evaluate((node) => {
+    const el = node as unknown as SledGame;
+    el.save();
+    return el.openWorld(el.saved.id);
+  });
+  expect(await sledStage(game)).toBe('fehlt');
+  await page.keyboard.press('ArrowDown'); // aufwachen neben dem Schneebett
+  // gut 2 s später trabt er herbei: Stufe `bereit`
+  await expect
+    .poll(async () => {
+      await ticks(page, 10);
+      return sledStage(game);
+    })
+    .toBe('bereit');
+  await ticks(page, 20); // herbeigetrabt
+  // Ein neuer Druck zum Sitz steigt ein; die Fahrt geht von selbst durch den Gang über die Lichtung (Festfahrt)
+  const keys = await besideSeat(page, game, 1);
+  expect(keys).not.toBeNull();
+  await page.keyboard.press(keys!.to);
+  expect(await game.evaluate((el) => (el as unknown as SledGame).state.ride?.phase)).toBe('seated');
+  await rideToEnd(page, game);
+  // am Halt auf der Lichtung ausgestiegen, Fest gefeiert und sofort gespeichert
+  const out = await whereRider(page, game);
+  expect(out.realm).toBe('lichtung');
+  expect(out.near).toBeGreaterThanOrEqual(0); // der Schlitten steht jetzt auch auf der Lichtung
+  expect(out.near).toBeLessThanOrEqual(2);
+  expect(await sledStage(game)).toBe('fest');
+  const stored = await page.evaluate(() =>
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('larmic.games.world.'))
+      .map(
+        (k) =>
+          (JSON.parse(localStorage.getItem(k)!) as { packs?: { fahrt?: { schlitten?: { stage: string } } } }).packs
+            ?.fahrt?.schlitten?.stage,
+      ),
+  );
+  expect(stored).toEqual(['fest']);
+  // zurück in die Eis-Welt
+  const back = await besideSeat(page, game, 1);
+  expect(back).not.toBeNull();
+  await page.keyboard.press(back!.to);
+  expect(await game.evaluate((el) => !!(el as unknown as SledGame).state.ride)).toBe(true);
+  await rideToEnd(page, game);
+  const home = await whereRider(page, game);
+  expect(home.realm).toBe('eis');
+  expect(home.near).toBeLessThanOrEqual(2);
+  // Antippen des Schlittens (ein Finger, wie auf dem Tablet) steigt ein
+  await render(page, 4);
+  const spot = await game.evaluate((node, id) => {
+    const el = node as unknown as SledGame;
+    const seat = el.rides.find((r) => r.id === id)!;
+    return el.project(seat.x + 0.5, seat.y + 0.5, seat.z + 0.4);
+  }, SLED);
+  await page.locator('canvas.mw-canvas').click({ position: { x: spot[0], y: spot[1] } });
+  expect(await game.evaluate((el) => (el as unknown as SledGame).state.ride?.phase)).toBe('seated');
+  expect(errors).toEqual([]);
+});
+
+test('Spiel: Schlitten – ein gehaltener Pfeil stößt nur an, ein neuer Druck steigt ein, ein Pfeil weg steigt wieder aus', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  const game = await openGame(page, { clock: true });
+  await withIce(game);
+  await iceAtHome(game, 'bereit');
+  const keys = await besideSeat(page, game, 2);
+  expect(keys).not.toBeNull();
+  const before = await game.evaluate((el) => (el as unknown as SledGame).state.tick);
+  // gehalten: erst ein Schritt neben den Sitz, nach der Wartezeit drückt der Pfeil gegen ihn – kein Einsteigen
+  await page.keyboard.down(keys!.to);
+  await play(page, 1500);
+  const held = await game.evaluate((node) => {
+    const el = node as unknown as SledGame;
+    return { ride: !!el.state.ride, nudged: el.state.rideDue };
+  });
+  await page.keyboard.up(keys!.to);
+  expect(held.ride).toBe(false);
+  expect(held.nudged).toBeGreaterThan(before); // angestoßen (Tür geht auf, Tuten), gedrosselt über `rideDue`
+  // ein neuer Druck steigt ein
+  await render(page, 6); // ein Schritt-Takt (260 ms) seit dem letzten Schritt
+  await page.keyboard.press(keys!.to);
+  await render(page, 6);
+  expect(await game.evaluate((el) => (el as unknown as SledGame).state.ride?.phase)).toBe('seated');
+  // in den 2 s vor der Abfahrt: ein Pfeil weg steigt wieder aus
+  await page.keyboard.press(keys!.back);
+  await render(page, 6);
+  expect(await game.evaluate((el) => !!(el as unknown as SledGame).state.ride)).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test(
+  'Spiel: Schlitten wird gezeichnet (Schuppen, Schlitten, Rentier; die Figur sitzt darin), ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    const game = await openGame(page, { clock: true });
+    const webgl = await expectView(page);
+    await withIce(game);
+    await view3d(page, 'eis');
+    await iceAtHome(game, 'bereit');
+    const keys = await besideSeat(page, game, 1);
+    expect(keys).not.toBeNull();
+    // Geprüft wird die Szene, nicht die Pixel: in 3D nur jedes fünfte Bild an WebGL
+    if (webgl) await drawEvery(page, 5);
+    const shown = () =>
+      game.evaluate((node, id) => {
+        const el = node as unknown as SledGame;
+        const ids = [id, `${id}:rentier`, `${id}:schuppen`];
+        const has = (k: string) => (el.r3d ? el.r3d.bodies.has(k) : el.rides.some((r) => r.id === k));
+        return { sled: ids.every(has), player: el.r3d ? el.r3d.bodies.has('player') : true };
+      }, SLED);
+    await expect
+      .poll(async () => {
+        await render(page);
+        return shown();
+      })
+      .toEqual({ sled: true, player: true });
+    await page.keyboard.press(keys!.to); // eingestiegen: Die Figur sitzt im Modell des Schlittens, kein eigener Körper
+    await play(page, 3000); // los
+    expect(await game.evaluate((el) => (el as unknown as SledGame).state.ride?.phase)).toMatch(/^(go|stop)$/);
+    await render(page);
+    expect(await shown()).toEqual({ sled: true, player: !webgl });
+    if (webgl) await drawEvery(page, 1);
+    await render(page);
+    expect(errors).toEqual([]);
+  },
+);

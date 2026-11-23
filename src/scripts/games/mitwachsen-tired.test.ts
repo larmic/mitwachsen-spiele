@@ -11,7 +11,9 @@ import {
   advance,
   evening,
   freshDay,
+  heldTired,
   loadTired,
+  restPose,
   saveTired,
   type Tired,
   type TiredEvent,
@@ -106,5 +108,29 @@ describe('Müde werden', () => {
     expect(idlePose(20_000)).toBe('read');
     expect(idlePose(119_999)).toBe('read');
     expect(idlePose(120_000)).toBe('doze');
+  });
+
+  it('im Fahrzeug liest sie nie und nickt nicht ein; schlafend und bei ruhendem Spiel steht sie', () => {
+    const awake = { sleeping: false };
+    expect(restPose(awake, false, DOZE_AFTER)).toBe('doze');
+    expect(restPose(awake, false, READ_AFTER)).toBe('read');
+    expect(restPose({ ...awake, ride: { phase: 'go' } }, false, DOZE_AFTER)).toBe('stand');
+    expect(restPose({ sleeping: true }, false, DOZE_AFTER)).toBe('stand');
+    expect(restPose(awake, true, DOZE_AFTER)).toBe('stand');
+  });
+
+  it('Gähnen und „ins Bett“ warten im Fahrzeug bis nach dem Aussteigen; „ins Bett“ geht vor', () => {
+    expect(heldTired(null, 'yawn', false)).toEqual({ now: 'yawn', held: null });
+    expect(heldTired(null, null, false)).toEqual({ now: null, held: null });
+    // unterwegs gemerkt, nichts sofort
+    const riding = heldTired(null, 'yawn', true);
+    expect(riding).toEqual({ now: null, held: 'yawn' });
+    expect(heldTired(riding.held, null, true)).toEqual({ now: null, held: 'yawn' }); // noch unterwegs
+    expect(heldTired('yawn', 'bed', true)).toEqual({ now: null, held: 'bed' });
+    expect(heldTired('bed', 'yawn', true)).toEqual({ now: null, held: 'bed' });
+    // ausgestiegen: kommt einmal
+    const out = heldTired('yawn', null, false);
+    expect(out).toEqual({ now: 'yawn', held: null });
+    expect(heldTired(out.held, null, false).now).toBeNull();
   });
 });

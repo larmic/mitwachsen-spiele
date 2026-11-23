@@ -5,7 +5,7 @@
 // Eislöchern, der Eisfall am Talende (Klippen aus gefrorenem Wasser), die Stufen des Eisbergs, Schneehaufen und
 // Schneemänner in ihrer Stufe (mitwachsen-snowman-look.ts, stehen still), die Eiszapfen des
 // Glockenspiels (mitwachsen-chime-look.ts, hängen still), die Fußspuren im Schnee
-// (view-3d-prints.ts) und am Eistor Tür, Eiszapfen und Eisscholle als Torplatte (view-3d-gate.ts). Braucht Three.js (wie die
+// (view-3d-prints.ts), die Schneespur des Schlittens (view-3d-sled.ts) und am Eistor Tür, Eiszapfen und Eisscholle als Torplatte (view-3d-gate.ts). Braucht Three.js (wie die
 // 3D-Ansicht, beide teilen es) und wird darum nicht mit dem Paket geladen, sondern erst, wenn die 3D-Ansicht es will (`pack.view3d`, index.ts):
 // im Build `_astro/welt-eis-3d.<hash>.js` mit eigener Grenze (scripts/verify-bundles.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
@@ -16,6 +16,7 @@ import type { Frame, Ground, View3D } from '../../mitwachsen-view-3d';
 import type { DrawDeco } from '../../mitwachsen-view';
 import { gateLook } from './view-3d-gate';
 import { layer } from './view-3d-prints';
+import { joined, marksLayer } from './view-3d-sled';
 import { stageAt } from './mitwachsen-snowman';
 import { snowBoxes } from './mitwachsen-snowman-look';
 import { chimeBoxes } from './mitwachsen-chime-look';
@@ -68,6 +69,6 @@ export const view3d: View3D = {
   bedFrame: (c) => (c.biome === 'eis' ? SNOW_FRAME : null),
   // alle zugleich (ein Material): pulsieren sanft mit dem Polarlicht, bei reduzierter Bewegung ruhig
   glow: (aurora, reduced, now) => glowTint(crystalGlow(aurora, reduced, now)),
-  // Fußspuren im Schnee, je Bild nachgeführt (view-3d-prints.ts)
-  layer,
+  // Fußspuren im Schnee und Schneespur des Schlittens, je Bild nachgeführt (view-3d-prints.ts, view-3d-sled.ts)
+  layer: joined(layer, marksLayer()),
 };

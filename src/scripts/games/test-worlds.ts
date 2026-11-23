@@ -39,7 +39,7 @@ export const SAMPLE_SEEDS: readonly number[] = [1, 7, 42, 2026, 123456];
  * Seeds, an denen ein Eigenschafts-Test im tiefen Lauf einmal scheiterte (die Meldung nennt den Seed): Nur anhängen, nie
  * streichen, auch wenn der Fehler behoben ist. Sie laufen in jedem Lauf mit, in jedem Eigenschafts-Test
  */
-export const REGRESSION_SEEDS: readonly number[] = [];
+export const REGRESSION_SEEDS: readonly number[] = [11];
 
 /** Die Seeds `from` bis `to` (beide eingeschlossen) */
 export const seedRange = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);

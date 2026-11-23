@@ -87,6 +87,19 @@ describe('Welten speichern', () => {
     expect(progressFrom(withProgress(w, p))).toEqual(p);
   });
 
+  it('der Spielstand der Fahrzeuge (packs.fahrt) übersteht Speichern, Laden und einen Zug, ohne Umzug im Kern', () => {
+    const store = memoryStore();
+    const fahrt = { schlitten: { stage: 'fest' }, spaeter: { stage: 'offen', schlaeft: true } };
+    const packs = { eis: { v: 1, snow: { '3,4': 2 } }, fahrt };
+    const w = withProgress(newWorld('f', 1, 'X'), { ...progressFrom(newWorld('f', 1, 'X')), packs });
+    expect(saveWorld(store, w)).toBe(true);
+    const loaded = loadWorld(store, 'f')!;
+    expect(loaded.packs).toEqual(packs);
+    const world = worldOf(1);
+    const s = step(initialState(world, progressFrom(loaded)), world, { type: 'tick' }).state;
+    expect(progressOf(s).packs).toEqual(packs); // auch nach einem Zug, unverändert
+  });
+
   it('läuft ohne Fehler weiter, wenn der Browser nichts speichern lässt', () => {
     expect(saveWorld(brokenStore, newWorld('a', 1, 'X'))).toBe(false);
     expect(loadWorld(brokenStore, 'a')).toBeNull();

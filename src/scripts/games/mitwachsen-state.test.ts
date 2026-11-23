@@ -29,6 +29,7 @@ import { ICE_ANIMALS } from '../../data/games/worlds/eis/mitwachsen-kessel';
 import { HAUNTS } from './worlds/eis/mitwachsen-haunts';
 import { bergPeak } from './worlds/eis/mitwachsen-ice-sky';
 import { migrate, newWorld, progressFrom, withProgress, type SavedWorld } from './mitwachsen-save';
+import type { RideRules } from './mitwachsen-rider';
 
 /** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich; Zuhause der Eis-Welt (im Kessel von Seed 1) */
 const { lichtung: LICHTUNG, eis: EIS_HOME } = worldOf(1).homes;
@@ -1360,6 +1361,125 @@ describe('Spielstand', () => {
     const world = worldOf(4);
     const s = initialState(world, { garden: [{ id: animalId('lichtung', 'hase'), species: 'hase' }] });
     expect(s.animals.filter((a) => a.id === animalId('lichtung', 'hase'))).toHaveLength(1);
+  });
+});
+
+describe('Haken der Fahrzeuge (WorldRules.ride)', () => {
+  type Call = { hook: 'tick' | 'move' | 'blocks'; tick: number; cmd?: Cmd };
+  /** Regeln eines Fahrzeugs zum Zuschauen: zeichnen jeden Aufruf auf; `move` und `blocks` liefern, was man ihnen sagt */
+  function spy(move = false, blocks = false) {
+    const calls: Call[] = [];
+    const ride: RideRules = {
+      tick: (s, _w, events) => {
+        calls.push({ hook: 'tick', tick: s.tick });
+        events.push({ type: 'ride', what: 'come', id: 'schlitten', x: 0, y: 0 });
+      },
+      move: (s, _w, cmd, events) => {
+        calls.push({ hook: 'move', tick: s.tick, cmd });
+        if (move) events.push({ type: 'ride', what: 'board', id: 'schlitten', x: s.player.x, y: s.player.y });
+        return move;
+      },
+      blocks: (s) => {
+        calls.push({ hook: 'blocks', tick: s.tick });
+        return blocks;
+      },
+    };
+    return { calls, packs: [{ rules: { bump: () => false, ride } }] };
+  }
+  const hasRide = (r: { events: GameEvent[] }) => r.events.some((e) => e.type === 'ride');
+
+  it('ohne Fahrt und ohne Fälligkeit beginnt jeder Zustand; die Fahrt wird kopiert, nie verändert', () => {
+    const world = fakeWorld();
+    const s0 = initialState(world);
+    expect(s0.rideDue).toBe(-1);
+    expect(s0.ride).toBeUndefined();
+    expect(progressOf(s0)).not.toHaveProperty('ride'); // nicht gespeichert
+    const ride = {
+      id: 'schlitten',
+      phase: 'go',
+      at: 0,
+      pos: 1,
+      speed: 0.1,
+      to: 'home',
+      feast: true,
+      jingleAt: 0,
+    } as const;
+    const s = { ...awake(world, 0, 0), ride: { ...ride, greeted: ['eis:robbe'] } };
+    const next = step(s, world, TICK).state;
+    expect(next.ride).toEqual(s.ride);
+    expect(next.ride).not.toBe(s.ride);
+    expect(next.ride!.greeted).not.toBe(s.ride.greeted);
+  });
+
+  it('tick ruft den Haken nach dem Takt der Tiere; move vor allem anderen, mit fresh und tap', () => {
+    const world = fakeWorld();
+    const { calls, packs } = spy();
+    const s = awake(world, 0, 0);
+    const t = step(s, world, TICK, undefined, undefined, packs);
+    expect(calls.filter((c) => c.hook === 'tick')).toEqual([{ hook: 'tick', tick: s.tick + 1 }]);
+    expect(hasRide(t)).toBe(true); // seine Ereignisse kommen mit
+    const cmd: Cmd = { type: 'move', dir: 'e', fresh: true, tap: true };
+    const r = step(t.state, world, cmd, undefined, undefined, packs);
+    expect(calls.at(-1)).toEqual({ hook: 'move', tick: s.tick + 1, cmd });
+    // false: Der Zug geht weiter wie immer
+    expect(types(r.events)).toEqual(['step']);
+    expect([r.state.player.x, r.state.player.y]).toEqual([1, 0]);
+  });
+
+  it('move === true verbraucht den Zug: kein Schritt, kein Hüpfen am Eistor, keine Weltgrenze', () => {
+    const world = fakeWorld();
+    const { packs } = spy(true);
+    let held = 0;
+    const guide = { guide: () => {}, meetGuide: () => {}, hold: () => (held++, true) };
+    const s = awake(world, 0, 0);
+    const r = step(s, world, { type: 'move', dir: 'e' }, undefined, guide, packs);
+    expect(types(r.events)).toEqual(['ride']);
+    expect([r.state.player.x, r.state.player.y]).toEqual([0, 0]);
+    expect(held).toBe(0);
+    // schlafend weckt der Pfeil, das Fahrzeug bekommt ihn nicht
+    const { calls, packs: asleep } = spy(true);
+    const w = step({ ...initialState(world) }, world, { type: 'move', dir: 'e' }, undefined, undefined, asleep);
+    expect(calls).toEqual([]);
+    expect(types(w.events)).toEqual(['wake']);
+  });
+
+  it('blocks hält umherlaufende Tiere ab; ohne Sperre laufen sie', () => {
+    const world = fakeWorld();
+    const walker = () => animal('lichtung:hase', 10, 10, { rest: 1 });
+    const walk = (blocks: boolean) => {
+      const { calls, packs } = spy(false, blocks);
+      let s = awake(world, 0, 0, [walker()]);
+      for (let i = 0; i < 200; i++) s = step(s, world, TICK, undefined, undefined, packs).state;
+      return { a: s.animals[0]!, asked: calls.some((c) => c.hook === 'blocks') };
+    };
+    const kept = walk(true);
+    expect(kept.asked).toBe(true);
+    expect([kept.a.x, kept.a.y]).toEqual([10, 10]);
+    const free = walk(false);
+    expect([free.a.x, free.a.y]).not.toEqual([10, 10]);
+  });
+
+  it('ohne Fahrzeug in den Regeln bleibt alles wie heute', () => {
+    const world = worldOf(1);
+    const plain = [{ rules: { bump: () => false } }];
+    let a = initialState(world, {}, 7);
+    let b = initialState(world, {}, 7);
+    const cmds: Cmd[] = [{ type: 'move', dir: 'e' }, TICK, { type: 'move', dir: 's', fresh: true }, ACT];
+    const ea: GameEvent[] = [];
+    const eb: GameEvent[] = [];
+    for (let i = 0; i < 60; i++) {
+      const cmd = cmds[i % cmds.length]!;
+      const ra = step(a, world, cmd);
+      const rb = step(b, world, cmd, undefined, undefined, plain);
+      ea.push(...ra.events);
+      eb.push(...rb.events);
+      [a, b] = [ra.state, rb.state];
+    }
+    expect(eb).toEqual(ea);
+    expect(ea.length).toBeGreaterThan(0);
+    expect(b).toEqual(a);
+    expect(a.ride).toBeUndefined();
+    expect(a.rideDue).toBe(-1);
   });
 });
 

@@ -13,6 +13,8 @@ import type { GateLook } from './mitwachsen-gate-kit';
 import type { Tile } from './mitwachsen-geo';
 import type { View2D } from './mitwachsen-view';
 import type { WorldPack } from './mitwachsen-pack-types';
+import type { Scene } from './mitwachsen-render';
+import type { State } from './mitwachsen-state';
 import type { World } from './mitwachsen-world';
 
 /** Nach so vielen ms wird ein gescheiterter 3D-Teil neu versucht (wie die Pakete, `RETRY_MS` in mitwachsen-packs.ts) */
@@ -28,8 +30,11 @@ export type Ground = { tiles: readonly [Tile, Tile, Tile]; top?: string; side?: 
 /** Rahmen des Betts: Farbe der Seiten, oben (null: wie die Seiten), Kachel */
 export type Frame = readonly [string, string | null, Tile];
 
-/** Was ein 3D-Teil je Bild nachführt (Eis-Welt: Fußspuren im Schnee): ein Objekt in der Szene und sein Nachführen */
-export type Layer = { object: Object3D; update(world: World): void };
+/**
+ * Was ein 3D-Teil je Bild nachführt (Eis-Welt: Fußspuren im Schnee, Schneespur des Schlittens): ein Objekt in der Szene
+ * und sein Nachführen aus Welt, Zustand und Bild
+ */
+export type Layer = { object: Object3D; update(world: World, state: State, sc: Scene): void };
 
 /** Der 3D-Teil eines Welt-Pakets */
 export type View3D = {
@@ -49,7 +54,7 @@ export type View3D = {
    * darf nur ein Paket `glow` haben (bisher die Eis-Welt); leuchtet eine zweite Welt, das Material je Tor schlüsseln
    */
   glow?(aurora: number, reduced: boolean, now: number): readonly [number, number, number];
-  /** was sich je Bild ändert (Eis-Welt: Fußspuren im Schnee); die 3D-Ansicht hängt es in ihre Szene */
+  /** was sich je Bild ändert (Eis-Welt: Fußspuren und Schneespur); die 3D-Ansicht hängt es in ihre Szene */
   layer?: Layer;
 };
 
@@ -111,14 +116,14 @@ export class Views3D {
   }
 
   /**
-   * Je Bild: was die 3D-Teile der Pakete nachführen (`View3D.layer`, Eis-Welt: Fußspuren), in die Szene `into` hängen
-   * (einmal; nach einem neuen WebGL-Kontext in die neue) und nachführen
+   * Je Bild: was die 3D-Teile der Pakete nachführen (`View3D.layer`, Eis-Welt: Fußspuren, Schneespur), in die Szene
+   * `into` hängen (einmal; nach einem neuen WebGL-Kontext in die neue) und nachführen
    */
-  layers(world: World, into: Object3D) {
+  layers(into: Object3D, world: World, state: State, sc: Scene) {
     for (const { layer } of this.views) {
       if (!layer) continue;
       if (layer.object.parent !== into) into.add(layer.object);
-      layer.update(world);
+      layer.update(world, state, sc);
     }
   }
 

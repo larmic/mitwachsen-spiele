@@ -3,6 +3,7 @@
 // Spezifikation: docs/specs/mitwachsen.md
 
 import type { GateId, RegionId } from '../../data/games/mitwachsen';
+import type { RideId } from '../../data/games/mitwachsen-rides';
 import type { StoryId } from '../../data/games/mitwachsen-stories';
 import type { PlatformSpot } from './mitwachsen-portal';
 
@@ -82,4 +83,5 @@ export type Cell = {
   note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz)
   slide?: true; // Rutschspur vom Eistor zum Schneebett (begehbar; glänzt, sobald das Tor offen ist)
   plate?: GateId; // Torplatte vor diesem Tor (mitten in der Bucht, eben und frei; Bild und Ton, öffnet das Eistor, mitwachsen-plate.ts)
+  ride?: RideId; // Strecke dieses Fahrzeugs (nur in einer Welt und ihrem Gang, begehbar wie die Rutschspur; Welt-Paket)
 };

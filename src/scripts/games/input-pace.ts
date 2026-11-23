@@ -6,6 +6,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Eingabe)
 
 import type { Dir } from '../../lib/games/front';
+import type { RideEvent } from './mitwachsen-pack-types';
 import type { GameEvent } from './mitwachsen-state';
 
 export const STEP_MS = 260; // gut 4 Schritte pro Sekunde
@@ -33,9 +34,11 @@ export const FREE_KEYS = new Set([
  * Schneehaufen wächst um eine Kugel (Eis-Welt), ins Bett gegangen. Danach bleibt die Figur kurz stehen (`pause`, so
  * lange wie die Wartezeit am Anfang, damit man Herz und Noten sieht) und läuft mit gehaltenem Pfeil weiter. Nur aus dem
  * Bett muss der Pfeil neu gedrückt werden (`AGAIN`). Kein Halt am Eiszapfen-Glockenspiel (`icicle`, Eis-Welt): Wer die
- * Reihe entlangläuft, spielt eine Melodie im Takt der Schritte.
+ * Reihe entlangläuft, spielt eine Melodie im Takt der Schritte. Fahrzeuge (`ride`, Schlüssel `ride:<what>`): kurz
+ * stehen nach dem Aussteigen (gleich wieder, `leave`, oder am Ziel, `alight`) und nach dem Fest (`feast`); Winken,
+ * Anstoßen, Halten unterwegs und der Wechsel der Gegend halten nicht an.
  */
-export const ENCOUNTERS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['type']>([
+export const ENCOUNTERS: ReadonlySet<Key> = new Set<Key>([
   'sing',
   'follow',
   'pick',
@@ -50,9 +53,18 @@ export const ENCOUNTERS: ReadonlySet<GameEvent['type']> = new Set<GameEvent['typ
   'hop',
   'snowman',
   'sleep',
+  'ride:leave',
+  'ride:alight',
+  'ride:feast',
 ]);
-/** Danach erst nach neuem Druck weiter: sonst weckte der noch gehaltene Pfeil sie gleich wieder, und sie liefe zurück ins Bett */
-const AGAIN: ReadonlySet<GameEvent['type']> = new Set<GameEvent['type']>(['sleep']);
+/**
+ * Danach erst nach neuem Druck weiter: sonst weckte der noch gehaltene Pfeil sie gleich wieder, und sie liefe zurück ins
+ * Bett; ebenso nach dem Einsteigen (`ride:board`), sonst stiege sie mit dem gehaltenen Pfeil gleich wieder aus
+ */
+const AGAIN: ReadonlySet<Key> = new Set<Key>(['sleep', 'ride:board']);
+/** Schlüssel eines Ereignisses für `stops`: sein Typ, bei Fahrzeugen mit Unterart (`ride:board`) */
+type Key = GameEvent['type'] | `ride:${RideEvent['what']}`;
+const keyOf = (e: GameEvent): Key => (e.type === 'ride' ? `ride:${e.what}` : e.type);
 
 /** Wie eine Begegnung die Figur anhält: kurz (`pause`), bis zum nächsten Druck (`clear`) oder gar nicht */
 export type Stop = 'pause' | 'clear' | null;
@@ -62,8 +74,8 @@ export type Stop = 'pause' | 'clear' | null;
  * hüpft dabei voraus oder tauscht den Platz, er blockiert nie (docs/specs/mitwachsen.md, „Der Pinguin holt dich ab“).
  */
 export function stops(events: readonly GameEvent[], leader?: string): Stop {
-  if (events.some((e) => AGAIN.has(e.type))) return 'clear';
-  return events.some((e) => ENCOUNTERS.has(e.type) && !(e.type === 'sing' && e.id === leader)) ? 'pause' : null;
+  if (events.some((e) => AGAIN.has(keyOf(e)))) return 'clear';
+  return events.some((e) => ENCOUNTERS.has(keyOf(e)) && !(e.type === 'sing' && e.id === leader)) ? 'pause' : null;
 }
 
 export class InputPace {
@@ -73,6 +85,11 @@ export class InputPace {
   private since = -Infinity; // wann der zuletzt gedrückte Pfeil gedrückt wurde
   private lastAction = -Infinity;
   private fresh = false; // nach clear: Wiederholungen zählen erst nach einem neuen Druck wieder
+  /**
+   * Kam der zuletzt gelieferte Schritt aus einem neuen Druck (sofort oder als gemerkter Tipp) statt aus einem gehaltenen
+   * Pfeil? Nur ein neuer Druck steigt in ein Fahrzeug (`Cmd.move.fresh`), ein gehaltener stößt nur sanft an.
+   */
+  lastFresh = false;
 
   /** Pfeil gedrückt (keine Wiederholungen des Systems): liefert den Schritt, falls er sofort dran ist */
   press(dir: Dir, now: number): Dir | null {
@@ -82,6 +99,7 @@ export class InputPace {
     if (now - this.lastStep >= STEP_MS) {
       this.lastStep = now;
       this.pending = null;
+      this.lastFresh = true;
       return dir;
     }
     this.pending = dir;
@@ -107,6 +125,7 @@ export class InputPace {
     const held = now - this.since >= HOLD_MS ? this.down.at(-1) : undefined; // gehalten erst nach der Wartezeit
     const dir = this.pending ?? held ?? null;
     if (dir) {
+      this.lastFresh = this.pending !== null;
       this.pending = null;
       this.lastStep = now;
     }

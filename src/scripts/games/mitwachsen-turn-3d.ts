@@ -126,7 +126,7 @@ export class PlateTurn {
   private input(world: World, state: State, sc: Frame): TurnInput {
     const t = state.tick - state.ritual; // Takte seit Beginn des Rituals, negativ im Vorspiel
     this.busy = t >= 0 && opening(state, RITUAL); // Ritual, nicht schon das Vorspiel
-    const on = !!sc.plate?.on && !state.sleeping;
+    const on = !!sc.plate?.on && !state.sleeping && !state.ride; // im Fahrzeug dreht die Kamera nie, sie folgt nur
     const back = this.busy && t >= RITUAL - (CAMERA_BACK_S * 1000) / RULE_TICK_MS;
     if (back && backNeedsBlink(this.lage)) this.blinker.ask(this.view.yaw, sc.now, () => {}); // einmal: danach 0°
     // im Ritual das Eistor; im Vorspiel (noch nicht `busy`) ist es das Tor der Platte, auf der die Figur steht, und

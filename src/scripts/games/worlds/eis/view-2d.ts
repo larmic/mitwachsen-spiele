@@ -4,7 +4,7 @@
 // Eiszapfen des Glockenspiels (mitwachsen-chime-look.ts, mit ihrem Glockenton), die Rutschspur zum Schneebett, das
 // Wetter der Eis-Welt mit Polarlicht, das Bild der Weltgrenze (mitwachsen-ice-sky.ts) und die Fußspuren im Schnee
 // (mitwachsen-prints.ts), dazu die Eisscholle vor dem Eistor (Torplatte) mit Schneeflocke und Klirren und „noch
-// nicht“, wenn die Figur dort ohne Pinguin steht (mitwachsen-plate-hint.ts).
+// nicht“, wenn die Figur dort ohne Pinguin steht (mitwachsen-plate-hint.ts), und der Schlitten (mitwachsen-sled-look.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
 import { ICE_COLORS, ICE_CRYSTALS, ICE_FLOE } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
@@ -18,6 +18,7 @@ import { stageAt } from './mitwachsen-snowman';
 import { snowBoxes, snowScore, wobble } from './mitwachsen-snowman-look';
 import { chimeBoxes, chimeScore, ring, since, swing } from './mitwachsen-chime-look';
 import { plateHint } from './mitwachsen-plate-hint';
+import { rideFx, sledBodies, sledMarks } from './mitwachsen-sled-look';
 
 /** Iglu, Eisschale, Eistrog: Quader wie in 3D */
 const look: DrawDeco = (world, c, x, y) => iceBoxes(world, c, x, y);
@@ -85,4 +86,8 @@ export const view: View2D = {
   ],
   // „noch nicht“: Steht die Figur auf der Scholle, ohne dass der Pinguin führt, zeigt das Tor, was fehlt
   hint: plateHint(),
+  // Schlitten mit Schlittenrentier und Schuppen, Schneespur und Fleck am Halt, Ton und Freude (mitwachsen-sled-look.ts)
+  bodies: sledBodies,
+  marks: sledMarks,
+  rideFx,
 };

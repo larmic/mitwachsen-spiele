@@ -101,6 +101,17 @@ module.exports = {
       to: { path: '^src/(scripts|data)/games/worlds/', pathNot: '^src/(scripts|data)/games/worlds/$1/' },
     },
     {
+      name: 'ride-engine-is-generic',
+      severity: 'error',
+      comment:
+        'Die Fahrzeug-Engine (worlds/eis/mitwachsen-ride*.ts: Spielstand, Regeln) kennt keinen Schlitten und nichts aus der Eis-Welt außer den Wegen (mitwachsen-flood.ts): So zieht sie später mit allen Fahrzeugen in ein eigenes Paket (worlds/fahrt/). Was nur der Schlitten braucht, steckt in mitwachsen-sled*.ts.',
+      from: { path: '^src/scripts/games/worlds/eis/mitwachsen-ride[^/]*\\.ts$', pathNot: '\\.test\\.ts$' },
+      to: {
+        path: '^src/(scripts|data)/games/worlds/eis/',
+        pathNot: '^src/scripts/games/worlds/eis/mitwachsen-(flood|ride[^/]*)\\.ts$',
+      },
+    },
+    {
       name: 'turn-lives-in-3d',
       severity: 'error',
       comment:

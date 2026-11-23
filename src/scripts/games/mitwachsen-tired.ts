@@ -3,7 +3,8 @@
 // Figur, nach 25 Minuten möchte sie ins Bett und sagt das danach alle 3 Minuten wieder. Gesperrt wird nichts.
 // Schlafen im Bett beendet den Tag; nach einer langen Pause beginnt die Zeit ebenfalls neu.
 // Die Uhr gehört zum Kind, nicht zur Welt: ein Wert je Browser, nicht je Spielstand.
-// Spielt niemand (keine Eingabe), setzt sich die Figur und liest, später nickt sie ein (idlePose).
+// Spielt niemand (keine Eingabe), setzt sich die Figur und liest, später nickt sie ein (idlePose); nie im Fahrzeug,
+// und Hinweise warten dort bis nach dem Aussteigen (restPose, heldTired).
 // Spezifikation: docs/specs/mitwachsen.md
 
 import type { Store } from './mitwachsen-save';
@@ -22,6 +23,13 @@ export type Pose = 'stand' | 'read' | 'doze';
 /** Was die wache Figur tut, wenn niemand spielt (ms seit der letzten Eingabe) */
 export const idlePose = (idleMs: number): Pose =>
   idleMs >= DOZE_AFTER ? 'doze' : idleMs >= READ_AFTER ? 'read' : 'stand';
+
+/**
+ * Was die wache Figur tut: Schläft sie, ruht das Spiel (Menü, Hinweis) oder fährt sie (Fahrzeug), steht sie; sonst nach
+ * der Zeit ohne Eingabe (`idlePose`). Im Fahrzeug liest sie nie und nickt nicht ein: Die Fahrt ist Spielzeit
+ */
+export const restPose = (state: { sleeping: boolean; ride?: unknown }, paused: boolean, idleMs: number): Pose =>
+  state.sleeping || paused || state.ride ? 'stand' : idlePose(idleMs);
 
 export type Tired = {
   played: number; // gespielte Zeit heute in ms
@@ -47,6 +55,19 @@ export function advance(t: Tired, now: number, active: boolean): { tired: Tired;
   const tired = { played, seen: now, told };
   if (told === t.told) return { tired, event: null };
   return { tired, event: told > YAWN_AT.length ? 'bed' : 'yawn' };
+}
+
+/**
+ * Gähnen und „ins Bett“ warten, bis die Figur aus dem Fahrzeug gestiegen ist (sie setzt sich dabei hin): Während der
+ * Fahrt (`riding`) wird ein Hinweis gemerkt (`held`), danach kommt er (`now`); „ins Bett“ geht vor Gähnen
+ */
+export function heldTired(
+  held: TiredEvent | null,
+  event: TiredEvent | null,
+  riding: boolean,
+): { now: TiredEvent | null; held: TiredEvent | null } {
+  const due = held === 'bed' || event === 'bed' ? 'bed' : (event ?? held);
+  return riding ? { now: null, held: due } : { now: due, held: null };
 }
 
 /** Wie abendlich der Himmel ist: 0 bis 20 Minuten Tag, bis 25 Minuten gut zur Hälfte golden, bis 35 Minuten ganz */

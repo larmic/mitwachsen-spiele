@@ -60,6 +60,7 @@ import { moodLife } from './mitwachsen-sky';
 import { turnHead } from './mitwachsen-air';
 import { Album } from './mitwachsen-album';
 import { ASK, HEART, NOTE, ZZZ, sprite, type Particle } from './mitwachsen-glyphs';
+import { byRow, type RideBody } from './mitwachsen-ride-view';
 
 /** Gleitende Position eines Wesens auf dem Bildschirm (in Feldern), dazu Hüpfer und Blickrichtung */
 export type Body = { x: number; y: number; z: number; hop: number; puff?: number }; // puff: Haltung im Iglu (Größe)
@@ -91,6 +92,7 @@ export type Scene = {
   explored: (x: number, y: number) => boolean; // Nebel: nur Erkundetes wird gezeigt
   plate: PlateFx | null; // Torplatte, die die Figur zuletzt betreten oder verlassen hat (sinkt ein, springt hoch)
   hint: Hint | null; // „noch nicht“: was dem Eistor fehlt und seit wann es das zeigt (vergeht nach HINT_MS von selbst)
+  rides: readonly RideBody[]; // Fahrzeug aus einem Welt-Paket (Schlitten, Zugtier, Schuppen; die Figur sitzt darin)
 };
 
 /** Rahmen des Betts aus Holz (das Schneebett der Eis-Welt ist aus Schnee: `BED_SNOW`) */
@@ -147,23 +149,32 @@ export class Renderer {
     const y0 = Math.floor(sc.cam.y - sc.height / 2 / (TILE_D * z)) - 2;
     const y1 = Math.ceil(sc.cam.y + (sc.height / 2 + 4 * LEVEL_H * z) / (TILE_D * z)) + 2;
 
-    // Wesen nach der Reihe, in der sie gezeichnet werden: beim Gehen nach vorn schon in der Zielreihe
+    // Wesen nach der Reihe, in der sie gezeichnet werden: beim Gehen nach vorn schon in der Zielreihe. Im Fahrzeug
+    // sitzt die Figur in seinem Modell, im Bett liegt sie im Bett
     const rows = new Map<number, string[]>();
     for (const [id, b] of sc.bodies) {
-      if (id === 'player' && state.sleeping) continue;
+      if (id === 'player' && (state.sleeping || state.ride)) continue;
       const row = Math.ceil(b.y - 1e-6);
       rows.set(row, [...(rows.get(row) ?? []), id]);
     }
     const byId = new Map(state.animals.map((a) => [a.id, a]));
+    const rides = new Map<number, RideBody[]>();
+    for (const r of sc.rides) {
+      const row = Math.ceil(r.y - 1e-6);
+      rides.set(row, [...(rides.get(row) ?? []), r]);
+    }
+    const marks = byRow(this.view?.marks?.(state, world) ?? []); // Schneespur des Fahrzeugs
 
     this.later = [];
     this.at = { now: sc.now, reduced: sc.reduced, picked: state.picked, packs: state.packs };
     this.guest = this.view?.sky.guestAt(world, state) ?? null;
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) this.ground(P, world, x, y, sc);
+      for (const b of marks.get(y) ?? []) if (sc.explored(Math.floor(b[0]), y)) drawBox(ctx, P, b);
       this.view?.trail?.draw(ctx, world, P, y); // Fußspuren im Schnee (aus dem Welt-Paket)
       for (let x = x0; x <= x1; x++) this.deco(P, world, state, sc, x, y);
       for (const b of this.later) if (Math.ceil(b[1] + b[4] - 1e-6) - 1 === y) drawBox(ctx, P, b);
+      for (const r of rides.get(y) ?? []) this.ride(P, sc, r);
       const ids = (rows.get(y) ?? []).sort((a, b) => sc.bodies.get(a)!.x - sc.bodies.get(b)!.x);
       for (const id of ids) {
         const b = sc.bodies.get(id)!;
@@ -183,7 +194,7 @@ export class Renderer {
 
     // Die Figur noch einmal halb durchsichtig obenauf: Steht sie hinter einem Hügel oder Baum, bleibt sie sichtbar
     const me = sc.bodies.get('player');
-    if (me && !state.sleeping) {
+    if (me && !state.sleeping && !state.ride) {
       ctx.globalAlpha = 0.35;
       drawModel(ctx, P, figure(state, sc), me.x + 0.5, me.y + 0.5, me.z + me.hop, facing(state, sc), 1);
       ctx.globalAlpha = 1;
@@ -191,6 +202,13 @@ export class Renderer {
 
     this.atmosphere(sc);
     this.overlay(world, state, sc, P);
+  }
+
+  /** Ein Körper eines Fahrzeugs (im Nebel verborgen wie die Tiere) */
+  private ride(P: Projection, sc: Scene, r: RideBody) {
+    if (!sc.explored(Math.round(r.x), Math.round(r.y))) return;
+    this.shadow(P, r.x + 0.5, r.y + 0.5, r.z, 0.3);
+    drawModel(this.ctx, P, r.parts, r.x + 0.5, r.y + 0.5, r.z, r.dir, 1);
   }
 
   /**

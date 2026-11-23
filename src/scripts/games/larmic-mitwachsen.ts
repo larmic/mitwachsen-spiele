@@ -42,8 +42,11 @@ import { platformLift, portalColor } from './mitwachsen-portal';
 import { HOME_STAGGER, SNAP_DELAY, hopOf, snaps } from './mitwachsen-gait';
 import { windAt } from './mitwachsen-weather';
 import { Air, postures, stepSound } from './mitwachsen-air';
-import { idlePose, type Pose } from './mitwachsen-tired';
+import { heldTired, restPose, type Pose } from './mitwachsen-tired';
 import { advance, evening, freshDay, loadTired, saveTired, type Tired, type TiredEvent } from './mitwachsen-tired';
+import type { RideEvent } from './mitwachsen-pack-types';
+import { seatOf, withHop, type RideBody } from './mitwachsen-ride-view';
+import { listenTap } from './mitwachsen-tap';
 import { SLEEP_EVENT, type GameMoment } from './pwa-update';
 import { browserStore } from './browser-store';
 
@@ -70,6 +73,9 @@ class LarmicMitwachsen extends HTMLElement {
   private tired!: Tired;
   private lastTiredSave = 0;
   private sitUntil = 0; // bis dahin sitzt die müde Figur
+  private tiredLater: TiredEvent | null = null; // Gähnen oder „ins Bett“ während einer Fahrt: kommt nach dem Aussteigen
+  private rides: readonly RideBody[] = []; // Körper eines Fahrzeugs in diesem Bild (aus dem Welt-Paket)
+  private tickAt = 0; // wann der letzte Takt lief (das Fahrzeug gleitet zwischen den Takten weiter)
   private lastInput = 0; // letzte Eingabe: Spielt lange niemand, setzt sich die Figur und liest
   private pose: Pose = 'stand';
   private sfx = new Sfx();
@@ -302,7 +308,10 @@ class LarmicMitwachsen extends HTMLElement {
 
   private apply(cmd: Cmd) {
     if (this.opening !== this.live) return; // die alte Welt ruht, bis die neue steht
-    if (cmd.type !== 'tick') this.lastInput = performance.now(); // jemand spielt
+    if (cmd.type !== 'tick' || this.state.ride) this.lastInput = performance.now(); // jemand spielt (auch: fährt)
+    if (cmd.type === 'tick') this.tickAt = performance.now();
+    // nur ein neuer Druck (kein gehaltener Pfeil) steigt in ein Fahrzeug
+    else if (cmd.type === 'move' && this.pace.lastFresh && !cmd.fresh) cmd = { ...cmd, fresh: true };
     const go = () => (this.pace.halt('pause', performance.now()), this.apply(cmd)); // nach Blinzeln: Takt frisch
     if (cmd.type === 'move' && (performance.now() < this.sitUntil || this.r3d?.blink(go))) return; // müde, gedreht
     const { state, events } = step(this.state, this.world, cmd, this.seen, this.guide, this.packs.loaded);
@@ -324,7 +333,10 @@ class LarmicMitwachsen extends HTMLElement {
     // Liest oder döst die Figur, spielt gerade niemand: Die Uhr fürs Müdewerden läuft dann nicht
     const { tired, event } = advance(this.tired, Date.now(), !this.state.sleeping && this.pose === 'stand');
     this.tired = tired;
-    if (event) this.getTired(event);
+    // im Fahrzeug setzt sich die Figur nicht hin: Gähnen und „ins Bett“ kommen nach dem Aussteigen
+    const { now, held } = heldTired(this.tiredLater, event, !!this.state.ride);
+    this.tiredLater = held;
+    if (now) this.getTired(now);
     if (performance.now() - this.lastTiredSave > 5000) {
       saveTired(this.store, this.tired);
       this.lastTiredSave = performance.now();
@@ -414,6 +426,8 @@ class LarmicMitwachsen extends HTMLElement {
 
     this.querySelector('.mw-gear')!.addEventListener('click', () => void this.openMenu(), { signal });
     listenTouch(this, signal, this.pace, this.sfx, (dir) => this.apply({ type: 'move', dir }));
+    // Antippen eines Fahrzeugs (mitwachsen-tap.ts): in 2D und 3D über die Projektion der Ansicht
+    listenTap(this.canvas, signal, () => this.tapScene(), this.apply.bind(this));
     // Beim Schließen gibt der Dialog den Fokus ans Zahnrad zurück; die Leertaste öffnete dann sofort wieder das Menü
     this.menu.addEventListener(
       'close',
@@ -538,6 +552,9 @@ class LarmicMitwachsen extends HTMLElement {
           this.dayAt = now;
           this.hops.set('player', now);
           break;
+        case 'ride': // Fahrzeug aus einem Welt-Paket (mitwachsen-rider.ts): Bild und Ton kommen mit seiner Ansicht
+          this.ride(e, now);
+          break;
         default:
           // Ein Tier ruft und hüpft (Wiese, Weltgrenze, der Pinguin), sonst Handgriffe: pflücken, fangen, nachwachsen,
           // schöpfen, füttern, tränken; und was die Regeln einer Welt melden (Schneemann, Eiszapfen)
@@ -563,6 +580,39 @@ class LarmicMitwachsen extends HTMLElement {
     if (e.type === 'guide' || e.type === 'peep' || e.type === 'aside') return;
     this.float('heart', e.id, GAME_COLORS.heart, now + later + 150);
     if (e.type !== 'arrive') this.hops.set(`seat:${e.id}`, now); // gleitet zum Warteplatz, in die Kette, durch den Gang
+  }
+
+  /**
+   * Ein Fahrzeug (Welt-Paket): Töne, Hüpfer, Herz und Funken, wie seine Ansicht sagt (`View2D.rideFx`; Funken nicht bei
+   * reduzierter Bewegung); was zählt (erschienen, Fest), gleich speichern
+   */
+  private ride(e: RideEvent, now: number) {
+    const fx = this.renderer.view?.rideFx?.(e, this.state);
+    this.sfx.score(fx?.score ?? []);
+    if (fx?.who) this.hops.set(fx.who, now);
+    if (fx?.who && fx.heart) this.float('heart', fx.who, GAME_COLORS.heart, now + 150);
+    if (fx?.burst) this.burst('', fx.burst, 24, { x: e.x, y: e.y, z: this.world.cell(e.x, e.y).h + 0.4 });
+    if (e.persist) this.save();
+  }
+
+  /** Was das Antippen sieht: die Körper des Fahrzeugs, die Projektion der Ansicht und die Figur (nicht, solange es ruht) */
+  private tapScene() {
+    if (this.paused() || !this.rides.length) return null;
+    return {
+      rides: this.rides,
+      project: (x: number, y: number, z: number) => this.project(x, y, z),
+      player: this.state.player,
+    };
+  }
+
+  /**
+   * Körper eines Fahrzeugs für dieses Bild (aus dem Welt-Paket): zwischen den Takten weitergleitend (`frac`), mit
+   * Laterne am Abend und in der Nacht
+   */
+  private rideFrame(t: number, night: number) {
+    const lit = night > 0.3 || (!this.state.sleeping && evening(this.tired) > 0.3);
+    const at = { now: t, frac: Math.min(1, (t - this.tickAt) / TICK_MS), reduced: this.reduced.matches, lit };
+    this.rides = this.renderer.view?.bodies?.(this.state, this.world, at) ?? [];
   }
 
   /** Ins Bett gebracht: Schlaflied, Nacht; der Tag ist zu Ende, morgen ist die Figur wieder ausgeschlafen */
@@ -619,13 +669,23 @@ class LarmicMitwachsen extends HTMLElement {
     return this.bodies.get('player') ?? { x: this.state.player.x, y: this.state.player.y };
   }
 
-  /** Wesen gleiten zu ihrem Feld; große Sprünge (Aufwachen, Heimkehr) springen direkt */
+  /**
+   * Wesen gleiten zu ihrem Feld; große Sprünge (Aufwachen, Heimkehr) springen direkt. Im Fahrzeug folgt die Figur seinem
+   * Sitz; hüpft sie (winkt), hüpft er mit
+   */
   private glide(dt: number, now: number) {
     const snap = this.reduced.matches;
+    const seat = seatOf(this.rides);
+    if (seat) {
+      const hop = snap ? 0 : hopOf('player', 0, now - (this.hops.get('player') ?? -1e9));
+      this.bodies.set('player', { x: seat.x, y: seat.y, z: seat.z, hop });
+      this.rides = withHop(this.rides, hop);
+    }
     const targets = new Map<string, { x: number; y: number }>();
     targets.set('player', this.state.player);
     for (const a of this.state.animals) targets.set(a.id, a);
     for (const id of this.bodies.keys()) if (!targets.has(id)) this.bodies.delete(id);
+    if (seat) targets.delete('player');
     const poses = postures(this.world, this.state); // Pustewind: zusammenrücken, aufplustern; Eule auf dem Iglu
     for (const [id, t] of targets) {
       const pose = poses.get(id);
@@ -709,6 +769,10 @@ class LarmicMitwachsen extends HTMLElement {
     // Gehaltener Pfeil oder gemerkter Tipp: im ruhigen Takt weiterlaufen (sitzt die müde Figur, verwirft apply den Schritt)
     const next = this.paused() ? null : this.pace.poll(t);
     if (next) this.apply({ type: 'move', dir: next });
+    // Nacht blendet ein und aus (ohne Überblendung bei reduzierter Bewegung)
+    const fade = (since: number, ms: number) => (this.reduced.matches ? 1 : Math.min(1, (t - since) / ms));
+    const night = this.state.sleeping ? fade(this.nightSince, 1500) : 1 - fade(this.dayAt, 900);
+    this.rideFrame(t, night);
     this.glide(dt, t);
     this.storyFrame(t);
 
@@ -717,11 +781,7 @@ class LarmicMitwachsen extends HTMLElement {
     const player = this.bodies.get('player')!;
     const cam = { x: player.x + shake, y: player.y };
 
-    // Nacht blendet ein und aus (ohne Überblendung bei reduzierter Bewegung)
-    const fade = (since: number, ms: number) => (this.reduced.matches ? 1 : Math.min(1, (t - since) / ms));
-    const night = this.state.sleeping ? fade(this.nightSince, 1500) : 1 - fade(this.dayAt, 900);
-
-    this.pose = this.state.sleeping || this.paused() ? 'stand' : idlePose(t - this.lastInput);
+    this.pose = restPose(this.state, this.paused(), t - this.lastInput);
     const dozing = this.state.sleeping || this.pose === 'doze'; // im Bett oder eingenickt über dem Buch
     if (dozing && !this.floats.some((f) => f.kind === 'zzz' && t - f.born < 1000) && !this.reduced.matches)
       this.floats.push({
@@ -782,6 +842,7 @@ class LarmicMitwachsen extends HTMLElement {
       // Torplatte unter den Füßen (wo der Körper gerade ist, nicht das Ziel des Schritts): Ton, einsinken
       plate: this.plates(this.world, player, this.state.sleeping, this.packs.loaded, t),
       hint: this.hint(t), // „noch nicht“ an den Toren
+      rides: this.rides,
     };
     this.postcard(postcard(scene.plate, t, this.world.gates), gates);
     if (this.r3d) {

@@ -389,7 +389,7 @@ export class World3D {
     this.platforms.sync(state, sc);
     this.notes.update(state, sc.now, sc.reduced);
     this.glow.color.setRGB(...this.views.glow(sc.aurora, sc.reduced, sc.now));
-    this.views.layers(world, this.scene); // was die Welt-Pakete je Bild nachführen (Fußspuren im Schnee)
+    this.views.layers(this.scene, world, state, sc); // was die Welt-Pakete je Bild nachführen (Fuß- und Schneespur)
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -858,11 +858,14 @@ export class World3D {
     return g;
   }
 
-  /** Wesen an ihren Platz; `facing`: zur Kamera (die lesende Figur schaut zum Betrachter) */
+  /**
+   * Wesen an ihren Platz; `facing`: zur Kamera (die lesende Figur schaut zum Betrachter). Dazu die Körper eines
+   * Fahrzeugs (`Scene.rides`, aus dem Welt-Paket, wie in 2D); im Fahrzeug sitzt die Figur in seinem Modell
+   */
   private syncBodies(state: State, sc: Scene, facing: number) {
     const seen = new Set<string>();
-    const place = (id: string, geo: BufferGeometry, scale: number, dir: Dir) => {
-      const b = sc.bodies.get(id);
+    type At = { x: number; y: number; z: number; hop?: number; puff?: number };
+    const place = (id: string, geo: BufferGeometry, scale: number, dir: Dir, b: At | undefined = sc.bodies.get(id)) => {
       if (!b) return;
       seen.add(id);
       let m = this.bodies.get(id);
@@ -874,10 +877,10 @@ export class World3D {
       }
       m.geometry = geo;
       m.scale.setScalar(scale * (b.puff ?? 1)); // Haltung im Iglu: aufgeplustert oder eingerollt
-      m.position.set(b.x + 0.5, b.z + b.hop, b.y + 0.5);
+      m.position.set(b.x + 0.5, b.z + (b.hop ?? 0), b.y + 0.5);
       m.rotation.y = id === 'player' && sc.pose !== 'stand' ? facing : YAW[dir];
     };
-    if (!state.sleeping) {
+    if (!state.sleeping && !state.ride) {
       // Korb auf dem Rücken, Eimer und Netz in den Händen, Buch beim Lesen; beim Lesen schaut die Figur zum Betrachter
       const book = sc.pose !== 'stand';
       const doze = sc.pose === 'doze';
@@ -898,6 +901,8 @@ export class World3D {
       if (b && !this.explored(Math.round(b.x), Math.round(b.y))) continue; // Tiere im Nebel bleiben verborgen
       place(a.id, this.model(a.species, SPECIES[a.species].parts), SPECIES[a.species].scale, a.dir);
     }
+    for (const r of sc.rides)
+      if (this.explored(Math.round(r.x), Math.round(r.y))) place(r.id, this.model(r.key, r.parts), 1, r.dir, r);
     for (const [id, m] of this.bodies)
       if (!seen.has(id)) {
         this.scene.remove(m);

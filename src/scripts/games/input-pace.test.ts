@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../lib/games/front';
 import { ACTION_MS, ENCOUNTERS, HOLD_MS, InputPace, STEP_MS, stops } from './input-pace';
-import { initialState, step, type State } from './mitwachsen-state';
+import { initialState, step, type GameEvent, type State } from './mitwachsen-state';
 import { plateMid } from './mitwachsen-plate';
 import { worldOf } from './test-worlds';
 import { Blink } from './mitwachsen-turn';
@@ -253,6 +253,56 @@ describe('Ruhiger Takt der Eingabe', () => {
     expect(done[1]! - done[0]!).toBeGreaterThanOrEqual(HOLD_MS); // nicht gleich hinterher
     for (let i = 2; i < done.length; i++) expect(done[i]! - done[i - 1]!).toBeGreaterThanOrEqual(STEP_MS);
     expect(done.length).toBeGreaterThan(4); // und dann läuft sie gleichmäßig weiter
+  });
+
+  it('lastFresh: neuer Druck und gemerkter Tipp sind frisch, ein gehaltener Pfeil nicht (Einsteigen ins Fahrzeug)', () => {
+    const pace = new InputPace();
+    expect(pace.lastFresh).toBe(false);
+    expect(pace.press('e', 0)).toBe('e'); // Tipp: sofort
+    expect(pace.lastFresh).toBe(true);
+    // gehalten: Nach der Wartezeit läuft die Figur weiter, aber nicht frisch
+    const held = steps(pace, 16, HOLD_MS + STEP_MS);
+    expect(held.length).toBeGreaterThan(0);
+    expect(pace.lastFresh).toBe(false);
+    pace.release('e');
+    // gemerkter Tipp: kommt im Takt dran und zählt wie ein neuer Druck
+    const at = held.at(-1)! + 16;
+    expect(pace.press('w', at)).toBeNull();
+    pace.release('w');
+    expect(pace.poll(at + STEP_MS)).toBe('w');
+    expect(pace.lastFresh).toBe(true);
+    // kein Schritt: lastFresh bleibt beim zuletzt gelieferten
+    expect(pace.poll(at + STEP_MS + 16)).toBeNull();
+    expect(pace.lastFresh).toBe(true);
+  });
+
+  it('Fahrzeuge: nach dem Einsteigen erst nach neuem Druck weiter, kurz stehen nach Aussteigen und Fest, sonst nie', () => {
+    const ride = (what: Extract<GameEvent, { type: 'ride' }>['what']): GameEvent => ({
+      type: 'ride',
+      what,
+      id: 'schlitten',
+      x: 0,
+      y: 0,
+    });
+    expect(stops([ride('board')])).toBe('clear');
+    expect(stops([{ type: 'step', climb: 0 }, ride('board')])).toBe('clear');
+    for (const what of ['leave', 'alight', 'feast'] as const) expect(stops([ride(what)]), what).toBe('pause');
+    for (const what of [
+      'appear',
+      'come',
+      'snort',
+      'nudge',
+      'go',
+      'wave',
+      'stop',
+      'shoo',
+      'arrive',
+      'cheer',
+      'farewell',
+    ] as const)
+      expect(stops([ride(what)]), what).toBeNull();
+    expect(stops([{ type: 'realm', to: 'eis' }])).toBeNull(); // Wechsel der Gegend unterwegs hält nicht an
+    expect(ENCOUNTERS.has('ride')).toBe(false); // nur mit Unterart
   });
 
   it('Aktionen zählen höchstens im eigenen Takt', () => {

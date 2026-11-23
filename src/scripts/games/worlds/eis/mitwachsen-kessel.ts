@@ -30,6 +30,7 @@ import { chimes } from './mitwachsen-chime';
 import { haunts } from './mitwachsen-haunts';
 import { iceberg, lakes, peaks, type Iceberg } from './mitwachsen-lakes';
 import { key } from './mitwachsen-flood';
+import { sledGround } from './mitwachsen-sled-ground';
 
 const { rx, ry } = KESSEL.shape;
 const OUTER = { rx: rx + KESSEL.cliff, ry: ry + KESSEL.cliff }; // fester Außenrand der Klippen
@@ -135,13 +136,14 @@ export function buildKessel(
   const wild = winter(seed, gang, place, free, map);
   frost(seed, wild, map); // Kristalle, Schneewehen und Schneehaufen nach Tannen und Eisblöcken
   chimes(seed, wild, map); // zuletzt das Glockenspiel am Klippenfuß, nur auf blankem Schnee: sonst bleibt alles, wo es war
+  const sled = sledGround(gang, place, map); // ganz zuletzt Strecke und Schuppen des Schlittens: nichts wird neu gewürfelt
   // Eis-Welt: der ganze Kessel und der Gang ab seiner Mitte (dort wechselt auch die Tieranzeige)
   let inner = gang.depth + 1;
   while (map.get(key(...gang.at(0, inner)))?.region !== 'eis' && inner < centre) inner++;
   for (let t = gang.depth + 1 + Math.floor((inner - gang.depth - 1) / 2); t < centre; t++)
     for (let u = -gang.half - gang.wall; u <= gang.half + gang.wall; u++) realm.add(key(...gang.at(u, t)));
   const stone: Point = [place.bed[0] + ICE_STONE[0], place.bed[1] + ICE_STONE[1]];
-  const spots = spotsOf(place, map);
+  const spots = spotsOf(place, map, sled);
   const eis = haunts(place.cells, map, (p) => gang.at(...uv(centre, p)), place.bed); // Lieblingsorte nur hier
   const spawns = findSpawns(seed, eis, spots, place.bed);
   return { bed: place.bed, realm, spots, spawns, stone, portal: [ICE_PORTAL, portal] };
@@ -484,9 +486,10 @@ function slidePath(gang: Gang, bed: Point, map: ReadonlyMap<string, Cell>): Poin
 
 /**
  * Wohnplätze der Eis-Tiere: vom Schneebett aus erreichbare Felder des Kessels außerhalb der Schneewiese und der
- * Portal-Plattformen, nicht in der Mündung (zwei Felder Abstand zum Gang, so versperrt kein Tier den Weg hinein)
+ * Portal-Plattformen, nicht in der Mündung (zwei Felder Abstand zum Gang, so versperrt kein Tier den Weg hinein), nicht
+ * auf Strecke und Schuppen des Schlittens (`sled`)
  */
-function spotsOf({ bed }: KesselPlace, map: ReadonlyMap<string, Cell>): Point[] {
+function spotsOf({ bed }: KesselPlace, map: ReadonlyMap<string, Cell>, sled: ReadonlySet<string>): Point[] {
   const seen = new Set<string>();
   const queue = placeHome('eis', bed).wake.filter(([x, y]) => stand(map, x, y));
   for (const [x, y] of queue) seen.add(key(x, y));
@@ -507,6 +510,6 @@ function spotsOf({ bed }: KesselPlace, map: ReadonlyMap<string, Cell>): Point[] 
     if (map.get(key(x, y))!.region !== 'eis') for (const [dx, dy] of NEAR_2) mouth.add(key(x + dx, y + dy));
   return queue.filter(([x, y]) => {
     const c = map.get(key(x, y))!;
-    return c.region === 'eis' && !c.garden && !c.portal && !mouth.has(key(x, y));
+    return c.region === 'eis' && !c.garden && !c.portal && !mouth.has(key(x, y)) && !sled.has(key(x, y));
   });
 }

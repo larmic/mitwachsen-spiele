@@ -1,7 +1,7 @@
 // Der verlaufene Pinguin holt die Figur ab und öffnet das Eistor (`opens: { key: 'pinguin' }`), gegen die echten Daten.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../lib/games/front';
-import { GATES, REGIONS, animalId, type Point } from '../../data/games/mitwachsen';
+import { GATES, REGIONS, animalId, regionAnimalList, type Point } from '../../data/games/mitwachsen';
 import {
   initialState,
   progressOf,
@@ -17,6 +17,7 @@ import {
   DUE,
   FAR,
   GUIDE,
+  full,
   LOST,
   NEAR,
   PEEP_EVERY,
@@ -147,6 +148,23 @@ describe('Der Pinguin holt dich ab: Auftauchen', () => {
       const r = run({ ...initialState(world, { garden }), sleeping: false, wokeAt: -100 }, world, ...ticks(200));
       expect(guideOf(r.s), String(garden.length)).toBeUndefined();
     }
+  });
+
+  it('full: Leiste einer Gegend voll, auch in der Eis-Welt (der Pinguin zählt mit, Tiere der Landschaft nicht)', () => {
+    const eis = REGIONS[1]!;
+    const ice = regionAnimalList(eis);
+    const onePerSpecies = [...new Map(ice.map((a) => [a.species, a])).values()];
+    expect(eis.id).toBe('eis');
+    expect(onePerSpecies).toHaveLength(eis.animals.length);
+    expect(full({ garden: [] }, eis)).toBe(false);
+    expect(full({ garden: ice }, eis)).toBe(true);
+    expect(full({ garden: onePerSpecies }, eis)).toBe(true);
+    expect(full({ garden: onePerSpecies.filter((a) => a.species !== 'pinguin') }, eis)).toBe(false);
+    const wild = { id: 'wild:0:0:0', species: 'pinguin' as const };
+    expect(full({ garden: [...onePerSpecies.filter((a) => a.species !== 'pinguin'), wild] }, eis)).toBe(false);
+    expect(full({ garden: [...everyone(), ...onePerSpecies.slice(1)] }, eis)).toBe(false); // die Lichtung zählt nicht
+    expect(full({ garden: everyone() }, REGIONS[0])).toBe(true);
+    expect(full({ garden: ice }, REGIONS[0])).toBe(false);
   });
 
   it('kommt erst, wenn die Figur in der Nähe des Betts der Lichtung steht (so weit die Wiese reicht)', () => {

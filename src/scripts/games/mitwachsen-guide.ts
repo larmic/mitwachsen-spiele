@@ -14,6 +14,7 @@ import {
   regionAnimalList,
   type GateId,
   type Point,
+  type Region,
   type RegionId,
   type SpeciesId,
 } from '../../data/games/mitwachsen';
@@ -102,13 +103,17 @@ const keyed = (open: readonly GateId[]) =>
 /** Wohnt dieses Tier gerade nicht in seiner Gegend, weil es sich verlaufen hat? (der Pinguin, solange sein Tor zu ist) */
 export const lost = (id: string, open: readonly GateId[]) => id === GUIDE && keyed(open);
 
-const LICHTUNG = regionAnimalList(REGIONS[0]); // Tiere der Landschaft zählen nicht
-/** Die erste Art der Lichtung, von der noch kein Tier auf der Wiese wohnt (undefined: die Leiste ist voll) */
-const lacking = (s: Pick<Guided, 'garden'>) => {
+/**
+ * Die erste Art einer Gegend (sonst der Lichtung), von der noch kein Tier auf ihrer Wiese wohnt (undefined: ihre Leiste
+ * ist voll). Tiere der Landschaft zählen nicht; in der Eis-Welt zählt der Pinguin mit.
+ */
+const lacking = (s: Pick<Guided, 'garden'>, region: Region = REGIONS[0]) => {
   const home = new Set(s.garden.map((p) => p.id));
-  return REGIONS[0].animals.find(({ species }) => !LICHTUNG.some((a) => a.species === species && home.has(a.id)))
-    ?.species;
+  const all = regionAnimalList(region);
+  return region.animals.find(({ species }) => !all.some((a) => a.species === species && home.has(a.id)))?.species;
 };
+/** Ist die Leiste einer Gegend voll? Von jeder ihrer Arten wohnt mindestens ein Tier auf ihrer Wiese (Fahrzeug fällig) */
+export const full = (s: Pick<Guided, 'garden'>, region: Region) => !lacking(s, region);
 /**
  * Soll er da sein? Schlüssel am Tor, Tor zu, und die Leiste der Lichtung ist voll: Von jeder Art der Lichtung wohnt
  * mindestens ein Tier auf der Wiese (wie viele es je Art sind, sieht das Kind nirgends)

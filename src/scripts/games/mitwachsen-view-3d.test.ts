@@ -3,10 +3,14 @@ import type { Cell } from './mitwachsen-cell';
 import { Views3D, type Frame, type View3D } from './mitwachsen-view-3d';
 import { Group } from 'three';
 import { EIS_PACK, worldOf } from './test-worlds';
+import type { Scene } from './mitwachsen-render';
+import { initialState } from './mitwachsen-state';
 
 const WOOD: Frame = ['#8a5a30', null, 'planks'];
 const snow: Cell = { h: 2, ground: 'snow', deco: 'bed', region: 'eis', solid: false, biome: 'eis' };
 const grass: Cell = { h: 1, ground: 'grass', deco: 'bed', region: 'lichtung', solid: false };
+const STATE = initialState(worldOf(1));
+const SC = { now: 0, reduced: false } as Scene;
 
 describe('Haken der 3D-Ansicht für Welt-Pakete (Views3D)', () => {
   it('solange der 3D-Teil fehlt: schlicht (Boden wie auf der Lichtung, Bett aus Holz, kein Schmuck am Tor)', () => {
@@ -17,7 +21,7 @@ describe('Haken der 3D-Ansicht für Welt-Pakete (Views3D)', () => {
     expect(v.decos.decos).toEqual({});
     expect(v.glow(1, false, 500)).toEqual([1, 1, 1]); // Quader 'glow' leuchten wie gebaut
     const scene = new Group();
-    v.layers(worldOf(1), scene);
+    v.layers(scene, worldOf(1), STATE, SC);
     expect(scene.children).toEqual([]); // nichts, was je Bild nachgeführt wird (keine Fußspuren)
   });
 
@@ -51,10 +55,10 @@ describe('Haken der 3D-Ansicht für Welt-Pakete (Views3D)', () => {
     // je Bild nachgeführt: die Fußspuren im Schnee, einmal in die Szene gehängt (nach neuem Kontext in die neue)
     const { layer } = await EIS_PACK.view3d!();
     const [one, two] = [new Group(), new Group()];
-    v.layers(worldOf(1), one);
-    v.layers(worldOf(1), one);
+    v.layers(one, worldOf(1), STATE, SC);
+    v.layers(one, worldOf(1), STATE, SC);
     expect(one.children).toEqual([layer!.object]);
-    v.layers(worldOf(1), two);
+    v.layers(two, worldOf(1), STATE, SC);
     expect([one.children, two.children]).toEqual([[], [layer!.object]]);
   });
 

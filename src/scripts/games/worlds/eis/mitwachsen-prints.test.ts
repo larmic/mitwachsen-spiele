@@ -203,6 +203,6 @@ describe('Fußspuren im Schnee (Eis-Welt, nur Bild)', () => {
 
   it('kommt mit dem Paket: 2D über den Haken `trail`, 3D über `layer` des 3D-Teils', async () => {
     expect(EIS_PACK.view!.trail).toBe(trail);
-    expect((await EIS_PACK.view3d!()).layer).toBe(layer);
+    expect((await EIS_PACK.view3d!()).layer!.object.children).toContain(layer.object); // samt Schneespur
   });
 });

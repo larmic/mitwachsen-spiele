@@ -1,8 +1,8 @@
 // Welt-Paket der Eis-Welt: einziger Einstieg (`import('./worlds/eis')`). Alles, was nur die Eis-Welt braucht, kommt von
 // hier: der Gletscherkessel hinter dem Eistor (Gelände, Zuhause, Wohnorte der Eis-Tiere, Eis-Portal), die Regeln des
 // verlaufenen Pinguins, der zum Eistor führt und es öffnet, die Regeln der Schneemänner und des Eiszapfen-Glockenspiels
-// (`rules`) und die Zeichenteile der 2D-Ansicht (Iglu, Fischkisten, Rutschspur, Wetter, Bild der Weltgrenze) samt den
-// Modellen der zehn Eis-Tiere.
+// (`rules`), der Schlitten zwischen Schneebett und Lichtung (`rules.ride`) und die Zeichenteile der 2D-Ansicht (Iglu,
+// Fischkisten, Rutschspur, Wetter, Bild der Weltgrenze, Schlitten) samt den Modellen der zehn Eis-Tiere.
 // Geladen wird es erst, wenn sein Tor eine Rolle spielt (`needsPack`). Nichts außerhalb dieses Ordners importiert
 // statisch von hier (geprüft durch `npm run arch`), so bleibt es ein eigenes Paket, das der Browser nachlädt: im Build
 // `_astro/welt-eis.<hash>.js` (Name aus astro.config.mjs), gemessen mit eigener Grenze (scripts/verify-bundles.ts).
@@ -12,6 +12,7 @@
 
 import type { GuideRules } from '../../mitwachsen-guide';
 import type { WorldPack } from '../../mitwachsen-pack-types';
+import type { RideRules } from '../../mitwachsen-rider';
 import type { View2D } from '../../mitwachsen-view';
 import type { View3D } from '../../mitwachsen-view-3d';
 import { buildKessel, placeKessel } from './mitwachsen-kessel';
@@ -21,15 +22,17 @@ import { guide, hold, meetGuide } from './mitwachsen-lead';
 import { shut } from './mitwachsen-ritual';
 import { rules as snowman } from './mitwachsen-snowman';
 import { rules as chime } from './mitwachsen-chime';
+import { sled } from './mitwachsen-sled';
 
-export const pack: WorldPack<GuideRules, View2D, View3D> = {
+export const pack: WorldPack<GuideRules, View2D, View3D, RideRules> = {
   id: 'eis',
   gate: 'eis',
   build: buildKessel,
   place: placeKessel,
   lead: { guide, meetGuide, hold }, // Regeln des Pinguins (ein schlichtes Objekt, kein Modul-Namensraum: spart Bytes)
-  // Tür im Vorspiel des Eistors (die Flügel sind noch zu); Schneemänner bauen; Eiszapfen klingen (ohne Halt, darum zuletzt)
-  rules: { bump: (...a) => shut(...a) || snowman.bump(...a) || chime.bump(...a) },
+  // Tür im Vorspiel des Eistors (die Flügel sind noch zu); Schneemänner bauen; Eiszapfen klingen (ohne Halt, darum
+  // zuletzt); der Schlitten mit dem Schlittenrentier (mitwachsen-sled.ts)
+  rules: { bump: (...a) => shut(...a) || snowman.bump(...a) || chime.bump(...a), ride: sled },
   view,
   view3d: () => import('./view-3d').then((m) => m.view3d),
   models: ICE_MODELS,

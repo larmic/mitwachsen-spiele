@@ -327,6 +327,37 @@ describe('Drehung zur Torfront (mitwachsen-turn.ts)', () => {
     clock.mockRestore();
   });
 
+  it('im Fahrzeug dreht die Kamera nie, auch nicht auf einer Torplatte; ohne Fahrt dreht sie dort', () => {
+    // Nordtor, kein Ritual, die Figur steht still auf seiner Platte (wie der Schlitten in der Bucht über die Platte fährt)
+    const gate = { id: 'eis', mid: [0, 0], out: OUT.N, cells: [] };
+    const world = { gates: new Map([['eis', gate]]) } as unknown as World;
+    const yawAfter = (ride: boolean) => {
+      let now = 0;
+      const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+      const turn = new PlateTurn(null);
+      let yaw = 0;
+      for (; now < 3000; now += DT * 1000) {
+        const tick = Math.floor(now / RULE_TICK_MS);
+        const state = {
+          tick,
+          ritual: -1,
+          still: tick + 10,
+          sleeping: false,
+          player: { x: 0, y: 2 },
+          openGates: ['eis'],
+          animals: [],
+          ...(ride && { ride: { id: 'schlitten', phase: 'go' } }),
+        } as unknown as State;
+        const sc = { now, reduced: false, plate: { id: 'eis' as const, since: 0, on: true }, bodies: new Map() };
+        yaw = Math.max(yaw, Math.abs(turn.frame(world, state, sc).yaw));
+      }
+      clock.mockRestore();
+      return yaw;
+    };
+    expect(yawAfter(false)).toBeGreaterThan(10);
+    expect(yawAfter(true)).toBeLessThan(0.01);
+  });
+
   it('Rückfahrt: Süd blinzelt zurück, Nord, Ost und West fahren', () => {
     expect(BACK_BLINK_FROM_DEG).toBe(65);
     expect(LAGEN.map(backNeedsBlink)).toEqual([false, false, true, false]);

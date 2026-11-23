@@ -21,7 +21,11 @@ const PRINT = new Color(`rgb(${PRINT_RGB})`); // kühles Blaugrau, wie in 2D
 export const OPACITY = 0.65; // ein frischer Abdruck; verweht wird er ganz durchsichtig (kein Fleck, kein Sprung)
 
 /** Mesh der Fußspuren einer 3D-Ansicht (je Plättchen eine Fläche nach oben); liest die Spuren `from` */
-export function printLayer(from: Pick<Prints, 'seen' | 'rev'>): Layer & { object: Mesh; drawn: () => number } {
+export function printLayer(from: Pick<Prints, 'seen' | 'rev'>): Layer & {
+  object: Mesh;
+  update(world: World): void; // braucht nur die Welt
+  drawn: () => number;
+} {
   const pos = new BufferAttribute(new Float32Array(MAX_MARKS * 12), 3);
   const rgba = new BufferAttribute(new Float32Array(MAX_MARKS * 16), 4);
   const up = new Float32Array(MAX_MARKS * 12);
