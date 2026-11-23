@@ -3,8 +3,8 @@
 // Dazu die Seeds der Eigenschafts-Tests: im normalen Lauf (npm test, pre-commit, Job coverage) nur wenige, die vollen
 // Bereiche im tiefen Lauf (`npm run test:deep`, im Job static der Pipeline und in gates:ci). So bleibt der Hook vor
 // jedem Commit schnell, und doch prüft jeder Pull Request und jeder Deploy alle Seeds.
-// Achtung, Seiteneffekt beim Import: Er trägt die Modelle der Eis-Tiere in `SPECIES` ein (`addModels`, wie im Spiel beim
-// Ankommen des Pakets). Ein Test, der Eis-Tiere zeichnet oder vermisst, importiert diesen Helfer, sonst sind ihre
+// Achtung, Seiteneffekt beim Import: Er trägt die Modelle der Eis- und Höhlen-Tiere in `SPECIES` ein (`addModels`, wie im
+// Spiel beim Ankommen des Pakets). Ein Test, der diese Tiere zeichnet oder vermisst, importiert diesen Helfer, sonst sind ihre
 // Modelle leer (geprüft in mitwachsen-packs.test.ts).
 
 import { pack as eis } from './worlds/eis';
@@ -16,6 +16,7 @@ import { addModels } from './mitwachsen-packs';
 import type { WorldPack } from './mitwachsen-pack-types';
 
 addModels(eis.models); // wie im Spiel, wenn das Paket ankommt: Modelle der Eis-Tiere
+addModels(hoehle.models, hoehle.roosts); // und der Höhlen-Tiere samt der Fledermaus kopfüber
 export const PACKS = [eis, hoehle] as const;
 export const EIS_PACK = eis;
 export const HOEHLE_PACK = hoehle;

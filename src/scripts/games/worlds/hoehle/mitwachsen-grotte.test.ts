@@ -173,6 +173,9 @@ describe('Kristallgrotte: Gelände', () => {
       ).toEqual([2, 3, 3, 4, 5]);
       expect(count(({ c }) => c.deco === 'crystalarch')).toBe(5);
       expect(count(({ c }) => c.deco === 'crystalarch' && c.solid)).toBe(2); // nur die Pfeiler
+      // unter dem Bogen drei Sitzplätze zum Hängen (die Fledermäuse), sonst nirgends
+      expect(count(({ c }) => c.perch !== undefined)).toBe(3);
+      expect(count(({ c }) => c.perch !== undefined && c.deco === 'crystalarch' && !c.solid)).toBe(3);
       expect(count(({ c }) => c.deco === 'glowshroom')).toBeGreaterThan(10);
       const notes = new Set(all.filter(({ c }) => c.deco === 'stalagmite').map(({ c }) => c.note));
       expect([...notes].sort()).toEqual([0, 1, 2]); // drei Höhen

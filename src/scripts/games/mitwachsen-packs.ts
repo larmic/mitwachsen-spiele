@@ -37,13 +37,16 @@ export const PACK_IDS = Object.keys(LOADERS) as PackId[];
 /** Ein Paket holen; ohne Lader scheitert es (wie ein Netzfehler) */
 const loadPack = (id: PackId) => LOADERS[id]?.() ?? Promise.reject(new Error(`kein Welt-Paket ${id}`));
 
+type Models = Partial<Record<SpeciesId, readonly Part[]>>;
 /**
- * Modelle von Arten aus einem Welt-Paket eintragen (Eis-Welt: ihre zehn Tiere, `ICE_MODELS`): sobald das Paket
- * ankommt, bevor eines seiner Tiere erscheint. Bis dahin ist ihr Modell leer (der Kern kennt nur Name, Ton, Gangart).
- * Ändert `SPECIES` für die ganze Seite (in Tests: test-worlds.ts ruft es beim Import).
+ * Modelle von Arten aus einem Welt-Paket eintragen (Eis-Welt: ihre zehn Tiere, `ICE_MODELS`; Höhlenwelt: ihre acht,
+ * `roosts` die Fledermaus kopfüber): sobald das Paket ankommt, bevor eines seiner Tiere erscheint. Bis dahin ist ihr
+ * Modell leer (der Kern kennt nur Name, Ton, Gangart). Ändert `SPECIES` für die ganze Seite (in Tests: test-worlds.ts
+ * ruft es beim Import).
  */
-export function addModels(models: Partial<Record<SpeciesId, readonly Part[]>> = {}) {
+export function addModels(models: Models = {}, roosts: Models = {}) {
   for (const [id, parts] of Object.entries(models) as [SpeciesId, readonly Part[]][]) SPECIES[id].parts = parts;
+  for (const [id, parts] of Object.entries(roosts) as [SpeciesId, readonly Part[]][]) SPECIES[id].roost = parts;
 }
 const noop = () => {};
 
@@ -106,7 +109,7 @@ export class Packs {
         id,
         this.load(id).then(
           (pack) => {
-            addModels(pack.models);
+            addModels(pack.models, pack.roosts);
             this.ready.push(pack);
             this.arrive(pack);
           },

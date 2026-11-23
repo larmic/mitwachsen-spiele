@@ -92,6 +92,7 @@ export type Cell = {
   story?: StoryId; // Klangstein dieser Geschichte
   note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz); Kristallgrotte: Teil oder Höhe
   light?: number; // so viel heller (0 … 0,5) ist das Feld in der Grotte: Lichtschacht, Kristall oder Leuchtpilz daneben
+  perch?: number; // Sitzplatz zum Hängen so hoch über dem Feld (unter dem Kristallbogen): Tiere mit Ruhehaltung hängen dort (`Species.roost`)
   slide?: true; // Rutschspur vom Eistor zum Schneebett (begehbar; glänzt, sobald das Tor offen ist)
   plate?: GateId; // Torplatte vor diesem Tor (mitten in der Bucht, eben und frei; Bild und Ton, öffnet das Eistor, mitwachsen-plate.ts)
   ride?: RideId; // Strecke dieses Fahrzeugs (nur in einer Welt und ihrem Gang, begehbar wie die Rutschspur; Welt-Paket)

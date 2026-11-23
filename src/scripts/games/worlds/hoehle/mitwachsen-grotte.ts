@@ -15,6 +15,7 @@
 import { hash, rand01, valueNoise } from '../../../../lib/games/rng';
 import type { Point } from '../../../../data/games/mitwachsen';
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
+import { ARCH_PERCH } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-animals';
 import { HOMES } from '../../../../data/games/mitwachsen-homes';
 import { CAVE_PORTAL } from '../../../../data/games/mitwachsen-portals';
 import { BED_STONE } from '../../../../data/games/mitwachsen-stories';
@@ -22,7 +23,9 @@ import type { Cell } from '../../mitwachsen-cell';
 import { placeHome } from '../../mitwachsen-home';
 import type { Beyond, Gang, Kessel, KesselPlace } from '../../mitwachsen-pack-types';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from '../../mitwachsen-portal';
+import { findSpawns } from '../../mitwachsen-spawns';
 import { OBSTACLE_GAP } from '../../mitwachsen-world';
+import { caveHaunts } from './mitwachsen-cave-haunts';
 import { siteOf, type Site } from './mitwachsen-site';
 
 const { rx, ry } = GROTTE.shape;
@@ -130,7 +133,10 @@ export function buildGrotte(
   }
   light(realm, at, map);
   const stone: Point = [bed[0] + BED_STONE[0], bed[1] + BED_STONE[1]];
-  return { bed, realm, spots: spotsOf(site, reach, map), spawns: new Map(), stone, portal: [CAVE_PORTAL, portal] };
+  const spots = spotsOf(site, reach, map);
+  // Wohnorte der Höhlen-Tiere: das erste je Art an seinem Fundort, die anderen verteilt über die Grotte
+  const spawns = findSpawns(seed, caveHaunts(spots, map, at, bed), spots, bed);
+  return { bed, realm, spots, spawns, stone, portal: [CAVE_PORTAL, portal] };
 }
 
 /** Winkel von `a` nach `b` */
@@ -236,8 +242,12 @@ function hallOf(put: Put) {
   const { hall } = GROTTE;
   const [kr, kt, kp] = GROTTE_COLORS.crystals;
   hall.columns.forEach((h, i) => put([hall.across - 4 + 2 * i, hall.out - 3], thing('column', { note: h })));
+  // Kristallbogen: Pfeiler an den Enden, darunter drei Felder, an deren Bogen man hängen kann (`perch`: die Fledermäuse)
   for (let i = 0; i < 5; i++)
-    put([hall.across - 2 + i, hall.out + hall.arch - 3], { ...thing('crystalarch', { note: i }), solid: i % 4 === 0 });
+    put(
+      [hall.across - 2 + i, hall.out + hall.arch - 3],
+      i % 4 === 0 ? thing('crystalarch', { note: i }) : { ...floor(), deco: 'crystalarch', note: i, perch: ARCH_PERCH },
+    );
   for (const [du, dv, color] of [
     [-7, 3, kr],
     [7, 1, kp],
@@ -425,7 +435,7 @@ function light(realm: ReadonlySet<string>, at: (p: readonly [number, number]) =>
 }
 
 /**
- * Wohnplätze der Höhlen-Tiere (sie kommen später): vom Bett aus erreichbare Felder der Grotte außerhalb der Mooswiese
+ * Wohnplätze der Höhlen-Tiere: vom Bett aus erreichbare Felder der Grotte außerhalb der Mooswiese
  * und der Plattformen, nicht in der Mündung (zwei Felder Abstand zum Gang) und nicht auf dem Platz von Bahnhof und Lokschuppen
  */
 function spotsOf(site: Site, reach: ReadonlySet<string>, map: ReadonlyMap<string, Cell>): Point[] {

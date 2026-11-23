@@ -6,6 +6,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
 
 import { GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
+import { ARCH_PERCH } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-animals';
 import { hash } from '../../../../lib/games/rng';
 import type { Cell } from '../../mitwachsen-cell';
 import type { Realms } from '../../mitwachsen-home';
@@ -50,10 +51,11 @@ export function caveBoxes(world: Realms, c: Cell, x: number, y: number): readonl
     }
     case 'crystalarch': {
       // Kristallbogen: Pfeiler an den Enden (note 0 und 4), darüber durchgehend ein Bogen in drei Farben
-      const beam: Box = [x, y + 0.3, h + 3, 1, 0.4, 0.45, C.bands[1], C.bands[2]];
+      // Unterkante des Bogens auf der Höhe, an der die Fledermäuse hängen (`ARCH_PERCH`, `Cell.perch`)
+      const beam: Box = [x, y + 0.3, h + ARCH_PERCH, 1, 0.4, 0.45, C.bands[1], C.bands[2]];
       const color = C.crystals[(c.note ?? 0) % 3]!;
-      const gem: Box = [x + 0.38, y + 0.28, h + 3.45, 0.24, 0.3, 0.24, color, color];
-      if (c.note === 0 || c.note === 4) return [[x + 0.2, y + 0.25, h, 0.6, 0.5, 3, ...C.rock], beam, gem];
+      const gem: Box = [x + 0.38, y + 0.28, h + ARCH_PERCH + 0.45, 0.24, 0.3, 0.24, color, color];
+      if (c.note === 0 || c.note === 4) return [[x + 0.2, y + 0.25, h, 0.6, 0.5, ARCH_PERCH, ...C.rock], beam, gem];
       return [beam, gem];
     }
     case 'glowshroom': // kleiner Leuchtpilz: Stiel und Hut in seiner Farbe

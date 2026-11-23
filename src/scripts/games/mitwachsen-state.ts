@@ -34,6 +34,7 @@ import { lost, type GuideEvent, type GuideRules } from './mitwachsen-guide';
 import type { PackEvent, Ride, RideEvent, WorldRules } from './mitwachsen-pack-types';
 import type { MoveCmd, RideRules } from './mitwachsen-rider';
 import { listen } from './mitwachsen-listen';
+import { roostAt } from './mitwachsen-roost';
 
 export const SLEEP_LOCK = 30; // Takte nach dem Einschlafen, in denen Tasten nicht wecken (3 s)
 export const WAKE_GRACE = 15; // Takte nach dem Aufwachen, in denen das Bett nur ein Hindernis ist (1,5 s)
@@ -343,6 +344,7 @@ function tick(s: State, world: World, events: GameEvent[], ride?: RideRules) {
       a.rest = Math.max(a.rest, 5);
       continue;
     }
+    if (roostAt(a, world.cell(a.x, a.y)) !== undefined) continue; // hängt an seinem Sitzplatz, bis man es findet
     if (--a.rest > 0) continue;
     a.rest = arriving ? 3 : 8 + Math.floor(random(s) * 18);
     if (!arriving && random(s) < 0.3) {

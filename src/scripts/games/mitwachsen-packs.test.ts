@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SPECIES } from '../../data/games/mitwachsen';
 import { ICE_MODELS } from '../../data/games/worlds/eis/mitwachsen-ice-models';
+import { BAT_ROOST, CAVE_MODELS } from '../../data/games/worlds/hoehle/mitwachsen-cave-models';
 import { PACK_IDS, PACK_WAIT_MS, Packs, RETRY_MS, type LoadedPack } from './mitwachsen-packs';
 import type { Need } from './mitwachsen-pack';
 import { HINT_AFTER } from './mitwachsen-guide';
@@ -171,6 +172,22 @@ describe('Welt-Pakete laden (Packs)', () => {
     expect(cave.gate).toBe('hoehle');
     expect(typeof cave.view3d).toBe('function');
     expect((await cave.view3d!()).gate).toBe('hoehle');
+  });
+
+  it('mit der Höhlenwelt kommen die Modelle ihrer Tiere und die Fledermaus kopfüber (Ruhehaltung)', async () => {
+    const { parts, roost } = SPECIES.fledermaus;
+    SPECIES.fledermaus.parts = [];
+    SPECIES.fledermaus.roost = [];
+    const packs = new Packs(() => {}, undefined, ['hoehle']);
+    packs.extra = ['hoehle'];
+    await packs.want(bed, gates);
+    try {
+      expect(SPECIES.fledermaus.parts).toBe(CAVE_MODELS.fledermaus);
+      expect(SPECIES.fledermaus.roost).toBe(BAT_ROOST);
+    } finally {
+      SPECIES.fledermaus.parts = parts;
+      SPECIES.fledermaus.roost = roost;
+    }
   });
 
   it('test-worlds.ts trägt beim Import die Modelle aller Eis-Tiere ein (Tests sehen sie nur über diesen Helfer)', () => {

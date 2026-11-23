@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
+import { ARCH_PERCH } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-animals';
 import type { Cell } from '../../mitwachsen-cell';
 import { drawDeco, type DecoAt, type Turn } from '../../mitwachsen-view';
 import { HOEHLE_PACK, worldOf } from '../../test-worlds';
@@ -37,6 +38,8 @@ describe('Dinge der Kristallgrotte, gleich für 2D und 3D', () => {
     const span = caveBoxes(w, cell('crystalarch', { note: 2 }), 0, 0)!;
     expect(pillar.length).toBe(span.length + 1);
     expect(Math.min(...span.map((b) => b[2]))).toBeGreaterThanOrEqual(4); // darunter geht man durch
+    // die Unterkante des Bogens ist der Sitzplatz der Fledermäuse (`Cell.perch`): sie hängen genau darunter
+    expect(Math.min(...span.map((b) => b[2]))).toBe(1 + ARCH_PERCH);
     const column = caveBoxes(w, cell('column', { note: 5 }), 0, 0)!;
     expect(Math.max(...column.map((b) => b[2] + b[5]))).toBeCloseTo(6); // Boden 1 + Höhe 5
   });

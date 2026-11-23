@@ -4,6 +4,7 @@
 
 import { eyes, type Part } from '../../lib/games/front';
 import { ICE_SPECIES, type IceSpeciesId } from './mitwachsen-eis';
+import { CAVE_SPECIES, type CaveSpeciesId } from './mitwachsen-hoehle';
 import type { SpeciesOf } from './mitwachsen-species';
 
 /**
@@ -26,7 +27,8 @@ export type SpeciesId =
   | 'eichhoernchen'
   | 'baer'
   | 'ziege'
-  | IceSpeciesId; // die Tiere der Eis-Welt stehen in mitwachsen-eis.ts
+  | IceSpeciesId // die Tiere der Eis-Welt stehen in mitwachsen-eis.ts
+  | CaveSpeciesId; // die Tiere der Höhlenwelt in mitwachsen-hoehle.ts
 export type GateTheme = 'eis' | 'sand' | 'wasser' | 'lava' | 'hoehle' | 'wald' | 'wolken' | 'pilze';
 export type GateId = GateTheme; // je Welt genau ein Tor
 
@@ -103,7 +105,7 @@ export function regionAnimalList(region: Region): { id: string; species: Species
  * Am Anfang gibt es nur die Lichtung mit dem Bett. Ringsum Felsen mit acht großen Toren, die vorerst zu sind.
  * Dahinter liegen die Welten der Tore als endlose Landschaft. Hinter dem Eistor liegt die Eis-Welt, ein Gletscherkessel
  * mit eigenem Zuhause und zehn eigenen Tierarten (noch unerreichbar, solange das Tor zu ist). Hinter dem Höhlentor
- * liegt die Höhlenwelt, eine Kristallgrotte (noch ohne Tiere, nur per Entwickler-Schalter zu sehen).
+ * liegt die Höhlenwelt, eine Kristallgrotte mit acht eigenen Tierarten (vorerst nur per Entwickler-Schalter zu sehen).
  */
 export const REGIONS: readonly [Region & { shape: { rx: number; ry: number } }, ...Region[]] = [
   {
@@ -138,10 +140,10 @@ export const REGIONS: readonly [Region & { shape: { rx: number; ry: number } }, 
   {
     id: 'hoehle',
     name: 'Höhlenwelt',
-    // Kristallgrotte hinter dem Höhlentor: Form und Gelände kommen mit ihrem Welt-Paket (worlds/hoehle/), die Tiere
-    // später (Schritt 8). Das Höhlentor geht vorerst nie auf; die Grotte sieht nur, wer den Entwickler-Schalter nutzt
-    animals: [],
-    herd: 4,
+    // Kristallgrotte hinter dem Höhlentor: Form, Gelände und Wohnorte der Tiere kommen mit ihrem Welt-Paket
+    // (worlds/hoehle/). Das Höhlentor geht vorerst nie auf; die Grotte sieht nur, wer den Entwickler-Schalter nutzt
+    animals: (Object.keys(CAVE_SPECIES) as CaveSpeciesId[]).map((species) => ({ species })),
+    herd: 4, // acht Arten, je vier Tiere: 32 in der Grotte
     behind: 'hoehle',
     room: { rx: 51, ry: 77, gap: 2, bend: true }, // `GROTTE`: Grotte 46 × 72, Klippen 5, Abstand 2 (Test hält es gleich)
     night: 0.8, // hell, ohne Decke: nie dunkler als die Lichtung in der Dämmerung
@@ -464,6 +466,7 @@ export const SPECIES: Record<SpeciesId, Species> = {
     ],
   },
   ...ICE_SPECIES,
+  ...CAVE_SPECIES,
 };
 
 /** Arten, die frei in der endlosen Landschaft unterwegs sind */

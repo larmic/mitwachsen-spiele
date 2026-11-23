@@ -63,6 +63,7 @@ import { turnHead } from './mitwachsen-air';
 import { Album } from './mitwachsen-album';
 import { ASK, HEART, NOTE, ZZZ, sprite, type Particle } from './mitwachsen-glyphs';
 import { byRow, type RideBody } from './mitwachsen-ride-view';
+import { hangAt, labelHeight } from './mitwachsen-roost';
 
 /** Gleitende Position eines Wesens auf dem Bildschirm (in Feldern), dazu Hüpfer und Blickrichtung */
 export type Body = { x: number; y: number; z: number; hop: number; puff?: number }; // puff: Haltung im Iglu (Größe)
@@ -191,8 +192,11 @@ export class Renderer {
         if (!a || !sc.explored(Math.round(b.x), Math.round(b.y))) continue; // Tiere im Nebel bleiben verborgen
         const sp = SPECIES[a.species];
         const scale = sp.scale * (b.puff ?? 1);
+        const perch = hangAt(a, world.cell(a.x, a.y)); // hängt kopfüber an seinem Sitzplatz (Fledermaus im Bogen)
         this.shadow(P, b.x + 0.5, b.y + 0.5, b.z, 0.26 * scale);
-        drawModel(ctx, P, sp.parts, b.x + 0.5, b.y + 0.5, b.z + b.hop, a.dir, scale);
+        if (perch !== undefined && sp.roost)
+          drawModel(ctx, P, sp.roost, b.x + 0.5, b.y + 0.5, b.z + perch, a.dir, scale);
+        else drawModel(ctx, P, sp.parts, b.x + 0.5, b.y + 0.5, b.z + b.hop, a.dir, scale);
       }
     }
 
@@ -232,7 +236,7 @@ export class Renderer {
     for (const a of state.animals) {
       const b = sc.bodies.get(a.id);
       if (!b || !sc.explored(Math.round(b.x), Math.round(b.y))) continue; // im Nebel nichts verraten
-      const [hx, hy] = P(b.x + 0.5, b.y + 0.5, b.z + b.hop + 1.05 * SPECIES[a.species].scale * 0.75);
+      const [hx, hy] = P(b.x + 0.5, b.y + 0.5, b.z + labelHeight(a, world.cell(a.x, a.y), b.hop)); // hängend: am Sitzplatz
       if (followers.has(a.id)) sprite(ctx, HEART, GAME_COLORS.heart, hx, hy, 2.5 * z);
       else if (a.mode === 'wait')
         ice?.waitArrow(ctx, world, P, a, b, [hx, hy], 3 * z); // Pfeil zum Tor

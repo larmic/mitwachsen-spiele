@@ -71,6 +71,7 @@ import { DUSK_SKY, nightMix, sunLevel, type Rgb } from './mitwachsen-dusk';
 import { tree, tufts } from './mitwachsen-trees-3d';
 import type { PlateTurn } from './mitwachsen-turn-3d';
 import { CAM_REST, camPose } from './mitwachsen-camera';
+import { hangAt } from './mitwachsen-roost';
 
 /** Beeren am Busch: [x, Höhe, z] im Feld; oben auf der Kuppe und an der Vorderseite (zur Kamera) */
 const BERRIES = [
@@ -917,7 +918,11 @@ export class World3D {
     for (const a of state.animals) {
       const b = sc.bodies.get(a.id);
       if (b && !this.explored(Math.round(b.x), Math.round(b.y))) continue; // Tiere im Nebel bleiben verborgen
-      place(a.id, this.model(a.species, SPECIES[a.species].parts), SPECIES[a.species].scale, a.dir);
+      const sp = SPECIES[a.species];
+      const perch = this.world ? hangAt(a, this.world.cell(a.x, a.y)) : undefined; // kopfüber am Sitzplatz (Fledermaus im Bogen)
+      if (b && perch !== undefined && sp.roost)
+        place(a.id, this.model(`${a.species}-roost`, sp.roost), sp.scale, a.dir, { ...b, z: b.z + perch, hop: 0 });
+      else place(a.id, this.model(a.species, sp.parts), sp.scale, a.dir);
     }
     for (const r of sc.rides)
       if (this.explored(Math.round(r.x), Math.round(r.y))) place(r.id, this.model(r.key, r.parts), 1, r.dir, r);

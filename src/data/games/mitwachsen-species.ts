@@ -1,5 +1,6 @@
 // Tiere von Mitwachsen als Bauplan: Ton, Gangart und Modell einer Art. Die Arten selbst stehen in mitwachsen.ts
-// (Lichtung) und mitwachsen-eis.ts (Eis-Welt); hier nur ihre Form, damit beide sie ohne Kreis nutzen.
+// (Lichtung), mitwachsen-eis.ts (Eis-Welt) und mitwachsen-hoehle.ts (Höhlenwelt); hier nur ihre Form, damit alle sie
+// ohne Kreis nutzen.
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md
 
 import type { Part } from '../../lib/games/front';
@@ -25,4 +26,11 @@ export type SpeciesOf<Id extends string> = {
   parts: readonly Part[];
   tone: Tone;
   gait?: Gait;
+  /**
+   * Ruhehaltung: Diese Art hängt kopfüber an einem Sitzplatz (`Cell.perch`, in der Grotte der Kristallbogen). Steht
+   * ein frei umherlaufendes Tier dieser Art dort, bleibt es hängen, bis man es findet, und zeigt dieses Modell (es hängt
+   * von z = 0 nach unten, die Ansicht hängt es an die Höhe des Sitzplatzes). Schon die Angabe macht die Art zum Hänger;
+   * das Modell bringt das Welt-Paket mit (`addModels`), bis dahin ist es leer (Fledermaus)
+   */
+  roost?: readonly Part[];
 };

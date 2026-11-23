@@ -156,8 +156,9 @@ test('Spiel: Portal-Plattform erwacht beim Herangehen, die Mitte bringt zum Bett
   expect(errors).toEqual([]);
 });
 
-// Die Grotte sieht vorerst nur der Entwickler-Schalter: Die Figur wacht im Höhlenbett auf, gezeichnet wird die Grotte
-// (in 3D mit ihrem 3D-Teil und dem lila Höhlenhimmel), gespeichert wird nichts; ohne Schalter wieder auf der Lichtung
+// Die Grotte sieht vorerst nur der Entwickler-Schalter: Die Figur wacht im Höhlenbett auf, die Höhlen-Tiere sind da,
+// gezeichnet wird die Grotte (in 3D mit ihrem 3D-Teil und dem lila Höhlenhimmel), gespeichert wird nichts; ohne
+// Schalter wieder auf der Lichtung
 test(
   'Spiel: Welt hoehle wird per Entwickler-Schalter gezeichnet, speichert nichts, ohne Fehler',
   { tag: '@3d' },
@@ -166,8 +167,17 @@ test(
     const game = await openGame(page, { clock: true, dev: 'hoehle' });
     const webgl = await expectView(page);
     type Game = {
-      world: { homes: Record<string, { bed: [number, number] }>; realm(x: number, y: number): string };
-      state: { player: { x: number; y: number }; openGates: string[]; sleeping: boolean };
+      world: {
+        homes: Record<string, { bed: [number, number] }>;
+        realm(x: number, y: number): string;
+        cell(x: number, y: number): { perch?: number };
+      };
+      state: {
+        player: { x: number; y: number };
+        openGates: string[];
+        sleeping: boolean;
+        animals: { species: string; realm: string; x: number; y: number }[];
+      };
       r3d: unknown;
       gl3d: { views: { look(gate: string): unknown; air(realm: string): unknown } } | null;
       apply(cmd: { type: 'move'; dir: string }): void;
@@ -182,6 +192,14 @@ test(
       return { realm: el.world.realm(x, y), inBed: x === bed[0] && y === bed[1], open: el.state.openGates };
     });
     expect(at).toEqual({ realm: 'hoehle', inBed: true, open: [] }); // das Höhlentor bleibt zu
+    // die acht Höhlen-Tiere wohnen in der Grotte (je vier), drei Fledermäuse hängen unter dem Kristallbogen
+    const cave = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const animals = el.state.animals.filter((a) => a.realm === 'hoehle');
+      const hanging = animals.filter((a) => a.species === 'fledermaus' && el.world.cell(a.x, a.y).perch !== undefined);
+      return { animals: animals.length, species: new Set(animals.map((a) => a.species)).size, hanging: hanging.length };
+    });
+    expect(cave).toEqual({ animals: 32, species: 8, hanging: 3 });
     await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
     await ticks(page, 10);
     await render(page, 10);

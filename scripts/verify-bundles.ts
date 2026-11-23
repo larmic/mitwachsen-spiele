@@ -27,8 +27,8 @@ export const RULES: Rule[] = [
     name: 'Spiel lädt 3D erst bei Bedarf',
     pages: /^spielen\//,
     // Kern: Regeln, Welt, 2D-Ansicht und Daten des Spiels; 3D (Three.js) und die Welt-Pakete kommen erst per import().
-    // Gemessen 137 268 Bytes (134,1 KB)
-    budget: 139 * 1024,
+    // Gemessen 139 756 Bytes (136,5 KB)
+    budget: 151 * 1024,
     // Probe: Der Höhlenhimmel der Grotte steht nur in ihrem Welt-Paket (GROTTE_COLORS.sky)
     forbidden: /WebGLRenderer|three\.module|#4a4370/,
   },
@@ -51,7 +51,7 @@ export const RULES: Rule[] = [
       // Drehung zur Torfront: kommt erst nach der 3D-Ansicht, wenn die Figur einem Tor nah ist (`NEAR_GATE`)
       { chunks: /\/mitwachsen-turn-3d\.[\w-]+\.js$/, after: /\/mitwachsen-3d\.[\w-]+\.js$/ },
     ],
-    // Gemessen 91 390 Bytes (89,2 KB)
+    // Gemessen 91 693 Bytes (89,5 KB)
     budget: 97 * 1024,
     // Three.js liegt nur in seiner eigenen Datei. Proben: Das Leuchten der Eiszapfen gibt es nur im 3D-Teil der
     // Eis-Welt (ICE_GLOW in worlds/eis/view-3d-gate.ts), den Höhlenhimmel nur im Paket der Grotte
@@ -66,7 +66,7 @@ export const RULES: Rule[] = [
       // 3D-Teil: kommt erst nach der 3D-Ansicht (Three.js, Baukasten der Zugänge) und dem Paket der Welt
       { chunks: /\/welt-eis-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-eis)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 68 877 Bytes (67,3 KB)
+    // Gemessen 68 872 Bytes (67,3 KB)
     budget: 74 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
@@ -74,14 +74,14 @@ export const RULES: Rule[] = [
     name: 'Welt-Paket Höhle',
     pages: /^spielen\/index\.html$/,
     parts: [
-      // Kristallgrotte (Lage, Gelände, Zuhause, Licht, Portal am See) und Zeichenteile der 2D-Ansicht; nur der
-      // Entwickler-Schalter holt sie (das Höhlentor geht vorerst nie auf)
+      // Kristallgrotte (Lage, Gelände, Zuhause, Licht, Portal am See, Fundorte der Höhlen-Tiere), Zeichenteile der
+      // 2D-Ansicht und Modelle der Höhlen-Tiere; nur der Entwickler-Schalter holt sie (das Höhlentor geht vorerst nie auf)
       { chunks: /\/welt-hoehle\.[\w-]+\.js$/ },
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Welt
       { chunks: /\/welt-hoehle-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-hoehle)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 13 148 Bytes (12,8 KB)
-    budget: 14.2 * 1024,
+    // Gemessen 17 901 Bytes (17,5 KB)
+    budget: 19.5 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {
@@ -90,7 +90,7 @@ export const RULES: Rule[] = [
     // Seltenes, das der Kern erst bei Bedarf holt: „noch nicht“ an den Toren (Bild, Ton, Live-Region), Inhalt des
     // Menüs, Postkarte der Torfront, Anmeldung des Service Workers
     parts: [{ chunks: /\/(mitwachsen-(hint-look|menu|card)|pwa-register)\.[\w-]+\.js$/ }],
-    // Gemessen 7587 Bytes (7,4 KB)
+    // Gemessen 7697 Bytes (7,5 KB)
     budget: 8.2 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },

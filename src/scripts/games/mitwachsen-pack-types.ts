@@ -145,7 +145,8 @@ export type Beyond = (x: number, y: number) => boolean;
  * Ansicht mitbringt (Eis-Welt: der verlaufene Pinguin führt zum Tor und öffnet es, `GuideRules`). `view`: ihre
  * Zeichenteile für die Ansicht (Eis-Welt: `View2D` aus mitwachsen-view.ts, Wetter und Bild der Weltgrenze). `view3d`:
  * lädt ihren 3D-Teil nach (`View3D` aus mitwachsen-view-3d.ts; braucht Three.js, darum ein eigener `import()`, erst wenn
- * die 3D-Ansicht da ist). `models`: Modelle der Tiere dieser Welt (`addModels`). `rules`: Regeln, die nur in dieser
+ * die 3D-Ansicht da ist). `models`: Modelle der Tiere dieser Welt (`addModels`), `roosts` ihre Ruhehaltungen (Höhlenwelt:
+ * die Fledermaus kopfüber, `Species.roost`). `rules`: Regeln, die nur in dieser
  * Welt gelten (Eis-Welt: Schneehaufen wachsen zu Schneemännern, `ride`: Fahrzeug), `step` hereingereicht.
  */
 export type WorldPack<Rules = unknown, View = unknown, View3 = unknown, Ride = unknown> = {
@@ -164,4 +165,5 @@ export type WorldPack<Rules = unknown, View = unknown, View3 = unknown, Ride = u
   view?: View;
   view3d?: () => Promise<View3>;
   models?: Partial<Record<SpeciesId, readonly Part[]>>;
+  roosts?: Partial<Record<SpeciesId, readonly Part[]>>;
 };

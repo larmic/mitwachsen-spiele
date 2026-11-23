@@ -6,6 +6,7 @@ import { hash, nextRandom, pick } from '../../lib/games/rng';
 import { speciesOf, type Point, type RegionId } from '../../data/games/mitwachsen';
 import { occupied, type Crowd } from './mitwachsen-free';
 import { atHome, type Home } from './mitwachsen-meadow';
+import { perchesOf, roosts } from './mitwachsen-roost';
 import type { Mode } from './mitwachsen-border';
 import type { World } from './mitwachsen-world';
 
@@ -32,7 +33,7 @@ const cheb = (ax: number, ay: number, bx: number, by: number) => Math.max(Math.a
 export const SCATTER: Record<RegionId, { bed: number; apart: number; haunt?: number }> = {
   lichtung: { bed: 8, apart: 5 },
   eis: { bed: 8, apart: 5, haunt: 4 },
-  hoehle: { bed: 8, apart: 5 },
+  hoehle: { bed: 8, apart: 5, haunt: 4 }, // Grotte: jedes erste Tier nah an seinem Fundort
 };
 
 /** Erreichbare Felder je Welt und Gegend als Menge, einmal gebaut (das Tal hat über 10.000) */
@@ -51,7 +52,9 @@ const isFirst = (id: string) => speciesOf(id) !== null && id.split(':').length =
 /**
  * Tiere der Gegenden, die frei umherlaufen, an neue Plätze verteilen (beim Öffnen und an jedem neuen Morgen):
  * zufällige erreichbare Felder ihrer Gegend, mit Abstand zu deren Bett und zueinander (`SCATTER`); das erste Tier
- * jeder Art bleibt, wo die Gegend es will (`haunt`), nah an seinem Lieblingsort. Gleicher Zustand, gleiche Plätze.
+ * jeder Art bleibt, wo die Gegend es will (`haunt`), nah an seinem Lieblingsort. Tiere mit Ruhehaltung (die Fledermaus)
+ * bekommen vorher die freien Sitzplätze ihrer Gegend (`Cell.perch`, eng nebeneinander), die übrigen verteilen sich wie
+ * alle. Gleicher Zustand, gleiche Plätze.
  */
 export function scatter(s: Scattered, world: World, random: () => number) {
   const placed: Point[] = []; // die Gegenden liegen weit auseinander: eine Liste für alle genügt
@@ -67,16 +70,16 @@ export function scatter(s: Scattered, world: World, random: () => number) {
   const wild: Wild[] = [];
   for (const a of s.animals) if (a.mode === 'wander' && a.home.kind === 'region') wild.push(a);
   const done = new Set<string>();
+  // Zuerst die Tiere mit Ruhehaltung an die Sitzplätze ihrer Gegend, der Reihe nach (die Fledermäuse unter den Bogen)
+  for (const a of wild) {
+    const at = perchFor(s, world, a, placed);
+    if (!at) continue;
+    put(a, at);
+    done.add(a.id);
+  }
   // Zuerst die ersten Tiere jeder Art an ihren Lieblingsorten (die anderen nehmen ihnen den Platz nicht weg)
   for (const a of wild) {
-    const radius = SCATTER[a.realm].haunt;
-    const home = isFirst(a.id) ? world.spawns.get(a.id) : undefined;
-    if (radius === undefined || !home) continue;
-    const spots = spotSet(world, a.realm);
-    const near: Point[] = [];
-    for (let dy = -radius; dy <= radius; dy++)
-      for (let dx = -radius; dx <= radius; dx++)
-        if (spots.has(`${home[0] + dx},${home[1] + dy}`)) near.push([home[0] + dx, home[1] + dy]);
+    const near = done.has(a.id) ? [] : hauntSpots(world, a);
     for (let tries = 0; tries < 40 && near.length; tries++) {
       const at = pick(near, random());
       if (!free(a, at)) continue;
@@ -97,6 +100,31 @@ export function scatter(s: Scattered, world: World, random: () => number) {
       break;
     }
   }
+}
+
+/**
+ * Plätze nah am Lieblingsort eines Tiers (`SCATTER[realm].haunt` Felder um seinen Wohnort, nur das erste seiner Art und
+ * nur in Gegenden mit `haunt`; sonst keine)
+ */
+function hauntSpots(world: World, a: Wild): Point[] {
+  const radius = SCATTER[a.realm].haunt;
+  const home = isFirst(a.id) ? world.spawns.get(a.id) : undefined;
+  if (radius === undefined || !home) return [];
+  const spots = spotSet(world, a.realm);
+  const near: Point[] = [];
+  for (let dy = -radius; dy <= radius; dy++)
+    for (let dx = -radius; dx <= radius; dx++)
+      if (spots.has(`${home[0] + dx},${home[1] + dy}`)) near.push([home[0] + dx, home[1] + dy]);
+  return near;
+}
+
+/** Freier Sitzplatz der Gegend für ein Tier einer Art mit Ruhehaltung (sonst und ohne freien Platz: undefined) */
+function perchFor(s: Scattered, world: World, a: Wild, placed: readonly Point[]): Point | undefined {
+  const species = speciesOf(a.id);
+  if (!species || !roosts(species)) return undefined;
+  return perchesOf(world, a.realm).find(
+    ([x, y]) => !placed.some(([px, py]) => px === x && py === y) && !occupied(s, x, y, a.id),
+  );
 }
 
 const ARRIVE_SALT = 0xa77ac4; // eigener Zufall für Tiere, die mit einem Welt-Paket einziehen

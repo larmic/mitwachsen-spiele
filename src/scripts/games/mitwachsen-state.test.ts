@@ -543,7 +543,7 @@ describe('Unterstand bei Regen', () => {
 });
 
 describe('Iglu bei Pustewind (Eis-Welt)', () => {
-  const world = worldOf(1);
+  const world = worldOf(1, [EIS_PACK]); // nur die Eis-Welt: Tests einer Welt reichen nur ihr Paket herein
   const igloo = world.homes.eis.shelter;
   const lee = world.homes.eis.lee!;
   /** alle Tiere der Lichtung und der Eis-Welt wohnen auf ihrer Wiese (ohne den Pinguin: noch kein Pustewind) */
@@ -1249,7 +1249,7 @@ describe('Zuhause je Gegend', () => {
     expect([again.player.x, again.player.y]).toEqual([...world.homes.lichtung.bed]);
     expect(again.animals.filter((a) => a.id.startsWith('eis:'))).toHaveLength(49);
     // Gleich wie in einer Welt, die von Anfang an mit dem Paket gebaut wurde
-    expect(initialState(worldOf(1), progressFrom(file), 7)).toEqual(again);
+    expect(initialState(worldOf(1, [EIS_PACK]), progressFrom(file), 7)).toEqual(again);
   });
 
   it('Paket kommt an, während ein Stand aus dem Kessel gehalten wird: Eis-Tiere zu Hause ziehen ein, gehalten wird nicht mehr', () => {
@@ -1271,8 +1271,10 @@ describe('Zuhause je Gegend', () => {
   it('Tiere gehören zu ihrer Gegend, Tiere der Landschaft zur Lichtung', () => {
     const world = worldOf(4);
     const s = initialState(world, { garden: [{ id: 'wild:0:2:0', species: 'fuchs' }], openGates: ['eis'] });
-    for (const a of s.animals) expect(a.realm, a.id).toBe(a.id.startsWith('eis:') ? 'eis' : 'lichtung');
+    const own = (id: string) => (id.startsWith('eis:') ? 'eis' : id.startsWith('hoehle:') ? 'hoehle' : 'lichtung');
+    for (const a of s.animals) expect(a.realm, a.id).toBe(own(a.id));
     expect(s.animals.filter((a) => a.realm === 'eis')).toHaveLength(50);
+    expect(s.animals.filter((a) => a.realm === 'hoehle')).toHaveLength(32); // mit dem Paket der Höhlenwelt (Test-Welt)
     expect(s.animals.find((a) => a.id === 'wild:0:2:0')!.realm).toBe('lichtung');
   });
 

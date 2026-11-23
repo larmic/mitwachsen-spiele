@@ -19,9 +19,8 @@ describe('Gegenden und Tore', () => {
     expect(regionBehind('sand')).toBeUndefined(); // hinter den anderen Toren liegt nur Landschaft
   });
 
-  it('die Höhlenwelt hat noch keine Tiere; Kennungen mit ihr ergeben keine Art und gehören doch zu ihr', () => {
-    const hoehle = REGIONS.find((r) => r.id === 'hoehle')!;
-    expect(hoehle.animals).toEqual([]);
+  it('Kennungen mit der Höhlenwelt ergeben die Art und gehören zu ihr', () => {
+    expect(speciesOf('hoehle:fledermaus:3')).toBe('fledermaus');
     expect(speciesOf('hoehle:hase')).toBe('hase'); // Art aus der Kennung (die Gegend gibt es)
     expect(realmOfAnimal('hoehle:hase')).toBe('hoehle');
   });

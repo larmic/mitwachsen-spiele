@@ -73,7 +73,7 @@ export class Album {
 }
 
 /** Je Gegend ein Platz pro Art (mehrere Tiere je Art: eines gefunden heißt die Art gefunden), dahinter die Landschaft */
-function slots(state: State, realm: RegionId): Slot[][] {
+export function slots(state: State, realm: RegionId): Slot[][] {
   const of = (ids: readonly string[], region: string, species: string) =>
     ids.some((id) => id.startsWith(`${region}:`) && speciesOf(id) === species);
   const garden = state.garden.map((p) => p.id);
