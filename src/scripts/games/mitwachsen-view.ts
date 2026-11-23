@@ -105,6 +105,8 @@ export type View2D = {
   sky: Sky;
   /** Himmel hinter der Welt in 2D (drei Streifen von oben), solange die Figur in ihr ist (Grotte), sonst blau */
   heaven?: readonly string[];
+  /** Wasser dieser Welt (Grotte: türkis): Farbe und Glanz, sonst blau wie überall */
+  water?: readonly [string, string];
   trail?: Trail;
   /**
    * Töne zu Ereignissen der Regeln dieser Welt (Eis-Welt: Ploppen, wenn ein Schneemann wächst); ein Ereignis einer
@@ -164,6 +166,7 @@ const PACKED: ReadonlySet<Deco> = new Set<Deco>([
   'cavelamp',
   'column',
   'crystalarch',
+  'crystalbush',
 ]);
 
 /**

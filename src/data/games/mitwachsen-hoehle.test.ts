@@ -105,7 +105,7 @@ describe('Tiere der Höhlenwelt', () => {
     expect(hoehle.animals.every((a) => a.at === undefined)).toBe(true);
     expect(Object.fromEntries(CAVE_ANIMALS.map((a) => [a.species, a.near]))).toEqual({
       maulwurf: 'floor', // vorerst gegenüber dem Platz des Bahnhofs; später auf Toks Helm
-      dachs: 'moss', // Lehmhang am Pilzgarten
+      dachs: 'clay', // Lehmhang neben dem Pilzgarten
       grottenolm: 'jetty', // am Steg im See
       eidechse: 'scree', // Geröllhang
       siebenschlaefer: 'floor', // neben dem Platz des Lokschuppens
@@ -120,6 +120,12 @@ describe('Tiere der Höhlenwelt', () => {
     const { hall, lake } = GROTTE;
     expect(CAVE_ANIMALS.find((a) => a.species === 'fledermaus')!.at).toEqual([hall.across, hall.out + hall.arch - 3]);
     expect(CAVE_ANIMALS.find((a) => a.species === 'grottenolm')!.at).toEqual([lake.across, lake.out - lake.ry - 1]);
+    // der Dachs auf seinem Lehmhang (zwei Stufen nach außen ab `clay.across`)
+    const { clay } = GROTTE;
+    const dachs = CAVE_ANIMALS.find((a) => a.species === 'dachs')!.at;
+    expect(dachs[0]).toBeLessThanOrEqual(clay.across);
+    expect(dachs[0]).toBeGreaterThan(clay.across - 2 * clay.step);
+    expect(Math.abs(dachs[1] - clay.out)).toBeLessThanOrEqual(clay.long >> 1);
   });
 
   it('jedes Modell (im Welt-Paket) hat Augen, die zur Kamera zeigen können, und die Farben aus dem Konzept', () => {

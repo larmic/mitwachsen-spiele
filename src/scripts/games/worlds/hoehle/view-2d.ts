@@ -68,6 +68,13 @@ export const view: View2D = {
     dripmoss: look,
     stalagmite: look,
     jetty: look,
+    // Füllung (mitwachsen-fill.ts); Farn und Felsbrocken draußen in der Landschaft zeichnet die Ansicht wie immer
+    crystalbush: look,
+    boulder: look,
+    mosstop: look,
+    clay: look,
+    puddle: look,
+    fern: look,
   },
   // Lichtfleck unter einem Lichtschacht und neben Kristallen: helles Licht obenauf (der Kern ruft das nur auf Grottenboden)
   ground: (c, x, y) => (c.light ? [x, y, c.h, 1, 1, 0.01, glowOver(c.light), glowOver(c.light)] : null),
@@ -95,4 +102,5 @@ export const view: View2D = {
     gateScore: () => [],
   },
   heaven: GROTTE_COLORS.heaven,
+  water: GROTTE_COLORS.water, // türkis: Felsbecken, See
 };

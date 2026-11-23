@@ -28,6 +28,25 @@ describe('Haken der 3D-Ansicht für Welt-Pakete (Views3D)', () => {
     expect(Object.keys(v.decos.decos)).toEqual([...ice, ...cave]);
   });
 
+  it('Wasser je Welt des Felds: in der Grotte türkis, sonst (undefined) blau wie überall, auch solange der 3D-Teil fehlt', async () => {
+    const water = (biome?: Cell['biome']): Cell => ({
+      h: 0,
+      ground: 'water',
+      deco: null,
+      region: 'hoehle',
+      solid: false,
+      biome,
+    });
+    const v = new Views3D();
+    expect(v.water(water('hoehle'))).toBeUndefined();
+    await v.use(EIS_PACK, () => {});
+    await v.use(HOEHLE_PACK, () => {});
+    const cave = (await HOEHLE_PACK.view3d!()).water!;
+    expect(v.water(water('hoehle'))).toBe(cave);
+    expect(v.water(water('eis'))).toBeUndefined();
+    expect(v.water(water())).toBeUndefined();
+  });
+
   it('solange der 3D-Teil fehlt: schlicht (Boden wie auf der Lichtung, Bett aus Holz, kein Schmuck am Tor)', () => {
     const v = new Views3D();
     expect(v.ground(snow, ['eis'])).toBeNull();

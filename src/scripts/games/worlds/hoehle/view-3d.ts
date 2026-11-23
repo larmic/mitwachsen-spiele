@@ -41,6 +41,13 @@ export const view3d: View3D = {
     dripmoss: look,
     stalagmite: look,
     jetty: look,
+    // Füllung (mitwachsen-fill.ts); Farn und Felsbrocken draußen in der Landschaft zeichnet die Ansicht wie immer
+    crystalbush: look,
+    boulder: look,
+    mosstop: look,
+    clay: look,
+    puddle: look,
+    fern: look,
   },
   ground(c) {
     if (c.biome !== 'hoehle' || c.region === 'wild') return null;
@@ -58,4 +65,5 @@ export const view3d: View3D = {
   },
   bedFrame: () => null,
   air: { realm: 'hoehle', sky: GROTTE_COLORS.sky, mist: GROTTE_COLORS.mist },
+  water: GROTTE_COLORS.water[0], // türkis: Felsbecken, See
 };

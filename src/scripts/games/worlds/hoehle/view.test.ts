@@ -34,6 +34,12 @@ describe('Dinge der Kristallgrotte, gleich für 2D und 3D', () => {
       'dripspring',
       'dripmoss',
       'jetty',
+      'crystalbush',
+      'boulder',
+      'mosstop',
+      'clay',
+      'puddle',
+      'fern',
     ] as const) {
       const c = cell(deco, { note: 2, color: '#6fd6f0' });
       const boxes = caveBoxes(w, c, 5, 7)!;
@@ -106,6 +112,49 @@ describe('Dinge der Kristallgrotte, gleich für 2D und 3D', () => {
     expect(roof[0]).toBeLessThan(home.shelter.x0);
     expect(roof[0] + roof[3]).toBeGreaterThan(home.shelter.x1 + 1);
     expect(roof[1] + roof[4]).toBeCloseTo(home.shelter.y1 + 1);
+  });
+});
+
+describe('Füllung der Grotte', () => {
+  it('Kristallbusch niedriger als die Figur, Moos, Lehm und Pfütze flach; Farn und Felsbrocken draußen wie immer; nirgends Gold', () => {
+    const top = (boxes: readonly (readonly unknown[])[]) =>
+      Math.max(...boxes.map((b) => (b[2] as number) + (b[5] as number)));
+    const bush = caveBoxes(w, cell('crystalbush', { color: GROTTE_COLORS.crystals[0] }), 0, 0)!;
+    expect(top(bush)).toBeLessThan(1.8); // niedrig wie ein Busch: Boden 1 + weniger als 0,8
+    expect(bush.some((b) => b[6] === GROTTE_COLORS.crystals[0])).toBe(true); // in seiner Farbe
+    // Moos nur unter den Lichtschächten: der Busch steht auf Stein, nicht auf einem Moospolster
+    const moss: unknown[] = [...GROTTE_COLORS.moss];
+    expect(bush.filter((b) => moss.includes(b[6]) || moss.includes(b[7]))).toEqual([]);
+    for (const deco of ['mosstop', 'clay', 'puddle'] as const)
+      expect(top(caveBoxes(w, cell(deco, { solid: false }), 0, 0)!), deco).toBeLessThan(1.2);
+    expect(caveBoxes(w, cell('puddle'), 0, 0)!.some((b) => b[6] === GROTTE_COLORS.water[0])).toBe(true); // türkis
+    expect(caveBoxes(w, cell('clay'), 0, 0)!.some((b) => b[6] === GROTTE_COLORS.clay[0])).toBe(true);
+    for (const deco of ['fern', 'boulder'] as const) {
+      expect(caveBoxes(w, cell(deco, { region: 'wild' }), 0, 0), deco).toBeNull();
+      expect(drawDeco(view, w, cell(deco, { region: 'wild' }), 0, 0, at), deco).toBeNull();
+    }
+    const gold: unknown[] = Object.values(GOLD);
+    for (const deco of ['crystalbush', 'boulder', 'mosstop', 'clay', 'puddle', 'fern'] as const) {
+      const colors = caveBoxes(w, cell(deco, { color: GROTTE_COLORS.crystals[2] }), 3, 4)!.flatMap((b) => [b[6], b[7]]);
+      expect(
+        colors.filter((x) => gold.includes(x)),
+        deco,
+      ).toEqual([]);
+    }
+  });
+
+  it('Wasser in der Grotte türkis, in 2D und 3D; nie die Farbe der Probe im Bundle-Gate', () => {
+    expect(view.water).toEqual(GROTTE_COLORS.water);
+    expect(view3d.water).toBe(GROTTE_COLORS.water[0]);
+    expect([...GROTTE_COLORS.water].map((c) => c.toLowerCase())).not.toContain('#7fd6ff');
+    // türkis: Grün und Blau kräftig, Grün nicht schwächer als ein Viertel unter Blau, Rot deutlich schwächer
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(GROTTE_COLORS.water[0].slice(i, i + 2), 16)) as [
+      number,
+      number,
+      number,
+    ];
+    expect(r).toBeLessThan(g * 0.6);
+    expect(g).toBeGreaterThan(b * 0.75);
   });
 });
 

@@ -64,6 +64,8 @@ export type View3D = {
   layer?: Layer;
   /** Himmel und Nebel-Maske in ihrer Gegend (Grotte), sonst wie auf der Lichtung */
   air?: Air;
+  /** Farbe des Wassers dieser Welt (Grotte: türkis), sonst blau wie überall */
+  water?: string;
 };
 
 /** Die 3D-Teile der Welt-Pakete, die die 3D-Ansicht schon hat, und ihr Nachladen */
@@ -115,6 +117,11 @@ export class Views3D {
       if (own) return own;
     }
     return null;
+  }
+
+  /** Farbe des Wassers auf einem Feld aus dem 3D-Teil der Welt des Felds (`biome`), sonst undefined: blau */
+  water(c: Cell): string | undefined {
+    return c.biome && this.views.find((v) => v.gate === c.biome)?.water;
   }
 
   /** Leuchten der Quader `'glow'` aus dem 3D-Teil des (einzigen) Pakets mit `glow` (multipliziert), sonst wie gebaut */

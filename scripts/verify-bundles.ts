@@ -75,14 +75,15 @@ export const RULES: Rule[] = [
     pages: /^spielen\/index\.html$/,
     parts: [
       // Kristallgrotte (Lage, Gelände, Zuhause, Licht, Portal am See, Fundorte der Höhlen-Tiere, Pilzbeete, Tropfquelle,
-      // Tropfmoos), ihr Schmuck (Säulen-Glockenspiel mit Fledermaus-Runde, Grottenolm am Steg, Tropfsteine), Zeichenteile
+      // Tropfmoos), ihr Schmuck (Säulen-Glockenspiel mit Fledermaus-Runde, Grottenolm am Steg, Tropfsteine), ihre Füllung
+      // (Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken, Felsinseln, Pfützen, Moos und Farn, Lehmhang), Zeichenteile
       // der 2D-Ansicht und Modelle der Höhlen-Tiere; nur der Entwickler-Schalter holt sie (das Höhlentor geht vorerst nie auf)
       { chunks: /\/welt-hoehle\.[\w-]+\.js$/ },
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Welt
       { chunks: /\/welt-hoehle-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-hoehle)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 24 635 Bytes (24,1 KB)
-    budget: 26.5 * 1024,
+    // Gemessen 29 087 Bytes (28,4 KB)
+    budget: 32 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

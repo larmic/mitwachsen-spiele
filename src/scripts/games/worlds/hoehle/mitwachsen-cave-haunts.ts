@@ -1,5 +1,5 @@
 // Fundorte der Höhlen-Tiere in der Kristallgrotte – rein und deterministisch: Derselbe Seed ergibt dieselben Orte.
-// Je Art sucht die Grotte das Feld mit ihrem Thema (`CAVE_ANIMALS`: Grottenboden, Leuchtpilze, Moos, Steg, Geröllhang,
+// Je Art sucht die Grotte das Feld mit ihrem Thema (`CAVE_ANIMALS`: Grottenboden, Leuchtpilze, Lehmhang, Steg, Geröllhang,
 // Kristallbogen), das ihrem Platz in der Grotte am nächsten liegt; dort wohnt das erste Tier der Art (`findSpawns`).
 // Teil des Welt-Pakets der Höhlenwelt.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Höhlen-Tiere“)
@@ -12,7 +12,7 @@ import type { Cell } from '../../mitwachsen-cell';
 export const HAUNTS: Record<CaveHaunt, (c: Cell) => boolean> = {
   floor: (c) => c.ground === 'grotto' && !c.deco,
   shrooms: (c) => c.deco === 'glowshroom' && c.ground === 'grass',
-  moss: (c) => c.ground === 'grass' && !c.deco && !c.garden,
+  clay: (c) => c.deco === 'clay',
   jetty: (c) => c.ground === 'path',
   scree: (c) => c.ground === 'stone',
   arch: (c) => c.perch !== undefined,

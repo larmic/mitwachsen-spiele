@@ -1,6 +1,7 @@
 // Aussehen der Dinge in der Kristallgrotte, gleich für 2D und 3D: Pilzschale, Steintrog mit Tropfmoos am Rand,
 // Unterstand mit der Kristallwand, Kristall-Lampen, Kristallsäulen (leuchten kurz heller, wenn sie klingen), Kristallbogen,
-// Leuchtpilze, Pilzbeete (voll und leer), Tropfquelle, Tropfmoos, Stalagmiten in drei Höhen und der Holzsteg; dazu Boden
+// Leuchtpilze, Pilzbeete (voll und leer), Tropfquelle, Tropfmoos, Stalagmiten in drei Höhen, der Holzsteg und die
+// Füllung (Kristallbüsche, Felsbrocken, Moos auf Felsinseln, Lehm, Pfützen, Farn); dazu Boden
 // und Klippen in den Schichten des Höhlentors und die Lichtflecken. Eigene Voxel-Grafik: keine Drusen, keine Loren, kein
 // Tropfstein mit Kessel. Rein (ohne DOM und Three.js): liefert Quader in Feldern, die beide Ansichten zeichnen. Teil des
 // Welt-Pakets der Höhlenwelt: 2D über view-2d.ts, 3D über den 3D-Teil view-3d.ts.
@@ -28,7 +29,8 @@ const DROP = C.water[1];
  * diesem Feld trägt Leuchtpilze (sonst ist es abgeerntet). Kein Gold: Beet, Quelle und Trog sind keine Aktion.
  */
 export function caveBoxes(world: Realms, c: Cell, x: number, y: number, full = true): readonly Box[] | null {
-  if (SUPPLIES.has(c.deco)) return supplyBoxes(c, x, y);
+  const own = OWN.get(c.deco); // Futter und Wasser, Füllung
+  if (own) return own(c, x, y);
   if (c.deco === 'shroombed') return shroomBed(c, x, y, full);
   const h = c.h;
   switch (c.deco) {
@@ -100,11 +102,13 @@ export function columnBoxes(c: Cell, x: number, y: number, glow = 0): Box[] {
 const C_HEIGHTS = GROTTE.hall.columns;
 
 /** Futter und Wasser: Pilzschale, Steintrog mit Tropfmoos am Rand, Tropfquelle über dem Becken, Tropfmoos */
-const SUPPLIES: ReadonlySet<Cell['deco']> = new Set<Cell['deco']>([
-  'shroombowl',
-  'stonetrough',
-  'dripspring',
-  'dripmoss',
+const SUPPLIES: readonly Cell['deco'][] = ['shroombowl', 'stonetrough', 'dripspring', 'dripmoss'];
+/** Füllung der Grotte (mitwachsen-fill.ts); Farn und Felsbrocken gibt es auch in der Landschaft */
+const FILL: readonly Cell['deco'][] = ['crystalbush', 'boulder', 'mosstop', 'clay', 'puddle', 'fern'];
+/** Wer die Quader dieser Dinge baut */
+const OWN = new Map<Cell['deco'], (c: Cell, x: number, y: number) => Box[] | null>([
+  ...SUPPLIES.map((d) => [d, supplyBoxes] as const),
+  ...FILL.map((d) => [d, fillBoxes] as const),
 ]);
 
 function supplyBoxes(c: Cell, x: number, y: number): Box[] {
@@ -141,6 +145,59 @@ function supplyBoxes(c: Cell, x: number, y: number): Box[] {
       ];
     default:
       return [];
+  }
+}
+
+/**
+ * Füllung der Grotte (mitwachsen-fill.ts): Kristallbusch (vier kurze Kristalle in seiner Farbe auf einem flachen Stein, kein Moos fern der Lichtschächte, niedriger als die Figur),
+ * Felsbrocken (Stein der Grotte, oben heller), Moos auf einer Felsinsel, Lehm am Hang des Dachses (mit einem
+ * Erdhügelchen), Pfütze (flach, türkis, mit Glanz), Farn (Wedel in Moosgrün)
+ */
+function fillBoxes(c: Cell, x: number, y: number): Box[] | null {
+  if (c.region !== 'hoehle') return null; // Farn und Felsbrocken draußen in der Landschaft: wie immer
+  const h = c.h;
+  switch (c.deco) {
+    case 'crystalbush': {
+      const k = c.color ?? KT;
+      const l = lighten(k, 0.3);
+      return [
+        [x + 0.16, y + 0.24, h, 0.68, 0.56, 0.08, C.bands[3], C.bands[1]],
+        [x + 0.24, y + 0.32, h + 0.08, 0.16, 0.14, 0.42, k, l],
+        [x + 0.44, y + 0.28, h + 0.08, 0.14, 0.14, 0.6, l, k],
+        [x + 0.6, y + 0.4, h + 0.08, 0.16, 0.14, 0.36, k, l],
+        [x + 0.38, y + 0.56, h + 0.08, 0.16, 0.14, 0.3, l, k],
+      ];
+    }
+    case 'boulder':
+      return [
+        [x + 0.12, y + 0.2, h, 0.76, 0.62, 0.42, C.bands[3], C.bands[1]],
+        [x + 0.24, y + 0.3, h + 0.42, 0.5, 0.4, 0.18, C.bands[1], C.bands[2]],
+      ];
+    case 'mosstop':
+      return [
+        [x + 0.04, y + 0.04, h, 0.92, 0.92, 0.04, ...C.moss],
+        [x + 0.3 + (hash(7, x, y) % 3) * 0.12, y + 0.4, h + 0.04, 0.16, 0.14, 0.06, C.moss[1], C.moss[1]],
+      ];
+    case 'clay':
+      return [
+        [x, y, h, 1, 1, 0.03, ...C.clay],
+        ...(hash(8, x, y) % 3 === 0 ? [[x + 0.3, y + 0.35, h + 0.03, 0.34, 0.26, 0.1, ...C.clay] as Box] : []),
+      ];
+    case 'puddle':
+      return [
+        [x + 0.12, y + 0.18, h, 0.76, 0.6, 0.02, ...C.water],
+        [x + 0.3, y + 0.3, h + 0.02, 0.18, 0.06, 0.01, C.water[1], '#ffffff'],
+      ];
+    default: // Farn: vier Wedel und ein Blatt quer darüber, in Moosgrün
+      return [
+        ...[
+          [0.3, 0.45, 0.32],
+          [0.48, 0.38, 0.4],
+          [0.62, 0.5, 0.3],
+          [0.42, 0.58, 0.26],
+        ].map(([fx, fy, fh]): Box => [x + fx! - 0.05, y + fy!, h, 0.1, 0.06, fh!, ...C.moss]),
+        [x + 0.28, y + 0.42, h + 0.2, 0.44, 0.14, 0.04, C.moss[1], C.moss[1]],
+      ];
   }
 }
 

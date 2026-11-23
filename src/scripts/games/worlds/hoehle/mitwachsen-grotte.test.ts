@@ -9,6 +9,7 @@ import { DUSK_DAY, DUSK_SKY, dayOf, nightIn, nightMix, sunLevel, type Rgb } from
 import { beyondRing, canStep, kesselPlace, type World } from '../../mitwachsen-world';
 import { HOEHLE_PACK, PACKS, REGRESSION_SEEDS, SAMPLE_SEEDS, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import { GROTTE_ROOM, bedSpots, fromMouth, shedAt, stationAt } from './mitwachsen-grotte';
+import { corridorAt, fillZone, type FillZone } from './mitwachsen-fill';
 import type { Site } from './mitwachsen-site';
 import type { Cell } from '../../mitwachsen-cell';
 
@@ -136,6 +137,31 @@ function stepsFrom(w: World, start: Point): Map<string, number> {
   }
   return dist;
 }
+
+/** Dinge auf dem Boden der Grotte, die zur Dichte zählen: verstreute Dinge und Füllung */
+const THINGS: ReadonlySet<Cell['deco']> = new Set<Cell['deco']>([
+  'crystal',
+  'stalagmite',
+  'glowshroom',
+  'crystalbush',
+  'boulder',
+  'mosstop',
+  'puddle',
+  'fern',
+]);
+/** Feste Dinge, die verstreut oder als Füllung stehen */
+const SOLID_FILL: ReadonlySet<Cell['deco']> = new Set<Cell['deco']>([
+  'crystal',
+  'stalagmite',
+  'crystalbush',
+  'boulder',
+]);
+/** die acht Nachbarn eines Felds */
+const AROUND = [-1, 0, 1].flatMap((dx) => [-1, 0, 1].flatMap((dy) => (dx || dy ? [[dx, dy] as const] : [])));
+/** die Felder genau zwei Schritte (Chebyshev) um ein Feld: ein Feld dazwischen frei */
+const RING2 = [-2, -1, 0, 1, 2].flatMap((dx) =>
+  [-2, -1, 0, 1, 2].flatMap((dy) => (Math.max(Math.abs(dx), Math.abs(dy)) === 2 ? [[dx, dy] as const] : [])),
+);
 
 /** Lage eines Felds von der Mündung aus [quer, vom Tor weg] */
 const mouthOf = (site: Site, [x, y]: Point): Point => {
@@ -298,16 +324,13 @@ describe('Kristallgrotte: Gelände', () => {
       expect([...scree].sort()).toEqual([2, 3, 4]);
     });
 
-    it(`Seed ${seed}: etwa 5 Dinge je 100 Felder, die Mitte bleibt licht; keine Stufe höher als eins`, () => {
+    it(`Seed ${seed}: etwa 8 Dinge je 100 Felder samt Füllung, die Mitte bleibt licht; keine Stufe höher als eins`, () => {
       const cells = floor.map((k) => k.split(',').map(Number) as [number, number]);
       const all = placeOf(seed).cells.filter(([x, y]) => w.cell(x, y).region === 'hoehle');
-      const things = all.filter(([x, y]) => {
-        const d = w.cell(x, y).deco;
-        return d === 'crystal' || d === 'stalagmite' || d === 'glowshroom';
-      });
+      const things = all.filter(([x, y]) => THINGS.has(w.cell(x, y).deco));
       const per100 = (things.length / all.length) * 100;
-      expect(per100).toBeGreaterThan(3);
-      expect(per100).toBeLessThan(8);
+      expect(per100, `Seed ${seed}`).toBeGreaterThan(5);
+      expect(per100, `Seed ${seed}`).toBeLessThan(11);
       // der Weg durch die Mitte: frei bis zum See (am Bett führt er um die Mooswiese herum)
       const blocked: number[] = [];
       for (let out = 1; out < GROTTE.lake.out - GROTTE.lake.ry - 1; out++) {
@@ -346,6 +369,107 @@ describe('Kristallgrotte: Gelände', () => {
       const crystal = placeOf(seed).cells.find(([x, y]) => w.cell(x, y).deco === 'crystal')!;
       const n = w.cell(crystal[0] + 1, crystal[1]);
       if (n.region === 'hoehle') expect(n.light ?? 0).toBeGreaterThanOrEqual(GROTTE.glow);
+      // Kristallbüsche leuchten wie Kristalle
+      const bushes = placeOf(seed).cells.filter(([x, y]) => w.cell(x, y).deco === 'crystalbush');
+      expect(bushes.filter(([x, y]) => (w.cell(x, y).light ?? 0) < GROTTE.glow).map(key)).toEqual([]);
+    });
+
+    it(`Seed ${seed}: Füllung: Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken, Felsinseln, Pfützen, je Zone dicht genug, nichts abgeschnitten`, () => {
+      const all = placeOf(seed).cells.map((p) => ({ p, c: w.cell(...p), uv: site.uv(...p) }));
+      const inGrotto = all.filter(({ c }) => c.region === 'hoehle');
+      const is = (deco: Cell['deco']) => inGrotto.filter(({ c }) => c.deco === deco);
+      const bad: string[] = [];
+      // nichts wird von der Füllung abgeschnitten: kein Feld neben einem festen Ding der Füllung wird Fels, weil man es
+      // nicht erreicht (am Rand der Mündung kann zwischen Klippe und Lampe ein einzelnes Feld Fels werden, wie bisher)
+      const fillAt = new Set(inGrotto.filter(({ c }) => SOLID_FILL.has(c.deco)).map(({ p }) => key(p)));
+      const sealed = inGrotto.filter(
+        ({ c, p: [x, y] }) => c.deco === 'rock' && AROUND.some(([dx, dy]) => fillAt.has(key([x + dx, y + dy]))),
+      );
+      if (sealed.length) bad.push(`${sealed.length} Felder abgeschnitten, etwa ${key(sealed[0]!.p)}`);
+      // feste Dinge nie Seite an Seite oder über Eck: zwischen zweien bleibt immer ein begehbares Feld
+      const solids = fillAt;
+      for (const k of solids) {
+        const [x, y] = k.split(',').map(Number) as [number, number];
+        for (const [dx, dy] of AROUND) if (solids.has(key([x + dx, y + dy]))) bad.push(`${k}: Nachbar fest`);
+        if (!Object.values(DIRS).some(([dx, dy]) => steps.has(key([x + dx, y + dy])))) bad.push(`${k}: unerreichbar`);
+      }
+      // Stalagmiten-Gruppen: viele Stalagmiten mit einem zweiten genau ein freies Feld daneben, in drei Höhen
+      const stal = is('stalagmite');
+      const stalKeys = new Set(stal.map(({ p }) => key(p)));
+      const grouped = stal.filter(({ p: [x, y] }) => RING2.some(([dx, dy]) => stalKeys.has(key([x + dx, y + dy]))));
+      if (grouped.length < 100) bad.push(`nur ${grouped.length} Stalagmiten in Gruppen`);
+      if (new Set(grouped.map(({ c }) => c.note)).size !== 3) bad.push('Gruppen nicht in drei Höhen');
+      // Kristallbüsche fest und niedrig, Felsbrocken fest, Felsinseln eine Stufe hoch und begehbar, Pfützen begehbar
+      const counts = { crystalbush: 20, boulder: 5, mosstop: 30, puddle: 20 } as const;
+      for (const [deco, min] of Object.entries(counts) as [keyof typeof counts, number][])
+        if (is(deco).length < min) bad.push(`nur ${is(deco).length} ${deco}`);
+      for (const { p, c } of [...is('mosstop'), ...is('puddle')])
+        if (c.solid || !steps.has(key(p))) bad.push(`${key(p)}: ${c.deco} nicht begehbar`);
+      if (is('mosstop').some(({ c }) => c.h !== 2)) bad.push('Felsinsel nicht eine Stufe hoch');
+      if ([...is('crystalbush'), ...is('boulder')].some(({ c }) => !c.solid)) bad.push('Busch oder Brocken nicht fest');
+      // Dichte je Zone: am Rand und in der Tropfsteingrotte mindestens so dicht wie an den Seiten, keine leer
+      const density = (z: FillZone) => {
+        const cellsOf = inGrotto.filter(({ uv }) => fillZone(...uv) === z);
+        return (cellsOf.filter(({ c }) => SOLID_FILL.has(c.deco)).length / cellsOf.length) * 100;
+      };
+      for (const z of ['rim', 'drip', 'side'] as const) {
+        const d = density(z);
+        if (d < 3.5 || d > 14) bad.push(`Zone ${z}: ${d.toFixed(1)} feste Dinge je 100 Felder`);
+      }
+      expect(bad.slice(0, 5), `Seed ${seed}`).toEqual([]);
+    });
+
+    it(`Seed ${seed}: Moos und Farn nur unter den Lichtschächten, Lehmhang des Dachses neben dem Pilzgarten`, () => {
+      const all = placeOf(seed).cells.map((p) => ({ p, c: w.cell(...p), m: mouthOf(site, p) }));
+      const bad: string[] = [];
+      const underShaft = (m: Point) =>
+        GROTTE.shafts.some(([a, o]) => Math.hypot(m[0] - a, m[1] - o) <= GROTTE.fill.shade.r);
+      const { garden, drip, clay } = GROTTE;
+      const ferns = all.filter(({ c }) => c.region === 'hoehle' && c.deco === 'fern');
+      if (ferns.length < 5) bad.push(`nur ${ferns.length} Farne`);
+      for (const { p, c, m } of ferns)
+        if (!underShaft(m) || c.solid || c.ground !== 'grass') bad.push(`Farn ${key(p)}`);
+      // Moos (ground 'grass') nur auf der Mooswiese am Bett, im Pilzgarten, am Felsbecken und unter den Schächten
+      const mossy = all.filter(
+        ({ c, m }) =>
+          c.region === 'hoehle' &&
+          c.ground === 'grass' &&
+          !c.garden &&
+          Math.hypot(m[0] - garden.across, m[1] - garden.out) > garden.r &&
+          Math.hypot(m[0] - drip.across - drip.basin, m[1] - drip.out) > 3 &&
+          !underShaft(m),
+      );
+      if (mossy.length) bad.push(`Moos fern der Schächte, etwa ${key(mossy[0]!.p)}`);
+      if (
+        all.filter(
+          ({ c, m }) => c.ground === 'grass' && Math.hypot(m[0] - GROTTE.shafts[1][0], m[1] - GROTTE.shafts[1][1]) <= 3,
+        ).length < 10
+      )
+        bad.push('kein Moos unter dem Schacht der Kristallhalle');
+      // Lehmhang: zwei Stufen Lehm (Höhe 2 und 3), begehbar und erreichbar, links neben dem Pilzgarten
+      const bank = all.filter(({ c }) => c.deco === 'clay');
+      if (bank.length < clay.long * 2) bad.push(`nur ${bank.length} Felder Lehm`);
+      for (const { p, c, m } of bank) {
+        if (c.solid || !steps.has(key(p)) || c.h < 2 || c.h > 3) bad.push(`Lehm ${key(p)}`);
+        if (m[0] > clay.across || Math.abs(m[1] - clay.out) > clay.long) bad.push(`Lehm ${key(p)} nicht am Hang`);
+      }
+      if (new Set(bank.map(({ c }) => c.h)).size !== 2) bad.push('Lehmhang nicht in zwei Stufen');
+      expect(bad.slice(0, 5), `Seed ${seed}`).toEqual([]);
+    });
+
+    it(`Seed ${seed}: die Spur des künftigen Gleises von der Mündung bis zum Platz des Bahnhofs bleibt frei und eben`, () => {
+      const corridor = placeOf(seed).cells.filter((p) => corridorAt(...site.uv(...p)));
+      expect(corridor.length).toBeGreaterThan(40);
+      const blocked = corridor.filter((p) => {
+        const c = w.cell(...p);
+        return c.region !== 'hoehle' || c.solid || !!c.deco || c.h !== 1 || c.ground !== 'grotto' || !steps.has(key(p));
+      });
+      expect(blocked.map(key), `Seed ${seed}`).toEqual([]);
+      // sie reicht von der Mündung (o 0) bis an den Bahnsteig (ein Feld davor, auf der Höhe seiner Felder)
+      const mouthward = corridor.map((p) => mouthOf(site, p));
+      expect(Math.min(...mouthward.map(([, o]) => o))).toBe(0);
+      const { station } = GROTTE;
+      expect(mouthward.some(([a, o]) => o === station.out - 1 && a === station.side)).toBe(true);
     });
   }
 });

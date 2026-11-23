@@ -5,9 +5,13 @@
 // mit Kristall-Lampen links und rechts, der freie Platz für den Bahnhof Fledermaus und daneben für den Lokschuppen (beide
 // kommen mit dem Zug), das Höhlenbett unter dem ersten Lichtschacht mit Mooswiese, Pilzschale, Steintrog und dem
 // Unterstand dahinter (vorn offen, seine Rückwand ist die Kristallwand), links der Pilzgarten mit Leuchtpilzen und sechs
-// Pilzbeeten, rechts die Kristallhalle (zweiter Lichtschacht, fünf Kristallsäulen, der Kristallbogen), in der Mitte die
-// Tropfsteingrotte mit Stalagmiten in drei Höhen und einem Felsbecken samt Tropfquelle und Tropfmoos, hinten der stille See mit Steg zur Kristallinsel (dritter Lichtschacht), daneben der Geröllhang in drei
-// Stufen und ganz am Ende die Plattform des Portals `hoehlensee` (schläft noch), ihr Gegenstück im Kreis um das Bett.
+// Pilzbeeten und daneben der Lehmhang des Dachses, rechts die Kristallhalle (zweiter Lichtschacht, fünf Kristallsäulen,
+// der Kristallbogen), in der Mitte die Tropfsteingrotte mit Stalagmiten in drei Höhen und einem Felsbecken samt
+// Tropfquelle und Tropfmoos, hinten der stille See mit Steg zur Kristallinsel (dritter Lichtschacht), daneben der
+// Geröllhang in drei Stufen und ganz am Ende die Plattform des Portals `hoehlensee` (schläft noch), ihr Gegenstück im
+// Kreis um das Bett. Dazwischen die Füllung (mitwachsen-fill.ts): Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken,
+// Felsinseln mit Moos, Pfützen, unter den Schächten Moos und Farn; frei bleiben die Mitte, die Wege und die Spur des
+// künftigen Gleises von der Mündung zum Platz des Bahnhofs.
 // Licht ohne Punktlichter: Unter den Schächten und neben Kristallen und Leuchtpilzen ist der Boden heller (`Cell.light`).
 // Lagen rechnen von der Mündung aus. Teil des Welt-Pakets der Höhlenwelt (index.ts), nachgeladen.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
@@ -26,6 +30,7 @@ import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from '../../mitw
 import { findSpawns } from '../../mitwachsen-spawns';
 import { OBSTACLE_GAP } from '../../mitwachsen-world';
 import { caveHaunts } from './mitwachsen-cave-haunts';
+import { corridorAt, fillGrotte, shadeGrotte } from './mitwachsen-fill';
 import { siteOf, type Site } from './mitwachsen-site';
 
 const { rx, ry } = GROTTE.shape;
@@ -122,7 +127,9 @@ export function buildGrotte(
   features(site, map);
   homeGround(home, set);
   const portal = platforms(site, bed, ringHome, map);
+  fillGrotte(seed, site, free, map); // Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken, Felsinseln, Pfützen
   scatter(seed, site, free, map);
+  shadeGrotte(seed, site, (u, v) => Math.abs(u) <= 3 || nearStation(u, v), map); // Moos und Farn unter den Schächten
   level([...realm], map);
   const reach = reachOf(home.wake, map);
   for (const k of realm) {
@@ -176,14 +183,18 @@ export const stationAt = strip(GROTTE.station);
 /** Platz für den Lokschuppen: neben dem Bahnhof, zwei Felder weiter außen */
 export const shedAt = strip(GROTTE.shed);
 
+/** Die Spur des künftigen Gleises und die Plätze von Bahnhof und Lokschuppen samt einem Feld ringsum quer */
+const nearStation = (u: number, v: number) =>
+  corridorAt(u, v) || [-1, 0, 1].some((d) => stationAt(u + d, v) || shedAt(u + d, v));
+
 /**
- * Was frei bleibt (keine Hügel, keine Kristalle, keine Stalagmiten), in (u, v) von der Mitte: die Mündung mit dem
- * Lampengang, die Plätze von Bahnhof und Lokschuppen, der Weg in der Mitte (die Mitte bleibt licht), das Bett mit Mooswiese, das
- * Gegenstück des Portals, die Zonen mit ihren eigenen Dingen (Pilzgarten, Kristallhalle, Felsbecken, See, Geröllhang)
- * und die Plattform am Ende
+ * Was frei bleibt (keine Hügel, keine Kristalle, keine Stalagmiten, keine Füllung), in (u, v) von der Mitte: die Mündung
+ * mit dem Lampengang, die Spur des künftigen Gleises, die Plätze von Bahnhof und Lokschuppen, der Weg in der Mitte (die
+ * Mitte bleibt licht), das Bett mit Mooswiese, das Gegenstück des Portals, die Zonen mit ihren eigenen Dingen
+ * (Pilzgarten, Lehmhang, Kristallhalle, Felsbecken, See, Geröllhang) und die Plattform am Ende
  */
 function keepFree(site: Site, bed: Point, ring: Point) {
-  const { lamps, garden, hall, lake, scree, portal } = GROTTE;
+  const { lamps, garden, clay, hall, lake, scree, portal } = GROTTE;
   const [bu, bv] = site.uv(...bed);
   const [ru, rv] = site.uv(...ring);
   return (u: number, v: number) => {
@@ -192,9 +203,9 @@ function keepFree(site: Site, bed: Point, ring: Point) {
     if (Math.abs(u) <= 3) return true; // der Weg durch die Mitte
     if (Math.hypot(u - bu, v - bv) <= GROTTE.flat + 3) return true;
     if (Math.max(Math.abs(u - ru), Math.abs(v - rv)) <= PLATFORM_HALF + 3) return true;
-    if (stationAt(u, v) || stationAt(u + 1, v) || stationAt(u - 1, v)) return true;
-    if (shedAt(u, v) || shedAt(u + 1, v) || shedAt(u - 1, v)) return true;
+    if (nearStation(u, v)) return true;
     if (near(u, v, [garden.across, garden.out], garden.r)) return true;
+    if (box(u, v, [clay.across - clay.step, clay.out], clay.step + 2, clay.long / 2 + 2)) return true;
     if (box(u, v, [hall.across, hall.out + 2], 7, 9)) return true; // Säulen und Bogen mit Platz ringsum
     if (near(u, v, [GROTTE.drip.across + GROTTE.drip.basin, GROTTE.drip.out], 4)) return true; // Felsbecken
     const [lu, lv] = fromMouth([lake.across, lake.out]);
@@ -208,7 +219,7 @@ function keepFree(site: Site, bed: Point, ring: Point) {
 type Put = (p: readonly [number, number], c: Cell) => void;
 
 /**
- * Die Zonen mit ihren festen Dingen: Kristall-Lampen im Lampengang, Pilzgarten (Mooswiese mit den Pilzbeeten),
+ * Die Zonen mit ihren festen Dingen: Kristall-Lampen im Lampengang, Pilzgarten (Mooswiese mit den Pilzbeeten), Lehmhang,
  * Kristallsäulen und Kristallbogen in der Halle, Felsbecken mit Tropfquelle und Tropfmoos auf dem Moosrand, stiller See
  * mit Steg und Kristallinsel, Geröllhang in drei Stufen
  */
@@ -217,7 +228,7 @@ function features(site: Site, map: Map<string, Cell>) {
     const [x, y] = site.at(...fromMouth(p));
     if (map.get(key(x, y))?.region === 'hoehle') map.set(key(x, y), c);
   };
-  const { lamps, garden, drip, scree } = GROTTE;
+  const { lamps, garden, clay, drip, scree } = GROTTE;
   // Lampengang: links und rechts je eine Lampe alle `every` Felder, im Wechsel lila, türkis, rosa
   for (let o = 1, i = 0; o <= lamps.to; o += lamps.every, i++)
     for (const u of [-4, 4]) put([u, o], thing('cavelamp', { color: GROTTE_COLORS.crystals[i % 3] }));
@@ -227,6 +238,13 @@ function features(site: Site, map: Map<string, Cell>) {
       if (Math.hypot(du, dv) <= garden.r) put([garden.across + du, garden.out + dv], moss());
   for (const [du, dv] of bedSpots())
     put([garden.across + du, garden.out + dv], { ...moss(), deco: 'shroombed', solid: true });
+  // Lehmhang des Dachses: nach außen zwei Stufen Lehm (Höhe 2 und 3), begehbar
+  for (let du = 0; du < 2 * clay.step; du++)
+    for (let dv = 0; dv < clay.long; dv++)
+      put([clay.across - du, clay.out - (clay.long >> 1) + dv], {
+        ...floor(2 + Math.floor(du / clay.step)),
+        deco: 'clay',
+      });
   hallOf(put);
   // Felsbecken 3 × 2 mit Moosrand: hinten die Tropfquelle (fest), auf dem Rand an den Seiten und hinten Tropfmoos
   // (begehbar), vorn bleibt Moos, von dort schöpft man
@@ -435,7 +453,7 @@ function reachOf(wake: readonly Point[], map: ReadonlyMap<string, Cell>): Set<st
 
 /**
  * Licht ohne Punktlichter: unter den drei Lichtschächten ein Lichtfleck (Radius `GROTTE.shaft.r`, in der Mitte bis 35 %
- * heller), Kristalle, Leuchtpilze, Säulen und Lampen machen ihr Feld und die acht Nachbarn um `GROTTE.glow` heller.
+ * heller), Kristalle, Kristallbüsche, Leuchtpilze, Säulen und Lampen machen ihr Feld und die acht Nachbarn um `GROTTE.glow` heller.
  * Höchstens 0,5: Hell wird es, nie grell.
  */
 function light(realm: ReadonlySet<string>, at: (p: readonly [number, number]) => Point, map: Map<string, Cell>) {
@@ -446,7 +464,8 @@ function light(realm: ReadonlySet<string>, at: (p: readonly [number, number]) =>
     c.deco === 'glowshroom' ||
     c.deco === 'shroombed' ||
     c.deco === 'column' ||
-    c.deco === 'cavelamp';
+    c.deco === 'cavelamp' ||
+    c.deco === 'crystalbush';
   for (const k of realm) {
     const c = map.get(k);
     if (!c) continue;

@@ -68,12 +68,35 @@ export const GROTTE = {
   portal: [0, 134],
   /** Dichte der Dinge auf dem freien Boden: Kristalle, Stalagmiten, Leuchtpilze (Anteile) */
   things: { crystal: 0.03, stalagmite: 0.015, shroom: 0.02 },
+  /**
+   * Lehmhang des Dachses links neben dem Pilzgarten (`'clay'`, begehbar): `long` Felder lang (vom Tor weg), nach außen
+   * zwei Stufen Lehm (Höhe 2 und 3), jede `step` Felder breit; `across` ist seine Innenkante
+   */
+  clay: { across: -35, out: 43, long: 9, step: 2 },
+  /**
+   * Füllung der Grotte, damit sie nicht leer wirkt (wie Bäume und Büsche auf der Lichtung; mitwachsen-fill.ts).
+   * `groups`: Stalagmiten-Gruppen zu 3 bis 5 in drei Höhen, fest wie Bäume, mit begehbaren Lücken (ein Feld); je Feld
+   * eines Rasters von `every` Feldern eine Gruppe mit der Chance je Zone (`rim` am Rand, `drip` in der Tropfsteingrotte,
+   * `side` sonst). `bush`: niedrige leuchtende Kristallbüsche (fest wie ein Busch), `boulder`: Felsbrocken (fest),
+   * `puddle`: kleine türkise Pfützen (begehbar), je als Anteil der freien Felder. `islands`: flache Felsinseln mit Moos
+   * obenauf (eine Stufe hoch, begehbar), je Feld eines Rasters von `every` Feldern mit der Chance `chance`. `shade`: Farn
+   * und Moos nur unter den Lichtschächten, bis `r` Felder um ihre Mitte, Farn auf dem Anteil `fern` des Mooses.
+   */
+  fill: {
+    groups: { every: 7, rim: 1, drip: 1, side: 0.55 },
+    bush: 0.02,
+    boulder: 0.012,
+    puddle: 0.005,
+    islands: { every: 12, chance: 0.5 },
+    shade: { r: 5, fern: 0.3 },
+  },
 } as const;
 
 /**
  * Farben der Grotte. Höhlenhimmel (oben offen, nie dunkler als die Dämmerung der Lichtung) und Nebel-Maske über dem
  * Unerkundeten; Schichten der Klippen und des Bodens (wie am Höhlentor); Kristalle in Lila, Türkis und Rosa; Leuchtpilze
- * in Rosa, Türkis und Gelb; Moos; Holz des Dachs an der Kristallwand. Kein Gold: Das ist die Aktionsfarbe.
+ * in Rosa, Türkis und Gelb; Moos; Holz des Dachs an der Kristallwand; türkises Wasser; Lehm. Kein Gold: Das ist die
+ * Aktionsfarbe.
  */
 export const GROTTE_COLORS = {
   sky: '#4a4370',
@@ -90,5 +113,8 @@ export const GROTTE_COLORS = {
   jetty: ['#9a6a3e', '#b9864f'],
   roof: ['#8d86a8', '#a59fbf'],
   rock: ['#9a96b0', '#b8b4cc'],
+  /** Wasser in der Grotte (Becken, See, Pfützen, Steintrog), türkis: Farbe und Glanz */
   water: ['#5fc8d8', '#8fe0ea'],
+  /** Lehm des Dachshangs: Seite und Oberseite */
+  clay: ['#a8794c', '#c39462'],
 } as const;

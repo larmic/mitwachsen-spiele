@@ -71,6 +71,10 @@ export type Deco =
   | 'dripspring' // Tropfquelle über dem Felsbecken: Hineinlaufen füllt die Kanne wie das Wasser (fest)
   | 'dripmoss' // Tropfmoos auf dem Rand des Felsbeckens: daran naschen die Tiere selbst (nur Zierde, begehbar)
   | 'jetty' // Planke des Holzstegs am stillen See (begehbar); `note` 1 an seinem Ende: dort taucht der Grottenolm auf
+  | 'crystalbush' // niedriger leuchtender Kristallbusch, Farbe in `color` (fest wie ein Busch)
+  | 'mosstop' // Moos auf einer flachen Felsinsel, eine Stufe hoch (begehbar)
+  | 'clay' // Lehm am Hang des Dachses neben dem Pilzgarten (begehbar)
+  | 'puddle' // kleine türkise Pfütze auf dem Grottenboden (begehbar, nur Zierde)
   | 'klangstein'; // Stein mit schwebender Note: Hineinlaufen spielt die Geschichte des Ortes
 export type TreeKind =
   'oak' | 'birch' | 'autumn' | 'red' | 'blossom' | 'winter' | 'pine' | 'snowpine' | 'palm' | 'dead';

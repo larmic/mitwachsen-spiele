@@ -131,7 +131,8 @@ export class World3D {
   private hemi = new HemisphereLight(HEMI_SKY, '#5e7f3c', 1.35);
   private solid: MeshLambertMaterial;
   private foliage: MeshLambertMaterial;
-  private water = new MeshLambertMaterial({ color: GAME_COLORS.water, transparent: true, opacity: 0.8 });
+  // Farbe je Feld (Grotte: türkis, `View3D.water`), sonst blau
+  private water = new MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.8 });
   private explored: (x: number, y: number) => boolean = () => true;
   // Nebel: weiche Maske der erkundeten Felder um die Figur; ein Zusatz im Shader mischt die Welt dort in die
   // Himmelsfarbe. Keine Blöcke: Die Welt verschwindet einfach im Dunst.
@@ -626,7 +627,7 @@ export class World3D {
         [x, 0.82, y],
         [0, 1, 0],
         'white',
-        new Color('#ffffff'),
+        new Color(this.views.water(c) ?? GAME_COLORS.water),
       );
       if (c.deco === 'lily') {
         g.box(x + 0.25, 0.83, y + 0.3, 0.5, 0.03, 0.4, '#4f9a3c', '#6dbd47');

@@ -422,7 +422,9 @@ export class Renderer {
     const [bx, by] = P(x + 1, y + 1, 0.8);
     const w = bx - ax,
       d = by - ay;
-    ctx.fillStyle = GAME_COLORS.water;
+    const biome = world.cell(x, y).biome;
+    const [main, glint] = (biome && this.views.get(biome)?.water) || [GAME_COLORS.water, GAME_COLORS.waterLight];
+    ctx.fillStyle = main;
     ctx.fillRect(ax, ay, w + 0.5, d + 0.5);
     // Tiefer in der Mitte, heller am Ufer
     const shore = ['n', 'w', 'e'].filter((k) => {
@@ -435,7 +437,7 @@ export class Renderer {
     if (shore.includes('e')) ctx.fillRect(bx - Math.max(2, w * 0.06), ay, Math.max(2, w * 0.06), d);
     // Glitzern, das langsam wandert
     const t = sc.reduced ? 0 : sc.now / 1600;
-    ctx.fillStyle = GAME_COLORS.waterLight;
+    ctx.fillStyle = glint;
     for (let i = 0; i < 2; i++) {
       const seed = hash(7, x, y, i);
       const fx = ((seed % 100) / 100 + t * (0.15 + i * 0.1)) % 1;
