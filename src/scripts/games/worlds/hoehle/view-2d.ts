@@ -1,5 +1,6 @@
 // Zeichenteile der Kristallgrotte für die 2D-Ansicht und die Ebene über 3D, im Welt-Paket der Höhlenwelt: Pilzschale,
-// Steintrog, Unterstand mit Kristallwand, Kristall-Lampen, Kristallsäulen, Kristallbogen, Leuchtpilze und Stalagmiten
+// Steintrog, Unterstand mit Kristallwand, Kristall-Lampen, Kristallsäulen, Kristallbogen, Leuchtpilze, Pilzbeete (voll
+// oder abgeerntet), Tropfquelle, Tropfmoos und Stalagmiten
 // (Quader aus mitwachsen-cave-look.ts, je Deko-Art an den Haken `drawDeco` des Kerns gehängt), Lichtflecken auf dem
 // Grottenboden, der lila Höhlenhimmel und das Zeichen der Gegend in der Leiste (ein Kristall). Wetter gibt es in der
 // Grotte keins, Polarlicht auch nicht, und das Höhlentor geht vorerst nie auf.
@@ -13,6 +14,8 @@ import { caveBoxes, glowOver } from './mitwachsen-cave-look';
 
 /** Dinge der Grotte: Quader wie in 3D */
 const look: DrawDeco = (world, c, x, y) => caveBoxes(world, c, x, y);
+/** Pilzbeet: voll, bis die Figur es abgeerntet hat (`picked`), dann leer, bis es nachwächst */
+export const bed: DrawDeco = (world, c, x, y, { picked }) => caveBoxes(world, c, x, y, !(`${x},${y}` in picked));
 
 /** So lange klappt die Leiste beim Wechsel der Gegend um (wie in der Eis-Welt) */
 export const TURN_MS = 400;
@@ -48,6 +51,9 @@ export const view: View2D = {
     column: look,
     crystalarch: look,
     glowshroom: look,
+    shroombed: bed,
+    dripspring: look,
+    dripmoss: look,
     stalagmite: look,
   },
   // Lichtfleck unter einem Lichtschacht und neben Kristallen: helles Licht obenauf (der Kern ruft das nur auf Grottenboden)

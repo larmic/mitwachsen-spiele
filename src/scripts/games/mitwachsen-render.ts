@@ -32,8 +32,6 @@ import {
   REGIONS,
   SPECIES,
   figureParts,
-  BASKET_PARTS,
-  BUCKET_PARTS,
   BOOK_PARTS,
   SLEEPY_EYES,
   regionBehind,
@@ -41,7 +39,7 @@ import {
   type Look,
   type RegionId,
 } from '../../data/games/mitwachsen';
-import { FISH_PARTS } from '../../data/games/mitwachsen-eis';
+import { carried } from './mitwachsen-carry';
 import { grown } from './mitwachsen-growth';
 import { drawBox, drawDeco, type Box, type DecoAt, type View2D } from './mitwachsen-view';
 import { drawStone, heardStone } from './mitwachsen-story';
@@ -103,14 +101,12 @@ export type Scene = {
 const BED_FRAME: readonly [string, string] = [GAME_COLORS.bed.frame, GAME_COLORS.bed.frame];
 
 /**
- * Die Figur, mit Korb auf dem Rücken, Eimer und Netz in den Händen, solange sie Beeren, Wasser und Fische trägt, und mit
- * Buch, wenn niemand spielt
+ * Die Figur, mit Korb auf dem Rücken, Eimer (in der Grotte Kanne) und Netz in den Händen, solange sie Beeren oder Pilze,
+ * Wasser und Fische trägt, und mit Buch, wenn niemand spielt
  */
-const figure = (state: State, sc: Scene) => [
+const figure = (state: State, sc: Scene, world: World) => [
   ...(sc.glance ? turnHead(figureParts(sc.look)) : figureParts(sc.look)),
-  ...(state.basket ? BASKET_PARTS : []),
-  ...(state.bucket ? BUCKET_PARTS : []),
-  ...(state.fish ? FISH_PARTS : []),
+  ...carried(state, world.realm(state.player.x, state.player.y) === 'hoehle'),
   ...(sc.pose === 'stand' ? [] : BOOK_PARTS(sc.look, sc.pose === 'read' && !sc.reduced && sc.now % 5000 < 450)),
   ...(sc.pose === 'doze' ? SLEEPY_EYES(sc.look) : []),
 ];
@@ -185,7 +181,7 @@ export class Renderer {
         const b = sc.bodies.get(id)!;
         if (id === 'player') {
           this.shadow(P, b.x + 0.5, b.y + 0.5, b.z, 0.32);
-          drawModel(ctx, P, figure(state, sc), b.x + 0.5, b.y + 0.5, b.z + b.hop, facing(state, sc), 1);
+          drawModel(ctx, P, figure(state, sc, world), b.x + 0.5, b.y + 0.5, b.z + b.hop, facing(state, sc), 1);
           continue;
         }
         const a = byId.get(id);
@@ -204,7 +200,7 @@ export class Renderer {
     const me = sc.bodies.get('player');
     if (me && !state.sleeping && !state.ride) {
       ctx.globalAlpha = 0.35;
-      drawModel(ctx, P, figure(state, sc), me.x + 0.5, me.y + 0.5, me.z + me.hop, facing(state, sc), 1);
+      drawModel(ctx, P, figure(state, sc, world), me.x + 0.5, me.y + 0.5, me.z + me.hop, facing(state, sc), 1);
       ctx.globalAlpha = 1;
     }
 

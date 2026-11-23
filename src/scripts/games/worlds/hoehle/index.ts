@@ -1,7 +1,8 @@
 // Welt-Paket der Höhlenwelt: einziger Einstieg (`import('./worlds/hoehle')`). Alles, was nur die Höhlenwelt braucht,
 // kommt von hier: die Kristallgrotte hinter dem Höhlentor (Lage, Gelände mit allen Zonen, Zuhause mit Unterstand an der Kristallwand,
-// Licht, Portal am stillen See, Fundorte der acht Höhlen-Tiere) und die Zeichenteile der 2D-Ansicht samt den Modellen
-// der Höhlen-Tiere (die Fledermaus auch kopfüber). Sammeln, Tok und der Zug kommen später.
+// Licht, Portal am stillen See, Fundorte der acht Höhlen-Tiere, Pilzbeete, Tropfquelle und Tropfmoos zum Sammeln) und
+// die Zeichenteile der 2D-Ansicht samt den Modellen der Höhlen-Tiere (die Fledermaus auch kopfüber). Die Regeln des
+// Sammelns stehen bei den Handgriffen im Kern (mitwachsen-chores.ts). Tok und der Zug kommen später.
 // Das Spiel braucht es vorerst nie (das Höhlentor geht nie auf); nur der Entwickler-Schalter holt es
 // (`/spielen/?entwickler=hoehle`, mitwachsen-dev.ts). Nichts außerhalb dieses Ordners importiert statisch von hier
 // (geprüft durch `npm run arch`): im Build `_astro/welt-hoehle.<hash>.js` (Name aus astro.config.mjs), gemessen mit

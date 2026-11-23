@@ -2,6 +2,7 @@
 // Begegnungen aufspringen, mit ihren Farben. Gleich für 2D und die Ebene über 3D.
 
 import { FISH_SPARKS } from '../../data/games/mitwachsen-eis';
+import { SHROOM_SPARKS } from '../../data/games/mitwachsen-hoehle';
 
 /** Funke: Bildschirmpunkt, Geschwindigkeit, Lebensdauer in Bildern (bei 60 Hz), Farbe, Größe; `still` fliegt nicht */
 export type Particle = {
@@ -21,15 +22,18 @@ export const ZZZ = ['zzzz', '..z.', '.z..', 'zzzz'];
 export const ASK = ['.qqq.', 'q...q', '...q.', '..q..', '.....', '..q..']; // Fragezeichen über verlorenen Tieren
 
 /**
- * Farben der Funken: Handgriffe an Busch, Fischkiste und Wasser, dann an Futtertrog, Eisschale und Wassertrog; dazu die
+ * Farben der Funken: Handgriffe an Busch, Fischkiste, Pilzbeet und Wasser, dann an Futtertrog, Eisschale, Pilzschale und
+ * Wassertrog; dazu die
  * kleine Schneewolke, mit der der verlaufene Pinguin auftaucht, und der Einzug auf der Wiese je Gegend
  */
 export const SPARKS = {
   pick: ['#c8323a', '#ef5b5b', '#3f9a3c'],
   catch: FISH_SPARKS.catch,
+  gather: SHROOM_SPARKS.gather,
   fill: ['#3f8fd8', '#7fc0f0', '#ffffff'],
   berries: ['#c8323a', '#ef5b5b', '#ffd47e'],
   fish: FISH_SPARKS.feed,
+  pilze: SHROOM_SPARKS.feed,
   pour: ['#3f8fd8', '#7fc0f0', '#ffd47e'],
   snow: ['#ffffff', '#dfe9f2', '#bfe6f5'],
   lichtung: ['#ffd47e', '#ffffff', '#6cc46f'], // ein Tier zieht auf der Wiese der Lichtung ein

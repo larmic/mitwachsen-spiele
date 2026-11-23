@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { MOOD_LIGHT, REGIONS, type Point } from '../../../../data/games/mitwachsen';
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
-import { DIRS } from '../../../../lib/games/front';
+import { DIRS, type Dir } from '../../../../lib/games/front';
 import { platformsToWake } from '../../mitwachsen-portal';
+import { initialState, step, type State } from '../../mitwachsen-state';
+import { caveBoxes } from './mitwachsen-cave-look';
 import { DUSK_DAY, DUSK_SKY, dayOf, nightIn, nightMix, sunLevel, type Rgb } from '../../mitwachsen-dusk';
 import { beyondRing, canStep, kesselPlace, type World } from '../../mitwachsen-world';
 import { HOEHLE_PACK, PACKS, REGRESSION_SEEDS, SAMPLE_SEEDS, seedRange, seedsFor, worldOf } from '../../test-worlds';
-import { GROTTE_ROOM, fromMouth, shedAt, stationAt } from './mitwachsen-grotte';
+import { GROTTE_ROOM, bedSpots, fromMouth, shedAt, stationAt } from './mitwachsen-grotte';
 import type { Site } from './mitwachsen-site';
+import type { Cell } from '../../mitwachsen-cell';
 
 const CAVE = [HOEHLE_PACK];
 /** Seeds, deren Grotte um eine Ecke liegt (die Eis-Welt liegt gerade dahinter im Weg) */
@@ -18,6 +21,105 @@ const SEEDS = seedsFor(seedRange(1, 20), [...SAMPLE_SEEDS, ...TURNED]);
 type Placed = { bed: Point; cells: readonly Point[]; site: Site };
 const placeOf = (seed: number) => kesselPlace(seed, HOEHLE_PACK) as Placed;
 const key = ([x, y]: readonly [number, number]) => `${x},${y}`;
+
+/** Ein erreichbares Nachbarfeld von `p` und die Richtung von dort hinein (null: keins) */
+function beside(steps: ReadonlyMap<string, number>, p: Point): { at: Point; dir: Dir } | null {
+  for (const [dir, [dx, dy]] of Object.entries(DIRS) as [Dir, readonly [number, number]][]) {
+    const at: Point = [p[0] - dx, p[1] - dy];
+    if (steps.has(key(at))) return { at, dir };
+  }
+  return null;
+}
+
+/** Die Figur steht neben `p` (allein, wach, mit `hands`) und läuft hinein: Ereignisse und neuer Zustand */
+function walkInto(w: World, steps: ReadonlyMap<string, number>, p: Point, hands: Partial<State> = {}) {
+  const from = beside(steps, p);
+  if (!from) return null;
+  const s: State = {
+    ...initialState(w),
+    sleeping: false,
+    wokeAt: -1e9,
+    animals: [],
+    ...hands,
+    player: { x: from.at[0], y: from.at[1], dir: from.dir },
+  };
+  const r = step(s, w, { type: 'move', dir: from.dir });
+  return { events: r.events, state: r.state };
+}
+
+type Placed1 = { p: Point; c: Cell };
+
+/** Was an den Pilzbeeten nicht stimmt: Platz, Boden, Licht, erreichbar, Sammeln, Farben, Abstand */
+function bedProblems(w: World, site: Site, steps: ReadonlyMap<string, number>, all: readonly Placed1[]): string[] {
+  const bad: string[] = [];
+  const beds = all.filter(({ c }) => c.deco === 'shroombed');
+  const want = bedSpots().map(([du, dv]) =>
+    key(site.at(...fromMouth([GROTTE.garden.across + du, GROTTE.garden.out + dv]))),
+  );
+  if (
+    beds
+      .map(({ p }) => key(p))
+      .sort()
+      .join() !== [...want].sort().join()
+  )
+    bad.push('Beete nicht an ihren Plätzen');
+  const colors = [...GROTTE_COLORS.shrooms] as string[];
+  // je Beet drei Leuchtpilze, je einer in Rosa, Türkis und Gelb; abgeerntet keiner mehr
+  const caps = ({ p, c }: Placed1, full: boolean) =>
+    caveBoxes(w, c, ...p, full)!.flatMap((b) => (colors.includes(b[6]) ? [b[6]] : []));
+  for (const bed of beds) {
+    const { p, c } = bed;
+    if (c.ground !== 'grass' || !c.solid || c.h !== 1) bad.push(`${key(p)}: Beet nicht fest auf Moos`);
+    if ((c.light ?? 0) < GROTTE.glow) bad.push(`${key(p)}: Beet leuchtet nicht`);
+    const r = walkInto(w, steps, p);
+    if (r?.events[0]?.type !== 'gather' || !r.state.shrooms) bad.push(`${key(p)}: nicht erreichbar oder sammelt nicht`);
+    if (caps(bed, true).sort().join() !== [...colors].sort().join()) bad.push(`${key(p)}: Farben`);
+    if (caps(bed, false).length) bad.push(`${key(p)}: abgeerntet noch Pilze`);
+  }
+  // je Beet freies Moos ringsum (einzeln wie Busch und Fischkiste)
+  const cheb = (a: Point, b: Point) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
+  if (beds.some((a) => beds.some((b) => a !== b && cheb(a.p, b.p) <= 2))) bad.push('Beete zu dicht');
+  return bad;
+}
+
+/** Was an Tropfquelle, Tropfmoos und Wasser nicht stimmt: eine Quelle am Becken, die Kanne füllt sich, Moos begehbar */
+function dripProblems(w: World, site: Site, steps: ReadonlyMap<string, number>, all: readonly Placed1[]): string[] {
+  const bad: string[] = [];
+  const springs = all.filter(({ c }) => c.deco === 'dripspring');
+  if (springs.length !== 1) bad.push(`${springs.length} Tropfquellen`);
+  for (const { p } of springs) {
+    const r = walkInto(w, steps, p);
+    if (r?.events[0]?.type !== 'fill' || !r.state.bucket) bad.push('an der Tropfquelle füllt sich die Kanne nicht');
+    const basin = Object.values(DIRS).filter(([dx, dy]) => w.cell(p[0] + dx, p[1] + dy).ground === 'water');
+    if (basin.length !== 1) bad.push('Tropfquelle nicht am Becken');
+  }
+  const moss = all.filter(({ c }) => c.deco === 'dripmoss');
+  if (moss.length < 6) bad.push(`nur ${moss.length} Felder Tropfmoos`);
+  for (const { p, c } of moss) if (c.solid || !steps.has(key(p))) bad.push(`${key(p)}: Tropfmoos nicht begehbar`);
+  return [...bad, ...scoopProblems(w, site, steps, all)];
+}
+
+/** Wo man schöpft: im Felsbecken von vorn (die vordere Reihe des Rands erreichbar) und am See, beides für sich */
+function scoopProblems(w: World, site: Site, steps: ReadonlyMap<string, number>, all: readonly Placed1[]): string[] {
+  const bad: string[] = [];
+  // im Felsbecken schöpft man von vorn: die vordere Reihe des Rands (dv = −2) ist erreichbar, das Wasser dahinter füllt
+  const { drip, lake } = GROTTE;
+  const inBasin = (du: number, dv: number) => site.at(...fromMouth([drip.across + drip.basin + du, drip.out + dv]));
+  for (const du of [-1, 0, 1])
+    if (!steps.has(key(inBasin(du, -2)))) bad.push(`Rand vorn am Becken (${du}) unerreichbar`);
+  const basin = inBasin(0, -1);
+  const scoop = w.cell(...basin).ground === 'water' ? walkInto(w, steps, basin) : null;
+  if (scoop?.events[0]?.type !== 'fill') bad.push('im Felsbecken füllt sich die Kanne nicht');
+  // und am See
+  const inLake = ({ p, c }: Placed1) => {
+    const [u, v] = mouthOf(site, p);
+    return c.ground === 'water' && ((u - lake.across) / lake.rx) ** 2 + ((v - lake.out) / lake.ry) ** 2 < 1;
+  };
+  const shore = all.find((q) => inLake(q) && beside(steps, q.p));
+  const fill = shore && walkInto(w, steps, shore.p);
+  if (fill?.events[0]?.type !== 'fill') bad.push('am See füllt sich die Kanne nicht');
+  return bad;
+}
 
 /** Schritte vom Bett zu jedem erreichbaren Feld der Welt (Breitensuche, das Höhlentor zu) */
 function stepsFrom(w: World, start: Point): Map<string, number> {
@@ -215,6 +317,17 @@ describe('Kristallgrotte: Gelände', () => {
       expect(steep.map(key).slice(0, 3)).toEqual([]);
     });
 
+    it(`Seed ${seed}: Sammeln: sechs Pilzbeete im Pilzgarten, Tropfquelle und Tropfmoos am Felsbecken, alles erreichbar`, () => {
+      const all = placeOf(seed).cells.map((p) => ({ p, c: w.cell(...p) }));
+      const bad = [...bedProblems(w, site, steps, all), ...dripProblems(w, site, steps, all)];
+      // Futter und Wasser am Höhlenbett: mit Pilzen in die Pilzschale, mit der Kanne in den Steintrog
+      const feed = walkInto(w, steps, home.food, { shrooms: true });
+      if (feed?.events[0]?.type !== 'feed' || feed.state.shrooms) bad.push('Pilzschale nimmt keine Pilze');
+      const pour = walkInto(w, steps, home.water, { bucket: true });
+      if (pour?.events[0]?.type !== 'pour' || pour.state.bucket) bad.push('Steintrog nimmt kein Wasser');
+      expect(bad, `Seed ${seed}`).toEqual([]);
+    });
+
     it(`Seed ${seed}: Licht: Lichtflecken unter den drei Schächten, Kristalle machen ihre Nachbarn heller, nie grell`, () => {
       const all = placeOf(seed).cells.map((p) => w.cell(...p));
       expect(all.every((c) => (c.light ?? 0) >= 0 && (c.light ?? 0) <= 0.5)).toBe(true);
@@ -228,6 +341,17 @@ describe('Kristallgrotte: Gelände', () => {
       if (n.region === 'hoehle') expect(n.light ?? 0).toBeGreaterThanOrEqual(GROTTE.glow);
     });
   }
+});
+
+describe('Pilzbeete im Kreis', () => {
+  it('alle Beete gleich weit von der Mitte des Pilzgartens, der Kreis spiegelgleich (quer und vom Tor weg)', () => {
+    const spots = bedSpots();
+    expect(spots).toHaveLength(GROTTE.garden.beds);
+    expect(spots.map(([u, v]) => Math.round(Math.hypot(u, v)))).toEqual(spots.map(() => GROTTE.garden.ring));
+    const all = new Set(spots.map(key));
+    const mirror = (f: (p: Point) => Point) => spots.filter((p) => !all.has(key(f(p)))).map(key);
+    expect([mirror(([u, v]) => [-u + 0, v]), mirror(([u, v]) => [u, -v + 0])]).toEqual([[], []]);
+  });
 });
 
 describe('Kristallgrotte: nie dunkler als die Dämmerung', () => {

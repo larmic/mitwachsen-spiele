@@ -1,6 +1,6 @@
-// Höhlen-Tiere in der Kristallgrotte: Wohnorte (Fundorte) und Futter je Art. Nur das Welt-Paket der Höhlenwelt
-// (src/scripts/games/worlds/hoehle/) liest diese Daten; Name, Ton und Gangart kennt der Kern (`CAVE_SPECIES` in
-// mitwachsen-hoehle.ts), die Modelle stehen in mitwachsen-cave-models.ts.
+// Höhlen-Tiere in der Kristallgrotte: Wohnorte (Fundorte) je Art. Nur das Welt-Paket der Höhlenwelt
+// (src/scripts/games/worlds/hoehle/) liest diese Daten; Name, Ton, Gangart und Futter kennt der Kern (`CAVE_SPECIES`
+// und `CAVE_FOOD` in mitwachsen-hoehle.ts), die Modelle stehen in mitwachsen-cave-models.ts.
 // Konzept: docs/games/mitwachsen.md (Höhlenwelt) · Spec: docs/specs/mitwachsen.md (Abschnitt „Die Höhlen-Tiere“)
 
 import type { CaveSpeciesId } from '../../mitwachsen-hoehle';
@@ -30,21 +30,6 @@ export const CAVE_ANIMALS: readonly { species: CaveSpeciesId; near: CaveHaunt; a
   { species: 'murmeltier', near: 'scree', at: [28, 120] },
   { species: 'gluehwuermchen', near: 'shrooms', at: [-22, 50] },
 ];
-
-/**
- * Futter je Art (kommt mit dem Sammeln): Leuchtpilze aus dem Pilzgarten in der Pilzschale, oder Tropfmoos an der
- * Tropfquelle, an dem die Tiere selbst naschen
- */
-export const CAVE_FOOD: Readonly<Record<CaveSpeciesId, 'pilze' | 'tropfmoos'>> = {
-  maulwurf: 'pilze',
-  dachs: 'pilze',
-  grottenolm: 'tropfmoos',
-  eidechse: 'tropfmoos',
-  siebenschlaefer: 'pilze',
-  fledermaus: 'tropfmoos',
-  murmeltier: 'pilze',
-  gluehwuermchen: 'tropfmoos',
-};
 
 /** So hoch über dem Boden hängt man unter dem Kristallbogen (Unterkante des Bogens, `Cell.perch`) */
 export const ARCH_PERCH = 3;

@@ -1,6 +1,7 @@
 // 3D-Teil des Welt-Pakets der Höhlenwelt: Was die 3D-Ansicht nur für die Kristallgrotte baut. Pilzschale, Steintrog,
 // Unterstand mit Kristallwand (das Dach vor der Figur durchsichtig), Kristall-Lampen, Kristallsäulen, Kristallbogen,
-// Leuchtpilze und Stalagmiten (Quader aus mitwachsen-cave-look.ts, wie in 2D), Boden und Klippen in den zart lila-grauen
+// Leuchtpilze, Pilzbeete (voll oder abgeerntet; das Stück wird bei `gather` und `regrow` neu gebaut), Tropfquelle,
+// Tropfmoos und Stalagmiten (Quader aus mitwachsen-cave-look.ts, wie in 2D), Boden und Klippen in den zart lila-grauen
 // Schichten des Höhlentors, Lichtflecken in den Farben der Ecken (keine Punktlichter) und der lila Höhlenhimmel ohne
 // Decke mit seiner Nebel-Maske. Braucht Three.js (wie die 3D-Ansicht) und kommt darum erst, wenn die 3D-Ansicht es will
 // (`pack.view3d`, index.ts): im Build `_astro/welt-hoehle-3d.<hash>.js` mit eigener Grenze (scripts/verify-bundles.ts).
@@ -13,6 +14,7 @@ import type { Ground, View3D } from '../../mitwachsen-view-3d';
 import { band, caveBoxes } from './mitwachsen-cave-look';
 
 const look: DrawDeco = (world, c, x, y) => caveBoxes(world, c, x, y);
+const bed: DrawDeco = (world, c, x, y, { picked }) => caveBoxes(world, c, x, y, !(`${x},${y}` in picked));
 
 /** Kacheln je Boden in der Grotte (wie die 3D-Ansicht sie sonst nimmt), damit der Lichtfleck auch auf Moos und Steg liegt */
 const TILES: Partial<Record<Cell['ground'], Ground['tiles']>> = {
@@ -33,6 +35,9 @@ export const view3d: View3D = {
     column: look,
     crystalarch: look,
     glowshroom: look,
+    shroombed: bed,
+    dripspring: look,
+    dripmoss: look,
     stalagmite: look,
   },
   ground(c) {

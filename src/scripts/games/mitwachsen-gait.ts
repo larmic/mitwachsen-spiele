@@ -4,14 +4,52 @@
 
 import { SPECIES, speciesOf, type Gait } from '../../data/games/mitwachsen';
 import { FISH_EATERS } from '../../data/games/mitwachsen-eis';
+import { MOSS_EATERS, SHROOM_EATERS } from '../../data/games/mitwachsen-hoehle';
 
 const SING_MS = 320; // so lange dauert der Hüpfer beim Singen
-const SNAP_MS = 180; // so lange dauert der Schnapp-Hüpfer eines Fischfressers
+const SNAP_MS = 180; // so lange dauert der Schnapp-Hüpfer
 export const HOME_STAGGER = 250; // ziehen mehrere Tiere zugleich ein, ruft und hüpft jedes so viele ms nach dem vorigen
-export const SNAP_DELAY = 300; // ms nach dem Hüpfer beim Füttern mit Fisch: Dann schnappen die Fischfresser zu
+export const SNAP_DELAY = 300; // ms nach dem Hüpfer beim Füttern: Dann schnappen die Fischfresser zu, naschen Pilz- und Moosfresser
 
-/** Schnappt dieses Wesen nach Fisch (ein Fischfresser der Eis-Welt)? */
-export const snaps = (id: string) => FISH_EATERS.has(speciesOf(id) ?? '');
+/** Wer schnappt oder nascht nach welchem Futter: Fisch, Pilze, Wasser im Trog (frisches Tropfmoos an seinem Rand) */
+const EATERS: Record<'fish' | 'pilze' | 'water', ReadonlySet<string>> = {
+  fish: FISH_EATERS,
+  pilze: SHROOM_EATERS,
+  water: MOSS_EATERS,
+};
+
+/**
+ * Schnappt dieses Wesen nach dem Futter (`food`): Fischfresser der Eis-Welt nach Fisch, Pilzfresser der Grotte nach
+ * Pilzen, Moosfresser der Grotte nach dem Tropfmoos am Trog, wenn Wasser hineinkommt? Beeren: niemand extra
+ */
+export const snaps = (id: string, food: 'berries' | 'fish' | 'pilze' | 'water') =>
+  food !== 'berries' && EATERS[food].has(speciesOf(id) ?? '');
+
+export const NIBBLE_EVERY = 50; // Takte zwischen zwei Naschern eines Moosfressers (5 s), je Tier versetzt
+
+/** Versatz je Kennung, damit nicht alle Moosfresser im selben Takt naschen */
+const offsetOf = (id: string) => [...id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) % NIBBLE_EVERY, 7);
+
+const NEAR = [-1, 0, 1].flatMap((dx) => [-1, 0, 1].map((dy) => [dx, dy] as const));
+
+/**
+ * Moosfresser naschen selbst, ohne dass das Kind etwas tut: Zu Hause (auf der Mooswiese mit dem Tropfmoos am Steintrog)
+ * und unterwegs neben Tropfmoos oder Tropfquelle macht jeder alle `NIBBLE_EVERY` Takte einen Schnapp-Hüpfer, je Tier
+ * versetzt; nachts nicht, und nicht, wer kopfüber an einem Sitzplatz hängt. Liefert die Kennungen, die in diesem Takt
+ * naschen (nur Bild: bei reduzierter Bewegung hüpft niemand).
+ */
+export function nibblers(
+  s: { tick: number; sleeping: boolean; animals: readonly { id: string; x: number; y: number; mode: string }[] },
+  cell: (x: number, y: number) => { deco: string | null; perch?: number | undefined },
+): string[] {
+  if (s.sleeping) return [];
+  const mossy = (x: number, y: number) =>
+    NEAR.some(([dx, dy]) => /^(dripmoss|dripspring|stonetrough)$/.test(cell(x + dx, y + dy).deco ?? ''));
+  return s.animals
+    .filter((a) => EATERS.water.has(speciesOf(a.id) ?? '') && (s.tick + offsetOf(a.id)) % NIBBLE_EVERY === 0)
+    .filter((a) => a.mode === 'home' || (a.mode === 'wander' && cell(a.x, a.y).perch === undefined && mossy(a.x, a.y)))
+    .map((a) => a.id);
+}
 
 /** Hüpfer je Gangart über einen Schritt (`moving` von 1 am Anfang bis 0 am Ziel) */
 const STRIDE: Record<Gait | 'schritt', (m: number) => number> = {
@@ -25,8 +63,8 @@ const STRIDE: Record<Gait | 'schritt', (m: number) => number> = {
 
 /**
  * Höhe des Hüpfers eines Wesens (Kennung `id`, die Figur heißt 'player'): Gangart seiner Art über den Schritt
- * (`moving`, 0 … 1), dazu der Hüpfer beim Singen (`sung` ms her; vor dem Zeitpunkt nichts) und der kurze Schnapp-Hüpfer nach Fisch (`snapped` ms
- * her; vor dem Zeitpunkt nichts).
+ * (`moving`, 0 … 1), dazu der Hüpfer beim Singen (`sung` ms her; vor dem Zeitpunkt nichts) und der kurze Schnapp-Hüpfer
+ * nach Futter oder beim Naschen (`snapped` ms her; vor dem Zeitpunkt nichts).
  */
 export function hopOf(id: string, moving: number, sung: number, snapped = Infinity): number {
   const species = speciesOf(id);

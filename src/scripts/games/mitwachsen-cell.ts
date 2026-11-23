@@ -67,6 +67,9 @@ export type Deco =
   | 'column' // Kristallsäule in der Kristallhalle, `note` ist ihre Höhe (fest)
   | 'crystalarch' // Kristallbogen: `note` 0 und 4 die Pfeiler (fest), 1 bis 3 der Bogen darüber (begehbar)
   | 'glowshroom' // kleiner Leuchtpilz im Pilzgarten, Farbe in `color` (nur Zierde, begehbar)
+  | 'shroombed' // Pilzbeet im Pilzgarten: Hineinlaufen sammelt seine drei Leuchtpilze in den Korb (fest wie ein Busch)
+  | 'dripspring' // Tropfquelle über dem Felsbecken: Hineinlaufen füllt die Kanne wie das Wasser (fest)
+  | 'dripmoss' // Tropfmoos auf dem Rand des Felsbeckens: daran naschen die Tiere selbst (nur Zierde, begehbar)
   | 'klangstein'; // Stein mit schwebender Note: Hineinlaufen spielt die Geschichte des Ortes
 export type TreeKind =
   'oak' | 'birch' | 'autumn' | 'red' | 'blossom' | 'winter' | 'pine' | 'snowpine' | 'palm' | 'dead';
@@ -77,7 +80,7 @@ export type Cell = {
   deco: Deco | null;
   color?: string; // Blumenfarbe
   region: RegionId | 'wild' | 'border'; // border: Fels, Zaun oder Wasser zwischen Gegenden
-  solid: boolean; // Deko versperrt das Feld (Baum, Busch, Fischkiste, Schneehaufen, Fels, Zaun, Bett, Tafel)
+  solid: boolean; // Deko versperrt das Feld (Baum, Busch, Fischkiste, Pilzbeet, Schneehaufen, Fels, Zaun, Bett, Tafel)
   gate?: GateId; // Tor oder Brücke: begehbar, sobald offen
   sign?: GateId; // Tafel zu diesem Tor
   garden?: true; // Wiese ums Bett: Hier sind gefundene Tiere zu Hause

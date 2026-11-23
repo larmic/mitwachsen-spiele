@@ -1339,6 +1339,91 @@ describe('Zuhause je Gegend', () => {
   });
 });
 
+describe('Pilzbeete, Pilzschale, Tropfquelle und Steintrog (Höhlenwelt)', () => {
+  it('Pilzbeet: hineinlaufen sammelt die Leuchtpilze in den Korb, das Beet ist leer und nach 300 Takten wieder voll (auch nachts)', () => {
+    const w = fakeWorld({ '1,0': { deco: 'shroombed', solid: true, biome: 'hoehle' } });
+    let r = run(awake(w, 0, 0), w, 'e');
+    expect(r.events).toEqual([{ type: 'gather', x: 1, y: 0 }]);
+    expect([r.s.shrooms, r.s.basket, r.s.player.x]).toEqual([true, false, 0]); // die Figur bleibt stehen
+    expect(types(run(r.s, w, 'e').events)).toEqual(['bump']); // leer ist das Beet ein Hindernis wie ein abgeernteter Busch
+    let s: State = { ...r.s, shrooms: false, sleeping: true };
+    const regrown: GameEvent[] = [];
+    for (let i = 0; i < REGROW; i++) {
+      r = run(s, w, TICK);
+      s = r.s;
+      regrown.push(...r.events);
+      if (i === REGROW - 2) expect(regrown).toEqual([]);
+    }
+    expect(regrown).toEqual([{ type: 'regrow', x: 1, y: 0 }]);
+    expect(types(run({ ...s, sleeping: false }, w, 'e').events)).toEqual(['gather']);
+    expect(initialState(w).shrooms).toBe(false);
+    expect('shrooms' in progressOf(s)).toBe(false); // der Korb wird nicht gespeichert
+  });
+
+  it('der Korb trägt nur eine Sorte: ein volles Pilzbeet tauscht Beeren gegen Pilze, ein voller Busch Pilze gegen Beeren (nie ein Hindernis)', () => {
+    const w = fakeWorld({
+      '1,0': { deco: 'shroombed', solid: true },
+      '-1,0': { deco: 'bush', solid: true },
+    });
+    let r = run({ ...awake(w, 0, 0), basket: true }, w, 'e');
+    expect([r.events, r.s.basket, r.s.shrooms, Object.keys(r.s.picked)]).toEqual([
+      [{ type: 'gather', x: 1, y: 0 }],
+      false,
+      true,
+      ['1,0'],
+    ]);
+    r = run({ ...awake(w, 0, 0), shrooms: true }, w, 'w');
+    expect([r.events, r.s.basket, r.s.shrooms, Object.keys(r.s.picked)]).toEqual([
+      [{ type: 'pick', x: -1, y: 0 }],
+      true,
+      false,
+      ['-1,0'],
+    ]);
+    r = run(awake(w, 0, 0), w, 'e', 'w'); // erst Pilze, dann der Busch: jetzt Beeren im Korb
+    expect([types(r.events), r.s.basket, r.s.shrooms, r.s.player.x]).toEqual([['gather', 'pick'], true, false, 0]);
+  });
+
+  it('die Pilzschale nimmt nur Pilze, Futtertrog und Eisschale keine; alle Tiere der Wiese freuen sich', () => {
+    const w = fakeWorld({
+      '-1,0': { deco: 'shroombowl', solid: true, garden: true },
+      '1,0': { deco: 'trough', solid: true, garden: true },
+      '0,-1': { deco: 'icebowl', solid: true, garden: true },
+      '0,2': { garden: true },
+    });
+    const home = [animal('lichtung:hase', 0, 2, { mode: 'home', home: { kind: 'garden' } })];
+    const s = awake(w, 0, 0, home);
+    expect(types(run(s, w, 'w').events)).toEqual(['bump']); // leere Hände
+    let r = run({ ...s, basket: true, fish: true }, w, 'w');
+    expect([types(r.events), r.s.basket, r.s.fish]).toEqual([['bump'], true, true]); // Beeren und Fisch nicht in die Pilzschale
+    r = run({ ...s, shrooms: true }, w, 'e', 'n');
+    expect([types(r.events), r.s.shrooms]).toEqual([['bump', 'bump'], true]); // Pilze nicht in Futtertrog und Eisschale
+    r = run({ ...s, shrooms: true }, w, 'w');
+    expect(r.events).toEqual([{ type: 'feed', food: 'pilze', ids: ['lichtung:hase'] }]);
+    expect([r.s.shrooms, r.s.player.x]).toEqual([false, 0]);
+  });
+
+  it('an der Tropfquelle und am Wasser füllt die Figur die Kanne, im Steintrog leert sie sie; Tropfmoos ist begehbar', () => {
+    const w = fakeWorld({
+      '1,0': { deco: 'dripspring', solid: true, ground: 'grass' },
+      '-1,0': { deco: 'stonetrough', solid: true, garden: true },
+      '0,1': { deco: 'dripmoss', ground: 'grass' },
+      '0,2': { garden: true },
+    });
+    let s = awake(w, 0, 0, [animal('lichtung:hase', 0, 2, { mode: 'home', home: { kind: 'garden' } })]);
+    expect(types(run(s, w, 'w').events)).toEqual(['bump']); // ohne Kanne ist der Steintrog ein Hindernis
+    let r = run(s, w, 'e');
+    expect(r.events).toEqual([{ type: 'fill', x: 1, y: 0 }]);
+    s = r.s;
+    expect([s.bucket, s.player.x]).toEqual([true, 0]);
+    expect(types(run(s, w, 'e').events)).toEqual(['bump']); // volle Kanne: die Quelle ist nur Fels
+    r = run(s, w, 'w');
+    expect(r.events).toEqual([{ type: 'pour', ids: ['lichtung:hase'] }]);
+    expect(r.s.bucket).toBe(false);
+    r = run(r.s, w, 's');
+    expect([types(r.events), r.s.player.y]).toEqual([['step'], 1]); // aufs Tropfmoos: ein Schritt, nichts geschieht
+  });
+});
+
 describe('Rufen', () => {
   it('ruft, wenn weder Tier noch Bett in der Nähe sind', () => {
     const w = fakeWorld();

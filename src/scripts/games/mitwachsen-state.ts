@@ -67,9 +67,10 @@ export type State = Omit<Progress, 'position'> & {
   animals: Animal[];
   followers: string[]; // Reihenfolge = Platz in der Kette hinter der Figur
   arrived: readonly [number, number] | null; // Mittelfeld, auf dem die Figur angekommen ist: erst runter, dann wieder rauf (nicht gespeichert)
-  picked: Record<string, number>; // Büsche ohne Beeren und leere Fischkisten: "x,y" → Takt des Leerens (nicht gespeichert)
+  picked: Record<string, number>; // Büsche ohne Beeren, leere Fischkisten und Pilzbeete: "x,y" → Takt des Leerens (nicht gespeichert)
   dayStart: number; // Takt, an dem der heutige Tag begann (Aufwachen): Das Wetter zählt ab hier, jeder Tag beginnt mit Sonne
   basket: boolean; // Korb mit Beeren auf dem Rücken (nach dem Pflücken, bis zum Futtertrog)
+  shrooms: boolean; // Korb mit Leuchtpilzen auf dem Rücken (nach dem Sammeln am Pilzbeet, bis zur Pilzschale; nie zugleich mit Beeren)
   bucket: boolean; // Eimer mit Wasser in der Hand (nach dem Schöpfen, bis zum Wassertrog)
   fish: boolean; // Netz mit Fischen in der linken Hand (nach dem Fangen an der Fischkiste, bis zur Eisschale)
   calm: number; // Tag, an dem der Pinguin auf die Schneewiese gezogen ist: an ihm weht kein Pustewind (nicht gespeichert)
@@ -182,6 +183,7 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     arrived: null,
     picked: {},
     basket: false,
+    shrooms: false,
     bucket: false,
     fish: false,
     day: saved.day ?? 0,
@@ -319,7 +321,7 @@ export function step(
 
 function tick(s: State, world: World, events: GameEvent[], ride?: RideRules) {
   s.tick++;
-  regrow(s, events); // Beeren und Fische wachsen nach, auch nachts
+  regrow(s, events); // Beeren, Fische und Leuchtpilze wachsen nach, auch nachts
   if (s.sleeping) return; // nachts ist es still
   syncWild(s, world);
   // Regnet es auf der Lichtung bzw. weht in der Eis-Welt der Pustewind, gehen die Tiere der Wiese dieser Gegend unter
@@ -438,7 +440,7 @@ function move(
   if (animal && meetAnimal(s, world, animal, dir, events)) return;
   const story = world.cell(tx, ty).story;
   if (story) return listen(s, story, events);
-  // Handgriffe: Beeren pflücken, Fische fangen, Wasser schöpfen, in die Tröge der Wiese bringen (mitwachsen-chores.ts)
+  // Handgriffe: Beeren pflücken, Fische fangen, Pilze sammeln, Wasser schöpfen, in die Tröge der Wiese bringen (mitwachsen-chores.ts)
   if (chore(s, world, tx, ty, events)) return;
   // Regeln der Welten aus ihren Paketen: etwa ein Schneehaufen, der um eine Kugel wächst (worlds/eis/mitwachsen-snowman.ts)
   const move = { here: world.cell(p.x, p.y), walks: canStep(world, s.openGates, p.x, p.y, tx, ty) };

@@ -2,6 +2,8 @@
 // (src/scripts/games/worlds/hoehle/) liest diese Daten; es wird nachgeladen.
 // Konzept: docs/games/mitwachsen.md (Höhlenwelt) · Spec: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
 
+import { SHROOM_COLORS } from '../../mitwachsen-hoehle';
+
 /**
  * Die Grotte: eine große, oben offene Höhle hinter dem Höhlentor. Lagen quer zum Gang (`across`, links negativ) und vom
  * Tor weg (`out`), gemessen von der Mündung aus (dem inneren Rand der Klippen, wo der Gang hereinkommt).
@@ -39,15 +41,21 @@ export const GROTTE = {
   shaft: { r: 2.5, light: 0.35 },
   /** Kristalle und Leuchtpilze machen ihr Feld und die acht Nachbarn so viel heller */
   glow: 0.15,
-  /** Pilzgarten links: Mooswiese mit kleinen Leuchtpilzen (die Beete kommen mit dem Sammeln) */
-  garden: { across: -24, out: 47, r: 10 },
+  /**
+   * Pilzgarten links: Mooswiese mit kleinen Leuchtpilzen und `beds` Beeten (je drei Leuchtpilze zum Sammeln) im Kreis
+   * mit Radius `ring` um seine Mitte
+   */
+  garden: { across: -24, out: 47, r: 10, beds: 6, ring: 5 },
   /**
    * Kristallhalle rechts: fünf geschliffene Säulen in einer Reihe (`columns`, Höhen 2 bis 5, je zwei Felder Abstand),
    * dahinter der Kristallbogen (fünf Felder breit), ringsum hohe Kristalle
    */
   hall: { across: 25, out: 57, r: 12, columns: [2, 3, 5, 4, 3], arch: 8 },
-  /** Tropfsteingrotte in der Mitte: Stalagmiten in drei Höhen, dazu ein Felsbecken 3 × 2 mit Moosrand */
-  drip: { across: 0, out: 88, r: 11 },
+  /**
+   * Tropfsteingrotte in der Mitte: Stalagmiten in drei Höhen, dazu ein Felsbecken 3 × 2 mit Moosrand (`basin`: seine Mitte,
+   * quer von der Mitte der Zone); hinten über dem Becken die Tropfquelle, auf dem Rand ringsum Tropfmoos
+   */
+  drip: { across: 0, out: 88, r: 11, basin: -6 },
   /** Stiller See hinten: flaches Wasser (Ellipse), ein Steg zur Kristallinsel (Radius `isle`) in seiner Mitte */
   lake: { across: 0, out: 118, rx: 13, ry: 8, isle: 2.5 },
   /** Geröllhang seitlich am See: drei Stufen (Höhe 2, 3, 4), jede `step` Felder tief */
@@ -71,7 +79,7 @@ export const GROTTE_COLORS = {
   bands: ['#f0ecfa', '#d6d2e6', '#e6e2f2', '#ccc8de'],
   floor: ['#d6d2e6', '#e6e2f2'],
   crystals: ['#b48cf0', '#6fd6f0', '#f08cc8'],
-  shrooms: ['#f08cc8', '#6fd6f0', '#ffe08a'],
+  shrooms: SHROOM_COLORS,
   moss: ['#6f9a4a', '#86b45a'],
   wood: ['#8a5a34', '#a8723f'],
   roof: ['#8d86a8', '#a59fbf'],

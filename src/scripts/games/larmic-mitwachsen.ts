@@ -41,7 +41,7 @@ import { PACK_IDS, Packs, type LoadedPack } from './mitwachsen-packs';
 import { glimpse, sandbox } from './mitwachsen-dev';
 import { randomId, randomSeed, savedOrNew, showName } from './mitwachsen-world-list';
 import { platformLift, portalColor } from './mitwachsen-portal';
-import { HOME_STAGGER, SNAP_DELAY, hopOf, snaps } from './mitwachsen-gait';
+import { HOME_STAGGER, SNAP_DELAY, hopOf, nibblers, snaps } from './mitwachsen-gait';
 import { windAt } from './mitwachsen-weather';
 import { Air, postures, stepSound } from './mitwachsen-air';
 import { heldTired, restPose, type Pose } from './mitwachsen-tired';
@@ -337,6 +337,9 @@ class LarmicMitwachsen extends HTMLElement {
     this.lift();
     if (events.length) this.react(events);
     if (cmd.type === 'tick') this.ageTired();
+    // Moosfresser naschen selbst am Tropfmoos (Schnapp-Hüpfer ohne Zutun des Kinds)
+    if (cmd.type === 'tick')
+      for (const id of nibblers(state, (x, y) => this.world.cell(x, y))) this.hops.set(`snap:${id}`, performance.now());
     if (performance.now() - this.lastSave > SAVE_EVERY_MS) this.save();
   }
 
@@ -726,7 +729,7 @@ class LarmicMitwachsen extends HTMLElement {
       b.z += (z - b.z) * Math.min(1, dt * 14);
       const moving = Math.min(1, Math.hypot(tx - b.x, ty - b.y));
       const sung = now - (this.hops.get(id) ?? -1e9);
-      const snapped = now - (this.hops.get(`snap:${id}`) ?? -1e9); // Schnapp-Hüpfer der Fischfresser beim Füttern
+      const snapped = now - (this.hops.get(`snap:${id}`) ?? -1e9); // Schnapp-Hüpfer beim Füttern (Fisch-, Pilz- und Moosfresser) und beim Naschen am Tropfmoos
       b.hop = snap ? 0 : hopOf(id, moving, sung, snapped); // je Gangart der Art (watscheln, robben, hüpfen …)
       b.puff = pose?.puff ?? 1;
       this.bodies.set(id, b);
@@ -745,8 +748,9 @@ class LarmicMitwachsen extends HTMLElement {
     if (e.type === 'icicle')
       return this.burst('', SPARKS.eis, 6, { x: e.x, y: e.y - 0.35, z: this.world.cell(e.x, e.y).h }, true);
     if (e.type === 'regrow') return;
-    if (e.type === 'pick' || e.type === 'catch' || e.type === 'fill' || e.type === 'snowman') {
-      // Die Figur hüpft vor Freude: Beeren springen heraus, Fische platschen, beim Schöpfen spritzen Tropfen, Schnee stiebt
+    if (e.type === 'pick' || e.type === 'catch' || e.type === 'gather' || e.type === 'fill' || e.type === 'snowman') {
+      // Die Figur hüpft vor Freude: Beeren springen heraus, Fische platschen, Leuchtpilze hüpfen in den Korb, beim
+      // Schöpfen spritzen Tropfen, Schnee stiebt
       if (e.type !== 'snowman') this.sfx[e.type]();
       this.hops.set('player', now);
       this.burst('player', SPARKS[e.type === 'snowman' ? 'snow' : e.type], 12);
@@ -755,11 +759,12 @@ class LarmicMitwachsen extends HTMLElement {
     }
     // Alle Tiere der Wiese hüpfen und bekommen ein Herz
     this.sfx[e.type === 'feed' ? 'feed' : 'pour']();
-    const fish = e.type === 'feed' && e.food === 'fish'; // silberne und goldgelbe Funken, Fischfresser schnappen zu
+    // Fischfresser schnappen nach Fisch, Pilzfresser naschen Pilze, Moosfresser am Tropfmoos des Steintrogs
+    const food = e.type === 'feed' ? e.food : 'water';
     this.burst('player', SPARKS[e.type === 'feed' ? e.food : 'pour'], 16);
     e.ids.forEach((id, i) => {
       this.hops.set(id, now);
-      if (fish && snaps(id)) this.hops.set(`snap:${id}`, now + SNAP_DELAY);
+      if (snaps(id, food)) this.hops.set(`snap:${id}`, now + SNAP_DELAY);
       this.float('heart', id, GAME_COLORS.heart, now + 100 + i * 60);
     });
   }

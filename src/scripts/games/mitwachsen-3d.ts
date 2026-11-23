@@ -43,14 +43,12 @@ import {
   SPECIES,
   THEME_COLORS,
   figureParts,
-  BASKET_PARTS,
-  BUCKET_PARTS,
   BOOK_PARTS,
   SLEEPY_EYES,
   type GateId,
   type Look,
 } from '../../data/games/mitwachsen';
-import { FISH_PARTS } from '../../data/games/mitwachsen-eis';
+import { carried, carryKey } from './mitwachsen-carry';
 import { Geo, atlas, snapToShadowTexel, type Tile, type V3 } from './mitwachsen-geo';
 import { grown } from './mitwachsen-growth';
 import type { Parts } from './mitwachsen-gatehouse';
@@ -900,16 +898,15 @@ export class World3D {
       m.rotation.y = id === 'player' && sc.pose !== 'stand' ? facing : YAW[dir];
     };
     if (!state.sleeping && !state.ride) {
-      // Korb auf dem Rücken, Eimer und Netz in den Händen, Buch beim Lesen; beim Lesen schaut die Figur zum Betrachter
+      // Korb auf dem Rücken, Eimer (Kanne) und Netz in den Händen, Buch beim Lesen; beim Lesen schaut die Figur zum Betrachter
       const book = sc.pose !== 'stand';
       const doze = sc.pose === 'doze';
       const turning = sc.pose === 'read' && !sc.reduced && sc.now % 5000 < 450; // alle paar Sekunden umblättern
-      const key = `player${state.basket ? '-basket' : ''}${state.bucket ? '-bucket' : ''}${state.fish ? '-fish' : ''}${book ? '-book' : ''}${turning ? '-turn' : ''}${doze ? '-doze' : ''}${sc.glance ? '-glance' : ''}`;
+      const cave = this.world?.realm(state.player.x, state.player.y) === 'hoehle'; // in der Grotte trägt sie eine Kanne
+      const key = `player${carryKey(state, cave)}${book ? '-book' : ''}${turning ? '-turn' : ''}${doze ? '-doze' : ''}${sc.glance ? '-glance' : ''}`;
       const parts = [
         ...(sc.glance ? turnHead(figureParts(this.look)) : figureParts(this.look)), // Kopf kurz in die Böe gedreht
-        ...(state.basket ? BASKET_PARTS : []),
-        ...(state.bucket ? BUCKET_PARTS : []),
-        ...(state.fish ? FISH_PARTS : []),
+        ...carried(state, cave),
         ...(book ? BOOK_PARTS(this.look, turning) : []),
         ...(doze ? SLEEPY_EYES(this.look) : []),
       ];

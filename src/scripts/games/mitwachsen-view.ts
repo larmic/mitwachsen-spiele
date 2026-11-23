@@ -133,6 +133,8 @@ const PACKED: ReadonlySet<Deco> = new Set<Deco>([
   'fishcrate',
   'snowheap',
   'shroombowl',
+  'shroombed',
+  'dripspring',
   'stonetrough',
   'shed',
   'cavelamp',

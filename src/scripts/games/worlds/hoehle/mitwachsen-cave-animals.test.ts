@@ -8,6 +8,10 @@ import { initialState, step, type State } from '../../mitwachsen-state';
 import { meadowSpots } from '../../mitwachsen-meadow';
 import { HANG_LABEL, hangAt, labelHeight, perchesOf, roostAt } from '../../mitwachsen-roost';
 import { slots } from '../../mitwachsen-album';
+import { full } from '../../mitwachsen-guide';
+import { DIRS, type Dir } from '../../../../lib/games/front';
+import { CAVE_FOOD } from '../../../../data/games/mitwachsen-hoehle';
+import { snaps } from '../../mitwachsen-gait';
 import { attachPack } from '../../mitwachsen-state';
 import type { KesselPlace } from '../../mitwachsen-pack-types';
 import { kesselPlace } from '../../mitwachsen-world';
@@ -117,6 +121,45 @@ describe('Höhlen-Tiere: Wohnorte in der Grotte', () => {
     }
     const [bx, by] = w.homes.hoehle.bed;
     for (const a of home) expect(cheb(a.x, a.y, bx, by), a.id).toBeLessThanOrEqual(GROTTE.flat + 1);
+  });
+});
+
+describe('Sammeln in der Grotte: Futter und „fertig“', () => {
+  const species = Object.keys(CAVE_SPECIES) as (keyof typeof CAVE_SPECIES)[];
+  const garden = species.map((sp) => ({ id: animalId('hoehle', sp), species: sp }));
+
+  it('„fertig“ heißt wie überall: von jeder der acht Arten wohnt eines zu Hause', () => {
+    expect(full({ garden }, hoehle)).toBe(true);
+    for (const sp of species) expect(full({ garden: garden.filter((g) => g.species !== sp) }, hoehle), sp).toBe(false);
+    // ein zweites Tier derselben Art ersetzt keine fehlende
+    const twice = [...garden.slice(1), { id: animalId('hoehle', 'dachs', 1), species: 'dachs' as const }];
+    expect(full({ garden: twice }, hoehle)).toBe(false);
+  });
+
+  it('Pilze in die Pilzschale am Höhlenbett: alle acht Tiere der Mooswiese freuen sich, die Pilzfresser naschen; am Steintrog die Moosfresser', () => {
+    const w = worldOf(1, CAVE);
+    const s0 = initialState(w, { garden });
+    const into = (target: readonly [number, number], hands: Partial<State>) => {
+      for (const [dir, [dx, dy]] of Object.entries(DIRS) as [Dir, readonly [number, number]][]) {
+        const at = [target[0] - dx, target[1] - dy] as const;
+        const c = w.cell(...at);
+        if (c.solid || c.ground === 'water' || s0.animals.some((a) => a.x === at[0] && a.y === at[1])) continue;
+        const s: State = { ...s0, ...hands, sleeping: false, wokeAt: -1e9, player: { x: at[0], y: at[1], dir } };
+        return step(s, w, { type: 'move', dir }).events;
+      }
+      throw new Error('kein Platz neben dem Trog');
+    };
+    const home = w.homes.hoehle;
+    const fed = into(home.food, { shrooms: true }).find((e) => e.type === 'feed');
+    expect(fed && fed.type === 'feed' && fed.food).toBe('pilze');
+    const ids = fed?.type === 'feed' ? [...fed.ids].sort() : [];
+    expect(ids).toEqual(garden.map((g) => g.id).sort());
+    expect(ids.filter((id) => snaps(id, 'pilze')).length).toBe(4);
+    const poured = into(home.water, { bucket: true }).find((e) => e.type === 'pour');
+    const drink = poured?.type === 'pour' ? poured.ids : [];
+    expect(drink.filter((id) => snaps(id, 'water')).map((id) => CAVE_FOOD[id.split(':')[1] as 'dachs'])).toEqual(
+      Array(4).fill('tropfmoos'),
+    );
   });
 });
 

@@ -108,6 +108,10 @@ export class Sfx {
     this.note(196, 0.1, 'sine', 0.1, 0.6);
     this.note(1046.5, 0.08, 'sine', 0.08, 1.3, 0.12);
   }
+  /** Leuchtpilze sammeln: drei kleine Hüpfer hinauf (G5, A5, C6), einer je Pilz, der in den Korb springt */
+  gather() {
+    [783.99, 880, 1046.5].forEach((f, i) => this.note(f, 0.06, 'sine', 0.08, 1.25, i * 0.08));
+  }
   /** Futter im Trog: fröhliche, hüpfende Töne */
   feed() {
     [523.25, 659.25, 587.33, 783.99, 659.25, 1046.5].forEach((f, i) =>

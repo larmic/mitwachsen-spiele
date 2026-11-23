@@ -4,9 +4,9 @@
 // in den zart lila-grauen Schichten des Höhlentors; der Gang ist der einzige Zugang. Von der Mündung aus: der Lampengang
 // mit Kristall-Lampen links und rechts, der freie Platz für den Bahnhof Fledermaus und daneben für den Lokschuppen (beide
 // kommen mit dem Zug), das Höhlenbett unter dem ersten Lichtschacht mit Mooswiese, Pilzschale, Steintrog und dem
-// Unterstand dahinter (vorn offen, seine Rückwand ist die Kristallwand), links der Pilzgarten mit Leuchtpilzen, rechts die Kristallhalle (zweiter Lichtschacht, fünf
-// Kristallsäulen, der Kristallbogen), in der Mitte die Tropfsteingrotte mit Stalagmiten in drei Höhen und einem
-// Felsbecken, hinten der stille See mit Steg zur Kristallinsel (dritter Lichtschacht), daneben der Geröllhang in drei
+// Unterstand dahinter (vorn offen, seine Rückwand ist die Kristallwand), links der Pilzgarten mit Leuchtpilzen und sechs
+// Pilzbeeten, rechts die Kristallhalle (zweiter Lichtschacht, fünf Kristallsäulen, der Kristallbogen), in der Mitte die
+// Tropfsteingrotte mit Stalagmiten in drei Höhen und einem Felsbecken samt Tropfquelle und Tropfmoos, hinten der stille See mit Steg zur Kristallinsel (dritter Lichtschacht), daneben der Geröllhang in drei
 // Stufen und ganz am Ende die Plattform des Portals `hoehlensee` (schläft noch), ihr Gegenstück im Kreis um das Bett.
 // Licht ohne Punktlichter: Unter den Schächten und neben Kristallen und Leuchtpilzen ist der Boden heller (`Cell.light`).
 // Lagen rechnen von der Mündung aus. Teil des Welt-Pakets der Höhlenwelt (index.ts), nachgeladen.
@@ -196,7 +196,7 @@ function keepFree(site: Site, bed: Point, ring: Point) {
     if (shedAt(u, v) || shedAt(u + 1, v) || shedAt(u - 1, v)) return true;
     if (near(u, v, [garden.across, garden.out], garden.r)) return true;
     if (box(u, v, [hall.across, hall.out + 2], 7, 9)) return true; // Säulen und Bogen mit Platz ringsum
-    if (near(u, v, [GROTTE.drip.across - 6, GROTTE.drip.out], 4)) return true; // Felsbecken
+    if (near(u, v, [GROTTE.drip.across + GROTTE.drip.basin, GROTTE.drip.out], 4)) return true; // Felsbecken
     const [lu, lv] = fromMouth([lake.across, lake.out]);
     if (((u - lu) / (lake.rx + 3)) ** 2 + ((v - lv) / (lake.ry + 3)) ** 2 < 1) return true;
     if (box(u, v, [scree.across + 1, scree.out], 9, scree.half + 2)) return true;
@@ -208,8 +208,9 @@ function keepFree(site: Site, bed: Point, ring: Point) {
 type Put = (p: readonly [number, number], c: Cell) => void;
 
 /**
- * Die Zonen mit ihren festen Dingen: Kristall-Lampen im Lampengang, Pilzgarten (Mooswiese), Kristallsäulen und
- * Kristallbogen in der Halle, Felsbecken mit Moosrand, stiller See mit Steg und Kristallinsel, Geröllhang in drei Stufen
+ * Die Zonen mit ihren festen Dingen: Kristall-Lampen im Lampengang, Pilzgarten (Mooswiese mit den Pilzbeeten),
+ * Kristallsäulen und Kristallbogen in der Halle, Felsbecken mit Tropfquelle und Tropfmoos auf dem Moosrand, stiller See
+ * mit Steg und Kristallinsel, Geröllhang in drei Stufen
  */
 function features(site: Site, map: Map<string, Cell>) {
   const put: Put = (p, c) => {
@@ -224,17 +225,38 @@ function features(site: Site, map: Map<string, Cell>) {
   for (let dv = -garden.r; dv <= garden.r; dv++)
     for (let du = -garden.r; du <= garden.r; du++)
       if (Math.hypot(du, dv) <= garden.r) put([garden.across + du, garden.out + dv], moss());
+  for (const [du, dv] of bedSpots())
+    put([garden.across + du, garden.out + dv], { ...moss(), deco: 'shroombed', solid: true });
   hallOf(put);
-  // Felsbecken 3 × 2 mit Moosrand
+  // Felsbecken 3 × 2 mit Moosrand: hinten die Tropfquelle (fest), auf dem Rand an den Seiten und hinten Tropfmoos
+  // (begehbar), vorn bleibt Moos, von dort schöpft man
   for (let dv = -2; dv <= 1; dv++)
-    for (let du = -2; du <= 2; du++)
-      put([drip.across - 6 + du, drip.out + dv], Math.abs(du) <= 1 && dv >= -1 && dv <= 0 ? water() : moss());
+    for (let du = -2; du <= 2; du++) {
+      const p = [drip.across + drip.basin + du, drip.out + dv] as const;
+      if (Math.abs(du) <= 1 && dv >= -1 && dv <= 0) put(p, water());
+      else if (dv === 1 && du === 0) put(p, { ...moss(), deco: 'dripspring', solid: true });
+      else put(p, dv >= -1 ? { ...moss(), deco: 'dripmoss' } : moss());
+    }
   lakeOf(put);
   // Geröllhang: drei Stufen nach außen, jede eine Ebene höher (2, 3, 4)
   for (let s = 0; s < 3; s++)
     for (let du = 0; du < scree.step; du++)
       for (let dv = -scree.half; dv <= scree.half; dv++)
         put([scree.across - scree.step + s * scree.step + du, scree.out + dv], { ...floor(2 + s), ground: 'stone' });
+}
+
+/**
+ * Lagen der Pilzbeete [quer, vom Tor weg] von der Mitte des Pilzgartens: `GROTTE.garden.beds` Beete gleichmäßig im Kreis
+ * mit Radius `ring` (je drei Leuchtpilze zum Sammeln; einzeln, mit freiem Moos ringsum)
+ */
+export function bedSpots(): Point[] {
+  const { beds, ring } = GROTTE.garden;
+  // symmetrisch runden (2,5 wie −2,5 vom Nullpunkt weg; das Epsilon fängt 2,4999… aus sin und cos), + 0: ohne −0
+  const round = (v: number) => Math.sign(v) * Math.round(Math.abs(v) + 1e-9) + 0;
+  return Array.from({ length: beds }, (_, i) => {
+    const a = ((i + 0.5) / beds) * 2 * Math.PI;
+    return [round(Math.cos(a) * ring), round(Math.sin(a) * ring)] as Point;
+  });
 }
 
 /** Kristallhalle: fünf Säulen in einer Reihe (je ein Feld dazwischen), dahinter der Kristallbogen, am Rand hohe Kristalle */
@@ -410,7 +432,11 @@ function light(realm: ReadonlySet<string>, at: (p: readonly [number, number]) =>
   const shafts = GROTTE.shafts.map(at);
   const lit = new Map<string, number>();
   const glows = (c: Cell) =>
-    c.deco === 'crystal' || c.deco === 'glowshroom' || c.deco === 'column' || c.deco === 'cavelamp';
+    c.deco === 'crystal' ||
+    c.deco === 'glowshroom' ||
+    c.deco === 'shroombed' ||
+    c.deco === 'column' ||
+    c.deco === 'cavelamp';
   for (const k of realm) {
     const c = map.get(k);
     if (!c) continue;

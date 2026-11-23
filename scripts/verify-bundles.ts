@@ -74,14 +74,15 @@ export const RULES: Rule[] = [
     name: 'Welt-Paket Höhle',
     pages: /^spielen\/index\.html$/,
     parts: [
-      // Kristallgrotte (Lage, Gelände, Zuhause, Licht, Portal am See, Fundorte der Höhlen-Tiere), Zeichenteile der
-      // 2D-Ansicht und Modelle der Höhlen-Tiere; nur der Entwickler-Schalter holt sie (das Höhlentor geht vorerst nie auf)
+      // Kristallgrotte (Lage, Gelände, Zuhause, Licht, Portal am See, Fundorte der Höhlen-Tiere, Pilzbeete, Tropfquelle,
+      // Tropfmoos), Zeichenteile der 2D-Ansicht und Modelle der Höhlen-Tiere; nur der Entwickler-Schalter holt sie (das
+      // Höhlentor geht vorerst nie auf)
       { chunks: /\/welt-hoehle\.[\w-]+\.js$/ },
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Welt
       { chunks: /\/welt-hoehle-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-hoehle)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 17 901 Bytes (17,5 KB)
-    budget: 19.5 * 1024,
+    // Gemessen 19 582 Bytes (19,1 KB)
+    budget: 21.5 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

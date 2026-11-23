@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest';
+import { GOLD } from './mitwachsen-portals';
 import { REGIONS, SPECIES, WILD_SPECIES, speciesOf } from './mitwachsen';
-import { CAVE_SPECIES, type CaveSpeciesId } from './mitwachsen-hoehle';
-import { ARCH_PERCH, CAVE_ANIMALS, CAVE_FOOD } from './worlds/hoehle/mitwachsen-cave-animals';
+import {
+  CAVE_FOOD,
+  CAVE_SPECIES,
+  JUG_PARTS,
+  MOSS_EATERS,
+  SHROOM_BASKET_PARTS,
+  SHROOM_COLORS,
+  SHROOM_EATERS,
+  type CaveSpeciesId,
+} from './mitwachsen-hoehle';
+import { ARCH_PERCH, CAVE_ANIMALS } from './worlds/hoehle/mitwachsen-cave-animals';
 import { BAT_ROOST, CAVE_MODELS } from './worlds/hoehle/mitwachsen-cave-models';
-import { GROTTE } from './worlds/hoehle/mitwachsen-grotte';
+import { GROTTE, GROTTE_COLORS } from './worlds/hoehle/mitwachsen-grotte';
 
 const IDS = Object.keys(CAVE_SPECIES) as CaveSpeciesId[];
 const hoehle = REGIONS.find((r) => r.id === 'hoehle')!;
@@ -76,6 +86,18 @@ describe('Tiere der Höhlenwelt', () => {
     expect(Object.keys(CAVE_FOOD)).toEqual(IDS);
     const shrooms = IDS.filter((id) => CAVE_FOOD[id] === 'pilze');
     expect(shrooms).toEqual(['maulwurf', 'dachs', 'siebenschlaefer', 'murmeltier']);
+    expect([...SHROOM_EATERS]).toEqual(shrooms);
+    expect([...MOSS_EATERS]).toEqual(IDS.filter((id) => !shrooms.includes(id)));
+  });
+
+  it('Leuchtpilze in Rosa, Türkis und Gelb, gleich im Korb, im Beet und in der Schale; Korb und Kanne ohne Gold', () => {
+    expect(SHROOM_COLORS).toEqual(['#f08cc8', '#6fd6f0', '#ffe08a']);
+    expect(GROTTE_COLORS.shrooms).toBe(SHROOM_COLORS);
+    const colors = (parts: typeof JUG_PARTS) => parts.flatMap((p) => p.slice(6));
+    for (const c of SHROOM_COLORS) expect(colors(SHROOM_BASKET_PARTS)).toContain(c);
+    const gold: unknown[] = Object.values(GOLD);
+    expect([...colors(SHROOM_BASKET_PARTS), ...colors(JUG_PARTS)].filter((c) => gold.includes(c))).toEqual([]);
+    expect(colors(JUG_PARTS)).toContain(GROTTE_COLORS.water[0]); // Tropfwasser oben in der Kanne
   });
 
   it('Fundorte (im Welt-Paket) wie im Konzept, in der Reihe der Leiste und innerhalb der Grotte; der Kern kennt keinen', () => {

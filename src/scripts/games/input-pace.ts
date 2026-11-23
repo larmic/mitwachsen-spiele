@@ -43,6 +43,7 @@ export const ENCOUNTERS: ReadonlySet<Key> = new Set<Key>([
   'follow',
   'pick',
   'catch',
+  'gather',
   'fill',
   'feed',
   'pour',

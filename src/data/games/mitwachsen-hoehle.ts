@@ -1,10 +1,48 @@
 // Höhlenwelt von Mitwachsen, was alle brauchen (Leiste, Album, Arten, Ansicht): die acht Höhlen-Tiere (Name, Ton,
-// Gangart). Wohnorte, Futter und Modelle der Tiere braucht nur das Welt-Paket der Höhlenwelt:
+// Gangart, Futter), Farben der Leuchtpilze, der Korb mit Leuchtpilzen und die Kanne mit Tropfwasser, die die Figur
+// trägt. Wohnorte und Modelle der Tiere braucht nur das Welt-Paket der Höhlenwelt:
 // src/data/games/worlds/hoehle/mitwachsen-cave-animals.ts und mitwachsen-cave-models.ts. Die Gegend steht in `REGIONS`
 // (Gegend 'hoehle'), ihr Zuhause in `HOMES.hoehle`.
 // Konzept: docs/games/mitwachsen.md (Höhlenwelt) · Spec: docs/specs/mitwachsen.md (Abschnitt „Die Höhlen-Tiere“)
 
+import type { Part } from '../../lib/games/front';
 import type { SpeciesOf } from './mitwachsen-species';
+
+/**
+ * Kleine Leuchtpilze in Rosa, Türkis und Gelb: in den Beeten des Pilzgartens, im Korb der Figur, in der Pilzschale. Die
+ * übrigen Farben der Grotte (`GROTTE_COLORS`) braucht nur ihr Welt-Paket
+ */
+export const SHROOM_COLORS = ['#f08cc8', '#6fd6f0', '#ffe08a'] as const;
+const STEM = '#efe4d2'; // Stiel der Leuchtpilze
+
+/** Korb mit Leuchtpilzen auf dem Rücken (nach dem Sammeln am Beet, bis zur Pilzschale); der Korb wie bei den Beeren */
+export const SHROOM_BASKET_PARTS: Part[] = [
+  [-0.33, -0.17, 0.38, 0.21, 0.34, 0.3, '#b0803c', '#c9984e'], // Korb aus Weide
+  [-0.335, -0.175, 0.47, 0.22, 0.35, 0.03, '#8a5f2a'], // Flechtband
+  [-0.335, -0.175, 0.6, 0.22, 0.35, 0.03, '#8a5f2a'],
+  [-0.12, -0.15, 0.7, 0.25, 0.04, 0.03, '#8a5f2a'], // Riemen über den Schultern
+  [-0.12, 0.11, 0.7, 0.25, 0.04, 0.03, '#8a5f2a'],
+  [-0.27, -0.11, 0.68, 0.03, 0.03, 0.07, STEM], // drei Stiele, darauf die Hüte in den drei Farben
+  [-0.23, 0.0, 0.68, 0.03, 0.03, 0.09, STEM],
+  [-0.2, -0.07, 0.68, 0.03, 0.03, 0.05, STEM],
+  [-0.3, -0.14, 0.75, 0.09, 0.09, 0.04, SHROOM_COLORS[0], SHROOM_COLORS[0]],
+  [-0.26, -0.03, 0.77, 0.09, 0.09, 0.04, SHROOM_COLORS[1], SHROOM_COLORS[1]],
+  [-0.23, -0.1, 0.73, 0.09, 0.09, 0.04, SHROOM_COLORS[2], SHROOM_COLORS[2]],
+];
+
+/** Kanne aus hellem Stein mit Tropfwasser in der rechten Hand (in der Grotte statt des Eimers; bis zum Steintrog) */
+export const JUG_PARTS: Part[] = [
+  [-0.1, 0.27, 0.06, 0.2, 0.2, 0.2, '#9a96b0', '#b8b4cc'], // bauchige Kanne
+  [-0.08, 0.29, 0.26, 0.16, 0.16, 0.03, '#b8b4cc', '#5fc8d8'], // Hals, oben Wasser
+  [0.1, 0.33, 0.16, 0.05, 0.06, 0.04, '#9a96b0'], // Tülle nach vorn
+  [-0.14, 0.34, 0.1, 0.04, 0.05, 0.14, '#8d86a8'], // Henkel hinten
+];
+
+/** Funken beim Sammeln (Leuchtpilze hüpfen in den Korb) und beim Füttern mit Pilzen */
+export const SHROOM_SPARKS = {
+  gather: [...SHROOM_COLORS, '#ffffff'],
+  feed: [...SHROOM_COLORS, '#ffd47e'],
+} as const;
 
 /** Die acht Arten der Höhlenwelt, in der Reihenfolge der Leiste (der Maulwurf zieht später als erster ein) */
 export type CaveSpeciesId =
@@ -91,3 +129,25 @@ export const CAVE_SPECIES: { [K in CaveSpeciesId]: SpeciesOf<K> } = {
     parts: [], // Modell aus dem Welt-Paket der Höhlenwelt (CAVE_MODELS)
   },
 };
+
+/**
+ * Futter je Art (Konzept „Sammeln“): Leuchtpilze aus dem Pilzgarten in der Pilzschale (`pilze`) oder Tropfmoos (`tropfmoos`),
+ * das an der Tropfquelle und am Rand des Steintrogs wächst und an dem die Tiere selbst naschen
+ */
+export const CAVE_FOOD: Readonly<Record<CaveSpeciesId, 'pilze' | 'tropfmoos'>> = {
+  maulwurf: 'pilze',
+  dachs: 'pilze',
+  grottenolm: 'tropfmoos',
+  eidechse: 'tropfmoos',
+  siebenschlaefer: 'pilze',
+  fledermaus: 'tropfmoos',
+  murmeltier: 'pilze',
+  gluehwuermchen: 'tropfmoos',
+};
+
+const eaters = (food: 'pilze' | 'tropfmoos'): ReadonlySet<string> =>
+  new Set(Object.entries(CAVE_FOOD).flatMap(([id, f]) => (f === food ? [id] : [])));
+/** Pilzfresser: Sie naschen beim Füttern mit Pilzen zusätzlich (Schnapp-Hüpfer wie die Fischfresser) */
+export const SHROOM_EATERS = eaters('pilze');
+/** Moosfresser: Wird der Steintrog gefüllt, naschen sie am frischen Tropfmoos an seinem Rand (Schnapp-Hüpfer) */
+export const MOSS_EATERS = eaters('tropfmoos');
