@@ -6,7 +6,13 @@ import { eyes, type Part } from '../../lib/games/front';
 import { ICE_SPECIES, type IceSpeciesId } from './mitwachsen-eis';
 import type { SpeciesOf } from './mitwachsen-species';
 
-export type RegionId = 'lichtung' | 'eis';
+/**
+ * Die Gegenden, in fester Reihenfolge: zuerst die Lichtung, dann die Welten hinter ihren Toren (Eis-Welt, Höhlenwelt).
+ * Eine neue Gegend kommt hier dazu; TypeScript verlangt dann ihren Eintrag überall, wo es je Gegend etwas gibt (Zuhause
+ * in mitwachsen-homes.ts, Wohnorte, Verteilen).
+ */
+export const REGION_IDS = ['lichtung', 'eis', 'hoehle'] as const;
+export type RegionId = (typeof REGION_IDS)[number];
 export type SpeciesId =
   | 'hase'
   | 'igel'
@@ -52,7 +58,7 @@ export type Gate = {
   region: RegionId; // Gegend, in der das Tor steht
   leadsTo: string; // was dahinter liegt (kommt später)
   theme: GateTheme; // Blöcke oben auf dem Tor verraten, worum es dahinter geht
-  /** Wann das Tor aufgeht: nie, oder wenn das Tier dieser Art es aufschließt (Schlüssel) */
+  /** Wann das Tor aufgeht: nie, oder wenn sein Bote es aufschließt (`key`, der Schlüssel; je Tor einer, `keyOf`) */
   opens: 'never' | { key: SpeciesId };
   sign?: Point; // Tafel mit den Tieren der Gegend (noch keine)
 };
@@ -84,7 +90,8 @@ export function regionAnimalList(region: Region): { id: string; species: Species
 /**
  * Am Anfang gibt es nur die Lichtung mit dem Bett. Ringsum Felsen mit acht großen Toren, die vorerst zu sind.
  * Dahinter liegen die Welten der Tore als endlose Landschaft. Hinter dem Eistor liegt die Eis-Welt, ein Gletscherkessel
- * mit eigenem Zuhause und zehn eigenen Tierarten (noch unerreichbar, solange das Tor zu ist).
+ * mit eigenem Zuhause und zehn eigenen Tierarten (noch unerreichbar, solange das Tor zu ist). Hinter dem Höhlentor
+ * entsteht die Höhlenwelt (noch ohne Paket und ohne Tiere).
  */
 export const REGIONS: readonly [Region & { shape: { rx: number; ry: number } }, ...Region[]] = [
   {
@@ -115,6 +122,15 @@ export const REGIONS: readonly [Region & { shape: { rx: number; ry: number } }, 
     herd: 5, // zehn Arten, je fünf Tiere: das lange Tal ist fast so groß wie die Lichtung (gleiche Dichte)
     behind: 'eis',
   },
+  {
+    id: 'hoehle',
+    name: 'Höhlenwelt',
+    // Grotte hinter dem Höhlentor: Form, Wohnorte und Tiere kommen mit ihrem Welt-Paket (worlds/hoehle/). Bis dahin ohne
+    // Tiere; das Höhlentor geht nie auf, also baut die Welt dahinter nichts (mitwachsen-behind.ts)
+    animals: [],
+    herd: 4,
+    behind: 'hoehle',
+  },
 ];
 
 /**
@@ -132,6 +148,18 @@ export const GATES: readonly Gate[] = [
   { id: 'wolken', theme: 'wolken', kind: 'grosstor', region: 'lichtung', leadsTo: 'Wolkenwelt', opens: 'never' },
   { id: 'pilze', theme: 'pilze', kind: 'grosstor', region: 'lichtung', leadsTo: 'Pilzwald', opens: 'never' },
 ];
+
+/** Schlüssel eines Tors: die Art seines Boten, der es aufschließt; undefined, wenn es nie aufgeht */
+export function keyOf(gate: GateId): SpeciesId | undefined {
+  const opens = GATES.find((g) => g.id === gate)?.opens;
+  return opens && opens !== 'never' ? opens.key : undefined;
+}
+
+/** Das Tor, das der Bote dieser Art aufschließt (undefined: keines) */
+export const gateOfKey = (key: SpeciesId): GateId | undefined => GATES.find((g) => keyOf(g.id) === key)?.id;
+
+/** Gegend hinter einem Tor (undefined: dahinter liegt keine, nur die Landschaft seiner Welt) */
+export const regionBehind = (gate: GateId): Region | undefined => REGIONS.find((r) => r.behind === gate);
 
 // ---------- Tiere ----------
 

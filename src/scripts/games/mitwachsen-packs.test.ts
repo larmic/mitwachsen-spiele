@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SPECIES } from '../../data/games/mitwachsen';
 import { ICE_MODELS } from '../../data/games/worlds/eis/mitwachsen-ice-models';
-import { PACK_WAIT_MS, Packs, RETRY_MS, type LoadedPack } from './mitwachsen-packs';
+import { PACK_IDS, PACK_WAIT_MS, Packs, RETRY_MS, type LoadedPack } from './mitwachsen-packs';
 import type { Need } from './mitwachsen-pack';
+import { HINT_AFTER } from './mitwachsen-guide';
+import { plateMid } from './mitwachsen-plate';
+import { initialState, type State } from './mitwachsen-state';
 import { gatePlaces } from './mitwachsen-world';
-import { EIS_PACK } from './test-worlds';
+import { plateHint } from './worlds/eis/mitwachsen-plate-hint';
+import { EIS_PACK, worldOf } from './test-worlds';
 
 const gates = gatePlaces(1);
 const bed: Need = { openGates: [], garden: [], at: [[0, 0]] }; // Tor zu, Figur am Bett: kein Bedarf
@@ -114,6 +118,34 @@ describe('Welt-Pakete laden (Packs)', () => {
     SPECIES.robbe.parts = robbe;
   });
 
+  it('je Paket ein Lader: heute nur die Eis-Welt; jedes Paket lädt für sich, nur wenn sein Tor es braucht', async () => {
+    expect(PACK_IDS).toEqual(['eis']);
+    const asked: string[] = [];
+    const hoehle = { ...pack, id: 'hoehle', gate: 'hoehle' } as LoadedPack;
+    const packs = new Packs(
+      () => {},
+      (id) => (asked.push(id), Promise.resolve(id === 'eis' ? pack : hoehle)),
+      ['eis', 'hoehle'],
+    );
+    await packs.want(open, gates); // das Eistor ist offen: nur das Paket der Eis-Welt
+    expect(asked).toEqual(['eis']);
+    expect(packs.at('eis')).toBe(pack);
+    expect(packs.at('hoehle')).toBeUndefined();
+    const door = gates.get('hoehle')!;
+    await packs.want({ ...bed, at: [door.mid] }, gates); // nah am Höhlentor: nichts, es geht nie auf
+    expect(asked).toEqual(['eis']);
+    await packs.want({ ...bed, openGates: ['hoehle'] }, gates); // das Höhlentor ist offen: jetzt auch die Höhlenwelt
+    expect(asked).toEqual(['eis', 'hoehle']);
+    expect(packs.at('hoehle')).toBe(hoehle);
+    expect(packs.get('hoehle')).toBe(hoehle);
+  });
+
+  it('scheitert ein Paket, lädt das andere trotzdem; ohne Lader scheitert es still wie ein Netzfehler', async () => {
+    const packs = new Packs(() => {}, undefined, ['hoehle', 'eis']); // die Höhlenwelt hat keinen Lader
+    await packs.want({ ...open, openGates: ['eis', 'hoehle'] }, gates);
+    expect(packs.loaded.map((p) => p.id)).toEqual(['eis']);
+  });
+
   it('test-worlds.ts trägt beim Import die Modelle aller Eis-Tiere ein (Tests sehen sie nur über diesen Helfer)', () => {
     const ids = Object.keys(ICE_MODELS) as (keyof typeof ICE_MODELS)[];
     expect(ids).toHaveLength(10);
@@ -121,5 +153,78 @@ describe('Welt-Pakete laden (Packs)', () => {
       expect(SPECIES[id].parts, id).toBe(ICE_MODELS[id]);
       expect(SPECIES[id].parts.length, id).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('„Noch nicht“ über die Pakete (Packs.hint)', () => {
+  const w = worldOf(1);
+  const [x, y] = plateMid(w.gates.get('eis')!);
+  const base = initialState(w, {});
+  /** Wache Figur ohne Tiere auf (px, py), Takt `tick`, steht seit `still` Takten */
+  const at = (tick: number, still: number, [px, py] = [x, y]): State => ({
+    ...base,
+    sleeping: false,
+    animals: [],
+    player: { x: px, y: py, dir: 'n' },
+    tick,
+    still,
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+  /** Spielseite mit einem Eis-Paket, dessen Haken frisch ist (der des echten Pakets merkt sich, was er zeigte) */
+  async function setup() {
+    vi.useFakeTimers();
+    vi.stubGlobal('document', { querySelector: () => ({ textContent: '' }) }); // Live-Region des Spiels
+    let peeks = 0;
+    const own = { ...pack, view: { ...pack.view, hint: plateHint() } } as LoadedPack;
+    const packs = new Packs(
+      () => {},
+      () => Promise.resolve(own),
+    );
+    await packs.want(open, gates);
+    const sfx = { score: () => {} };
+    const ask = (s: State, now: number) => packs.hint(s, w, now, false, sfx, () => peeks++, null);
+    return { packs, ask, peeks: () => peeks };
+  }
+
+  it('ohne Paket: nichts', () => {
+    expect(new Packs(() => {}).hint(at(1, 0), w, 0, false, { score: () => {} }, () => {}, null)).toBeNull();
+  });
+
+  it('jeder geladene Haken wird je Bild gefragt, auch neben jeder Platte (er prüft seine Platte selbst)', async () => {
+    const asked: string[] = [];
+    const ask = (id: string, h: object) => () => (asked.push(id), h);
+    const eis = { ...pack, view: { ...pack.view, hint: ask('eis', {}) } } as LoadedPack;
+    const hoehle = { ...pack, id: 'hoehle', gate: 'hoehle', view: { hint: ask('hoehle', { id: 'hoehle' }) } };
+    const packs = new Packs(
+      () => {},
+      (id) => Promise.resolve(id === 'eis' ? eis : (hoehle as unknown as LoadedPack)),
+      ['eis', 'hoehle'],
+    );
+    await packs.want({ ...open, openGates: ['eis', 'hoehle'] }, gates);
+    const off = at(5, 0, [x + 9, y + 9]);
+    expect(packs.hint(off, w, 0, false, { score: () => {} }, () => {}, null)).toEqual({ id: 'hoehle' });
+    expect(asked).toEqual(['eis', 'hoehle']); // beide gefragt; was ein Tor zeigt, gewinnt
+  });
+
+  it('verlässt die Figur die Platte, während das Eistor zeigt, was fehlt, vergeht es von selbst (es bleibt im Bild)', async () => {
+    const { ask } = await setup();
+    ask(at(100, 0), 1000); // betreten: Das Bild wird geholt
+    await vi.dynamicImportSettled();
+    const shown = ask(at(100 + HINT_AFTER, HINT_AFTER), 2000);
+    expect(shown).toMatchObject({ id: 'eis', at: 2000 });
+    const off = ask(at(101 + HINT_AFTER, 0, [x + 9, y + 9]), 2100); // gleich weg von der Platte
+    expect(off).toBe(shown); // Umriss und Wackeln laufen weiter bis HINT_MS
+  });
+
+  it('was neben der Platte noch ausstand, verfällt: Zurück auf der Platte wartet es wieder die Sekunde', async () => {
+    const { ask, peeks } = await setup();
+    expect(ask(at(300, HINT_AFTER), 1000)?.at).toBeUndefined(); // fällig, das Bild ist noch unterwegs
+    ask(at(301, 0, [x + 9, y + 9]), 1100); // weg von der Platte, bevor es kam
+    await vi.dynamicImportSettled();
+    expect(ask(at(302, 0), 1200)?.at).toBeUndefined(); // zurück: nicht sofort
+    expect(peeks()).toBe(0);
   });
 });

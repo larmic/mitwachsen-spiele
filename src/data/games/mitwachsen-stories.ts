@@ -202,9 +202,18 @@ export const STORIES: Record<StoryId, Story> = {
   },
 };
 
-/** Was ein Klangstein erzählt: Ist das Eistor offen, erzählt der Stein davor die zweite Fassung der Eis-Geschichte */
+/**
+ * Zweite Fassung der Geschichte eines Tors, „Wenn das Tor offen ist“ (`<tor>-offen`, heute nur die Eis-Geschichte);
+ * undefined, wenn es keine gibt. Sie erzählen der Stein vor dem offenen Tor und der Stein am Bett der Welt dahinter.
+ */
+export function openStory(gate: GateId): StoryId | undefined {
+  const id = `${gate}-offen`;
+  return Object.hasOwn(STORIES, id) ? (id as StoryId) : undefined;
+}
+
+/** Was ein Klangstein erzählt: Ist sein Tor offen und hat es eine zweite Fassung, erzählt der Stein davor diese */
 export const told = (id: StoryId, open: readonly GateId[]): StoryId =>
-  id === 'eis' && open.includes('eis') ? 'eis-offen' : id;
+  (open.includes(id as GateId) && openStory(id as GateId)) || id;
 
 /** Wie lange eine Melodie dauert (s) */
 export const melodyLength = (m: Melody) => m.notes.reduce((t, [, len]) => t + len + m.gap, 0);

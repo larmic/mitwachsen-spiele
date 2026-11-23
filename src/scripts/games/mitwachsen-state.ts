@@ -18,7 +18,7 @@ import {
 } from '../../data/games/mitwachsen';
 import { STORIES, type StoryId } from '../../data/games/mitwachsen-stories';
 import { beyondRing, canStep, standHeight, type World } from './mitwachsen-world';
-import { packAt, wakeRealm } from './mitwachsen-pack';
+import { holds, wakeRealm } from './mitwachsen-pack';
 import { scatter, scatterArrivals } from './mitwachsen-scatter';
 import { canStay, wildAnimals } from './mitwachsen-wild';
 import { chore, regrow, type ChoreEvent } from './mitwachsen-chores';
@@ -193,9 +193,10 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     rideDue: -1,
     packs: { ...saved.packs }, // auch ohne Paket bleibt sein Zustand, wie er ist
   };
-  // Fehlt das Paket der Welt, zu der die Position gehört, wüsste die Welt nicht, ob die Figur dort war: Position behalten
-  if (saved.position && !world.spotsOf('eis').length && packAt(saved.position, world.gates, beyondRing))
-    s.held = [...saved.position];
+  // Fehlt das Paket der Welt, zu der die Position gehört (hinter einem Tor, das aufgehen kann), wüsste die Welt nicht,
+  // ob die Figur dort war: Position behalten
+  const pos = saved.position;
+  if (pos && REGIONS.some((r) => holds(world, r, pos, beyondRing))) s.held = [...pos];
   scatter(s, world, () => random(s)); // jeder Besuch: Die Tiere wohnen woanders
   syncWild(s, world);
   return s;

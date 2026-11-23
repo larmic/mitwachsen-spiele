@@ -11,7 +11,11 @@ import type { Dir, Projection } from '../../lib/games/front';
 import {
   GATES,
   REGIONS,
+  animalId,
+  gateOfKey,
+  keyOf,
   regionAnimalList,
+  regionBehind,
   type GateId,
   type Point,
   type Region,
@@ -24,7 +28,7 @@ import { PENGUIN, type Home } from './mitwachsen-meadow';
 import type { World } from './mitwachsen-world';
 
 export const GUIDE = PENGUIN; // der verlaufene Pinguin
-export const GUIDE_GATE: GateId = 'eis'; // sein Tor: Er ist der Schlüssel
+export const GUIDE_GATE: GateId = gateOfKey('pinguin') ?? 'eis'; // sein Tor: Er ist der Schlüssel (`GATES`, `opens`)
 export const DUE = 20; // so viele Takte, nachdem das letzte Tier der Lichtung eingezogen ist, taucht er auf
 export const APPEAR = [4, 6] as const; // so weit neben der Figur (in Feldern, auch schräg)
 export const NEAR = 2; // so nah muss die Figur kommen, dann läuft er die nächste Strecke
@@ -97,11 +101,23 @@ export type GuideRules = {
 };
 type Explored = (x: number, y: number) => boolean;
 
-/** Hat sein Tor den Schlüssel und ist noch zu? Dann ist der Pinguin verlaufen (und wohnt nicht hinter dem Tor). */
-const keyed = (open: readonly GateId[]) =>
-  !open.includes(GUIDE_GATE) && GATES.some((g) => g.id === GUIDE_GATE && g.opens !== 'never');
-/** Wohnt dieses Tier gerade nicht in seiner Gegend, weil es sich verlaufen hat? (der Pinguin, solange sein Tor zu ist) */
-export const lost = (id: string, open: readonly GateId[]) => id === GUIDE && keyed(open);
+/** Hat das Tor einen Schlüssel (`opens: { key }`) und ist noch zu? Dann ist sein Bote verlaufen. */
+export const keyed = (open: readonly GateId[], gate: GateId = GUIDE_GATE) => !open.includes(gate) && !!keyOf(gate);
+/**
+ * Der Bote eines Tors als Tier: das erste Tier der Schlüssel-Art in der Gegend hinter dem Tor (beim Eistor der
+ * Pinguin `eis:pinguin`); undefined, wenn das Tor keinen Schlüssel oder keine Gegend dahinter hat
+ */
+export function keyAnimal(gate: GateId): string | undefined {
+  const key = keyOf(gate);
+  const region = regionBehind(gate);
+  return key && region ? animalId(region.id, key) : undefined;
+}
+/**
+ * Wohnt dieses Tier gerade nicht in seiner Gegend, weil es sich verlaufen hat? Der Bote eines Tors, solange es zu ist
+ * (heute der Pinguin)
+ */
+export const lost = (id: string, open: readonly GateId[]) =>
+  GATES.some((g) => keyed(open, g.id) && keyAnimal(g.id) === id);
 
 /**
  * Die erste Art einer Gegend (sonst der Lichtung), von der noch kein Tier auf ihrer Wiese wohnt (undefined: ihre Leiste
@@ -114,17 +130,26 @@ const lacking = (s: Pick<Guided, 'garden'>, region: Region = REGIONS[0]) => {
 };
 /** Ist die Leiste einer Gegend voll? Von jeder ihrer Arten wohnt mindestens ein Tier auf ihrer Wiese (Fahrzeug fällig) */
 export const full = (s: Pick<Guided, 'garden'>, region: Region) => !lacking(s, region);
+/** Gegend, in der ein Tor steht (alle großen Tore stehen heute auf der Lichtung) */
+const standsIn = (gate: GateId): Region =>
+  REGIONS.find((r) => GATES.some((g) => g.id === gate && g.region === r.id)) ?? REGIONS[0];
 /**
- * Soll er da sein? Schlüssel am Tor, Tor zu, und die Leiste der Lichtung ist voll: Von jeder Art der Lichtung wohnt
- * mindestens ein Tier auf der Wiese (wie viele es je Art sind, sieht das Kind nirgends)
+ * Soll der Bote des Tors `gate` da sein? Schlüssel am Tor, Tor zu, und die Leiste der Gegend `region` ist voll: Von
+ * jeder ihrer Arten wohnt mindestens ein Tier auf ihrer Wiese (wie viele es je Art sind, sieht das Kind nirgends).
+ * Ohne Angabe der Pinguin und die Leiste der Gegend, in der sein Tor steht (die Lichtung)
  */
-export const wanted = (s: Pick<Guided, 'openGates' | 'garden'>): boolean => keyed(s.openGates) && !lacking(s);
+export const wanted = (
+  s: Pick<Guided, 'openGates' | 'garden'>,
+  gate: GateId = GUIDE_GATE,
+  region: Region = standsIn(gate),
+): boolean => keyed(s.openGates, gate) && !lacking(s, region);
 
 /**
- * Was dem Eistor noch fehlt, als nächster Schritt für das Kind (nicht ein fernes Ziel): die erste Art der Lichtung, die
- * noch nicht auf der Wiese wohnt (in der Reihe der Leiste), sonst der Pinguin
+ * Was einem Tor noch fehlt, als nächster Schritt für das Kind (nicht ein fernes Ziel): die erste Art der Gegend, in der
+ * es steht, die noch nicht auf ihrer Wiese wohnt (in der Reihe der Leiste), sonst sein Bote (beim Eistor der Pinguin)
  */
-export const missing = (s: Pick<Guided, 'garden'>): SpeciesId => lacking(s) ?? 'pinguin';
+export const missing = (s: Pick<Guided, 'garden'>, gate: GateId = GUIDE_GATE): SpeciesId =>
+  lacking(s, standsIn(gate)) ?? keyOf(gate) ?? 'pinguin';
 
 /**
  * „Noch nicht“ in der Ansicht: an welchem Tor (`id`), wann es zu zeigen begann, was fehlt (ms; Wackeln der Flügel; noch
@@ -138,21 +163,19 @@ export const HINT_EVERY = 50; // … höchstens alle 5 s, und je Stehen einmal
 const ripe = (s: Pick<Guided, 'still' | 'tick'>, last: number) =>
   s.still >= HINT_AFTER && s.tick - last >= HINT_EVERY && s.tick - s.still > last;
 /**
- * „Noch nicht“ am Eistor (rein, ändert nichts, öffnet nichts): Steht die Figur seit `HINT_AFTER` Takten auf seiner
- * Torplatte (nur Stehen zählt, `still`; eine schlafende liegt im Bett), ist es zu und führt kein Pinguin (er ist auch
- * nicht schon fällig oder auf dem Weg zur Figur, `guideDue`: dann kommt er ja gleich), zeigt das Tor freundlich, was
- * fehlt (`missing`); `last`: Takt, an dem es das zuletzt tat. Je Stehen einmal (danach steht die Figur einfach da und schaut
+ * „Noch nicht“ an einem Tor mit Schlüssel (heute das Eistor; rein, ändert nichts, öffnet nichts): Steht die Figur seit
+ * `HINT_AFTER` Takten auf seiner Torplatte (nur Stehen zählt, `still`; eine schlafende liegt im Bett), ist es zu und
+ * führt kein Bote (er ist auch nicht schon fällig oder auf dem Weg zur Figur, `guideDue`: dann kommt er ja gleich),
+ * zeigt das Tor freundlich, was fehlt (`missing`); `last`: Takt, an dem es das zuletzt tat. Je Stehen einmal (danach steht die Figur einfach da und schaut
  * das Tor an) und höchstens alle `HINT_EVERY` Takte, auch beim Rauf und Runter; kam es eben erst, holt es das im selben
  * Stehen nach, sobald 5 s um sind. Liefert die fehlende Art, sonst undefined. Bild und Ton macht die Ansicht.
  */
-export const hint = (s: Guided, world: World, last: number): SpeciesId | undefined =>
-  ripe(s, last) &&
-  keyed(s.openGates) &&
-  s.guideDue < 0 &&
-  !leader(s) &&
-  world.cell(s.player.x, s.player.y).plate === GUIDE_GATE
-    ? missing(s)
+export const hint = (s: Guided, world: World, last: number): SpeciesId | undefined => {
+  const gate = world.cell(s.player.x, s.player.y).plate;
+  return gate && ripe(s, last) && keyed(s.openGates, gate) && s.guideDue < 0 && !leader(s)
+    ? missing(s, gate)
     : undefined;
+};
 /**
  * „Noch nicht“ an einem Tor, das nie aufgeht (`opens: 'never'`, rein, ändert nichts, öffnet nichts): Steht die Figur
  * seit `HINT_AFTER` Takten auf seiner Torplatte, zeigt es freundlich das Zeichen seiner Welt, getaktet wie am Eistor (je
@@ -165,11 +188,13 @@ export const nope = (s: Guided, world: World, last: number): GateId | undefined 
 };
 
 /**
- * Braucht es die Regeln des Pinguins (worlds/eis/mitwachsen-lead.ts)? Solange er fällig ist und nach dem Öffnen, bis er auf der
- * Schneewiese wohnt
+ * Braucht es die Regeln des Boten eines Tors (beim Eistor der Pinguin, worlds/eis/mitwachsen-lead.ts)? Solange er
+ * fällig ist und nach dem Öffnen, bis er auf der Wiese seiner Gegend wohnt (beim Pinguin die Schneewiese)
  */
-export const pending = (s: Pick<Guided, 'openGates' | 'garden'>) =>
-  wanted(s) || (s.openGates.includes(GUIDE_GATE) && !s.garden.some((p) => p.id === GUIDE));
+export const pending = (s: Pick<Guided, 'openGates' | 'garden'>, gate: GateId = GUIDE_GATE): boolean => {
+  const id = keyAnimal(gate);
+  return wanted(s, gate) || (!!id && s.openGates.includes(gate) && !s.garden.some((p) => p.id === id));
+};
 
 /** Der Pinguin, wenn er da ist: Er führt zum Tor bzw. ist nach dem Öffnen auf dem Weg zum Schneebett */
 export const leader = <A extends { mode: Mode }>(s: { animals: readonly A[] }): A | undefined =>

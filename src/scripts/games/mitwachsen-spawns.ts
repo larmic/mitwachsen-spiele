@@ -12,6 +12,7 @@ import { regionAnimalList, type Point, type Region, type RegionId } from '../../
 const SPREAD: Record<RegionId, { gaps: readonly number[]; bed: number; salt: number }> = {
   lichtung: { gaps: [9, 5, 1], bed: 6, salt: 77 },
   eis: { gaps: [9, 5, 1], bed: 6, salt: 78 },
+  hoehle: { gaps: [9, 5, 1], bed: 6, salt: 79 }, // Grotte: etwa 9.000 Felder, kleiner als das Tal
 };
 
 /**

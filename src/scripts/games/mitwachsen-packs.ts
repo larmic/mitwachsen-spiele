@@ -1,15 +1,15 @@
-// Welt-Pakete laden (Browser): per import() aus dem Netz oder dem Cache des Service Workers, aber erst, wenn ihr Tor
-// eine Rolle spielt (`needsPack`, mitwachsen-pack.ts). Braucht eine Welt das Paket schon beim Öffnen, wartet der Start
+// Welt-Pakete laden (Browser): per import() aus dem Netz oder dem Cache des Service Workers, je Paket ein Lader
+// (`LOADERS`), aber erst, wenn sein Tor eine Rolle spielt (`needsPack`, mitwachsen-pack.ts; jedes Paket für sich). Braucht eine Welt das Paket schon beim Öffnen, wartet der Start
 // höchstens `PACK_WAIT_MS` darauf; sonst kommt es im Takt nach, sobald es nötig wird, und wird in die laufende Welt
 // eingebaut (`arrive`). Scheitert das Laden, läuft das Spiel ohne diese Welt weiter, still wie ohne WebGL: Hinter ihrem
 // Tor steht eine Eisklippe, der Spielstand behält alles; beim nächsten Bedarf (frühestens nach `RETRY_MS`) neu versucht.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
 import type { Part } from '../../lib/games/front';
-import { SPECIES, type GateId, type Point, type SpeciesId } from '../../data/games/mitwachsen';
-import type { GuideRules } from './mitwachsen-guide';
+import { REGIONS, SPECIES, type GateId, type Point, type SpeciesId } from '../../data/games/mitwachsen';
+import type { GuideRules, Hint } from './mitwachsen-guide';
 import { needsPack, type Need } from './mitwachsen-pack';
-import type { WorldPack } from './mitwachsen-pack-types';
+import type { PackId, WorldPack } from './mitwachsen-pack-types';
 import type { RideRules } from './mitwachsen-rider';
 import type { View2D } from './mitwachsen-view';
 import type { View3D } from './mitwachsen-view-3d';
@@ -23,7 +23,17 @@ export const PACK_WAIT_MS = 4000;
 /** Nach einem gescheiterten Laden frühestens so viel später wieder versuchen */
 export const RETRY_MS = 30_000;
 
-const eis = () => import('./worlds/eis').then((m) => m.pack);
+/**
+ * Ein Lader je Welt-Paket (per import(), einziger Einstieg `worlds/<welt>/index.ts`). Eine Gegend ohne Eintrag hat noch
+ * kein Paket (die Höhlenwelt): Hinter ihrem Tor baut die Welt dann, was ohne Paket dort steht (mitwachsen-behind.ts).
+ */
+const LOADERS: Partial<Record<PackId, () => Promise<LoadedPack>>> = {
+  eis: () => import('./worlds/eis').then((m) => m.pack),
+};
+/** Die Pakete, die es gibt (je Lader eines) */
+export const PACK_IDS = Object.keys(LOADERS) as PackId[];
+/** Ein Paket holen; ohne Lader scheitert es (wie ein Netzfehler) */
+const loadPack = (id: PackId) => LOADERS[id]?.() ?? Promise.reject(new Error(`kein Welt-Paket ${id}`));
 
 /**
  * Modelle von Arten aus einem Welt-Paket eintragen (Eis-Welt: ihre zehn Tiere, `ICE_MODELS`): sobald das Paket
@@ -35,18 +45,19 @@ export function addModels(models: Partial<Record<SpeciesId, readonly Part[]>> = 
 }
 const noop = () => {};
 
-/** Die Welt-Pakete einer Spielseite: welche schon da sind, und Laden bei Bedarf */
+/** Die Welt-Pakete einer Spielseite: welche schon da sind, und Laden bei Bedarf, jedes für sich */
 export class Packs {
   private ready: LoadedPack[] = [];
-  private loading: Promise<unknown> | null = null;
-  private failedAt = -Infinity;
+  private loading = new Map<PackId, Promise<unknown>>();
+  private failedAt = new Map<PackId, number>();
   /** Höchstens so lange wartet `wait`; ein Test setzt es hoch, wenn er den wartenden Start prüft (langsame Pipeline) */
   waitMs = PACK_WAIT_MS;
 
-  /** `arrive`: ein Paket ist angekommen (einbauen), `load` holt es (im Test ersetzbar) */
+  /** `arrive`: ein Paket ist angekommen (einbauen), `load` holt es (im Test ersetzbar), `ids`: diese Pakete gibt es */
   constructor(
     private readonly arrive: (pack: LoadedPack) => void,
-    private readonly load: () => Promise<LoadedPack> = eis,
+    private readonly load: (id: PackId) => Promise<LoadedPack> = loadPack,
+    private readonly ids: readonly PackId[] = PACK_IDS,
   ) {}
 
   /** Die geladenen Pakete (für `createWorld`) */
@@ -54,26 +65,53 @@ export class Packs {
     return [...this.ready];
   }
 
-  get(id: LoadedPack['id']): LoadedPack | undefined {
+  get(id: PackId): LoadedPack | undefined {
     return this.ready.find((p) => p.id === id);
   }
 
-  /** Braucht der Spielstand das Paket und fehlt es noch, wird es geholt; erfüllt, sobald es da ist (oder scheiterte) */
+  /** Das geladene Paket der Welt hinter dem Tor `gate` (undefined: keines da) */
+  at(gate: GateId | undefined): LoadedPack | undefined {
+    return this.ready.find((p) => p.gate === gate);
+  }
+
+  /**
+   * „Noch nicht“ je Bild: fragt den Haken `View2D.hint` jedes geladenen Pakets, wo die Figur auch steht (jeder prüft
+   * selbst, ob sie auf der Platte seines Tors steht). Nur so vergeht ein gezeigter Umriss samt Wackeln nach `HINT_MS`
+   * von selbst, auch wenn die Figur die Platte schon verlassen hat, und was neben der Platte noch ausstand, verfällt.
+   * Liefert, was ein Tor gerade zeigt (`id` gesetzt), sonst die Antwort des ersten Pakets, ohne Paket null
+   */
+  hint(...a: Parameters<NonNullable<View2D['hint']>>): Hint | null {
+    const all = this.ready.flatMap((p) => (p.view?.hint ? [p.view.hint(...a)] : []));
+    return all.find((h) => h.id) ?? all[0] ?? null;
+  }
+
+  /**
+   * Braucht der Spielstand ein Paket und fehlt es noch, wird es geholt; erfüllt, sobald alle nötigen da sind (oder
+   * scheiterten). Jedes Paket für sich: sein Tor (`behind` seiner Gegend), sein Laden, sein Neuversuch
+   */
   want(need: Need, gates: ReadonlyMap<GateId, { mid: Point }>, now = performance.now()): Promise<void> {
-    if (this.get('eis') || !needsPack(need, gates, beyondRing)) return Promise.resolve();
-    if (!this.loading && now - this.failedAt >= RETRY_MS)
-      this.loading = this.load().then(
-        (pack) => {
-          addModels(pack.models);
-          this.ready.push(pack);
-          this.arrive(pack);
-        },
-        () => {
-          this.failedAt = performance.now();
-          this.loading = null;
-        },
+    return Promise.all(this.ids.map((id) => this.wantOne(id, need, gates, now))).then(noop);
+  }
+
+  private wantOne(id: PackId, need: Need, gates: ReadonlyMap<GateId, { mid: Point }>, now: number) {
+    const gate = REGIONS.find((r) => r.id === id)?.behind;
+    if (!gate || this.get(id) || !needsPack(need, gates, beyondRing, gate)) return Promise.resolve();
+    if (!this.loading.has(id) && now - (this.failedAt.get(id) ?? -Infinity) >= RETRY_MS)
+      this.loading.set(
+        id,
+        this.load(id).then(
+          (pack) => {
+            addModels(pack.models);
+            this.ready.push(pack);
+            this.arrive(pack);
+          },
+          () => {
+            this.failedAt.set(id, performance.now());
+            this.loading.delete(id);
+          },
+        ),
       );
-    return (this.loading ?? Promise.resolve()).then(noop);
+    return this.loading.get(id) ?? Promise.resolve();
   }
 
   /** Wie `want`, aber höchstens `waitMs` warten (Öffnen einer Welt: das Netz kann beim ersten Besuch hängen) */

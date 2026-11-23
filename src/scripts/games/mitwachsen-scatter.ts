@@ -32,6 +32,7 @@ const cheb = (ax: number, ay: number, bx: number, by: number) => Math.max(Math.a
 export const SCATTER: Record<RegionId, { bed: number; apart: number; haunt?: number }> = {
   lichtung: { bed: 8, apart: 5 },
   eis: { bed: 8, apart: 5, haunt: 4 },
+  hoehle: { bed: 8, apart: 5 },
 };
 
 /** Erreichbare Felder je Welt und Gegend als Menge, einmal gebaut (das Tal hat über 10.000) */

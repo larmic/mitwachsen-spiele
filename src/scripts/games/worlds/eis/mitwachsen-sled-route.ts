@@ -13,7 +13,7 @@ import { crossings } from '../../mitwachsen-border';
 import { atHome } from '../../mitwachsen-meadow';
 import { platformCells } from '../../mitwachsen-portal';
 import { canStep, type GatePlace, type World } from '../../mitwachsen-world';
-import { BESIDE, plateRow } from './mitwachsen-bay';
+import { BESIDE, plateRow } from '../../mitwachsen-bay';
 import { ALL, key } from './mitwachsen-flood';
 import { shedOf } from './mitwachsen-sled-ground';
 

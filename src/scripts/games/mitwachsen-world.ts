@@ -2,7 +2,8 @@
 // In der Mitte die Lichtung mit dem Bett, ringsum natürliche Felsen mit acht großen Toren (vorerst zu). Außen herum
 // endlose Landschaft aus Rauschen, berechnet in Stücken. Ums Bett die Wiese, auf der gefundene Tiere zu Hause sind.
 // Hinter dem Eistor liegt die Eis-Welt, ein Gletscherkessel mit eigenem Zuhause: Den baut ihr Welt-Paket
-// (worlds/eis/, nachgeladen und `createWorld` hereingereicht); ohne Paket endet der Gang an einer Eisklippe.
+// (worlds/eis/, nachgeladen und `createWorld` hereingereicht); ohne Paket endet der Gang an einer Eisklippe. So hat
+// jede Gegend hinter einem Tor (`REGIONS`, `behind`) ihre Welt aus ihrem Paket (mitwachsen-behind.ts).
 // Spezifikation: docs/specs/mitwachsen.md
 
 import { CHUNK, ChunkCache, changedChunks, fromKey } from '../../lib/games/chunks';
@@ -46,13 +47,13 @@ export type World = Realms & {
   /** Alle vom Bett aus erreichbaren Felder einer Gegend außerhalb der Wiese: hier dürfen ihre Tiere wohnen */
   spotsOf(realm: RegionId): readonly Point[];
   /**
-   * Portale: je Tor eines daneben und eines im Kreis um das Bett, mit dem Feld, auf dem man herauskommt; dazu das
-   * Eis-Portal im Gletscherkessel (hinter der Gangmündung und im Kreis um das Schneebett)
+   * Portale: je Tor eines daneben und eines im Kreis um das Bett, mit dem Feld, auf dem man herauskommt; dazu je Welt
+   * aus einem Paket ihr Portal (Eis-Portal im Gletscherkessel: hinter der Gangmündung und im Kreis um das Schneebett)
    */
   readonly portals: ReadonlyMap<PortalId, Portal>;
   /** Die großen Tore: Lage und Reihenfolge würfelt der Seed */
   readonly gates: ReadonlyMap<GateId, GatePlace>;
-  /** Klangsteine: einer am Bett, einer vor jedem großen Tor, einer am Schneebett im Gletscherkessel */
+  /** Klangsteine: einer am Bett, einer vor jedem großen Tor, einer am Bett jeder Welt aus einem Paket (Schneebett) */
   readonly stones: ReadonlyMap<StoryId, Point>;
   /** Stimmung an einem Ort: Richtung des nächsten Tors und wie stark (0 am Bett … 1 am Felsring) */
   climate(x: number, y: number): Climate;
@@ -187,8 +188,8 @@ function stonesOf(places: readonly Layout[]): Map<StoryId, Point> {
 function buildStart(
   seed: number,
   places: readonly Layout[],
-  eisPack: WorldPack | undefined,
-): { map: Map<string, Cell>; spawns: Map<string, Point>; spots: Point[]; kessel: Behind } {
+  packs: readonly WorldPack[],
+): { map: Map<string, Cell>; spawns: Map<string, Point>; spots: Point[]; inner: Map<RegionId, Behind> } {
   const map = new Map<string, Cell>();
   const set = (x: number, y: number, c: Cell) => map.set(key(x, y), c);
   const { rx, ry } = lichtung.shape;
@@ -263,8 +264,7 @@ function buildStart(
         else set(x, y, passage(seed, p.id, x, y));
       }
   }
-  // Hinter dem Eistor: der Gletscherkessel am Ende des Gangs (Eis-Welt), ohne ihr Paket eine Eisklippe
-  const kessel = behind(eisPack, seed, gangOf(places), roomOf(places), (x, y) => passage(seed, 'eis', x, y), map);
+  const inner = buildBehind(seed, places, packs, map);
 
   placePlatforms(map, portalsOf(places));
 
@@ -319,16 +319,36 @@ function buildStart(
   for (const [k, c] of map)
     if (c.region === 'lichtung' && !c.solid && c.ground !== 'water' && !reached.has(k)) map.set(k, rock(3));
   const spots = reach.filter(([x, y]) => map.get(key(x, y))!.region === 'lichtung' && !map.get(key(x, y))!.garden);
-  const spawns = new Map([...findSpawns(seed, lichtung, spots, LICHTUNG_HOME.bed), ...kessel.spawns]);
-  return { map, spawns, spots, kessel };
+  const spawns = new Map([
+    ...findSpawns(seed, lichtung, spots, LICHTUNG_HOME.bed),
+    ...[...inner.values()].flatMap((b) => [...b.spawns]),
+  ]);
+  return { map, spawns, spots, inner };
 }
 
-/** Wo die Welt hinter dem Eistor liegen darf: hinter dem Felsring, fern der Ausgänge der anderen Gänge (`roomBehind`) */
-const roomOf = (places: readonly Layout[]) => roomBehind(outside, GATE_HALF + TOWER, places, 'eis');
+/**
+ * Hinter jedem Tor mit einer Gegend dahinter ihre Welt aus ihrem Paket (Eistor: der Gletscherkessel am Ende des Gangs),
+ * ohne Paket eine Klippe (oder nichts, wenn das Tor nie aufgeht); in der Reihe von `REGIONS`
+ */
+function buildBehind(seed: number, places: readonly Layout[], packs: readonly WorldPack[], map: Map<string, Cell>) {
+  const inner = new Map<RegionId, Behind>();
+  for (const { id, behind: gate } of REGIONS)
+    if (gate) {
+      const pack = packs.find((p) => p.gate === gate);
+      const pass = (x: number, y: number) => passage(seed, gate, x, y);
+      inner.set(id, behind(pack, seed, gangOf(places, gate), roomOf(places, gate), pass, map, gate));
+    }
+  return inner;
+}
 
-/** Gang hinter dem Eistor: Er führt in den Gletscherkessel */
-function gangOf(places: readonly Layout[]): Gang {
-  const p = places.find((l) => l.id === 'eis') ?? places[0]!; // Tore gibt es immer, das Eistor auch
+/**
+ * Wo die Welt hinter dem Tor `gate` liegen darf: hinter dem Felsring, fern der Ausgänge der anderen Gänge (`roomBehind`)
+ */
+const roomOf = (places: readonly Layout[], gate: GateId) => roomBehind(outside, GATE_HALF + TOWER, places, gate);
+
+/** Gang hinter dem Tor `gate`: Er führt in seine Welt (Eistor: in den Gletscherkessel) */
+function gangOf(places: readonly Layout[], gate: GateId): Gang {
+  const p = places.find((l) => l.id === gate) ?? places[0]!; // Tore gibt es immer, jedes einmal
   return { at: p.at, depth: p.depth, end: p.end, half: GATE_HALF, wall: TOWER };
 }
 
@@ -620,10 +640,10 @@ function dress(seed: number, x: number, y: number, c: Cell): Cell {
   return out;
 }
 
-/** Lage des Gletscherkessels einer Welt (mit dem Paket der Eis-Welt); schnell, ohne die Welt zu bauen */
+/** Lage der Welt eines Pakets hinter seinem Tor (Eis-Welt: der Gletscherkessel); schnell, ohne die Welt zu bauen */
 export const kesselPlace = (seed: number, p: WorldPack) => {
   const l = layouts(seed);
-  return p.place(seed, gangOf(l), roomOf(l));
+  return p.place(seed, gangOf(l, p.gate), roomOf(l, p.gate));
 };
 /** Liegt ein Feld ganz hinter dem Felsring der Lichtung (Landschaft, Gänge ins Freie, Kessel)? */
 export const beyondRing = outside;
@@ -646,8 +666,10 @@ function build(
   from?: { regions: ReadonlyMap<string, Cell>; cache: ChunkCache<Cell> },
 ): { world: World; chunks: readonly string[] } {
   const places = layouts(seed);
-  const eis = packs.find((p) => p.id === 'eis'); // gebaut mit diesem Paket (die Liste kann danach noch wachsen)
-  const { map: regions, spawns, spots, kessel } = buildStart(seed, places, eis);
+  const built = [...packs]; // gebaut mit diesen Paketen (die Liste draußen kann danach noch wachsen)
+  const { map: regions, spawns, spots, inner } = buildStart(seed, places, built);
+  const realms = realmsOf(inner);
+  const worlds = [...inner.values()];
   const cache = new ChunkCache<Cell>((cx, cy) => {
     const cells: Cell[] = [];
     for (let y = cy * CHUNK; y < (cy + 1) * CHUNK; y++)
@@ -668,15 +690,19 @@ function build(
   const world: World = {
     seed,
     cell: (x, y) => cache.get(x, y),
-    ...realmsOf(kessel),
+    ...realms,
     gates: gatesOf(places),
     spawns,
-    spotsOf: (realm) => ({ lichtung: spots, eis: kessel.spots })[realm],
-    portals: new Map([...portalsOf(places), ...kessel.portals]),
-    stones: new Map<StoryId, Point>([...stonesOf(places), ...kessel.stones]),
-    // In der Eis-Welt überall kühles Licht (wie ganz nah am Eistor)
-    climate: (x, y) => (kessel.realm.has(key(x, y)) ? { id: 'eis', strength: 1 } : climateOf(seed, places, x, y)),
-    attach: (pack) => (eis?.id === pack.id ? { world, chunks: [] } : build(seed, [...packs, pack], { regions, cache })),
+    spotsOf: (realm) => (realm === lichtung.id ? spots : (inner.get(realm)?.spots ?? [])),
+    portals: new Map([...portalsOf(places), ...worlds.flatMap((b) => b.portals)]),
+    stones: new Map<StoryId, Point>([...stonesOf(places), ...worlds.flatMap((b) => b.stones)]),
+    // In der Welt hinter einem Tor überall ihr Licht wie ganz nah an ihrem Tor (Eis-Welt: kühles Licht)
+    climate: (x, y) => {
+      const gate = REGIONS.find((r) => r.id === realms.realm(x, y))?.behind;
+      return gate ? { id: gate, strength: 1 } : climateOf(seed, places, x, y);
+    },
+    attach: (pack) =>
+      built.some((p) => p.id === pack.id) ? { world, chunks: [] } : build(seed, [...built, pack], { regions, cache }),
   };
   return { world, chunks: [...chunks] };
 }

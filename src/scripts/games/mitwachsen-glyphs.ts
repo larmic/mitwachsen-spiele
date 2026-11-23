@@ -34,6 +34,7 @@ export const SPARKS = {
   snow: ['#ffffff', '#dfe9f2', '#bfe6f5'],
   lichtung: ['#ffd47e', '#ffffff', '#6cc46f'], // ein Tier zieht auf der Wiese der Lichtung ein
   eis: ['#7fd6ff', '#ffffff', '#3f8fd8'], // … auf der Schneewiese: eine Funkenwolke in Eisblau
+  hoehle: ['#b48cf0', '#ffffff', '#a07cff'], // … in der Grotte: Lila wie ihr Portal
 } as const;
 
 /** Pixel-Zeichen zeichnen: unten mittig bei (cx, bottom), jedes Pixel `px` groß */

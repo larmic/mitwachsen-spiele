@@ -170,6 +170,7 @@ Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzel
 - **Aussehen:** Dunkle Steinblöcke, leuchtende Kristalle und Pilze als Lichtquellen, unterirdische Seen. Nie ganz dunkel: Es bleibt immer genug Licht, damit nichts unheimlich wirkt.
 - **Tiere (Ideen):** Fledermaus, Maulwurf, Glühwürmchen, Höhlenmolch.
 - **Portal-Plattform:** Kristallnest aus dunklem Stein, Kristallsäulen in den Ecken; Bild: Kristall-Raute (das Thema `hoehle` gibt es schon).
+- **Stand (23.11.2026):** Entschieden vom Vater: erst die Höhle, danach die Verbindung mit dem Zug (Tok). Die Grotte (etwa 9.000 Felder) wird vorerst nur über einen Entwickler-Schalter erreichbar sein; für das Kind bleibt das Höhlentor zu, sein Klangstein erzählt die Höhlen-Geschichte wie bisher. Schritt 0 ist umgesetzt: Der Code kennt jetzt drei Gegenden (Lichtung, Eis-Welt, Höhlenwelt), lädt jedes Welt-Paket für sich und fragt Tore, Boten und „noch nicht“ je Tor statt fest am Eistor. Zu sehen ist davon nichts: Hinter dem Höhlentor steht noch keine Welt, der Gang endet wie bisher in der Landschaft.
 
 ## Tiere
 

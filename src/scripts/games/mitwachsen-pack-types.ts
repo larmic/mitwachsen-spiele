@@ -6,10 +6,16 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
 import type { Dir, Part } from '../../lib/games/front';
-import type { GateId, Point, SpeciesId } from '../../data/games/mitwachsen';
+import type { GateId, Point, RegionId, SpeciesId } from '../../data/games/mitwachsen';
 import type { RideId } from '../../data/games/mitwachsen-rides';
 import type { Cell } from './mitwachsen-cell';
 import type { Portal, PortalId } from './mitwachsen-portal';
+
+/**
+ * Kennung eines Welt-Pakets: die Gegend hinter einem Tor, deren Welt es baut (Eis-Welt, Höhlenwelt). Unter ihr steht
+ * auch sein Zustand in `State.packs`; je Kennung ein Lader in mitwachsen-packs.ts
+ */
+export type PackId = Exclude<RegionId, 'lichtung'>;
 
 /** Gang hinter einem Tor, in Koordinaten u (entlang des Tors) und t (nach außen) */
 export type Gang = {
@@ -143,8 +149,8 @@ export type Beyond = (x: number, y: number) => boolean;
  * Welt gelten (Eis-Welt: Schneehaufen wachsen zu Schneemännern, `ride`: Fahrzeug), `step` hereingereicht.
  */
 export type WorldPack<Rules = unknown, View = unknown, View3 = unknown, Ride = unknown> = {
-  id: 'eis';
-  gate: GateId;
+  id: PackId;
+  gate: GateId; // das Tor, hinter dem seine Welt liegt (`REGIONS`: `behind` der Gegend `id`)
   build(
     seed: number,
     gang: Gang,

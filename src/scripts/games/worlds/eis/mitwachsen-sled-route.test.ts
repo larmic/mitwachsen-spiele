@@ -9,7 +9,7 @@ import { platformCells } from '../../mitwachsen-portal';
 import { PLATE_ROW } from '../../mitwachsen-plate';
 import { canStep, createWorld, type World } from '../../mitwachsen-world';
 import { EIS_PACK, seedChunks, seedRange, seedsFor, worldOf } from '../../test-worlds';
-import { BESIDE, plateRow } from './mitwachsen-bay';
+import { BESIDE, plateRow } from '../../mitwachsen-bay';
 import { SHED_NEAR, SLIDE_GAP, shedOf, trackU } from './mitwachsen-sled-ground';
 import { RIDE_SEATS, STOP_STAGES, onFootpath, sledRoute, trackAt, type Route } from './mitwachsen-sled-route';
 

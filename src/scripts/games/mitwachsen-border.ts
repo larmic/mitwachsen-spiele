@@ -1,6 +1,6 @@
 // Weltgrenze am Tor – rein, ohne DOM: Jedes Tier bleibt in seiner Gegend. Betritt die Figur das erste Feld des
-// Durchgangs in eine andere Gegend (von der Lichtung aus die Torreihe des Eistors, vom Gletscherkessel aus die
-// Gangmündung), lösen sich alle Tiere der Kette, die nicht in die Gegend dahinter gehören, auch die hinteren: Sie drehen
+// Durchgangs in eine andere Gegend (von der Lichtung aus die Torreihe eines Tors, heute des Eistors, von der Welt
+// dahinter aus die Gangmündung), lösen sich alle Tiere der Kette, die nicht in die Gegend dahinter gehören, auch die hinteren: Sie drehen
 // sich zur Figur und setzen sich auf feste Warteplätze davor. Kommt die Figur auf ihre Seite zurück, reihen sie sich
 // wieder ein; erst beim Schlafen gehen sie heim. Kein Ablauf nach Zeit, nichts davon wird gespeichert. Teil der Regeln
 // (mitwachsen-state.ts).
@@ -58,12 +58,15 @@ const key = (x: number, y: number) => `${x},${y}`;
 const across = (g: GatePlace, [x, y]: Point) => Math.abs((x - g.mid[0]) * g.out[1] - (y - g.mid[1]) * g.out[0]);
 
 const cache = new WeakMap<World, Crossing[]>();
-/** Durchgänge einer Welt: einer je Gegend hinter einem Tor (heute das Eistor in den Gletscherkessel) */
+/**
+ * Durchgänge einer Welt: einer je Gegend hinter einem Tor, hinter dessen Gang die Welt etwas gebaut hat (`worlds`: die
+ * Welt aus dem Paket oder eine Klippe; heute das Eistor in den Gletscherkessel), in der Reihe von `REGIONS`
+ */
 export function crossings(world: World): Crossing[] {
   let out = cache.get(world);
   if (!out) {
     out = REGIONS.flatMap((r) => {
-      const gate = r.behind && world.gates.get(r.behind);
+      const gate = r.behind && world.worlds.includes(r.id) && world.gates.get(r.behind);
       return gate ? [crossingOf(world, gate, r.id)] : [];
     });
     cache.set(world, out);

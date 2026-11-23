@@ -16,7 +16,7 @@ import { dirTo, freeNear, occupied } from '../../mitwachsen-free';
 import { GUIDE_GATE, RITUAL, SLIDE, opening, type GuideEvents as Events, type Guided } from '../../mitwachsen-guide';
 import { atHome, meadowSpots } from '../../mitwachsen-meadow';
 import { ALL, flood, key } from './mitwachsen-flood';
-import { inBay } from './mitwachsen-bay';
+import { inBay } from '../../mitwachsen-bay';
 import { canStep, type World } from '../../mitwachsen-world';
 import type { WorldRules } from '../../mitwachsen-pack-types';
 

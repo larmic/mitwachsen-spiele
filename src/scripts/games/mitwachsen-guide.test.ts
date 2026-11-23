@@ -1,7 +1,7 @@
 // Der verlaufene Pinguin holt die Figur ab und öffnet das Eistor (`opens: { key: 'pinguin' }`), gegen die echten Daten.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../lib/games/front';
-import { GATES, REGIONS, animalId, regionAnimalList, type Point } from '../../data/games/mitwachsen';
+import { GATES, REGIONS, animalId, gateOfKey, keyOf, regionAnimalList, type Point } from '../../data/games/mitwachsen';
 import {
   initialState,
   progressOf,
@@ -17,7 +17,10 @@ import {
   DUE,
   FAR,
   GUIDE,
+  GUIDE_GATE,
   full,
+  keyAnimal,
+  keyed,
   LOST,
   NEAR,
   PEEP_EVERY,
@@ -48,7 +51,8 @@ import {
   toMeadow,
 } from './worlds/eis/mitwachsen-ritual';
 import { lageOf, leadTicks, type Lage } from './mitwachsen-turn-pace';
-import { BESIDE, BOB_EVERY, NET, bay, inBay, plateRow } from './worlds/eis/mitwachsen-bay';
+import { BESIDE, bay, inBay, plateRow } from './mitwachsen-bay';
+import { BOB_EVERY, NET } from './worlds/eis/mitwachsen-bay';
 import { plateMid } from './mitwachsen-plate';
 import { canStep, standHeight, type World } from './mitwachsen-world';
 import { dirTo as faceTo } from './mitwachsen-free';
@@ -1225,4 +1229,39 @@ describe('Invarianten bei wildem Drücken bis durchs offene Eistor', () => {
       expect(play()).toEqual(play());
     });
   }
+});
+
+describe('Boten je Tor: Schlüssel, Verlaufen, fällig, was fehlt', () => {
+  const lichtung = () => regionAnimalList(REGIONS[0]).map(({ id, species }) => ({ id, species }));
+
+  it('der Schlüssel eines Tors steht in GATES (`opens`): heute nur das Eistor mit dem Pinguin', () => {
+    expect(GATES.filter((g) => keyOf(g.id)).map((g) => [g.id, keyOf(g.id)])).toEqual([['eis', 'pinguin']]);
+    expect(GUIDE_GATE).toBe(gateOfKey('pinguin'));
+    expect(keyAnimal('eis')).toBe(GUIDE); // der Bote als Tier: das erste Tier seiner Art hinter dem Tor
+    expect(keyAnimal('hoehle')).toBeUndefined(); // das Höhlentor hat keinen Schlüssel (noch nicht)
+    expect(keyAnimal('sand')).toBeUndefined(); // ohne Schlüssel und ohne Gegend dahinter
+  });
+
+  it('keyed und lost je Tor: nur ein Tor mit Schlüssel, das zu ist, hat einen verlaufenen Boten', () => {
+    expect([keyed([], 'eis'), keyed(['eis'], 'eis'), keyed([], 'hoehle'), keyed(['hoehle'], 'hoehle')]).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ]);
+    expect(keyed([])).toBe(true); // ohne Angabe das Tor des Pinguins
+    expect(lost(GUIDE, ['hoehle'])).toBe(true); // ein anderes offenes Tor ändert nichts
+    expect(lost(animalId('hoehle', 'pinguin'), [])).toBe(false);
+  });
+
+  it('wanted, pending und missing je Tor: ein Tor ohne Schlüssel ruft keinen Boten und braucht keine Regeln', () => {
+    const s = { openGates: [], garden: lichtung() };
+    expect([wanted(s), wanted(s, 'eis'), wanted(s, 'eis', REGIONS[0])]).toEqual([true, true, true]);
+    expect(wanted(s, 'hoehle')).toBe(false);
+    expect(wanted(s, 'eis', REGIONS[1])).toBe(false); // die Leiste der Eis-Welt ist leer
+    expect([pending(s, 'hoehle'), pending({ ...s, openGates: ['hoehle'] }, 'hoehle')]).toEqual([false, false]);
+    expect(pending(s, 'eis')).toBe(true);
+    expect(missing(s, 'eis')).toBe('pinguin');
+    expect(missing({ garden: [] }, 'eis')).toBe(REGIONS[0].animals[0]!.species); // vor dem Boten die Leiste seiner Gegend
+  });
 });

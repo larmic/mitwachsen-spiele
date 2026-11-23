@@ -101,6 +101,14 @@ module.exports = {
       to: { path: '^src/(scripts|data)/games/worlds/', pathNot: '^src/(scripts|data)/games/worlds/$1/' },
     },
     {
+      name: 'bay-is-for-packs',
+      severity: 'error',
+      comment:
+        'Die Bucht vor einem Tor (mitwachsen-bay.ts: Felder vor der Tür, Reihe der Torplatte, Platz eines Boten) gilt für jedes Tor gleich, braucht aber nur ein Welt-Paket (Bote, Fahrzeug-Halt): Nur Pakete und Tests importieren sie, so landet sie nie im Kern der Spielseite.',
+      from: { pathNot: ['^src/scripts/games/worlds/', '\\.test\\.ts$'] },
+      to: { path: '^src/scripts/games/mitwachsen-bay\\.ts$' },
+    },
+    {
       name: 'ride-engine-is-generic',
       severity: 'error',
       comment:

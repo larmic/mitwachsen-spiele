@@ -4,7 +4,17 @@
 // Typen der Pakete: mitwachsen-pack-types.ts.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
-import { GATES, REGIONS, realmOfAnimal, type GateId, type Point, type RegionId } from '../../data/games/mitwachsen';
+import {
+  GATES,
+  REGIONS,
+  keyOf,
+  realmOfAnimal,
+  regionBehind,
+  type GateId,
+  type Point,
+  type Region,
+  type RegionId,
+} from '../../data/games/mitwachsen';
 import { GUIDE_GATE, pending, type Guided } from './mitwachsen-guide';
 import type { Beyond } from './mitwachsen-pack-types';
 import { startRealm, type Realms } from './mitwachsen-home';
@@ -19,9 +29,10 @@ export const NEAR_GATE = 40;
 export type Need = Pick<Guided, 'openGates' | 'garden'> & { at: readonly (readonly [number, number] | undefined)[] };
 
 /**
- * Braucht das Spiel das Paket der Welt hinter dem Tor `gate` (heute nur das Eistor)? Ja, wenn das Tor offen ist, wenn
- * sein Schlüssel fällig ist (der verlaufene Pinguin, `pending`), wenn ein Tier der Welt schon zu Hause wohnt oder wenn
- * ein Ort in `at` dazu gehört (`packAt`).
+ * Braucht das Spiel das Paket der Welt hinter dem Tor `gate` (ohne Angabe das Eistor)? Ja, wenn das Tor offen ist, wenn
+ * sein Bote fällig ist oder noch nicht eingezogen (beim Eistor der verlaufene Pinguin, `pending`), wenn ein Tier der
+ * Welt schon zu Hause wohnt oder wenn ein Ort in `at` dazu gehört (`packAt`;
+ * nur an einem Tor, das aufgehen kann, `keyOf`). Jedes Tor für sich (`Packs` fragt je Paket).
  */
 export function needsPack(
   s: Need,
@@ -29,10 +40,11 @@ export function needsPack(
   beyond: Beyond,
   gate: GateId = GUIDE_GATE,
 ): boolean {
-  const realm = REGIONS.find((r) => r.behind === gate)?.id;
-  if (s.openGates.includes(gate) || (gate === GUIDE_GATE && pending(s))) return true;
+  const realm = regionBehind(gate)?.id;
+  if (s.openGates.includes(gate) || pending(s, gate)) return true;
   if (realm && s.garden.some((a) => realmOfAnimal(a.id) === realm)) return true;
-  return s.at.some((p) => !!p && packAt(p, gates, beyond, gate));
+  // Nähe zählt nur an einem Tor, das aufgehen kann: Ein Tor, das nie aufgeht (das Höhlentor), lädt nichts im Vorbeigehen
+  return !!keyOf(gate) && s.at.some((p) => !!p && packAt(p, gates, beyond, gate));
 }
 
 /**
@@ -50,9 +62,25 @@ export function packAt(
   if (!mid) return false;
   if (Math.max(Math.abs(x - mid[0]), Math.abs(y - mid[1])) <= NEAR_GATE) return true;
   const far = (m: Point) => (x - m[0]) ** 2 + (y - m[1]) ** 2;
-  const opening = GATES.filter((g) => g.opens !== 'never').map((g) => gates.get(g.id)?.mid);
+  const opening = GATES.filter((g) => keyOf(g.id)).map((g) => gates.get(g.id)?.mid);
   return beyond(x, y) && opening.every((m) => !m || far(mid) <= far(m));
 }
+
+/**
+ * Hält der Spielstand die gespeicherte Position `p` fest, weil das Paket der Gegend `region` fehlt? Ja, wenn ihr Tor
+ * aufgehen kann (es hat einen Schlüssel), die Welt sie ohne Paket gebaut hat (keine Wohnplätze) und `p` zu ihr gehört
+ * oder ihr nah ist (`packAt`): Die Welt wüsste sonst nicht, ob die Figur dort war.
+ */
+export const holds = (
+  world: { gates: ReadonlyMap<GateId, { mid: Point }>; spotsOf(realm: RegionId): readonly Point[] },
+  region: Region,
+  p: readonly [number, number],
+  beyond: Beyond,
+): boolean =>
+  !!region.behind &&
+  !!keyOf(region.behind) &&
+  !world.spotsOf(region.id).length &&
+  packAt(p, world.gates, beyond, region.behind);
 
 /**
  * Gegend, in deren Bett die Figur aufwacht (`startRealm`). Eine Position hinter dem Felsring, die heute zu keinem Feld

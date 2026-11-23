@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { REGIONS, regionAnimalList } from '../../data/games/mitwachsen';
-import { NEAR_GATE, needsPack, packAt, type Need } from './mitwachsen-pack';
-import { beyondRing, gatePlaces } from './mitwachsen-world';
-import { worldOf } from './test-worlds';
+import { NEAR_GATE, holds, needsPack, packAt, type Need } from './mitwachsen-pack';
+import { beyondRing, createWorld, gatePlaces } from './mitwachsen-world';
+import { bareOf, worldOf } from './test-worlds';
 
 const SEED = 1;
 const gates = gatePlaces(SEED);
@@ -70,5 +70,33 @@ describe('Welt-Pakete: wann das Paket der Eis-Welt nötig ist (needsPack)', () =
         expect(packAt(p, gates, beyondRing)).toBe(false);
     expect(packAt([0, 0], new Map(), beyondRing)).toBe(false);
     expect(needsPack(need(), gates, beyondRing, 'sand')).toBe(false); // ein Tor ohne Welt dahinter
+  });
+});
+
+describe('Welt-Pakete je Tor: das Höhlentor (noch ohne Schlüssel und ohne Paket)', () => {
+  const hoehle = gates.get('hoehle')!;
+  const nearHoehle: [number, number] = [hoehle.mid[0] - hoehle.out[0] * 3, hoehle.mid[1] - hoehle.out[1] * 3];
+
+  it('jedes Tor für sich: Was das Paket der Eis-Welt braucht, braucht die Höhlenwelt nicht', () => {
+    for (const n of [need({ openGates: ['eis'] }), need({ garden: fullMeadow }), need({ at: [eis.mid] })]) {
+      expect(needsPack(n, gates, beyondRing, 'eis')).toBe(true);
+      expect(needsPack(n, gates, beyondRing, 'hoehle')).toBe(false);
+    }
+    expect(needsPack(need({ openGates: ['hoehle'] }), gates, beyondRing, 'hoehle')).toBe(true); // Tor offen
+    // nah an seinem Tor: nichts, es geht nie auf (die Höhlenwelt ist noch nicht für das Kind)
+    expect(needsPack(need({ at: [nearHoehle] }), gates, beyondRing, 'hoehle')).toBe(false);
+    expect(needsPack(need({ at: [hoehle.mid] }), gates, beyondRing, 'hoehle')).toBe(false);
+    expect(needsPack(need({ at: [nearHoehle] }), gates, beyondRing, 'eis')).toBe(false);
+  });
+
+  it('holds: Eine Position hält der Spielstand nur für eine Welt hinter einem Tor, das aufgehen kann, ohne ihr Paket', () => {
+    const [eisRegion, hoehleRegion] = [REGIONS[1]!, REGIONS[2]!];
+    expect([eisRegion.id, hoehleRegion.id]).toEqual(['eis', 'hoehle']);
+    const nearEis: [number, number] = [eis.mid[0] - eis.out[0] * 3, eis.mid[1] - eis.out[1] * 3];
+    expect(holds(bareOf(SEED), eisRegion, nearEis, beyondRing)).toBe(true); // Paket fehlt: festhalten
+    expect(holds(worldOf(SEED), eisRegion, nearEis, beyondRing)).toBe(false); // Paket da
+    expect(holds(bareOf(SEED), hoehleRegion, nearHoehle, beyondRing)).toBe(false); // das Höhlentor geht nie auf
+    expect(holds(bareOf(SEED), REGIONS[0], [0, 0], beyondRing)).toBe(false); // die Lichtung liegt hinter keinem Tor
+    expect(holds(createWorld(SEED, []), eisRegion, [0, 0], beyondRing)).toBe(false); // am Bett: nicht ihre Welt
   });
 });

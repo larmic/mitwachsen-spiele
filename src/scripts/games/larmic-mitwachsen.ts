@@ -35,7 +35,7 @@ import { Fog, START_REVEAL, lookAround } from './mitwachsen-fog';
 import { attachPack, initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
 import { reshapes, type ChoreEvent } from './mitwachsen-chores';
 import { createWorld, gatePlaces, standHeight, type World } from './mitwachsen-world';
-import { pending, type GuideRules } from './mitwachsen-guide';
+import { GUIDE_GATE, pending, type GuideRules } from './mitwachsen-guide';
 import { Packs, type LoadedPack } from './mitwachsen-packs';
 import { randomId, randomSeed, savedOrNew, showName } from './mitwachsen-world-list';
 import { platformLift, portalColor } from './mitwachsen-portal';
@@ -124,12 +124,14 @@ class LarmicMitwachsen extends HTMLElement {
   // „noch nicht“ an den Toren, die nie aufgehen: Bild und Ton nachgeladen mit dem ersten Schritt auf eine Torplatte
   private never = later(() => import('./mitwachsen-hint-look').then((m) => m.never()));
   /**
-   * „Noch nicht“: am Eistor (Haken im Welt-Paket), steht die Figur dort ohne Pinguin; an den Toren, die nie aufgehen,
-   * zeigen sie das Zeichen ihrer Welt (mitwachsen-hint-look.ts). In 3D, wenn die Kamera vorn ist
+   * „Noch nicht“: an einem Tor mit Schlüssel (Haken im Paket seiner Welt, heute am Eistor), steht die Figur dort ohne
+   * seinen Boten; an den Toren, die nie aufgehen, zeigen sie das Zeichen ihrer Welt (mitwachsen-hint-look.ts). In 3D,
+   * wenn die Kamera vorn ist
    */
-  private hint = (now: number, eis = this.packs.get('eis')?.view, { state, world } = this) => {
+  private hint = (now: number, { state, world } = this) => {
+    const plate = world.cell(state.player.x, state.player.y).plate;
     const a = [state, world, now, this.reduced.matches, this.sfx, this.lift, this.r3d] as const;
-    return this.never(world.cell(state.player.x, state.player.y).plate)?.(...a) ?? eis?.hint?.(...a) ?? null;
+    return this.never(plate)?.(...a) ?? this.packs.hint(...a); // die Haken der Pakete je Bild, auch neben der Platte
   };
 
   connectedCallback() {
@@ -317,8 +319,8 @@ class LarmicMitwachsen extends HTMLElement {
     const { state, events } = step(this.state, this.world, cmd, this.seen, this.guide, this.packs.loaded);
     this.state = state;
     // Ist die Leiste der Lichtung voll, gelten die Regeln des Pinguins aus dem Paket der Eis-Welt (bis er im Kessel wohnt)
-    if (!this.guide && pending(state)) this.guide = this.packs.get('eis')?.lead;
-    const { player, held } = state; // Paket der Eis-Welt holen, sobald ihr Tor eine Rolle spielt
+    if (!this.guide && pending(state)) this.guide = this.packs.at(GUIDE_GATE)?.lead;
+    const { player, held } = state; // Pakete der Welten holen, sobald ihr Tor eine Rolle spielt
     void this.packs.want({ ...state, at: [[player.x, player.y], held] }, this.world.gates);
     this.lift();
     if (events.length) this.react(events);
@@ -506,8 +508,8 @@ class LarmicMitwachsen extends HTMLElement {
         case 'follow':
           this.float('heart', e.id, GAME_COLORS.heart, now + 150);
           break;
-        case 'realm': // Weltwechsel an der Gangmitte: hoher Glockenton in die Eis-Welt, tiefer zurück
-          this.sfx.bell(e.to === 'eis');
+        case 'realm': // Weltwechsel an der Gangmitte: hoher Glockenton in eine Welt hinter einem Tor, tiefer zurück
+          this.sfx.bell(e.to !== 'lichtung');
           break;
         case 'breath': // ein kalter Atemzug weht aus dem offenen Eistor Schnee auf die Lichtung
           this.burst('', SPARKS.snow, 30, { x: e.x, y: e.y, z: this.world.cell(e.x, e.y).h + 1 });
@@ -534,7 +536,7 @@ class LarmicMitwachsen extends HTMLElement {
         // das Eistor geht mit dem Pinguin auf: nach dem Vorspiel Eiszapfen-Lied, Türflügel, Rumms und Akkord, wenn die
         // Kamera vorn ist (`at` in Takten, worlds/eis/mitwachsen-ritual.ts); die Flügel im Takt der Regeln
         case 'gate':
-          this.sfx.score(this.packs.get('eis')?.view?.sky.gateScore(e.at) ?? []); // Töne aus dem Welt-Paket
+          this.sfx.score(this.packs.at(e.id)?.view?.sky.gateScore(e.at) ?? []); // Töne aus dem Paket seiner Welt
           this.gates.set(e.id, this.state.tick + e.at);
           persist = true;
           break;

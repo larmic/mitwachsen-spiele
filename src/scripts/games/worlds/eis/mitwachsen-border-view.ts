@@ -15,8 +15,11 @@ import type { World } from '../../mitwachsen-world';
 export const TURN_MS = 400; // so lange klappt die Leiste beim Wechsel der Gegend um
 
 const ARROW = ['..a..', '.aaa.', 'aaaaa', '.aaa.', '.aaa.']; // zeigt nach oben
-/** Zeichen und Farbe jeder Gegend links in der Leiste: grünes Blatt der Lichtung, Schneeflocke der Eis-Welt */
-const SIGN: Record<RegionId, readonly [string[], string]> = {
+/**
+ * Zeichen und Farbe der Gegenden links in der Leiste, die dieses Paket kennt: grünes Blatt der Lichtung, Schneeflocke der
+ * Eis-Welt (einer Gegend ohne Zeichen hier fehlt es in der Leiste)
+ */
+const SIGN: Partial<Record<RegionId, readonly [string[], string]>> = {
   lichtung: [
     ['.....ggg', '...ggggg', '..gggggg', '.gggg.gg', '.ggg.ggg', '.gg.ggg.', '..gggg..', '.g......'],
     '#3f9a3c',
@@ -38,8 +41,8 @@ export function turnAlbum(t: Turn, realm: RegionId, now: number, reduced: boolea
 
 /** Zeichen der Gegend links in der Leiste, unten mittig bei (cx, bottom), `size` breit */
 export function realmSign(ctx: CanvasRenderingContext2D, realm: RegionId, cx: number, bottom: number, size: number) {
-  const [grid, color] = SIGN[realm];
-  sprite(ctx, grid, color, cx, bottom, size / 8);
+  const sign = SIGN[realm];
+  if (sign) sprite(ctx, sign[0], sign[1], cx, bottom, size / 8);
 }
 
 /** Wohin der Pfeil über einem wartenden Tier zeigt: zum nächsten ersten Feld seiner Seite (Tor bzw. Gangmündung) */

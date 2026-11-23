@@ -26,7 +26,8 @@ import {
   type Guided,
 } from '../../mitwachsen-guide';
 import { homeAt } from '../../mitwachsen-home';
-import { BESIDE, atPlate, plateRow } from './mitwachsen-bay';
+import { BESIDE, plateRow } from '../../mitwachsen-bay';
+import { atPlate } from './mitwachsen-bay';
 import { ALL, flood, key } from './mitwachsen-flood';
 import { homeward, opens, slideOn } from './mitwachsen-ritual';
 

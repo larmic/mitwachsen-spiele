@@ -2,7 +2,15 @@
 // Die Lagen relativ zum Bett stehen in HOMES (src/data/games/mitwachsen-homes.ts); wo das Bett steht, weiß die Welt.
 // Spezifikation: docs/specs/mitwachsen.md (Begriffe „Gegend“ und „Zuhause“)
 
-import { REGIONS, type GateId, type Point, type Rect, type Region, type RegionId } from '../../data/games/mitwachsen';
+import {
+  REGIONS,
+  REGION_IDS,
+  type GateId,
+  type Point,
+  type Rect,
+  type Region,
+  type RegionId,
+} from '../../data/games/mitwachsen';
 import { HOMES, type HomePlan } from '../../data/games/mitwachsen-homes';
 
 /** Zuhause einer Gegend in Feldern: Bett, Plätze zum Aufwachen, Wiese, Tröge und Unterstand (`HOMES`, ans Bett gelegt) */
@@ -19,10 +27,15 @@ export type Homestead = Omit<HomePlan, 'wake' | 'food' | 'water' | 'shelter' | '
 
 /** Was eine Welt über ihre Gegenden weiß (Teil von `World`) */
 export type Realms = {
-  /** Gegend, zu der ein Feld gehört (Lichtung oder Eis-Welt); die Landschaft draußen gehört zur Lichtung */
+  /** Gegend, zu der ein Feld gehört (Lichtung oder eine Welt hinter einem Tor); die Landschaft draußen gehört zur Lichtung */
   realm(x: number, y: number): RegionId;
   /** Zuhause je Gegend: jede hat ihr eigenes Bett, ihre Wiese, Tröge und ihren Unterstand */
   readonly homes: Readonly<Record<RegionId, Homestead>>;
+  /**
+   * Gegenden hinter einem Tor, hinter deren Gang die Welt etwas gebaut hat (ihre Welt aus dem Paket oder eine Klippe):
+   * Nur dort gibt es eine Weltgrenze (mitwachsen-border.ts)
+   */
+  readonly worlds: readonly RegionId[];
 };
 
 /** Zuhause einer Gegend an ihr Bett legen: alle Lagen aus `HOMES` sind relativ zum Bett */
@@ -47,13 +60,25 @@ export function placeHome(realm: RegionId, bed: Point): Homestead {
 export const LICHTUNG_HOME = placeHome('lichtung', [0, 0]);
 
 /**
- * Gegenden einer Welt: die Lichtung (dazu die Landschaft draußen) und die Eis-Welt hinter dem Eistor, deren Felder
- * (`realm`, als "x,y") und Bett die Welt kennt (Gletscherkessel und Gang ab seiner Mitte, worlds/eis/mitwachsen-kessel.ts)
+ * Gegenden einer Welt: die Lichtung (dazu die Landschaft draußen) und je Tor die Gegend dahinter (`inner`: Felder als
+ * "x,y" und Bett, wie sie die Welt gebaut hat; bei der Eis-Welt Gletscherkessel und Gang ab seiner Mitte,
+ * worlds/eis/mitwachsen-kessel.ts). Eine Gegend, die fehlt, hat ihr Bett vorerst am Bett der Lichtung.
  */
-export function realmsOf(eis: { bed: Point; realm: ReadonlySet<string> }): Realms {
+export function realmsOf(
+  inner: ReadonlyMap<RegionId, { bed: Point; realm: ReadonlySet<string>; built?: boolean }>,
+): Realms {
+  const homes = { lichtung: LICHTUNG_HOME } as Record<RegionId, Homestead>;
+  for (const id of REGION_IDS)
+    if (id !== 'lichtung') homes[id] = placeHome(id, inner.get(id)?.bed ?? LICHTUNG_HOME.bed);
+  const fields = [...inner].filter(([, r]) => r.realm.size); // nur Gegenden mit Feldern fragen
   return {
-    realm: (x, y) => (eis.realm.has(`${x},${y}`) ? 'eis' : 'lichtung'),
-    homes: { lichtung: LICHTUNG_HOME, eis: placeHome('eis', eis.bed) },
+    realm: (x, y) => {
+      const k = `${x},${y}`;
+      for (const [id, r] of fields) if (r.realm.has(k)) return id;
+      return 'lichtung';
+    },
+    homes,
+    worlds: [...inner].filter(([, r]) => r.built ?? true).map(([id]) => id),
   };
 }
 

@@ -20,7 +20,7 @@ import {
 import { wildAnimals } from './mitwachsen-wild';
 import { homeAt } from './mitwachsen-home';
 import { PLATE_HALF, plateMid } from './mitwachsen-plate';
-import { BESIDE, bay, inBay, plateRow } from './worlds/eis/mitwachsen-bay';
+import { BESIDE, bay, inBay, plateRow } from './mitwachsen-bay';
 import { EIS_PACK, PACKS, reachable, worldOf } from './test-worlds';
 
 const lichtung = REGIONS[0];
@@ -287,10 +287,11 @@ describe('Start auf der Lichtung', () => {
 
 describe('Zuhause je Gegend', () => {
   for (const seed of [1, 42]) {
-    it(`Seed ${seed}: jede Gegend hat ein Zuhause: Bett, Wiese, Tröge und Unterstand liegen in ihr, wie HOMES sie legt`, () => {
+    it(`Seed ${seed}: jede Gegend mit Welt hat ein Zuhause: Bett, Wiese, Tröge und Unterstand liegen in ihr, wie HOMES sie legt`, () => {
       const w = worldOf(seed);
       expect(w.homes.lichtung.bed).toEqual([0, 0]); // das Bett der Lichtung steht in ihrer Mitte
-      for (const r of REGIONS) {
+      // die Lichtung und jede Gegend, deren Paket es gibt (die Höhlenwelt hat noch keins)
+      for (const r of REGIONS.filter((g) => g.id === 'lichtung' || PACKS.some((p) => p.id === g.id))) {
         const home = w.homes[r.id];
         const plan = HOMES[r.id];
         const at = ([x, y]: readonly [number, number]) => [home.bed[0] + x, home.bed[1] + y];
@@ -450,6 +451,26 @@ describe('Welt-Pakete', () => {
       for (const id of lichtungIds) expect(bare.spawns.get(id), id).toEqual(full.spawns.get(id));
       expect(bare.spotsOf('lichtung')).toEqual(full.spotsOf('lichtung'));
       expect([...bare.gates.keys()]).toEqual([...full.gates.keys()]);
+    });
+
+    it(`Seed ${seed}: Hinter dem Höhlentor (geht nie auf) baut die Welt ohne Paket nichts: keine Gegend, keine Klippe, keine Weltgrenze`, () => {
+      for (const w of [bare, worldOf(seed)]) {
+        expect(w.worlds).toEqual(['eis']); // gebaut nur hinter dem Eistor (Kessel bzw. Eisklippe)
+        expect(w.spotsOf('hoehle')).toEqual([]);
+        expect(crossings(w).map((c) => c.gate.id)).toEqual(['eis']);
+        expect(w.homes.hoehle.realm).toBe('hoehle'); // ein Zuhause hat sie trotzdem (TypeScript verlangt es)
+        const gate = w.gates.get('hoehle')!;
+        const along = [gate.out[1], -gate.out[0]] as const;
+        const wrong: string[] = [];
+        // hinter der Mündung des Gangs: Landschaft wie hinter jedem Tor, das nie aufgeht, keine Klippe
+        for (let t = gate.deep + 1; t <= gate.deep + 3; t++)
+          for (let u = -GATE_HALF - 2; u <= GATE_HALF + 2; u++) {
+            const [x, y] = [gate.mid[0] + gate.out[0] * t + along[0] * u, gate.mid[1] + gate.out[1] * t + along[1] * u];
+            const c = w.cell(x, y);
+            if (c.region === 'border' || w.realm(x, y) !== 'lichtung') wrong.push(`${x},${y}`);
+          }
+        expect(wrong).toEqual([]);
+      }
     });
 
     it(`Seed ${seed}: Ohne Paket endet der Gang des Eistors an einer Eisklippe: keine Eis-Welt, kein Eis-Portal, kein Loch`, () => {

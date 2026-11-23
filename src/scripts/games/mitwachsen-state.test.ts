@@ -32,7 +32,7 @@ import { migrate, newWorld, progressFrom, withProgress, type SavedWorld } from '
 import type { RideRules } from './mitwachsen-rider';
 
 /** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich; Zuhause der Eis-Welt (im Kessel von Seed 1) */
-const { lichtung: LICHTUNG, eis: EIS_HOME } = worldOf(1).homes;
+const { lichtung: LICHTUNG, eis: EIS_HOME, hoehle: HOEHLE_HOME } = worldOf(1).homes;
 // Die Welten der Tests einmal vorab bauen (Frist der Hooks: vitest.config.ts): Sonst zahlt der erste Test je Seed den Bau (`worldOf`)
 beforeAll(() => {
   [1, 2, 3, 4, 5, 7, 42, 2026].forEach((s) => worldOf(s));
@@ -45,7 +45,8 @@ function fakeWorld(cells: Record<string, Partial<Cell>> = {}, home: Partial<Home
     seed: 1,
     cell: (x, y) => ({ h: 1, ground: 'grass', deco: null, region: 'lichtung', solid: false, ...cells[`${x},${y}`] }),
     realm: () => 'lichtung',
-    homes: { lichtung: { ...LICHTUNG, ...home }, eis: EIS_HOME },
+    homes: { lichtung: { ...LICHTUNG, ...home }, eis: EIS_HOME, hoehle: HOEHLE_HOME },
+    worlds: [],
     gates: new Map(),
     spawns: new Map(),
     spotsOf: () => [],
