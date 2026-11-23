@@ -9,6 +9,7 @@ import { chunkOf } from '../../lib/games/chunks';
 import { projection } from '../../lib/games/front';
 import type { World3D as World3DType } from './mitwachsen-3d';
 import { GAME_COLORS, LOOK, SPECIES, TIRED_TALK, realmOfAnimal, type GateId } from '../../data/games/mitwachsen';
+import { LANTERN_SPARKS } from '../../data/games/mitwachsen-hoehle';
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
 import { SPARKS, fly, glints, sparks } from './mitwachsen-glyphs';
 import { Sfx } from './sfx';
@@ -741,14 +742,20 @@ class LarmicMitwachsen extends HTMLElement {
    * Beeren gepflückt, Fische gefangen, nachgewachsen, Eimer geschöpft; Beeren, Fische oder Wasser in den Trog; ein
    * Schneehaufen wächst um eine Kugel (es ploppt, Töne aus dem Welt-Paket, und gleich gespeichert: der Schneemann
    * bleibt); ein Eiszapfen klingt (Ton aus dem Welt-Paket) und glitzert, die Figur läuft weiter; eine Kristallsäule
-   * klingt, der Grottenolm taucht am Steg auf (Bild und Ton aus dem Paket der Höhlenwelt)
+   * klingt, der Grottenolm taucht am Steg auf (Bild und Ton aus dem Paket der Höhlenwelt); die Figur nimmt die
+   * Kristall-Laterne (Ton aus dem Paket, sie hüpft, es glitzert)
    */
   private chore(e: ChoreEvent | Extract<GameEvent, { type: PackEvent['type'] | 'bob' }>, now: number) {
     if (e.type === 'bob') return void this.hops.set(e.id, now); // der Pinguin hüpft still neben der Torplatte
     if (reshapes(e)) this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]); // leer, wieder voll, gewachsen
-    if (e.type === 'snowman' || e.type === 'icicle' || e.type === 'column' || e.type === 'olm')
+    if (e.type === 'snowman' || e.type === 'icicle' || e.type === 'column' || e.type === 'olm' || e.type === 'lantern')
       this.sfx.score(packScore(this.renderer.views.values(), e)); // Töne aus dem Paket der Welt des Ereignisses
     if (e.type === 'column' || e.type === 'olm') return; // Säule und Grottenolm: Bild und Ton aus dem Paket
+    if (e.type === 'lantern') {
+      // Kristall-Laterne genommen: Die Figur hüpft, es glitzert (der Lichtkreis wächst im Bild des Pakets)
+      this.hops.set('player', now);
+      return this.burst('player', LANTERN_SPARKS, 12);
+    }
     if (e.type === 'icicle')
       return this.burst('', SPARKS.eis, 6, { x: e.x, y: e.y - 0.35, z: this.world.cell(e.x, e.y).h }, true);
     if (e.type === 'regrow') return;

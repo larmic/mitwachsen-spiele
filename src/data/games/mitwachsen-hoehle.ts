@@ -1,6 +1,6 @@
 // Höhlenwelt von Mitwachsen, was alle brauchen (Leiste, Album, Arten, Ansicht): die acht Höhlen-Tiere (Name, Ton,
-// Gangart, Futter), Farben der Leuchtpilze, der Korb mit Leuchtpilzen und die Kanne mit Tropfwasser, die die Figur
-// trägt. Wohnorte und Modelle der Tiere braucht nur das Welt-Paket der Höhlenwelt:
+// Gangart, Futter), Farben der Leuchtpilze, der Korb mit Leuchtpilzen, die Kanne mit Tropfwasser und die Kristall-Laterne,
+// die die Figur trägt. Wohnorte und Modelle der Tiere braucht nur das Welt-Paket der Höhlenwelt:
 // src/data/games/worlds/hoehle/mitwachsen-cave-animals.ts und mitwachsen-cave-models.ts. Die Gegend steht in `REGIONS`
 // (Gegend 'hoehle'), ihr Zuhause in `HOMES.hoehle`.
 // Konzept: docs/games/mitwachsen.md (Höhlenwelt) · Spec: docs/specs/mitwachsen.md (Abschnitt „Die Höhlen-Tiere“)
@@ -37,6 +37,21 @@ export const JUG_PARTS: Part[] = [
   [0.1, 0.33, 0.16, 0.05, 0.06, 0.04, '#9a96b0'], // Tülle nach vorn
   [-0.14, 0.34, 0.1, 0.04, 0.05, 0.14, '#8d86a8'], // Henkel hinten
 ];
+
+/**
+ * Kristall-Laterne in der linken Hand, vor dem Netz (in der Grotte, nach dem Hineinlaufen in ihren Sockel am Höhlenbett): ein
+ * leuchtender türkiser Kristall in einem Rahmen aus hellem Silber. Kein Gold: In der Hand ist sie keine Aktion mehr;
+ * nur auf ihrem Sockel trägt sie einen goldenen Rahmen (Welt-Paket der Höhlenwelt). Kein Feuer, keine Fackel
+ */
+export const LANTERN_PARTS: Part[] = [
+  [0.17, -0.36, 0.3, 0.03, 0.03, 0.07, '#8d86a8'], // Bügel bis zur Hand
+  [0.1, -0.43, 0.28, 0.17, 0.17, 0.03, '#c9c4dc', '#e4e0f0'], // Deckel
+  [0.12, -0.41, 0.09, 0.13, 0.13, 0.19, '#8fe0ea', '#d8f6fa'], // Kristall, leuchtet
+  [0.1, -0.43, 0.06, 0.17, 0.17, 0.03, '#c9c4dc', '#e4e0f0'], // Boden
+];
+
+/** Funken, wenn die Figur die Kristall-Laterne nimmt: türkis, lila, weiß */
+export const LANTERN_SPARKS = ['#8fe0ea', '#b48cf0', '#ffffff'] as const;
 
 /** Funken beim Sammeln (Leuchtpilze hüpfen in den Korb) und beim Füttern mit Pilzen */
 export const SHROOM_SPARKS = {

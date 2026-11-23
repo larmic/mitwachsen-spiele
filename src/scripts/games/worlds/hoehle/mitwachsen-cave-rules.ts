@@ -5,7 +5,8 @@
 // die verschlafene Fledermaus, die nach je vier Tönen eine Runde dreht; hängt keine mehr, fliegt keine.
 // Stiller See: Betritt sie das Ende des Holzstegs (`'jetty'` mit `note` 1, an der Kristallinsel), taucht der
 // Grottenolm daneben auf (Ereignis `olm`), und sie läuft weiter. Was man sieht und hört (Leuchten, Echo, die
-// Fledermaus nach je vier Tönen, „blubb“), steht in mitwachsen-chime-look.ts und mitwachsen-olm-look.ts. Die Regel
+// Fledermaus nach je vier Tönen, „blubb“), steht in mitwachsen-chime-look.ts und mitwachsen-olm-look.ts. Dazu nimmt die
+// Figur die Kristall-Laterne von ihrem Sockel am Bett (`takeLantern`, mitwachsen-lantern.ts). Die Regel
 // bekommt `step` als `pack.rules` (index.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Schmuck der Grotte“)
 
@@ -13,6 +14,7 @@ import type { Point } from '../../../../data/games/mitwachsen';
 import type { Cell } from '../../mitwachsen-cell';
 import type { Ruled, WorldRules } from '../../mitwachsen-pack-types';
 import { roostAt } from '../../mitwachsen-roost';
+import { takeLantern } from './mitwachsen-lantern';
 
 /** So weit (Felder, ringsum) von der Säule sucht das Glockenspiel eine hängende Fledermaus */
 export const PERCH_REACH = 12;
@@ -31,6 +33,7 @@ export function sleeperNear(s: Pick<Ruled, 'animals'>, cell: (x: number, y: numb
 
 const bump: WorldRules['bump'] = (s, c, x, y, events, { walks, cell }) => {
   if (c.region !== 'hoehle') return false;
+  if (takeLantern(s, c, x, y, events)) return true; // Kristall-Laterne am Bett (mitwachsen-lantern.ts)
   if (c.deco === 'column' && c.note !== undefined) {
     const perch = sleeperNear(s, cell, x, y);
     events.push({ type: 'column', x, y, note: c.note, ...(perch && { perch }) });

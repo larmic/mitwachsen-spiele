@@ -4,7 +4,9 @@
 // (Quader aus mitwachsen-cave-look.ts, je Deko-Art an den Haken `drawDeco` des Kerns gehängt), Lichtflecken auf dem
 // Grottenboden, der lila Höhlenhimmel und das Zeichen der Gegend in der Leiste (ein Kristall). Dazu der Schmuck der
 // Grotte: Töne des Säulen-Glockenspiels und „blubb“ des Grottenolms (`score`), „plink“ der Tropfsteine (`ambient`) und
-// in der Luft Tropfen, Grottenolm und die Fledermaus auf ihrer Runde (`sky.weather`, mitwachsen-cave-sky.ts). Wetter
+// in der Luft Tropfen, Grottenolm und die Fledermaus auf ihrer Runde (`sky.weather`, mitwachsen-cave-sky.ts). Licht der
+// Grotte (mitwachsen-glow.ts): Schatten der Ränder auf Boden und Wand (`ground`), der Lichtkreis um die Figur in der
+// Luft; die Kristall-Laterne auf ihrem Sockel als Körper (`bodies`) und ihr Ton beim Nehmen (mitwachsen-lantern.ts). Wetter
 // gibt es in der Grotte keins, Polarlicht auch nicht, und das Höhlentor geht vorerst nie auf.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
 
@@ -17,6 +19,8 @@ import { caveWeather, type CaveFx } from './mitwachsen-cave-sky';
 import { Chime } from './mitwachsen-chime-look';
 import { Drips } from './mitwachsen-drips';
 import { Olm } from './mitwachsen-olm-look';
+import { isWall, shadowOver } from './mitwachsen-glow';
+import { lanternBodies, lanternScore } from './mitwachsen-lantern';
 
 /** Dinge der Grotte: Quader wie in 3D */
 const look: DrawDeco = (world, c, x, y) => caveBoxes(world, c, x, y);
@@ -49,12 +53,26 @@ export function turnAlbum(t: Turn, realm: RegionId, now: number, reduced: boolea
 const none = () => {};
 
 /** Was die Grotte sich fürs Bild merkt (nur Bild, kein Spielstand) */
-export const fx: CaveFx = { chime: new Chime(), drips: new Drips(), olm: new Olm() };
+export const fx: CaveFx = { chime: new Chime(), drips: new Drips(), olm: new Olm(), light: {} };
+
+/**
+ * Boden der Grotte (der Kern ruft das nur auf Grottenboden und Felswand): Lichtfleck unter einem Lichtschacht und neben
+ * Kristallen als helles Licht obenauf; Ränder im Dunkel als halb durchsichtiger Schatten, an der Wand über ihren obersten
+ * Block, auf dem Boden (auch unter Stalagmit oder Findling) obenauf (mitwachsen-glow.ts)
+ */
+export const ground: View2D['ground'] = (c, x, y) => {
+  if (c.light) return [x, y, c.h, 1, 1, 0.01, glowOver(c.light), glowOver(c.light)];
+  if (!c.dim) return null;
+  const s = shadowOver(c.dim);
+  return isWall(c) ? [x, y, c.h - 1, 1, 1, 1, s, s] : [x, y, c.h, 1, 1, 0.01, s, s];
+};
 
 /** Kristallsäule: leuchtet kurz heller, nachdem sie geklungen hat */
 const column: DrawDeco = (_world, c, x, y, { now }) => columnBoxes(c, x, y, fx.chime.glow(x, y, now));
 
-export const view: View2D = {
+/** Zeichenteile der Grotte; `fx` dazu, damit die Browser-Tests den Lichtkreis sehen */
+export const view: View2D & { fx: CaveFx } = {
+  fx,
   decos: {
     shroombowl: look,
     stonetrough: look,
@@ -75,16 +93,20 @@ export const view: View2D = {
     clay: look,
     puddle: look,
     fern: look,
+    lantern: look, // Sockel; die Laterne darauf kommt als Körper (`bodies`)
   },
-  // Lichtfleck unter einem Lichtschacht und neben Kristallen: helles Licht obenauf (der Kern ruft das nur auf Grottenboden)
-  ground: (c, x, y) => (c.light ? [x, y, c.h, 1, 1, 0.01, glowOver(c.light), glowOver(c.light)] : null),
-  // Säule klingt (mit Echo; nach je vier Tönen zirpt die Fledermaus und fliegt), Grottenolm macht „blubb“
-  score: (e) =>
-    e.type === 'column'
-      ? fx.chime.ring(e.x, e.y, e.note, performance.now(), e.perch)
-      : e.type === 'olm'
-        ? fx.olm.surface(e.x, e.y, performance.now())
-        : undefined, // die anderen Ereignisse gehören anderen Welten
+  ground,
+  // Säule klingt (mit Echo; nach je vier Tönen zirpt die Fledermaus und fliegt), Grottenolm macht „blubb“, die Figur
+  // nimmt die Kristall-Laterne (der Lichtkreis wächst ab jetzt)
+  score: (e) => {
+    if (e.type === 'column') return fx.chime.ring(e.x, e.y, e.note, performance.now(), e.perch);
+    if (e.type === 'olm') return fx.olm.surface(e.x, e.y, performance.now());
+    if (e.type !== 'lantern') return undefined; // die anderen Ereignisse gehören anderen Welten
+    fx.light.since = performance.now();
+    return lanternScore();
+  },
+  // die Kristall-Laterne auf ihrem Sockel am Bett, solange die Figur sie nicht trägt
+  bodies: (state, world) => lanternBodies(state, world),
   // die verschlafene Fledermaus auf ihrer Runde hängt solange nicht an ihrem Sitzplatz
   away: (x, y, now) => fx.chime.away(x, y, now),
   // „plink“: höchstens ein Tropfen je 2 s in der Nähe der Figur, nur an Erkundetem

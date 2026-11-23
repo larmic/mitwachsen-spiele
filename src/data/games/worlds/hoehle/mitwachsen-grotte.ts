@@ -42,6 +42,18 @@ export const GROTTE = {
   /** Kristalle und Leuchtpilze machen ihr Feld und die acht Nachbarn so viel heller */
   glow: 0.15,
   /**
+   * Ränder im Dunkel (mitwachsen-glow.ts): Felswände um `wall` dunkler, der Boden direkt an der Wand um `floor`, nach
+   * innen weniger, `reach` Felder von der Wand nichts mehr. Wege, Bett, Lichtschächte und Leuchtendes bleiben hell
+   */
+  edge: { wall: 0.3, floor: 0.25, reach: 6 },
+  /**
+   * Lichtkreis um die Figur in der Grotte (Ebene über der Welt, kein Punktlicht): Radius in Feldern und Stärke, mit der
+   * Kristall-Laterne größer und etwas heller; wächst in `grow` ms (bei reduzierter Bewegung sofort)
+   */
+  circle: { r: 2.5, lantern: 4.5, alpha: 0.16, lanternAlpha: 0.22, grow: 600 },
+  /** Sockel der Kristall-Laterne, relativ zum Höhlenbett: rechts vorn, gespiegelt zum Platz des Klangsteins (−3, 1) */
+  lantern: [3, 1],
+  /**
    * Pilzgarten links: Mooswiese mit kleinen Leuchtpilzen und `beds` Beeten (je drei Leuchtpilze zum Sammeln) im Kreis
    * mit Radius `ring` um seine Mitte
    */
@@ -95,8 +107,8 @@ export const GROTTE = {
 /**
  * Farben der Grotte. Höhlenhimmel (oben offen, nie dunkler als die Dämmerung der Lichtung) und Nebel-Maske über dem
  * Unerkundeten; Schichten der Klippen und des Bodens (wie am Höhlentor); Kristalle in Lila, Türkis und Rosa; Leuchtpilze
- * in Rosa, Türkis und Gelb; Moos; Holz des Dachs an der Kristallwand; türkises Wasser; Lehm. Kein Gold: Das ist die
- * Aktionsfarbe.
+ * in Rosa, Türkis und Gelb; Moos; Holz des Dachs an der Kristallwand; türkises Wasser; Lehm; Schatten der Ränder und
+ * Licht des Lichtkreises. Kein Gold: Das ist die Aktionsfarbe (nur die Kristall-Laterne trägt es, solange man sie nehmen kann).
  */
 export const GROTTE_COLORS = {
   sky: '#4a4370',
@@ -117,4 +129,8 @@ export const GROTTE_COLORS = {
   water: ['#5fc8d8', '#8fe0ea'],
   /** Lehm des Dachshangs: Seite und Oberseite */
   clay: ['#a8794c', '#c39462'],
+  /** Schatten an den Rändern (2D halb durchsichtig über dem Boden; 3D dunkelt die Farbe ab) */
+  shadow: '#2e2848',
+  /** Lichtkreis um die Figur: kühles, helles Licht */
+  circle: [240, 238, 255],
 } as const;

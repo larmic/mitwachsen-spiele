@@ -31,7 +31,7 @@ export const FREE_KEYS = new Set([
 /**
  * Begegnungen: Tier gefunden oder angestoßen, Beeren gepflückt, Fische gefangen, Futter oder Wasser gebracht, Wasser
  * geschöpft, Plattform erwacht, gereist, Klangstein, das Eistor geht auf (und jeder Hüpfer, solange es aufgeht), ein
- * Schneehaufen wächst um eine Kugel (Eis-Welt), ins Bett gegangen. Danach bleibt die Figur kurz stehen (`pause`, so
+ * Schneehaufen wächst um eine Kugel (Eis-Welt), die Kristall-Laterne genommen (Grotte), ins Bett gegangen. Danach bleibt die Figur kurz stehen (`pause`, so
  * lange wie die Wartezeit am Anfang, damit man Herz und Noten sieht) und läuft mit gehaltenem Pfeil weiter. Nur aus dem
  * Bett muss der Pfeil neu gedrückt werden (`AGAIN`). Kein Halt am Eiszapfen-Glockenspiel (`icicle`, Eis-Welt): Wer die
  * Reihe entlangläuft, spielt eine Melodie im Takt der Schritte. Fahrzeuge (`ride`, Schlüssel `ride:<what>`): kurz
@@ -53,6 +53,7 @@ export const ENCOUNTERS: ReadonlySet<Key> = new Set<Key>([
   'gate',
   'hop',
   'snowman',
+  'lantern',
   'sleep',
   'ride:leave',
   'ride:alight',

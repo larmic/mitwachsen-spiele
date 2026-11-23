@@ -1,6 +1,7 @@
 // Aussehen der Dinge in der Kristallgrotte, gleich für 2D und 3D: Pilzschale, Steintrog mit Tropfmoos am Rand,
 // Unterstand mit der Kristallwand, Kristall-Lampen, Kristallsäulen (leuchten kurz heller, wenn sie klingen), Kristallbogen,
-// Leuchtpilze, Pilzbeete (voll und leer), Tropfquelle, Tropfmoos, Stalagmiten in drei Höhen, der Holzsteg und die
+// Leuchtpilze, Pilzbeete (voll und leer), Tropfquelle, Tropfmoos, Stalagmiten in drei Höhen, der Holzsteg, der Sockel
+// der Kristall-Laterne und die
 // Füllung (Kristallbüsche, Felsbrocken, Moos auf Felsinseln, Lehm, Pfützen, Farn); dazu Boden
 // und Klippen in den Schichten des Höhlentors und die Lichtflecken. Eigene Voxel-Grafik: keine Drusen, keine Loren, kein
 // Tropfstein mit Kessel. Rein (ohne DOM und Three.js): liefert Quader in Feldern, die beide Ansichten zeichnen. Teil des
@@ -13,6 +14,7 @@ import { hash } from '../../../../lib/games/rng';
 import type { Cell } from '../../mitwachsen-cell';
 import type { Realms } from '../../mitwachsen-home';
 import type { Box } from '../../mitwachsen-view';
+import { POST_H } from './mitwachsen-lantern';
 
 const C = GROTTE_COLORS;
 const [KR, KT, KP] = C.crystals;
@@ -109,7 +111,16 @@ const FILL: readonly Cell['deco'][] = ['crystalbush', 'boulder', 'mosstop', 'cla
 const OWN = new Map<Cell['deco'], (c: Cell, x: number, y: number) => Box[] | null>([
   ...SUPPLIES.map((d) => [d, supplyBoxes] as const),
   ...FILL.map((d) => [d, fillBoxes] as const),
+  ['lantern', post],
 ]);
+
+/** Sockel der Kristall-Laterne: niedriger Steinblock mit Platte, kein Gold (die Laterne darauf ist ein Körper) */
+function post(c: Cell, x: number, y: number): Box[] {
+  return [
+    [x + 0.28, y + 0.3, c.h, 0.44, 0.4, POST_H - 0.06, ...C.rock],
+    [x + 0.22, y + 0.24, c.h + POST_H - 0.06, 0.56, 0.52, 0.06, C.rock[1], C.rock[1]],
+  ];
+}
 
 function supplyBoxes(c: Cell, x: number, y: number): Box[] {
   const h = c.h;

@@ -75,6 +75,7 @@ export type Deco =
   | 'mosstop' // Moos auf einer flachen Felsinsel, eine Stufe hoch (begehbar)
   | 'clay' // Lehm am Hang des Dachses neben dem Pilzgarten (begehbar)
   | 'puddle' // kleine türkise Pfütze auf dem Grottenboden (begehbar, nur Zierde)
+  | 'lantern' // Sockel der Kristall-Laterne am Höhlenbett: Hineinlaufen nimmt die Laterne (fest; sie selbst zeichnet das Paket als Körper)
   | 'klangstein'; // Stein mit schwebender Note: Hineinlaufen spielt die Geschichte des Ortes
 export type TreeKind =
   'oak' | 'birch' | 'autumn' | 'red' | 'blossom' | 'winter' | 'pine' | 'snowpine' | 'palm' | 'dead';
@@ -100,6 +101,7 @@ export type Cell = {
   story?: StoryId; // Klangstein dieser Geschichte
   note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz); Kristallgrotte: Ton einer Säule, Teil, Höhe oder Ende des Stegs
   light?: number; // so viel heller (0 … 0,5) ist das Feld in der Grotte: Lichtschacht, Kristall oder Leuchtpilz daneben
+  dim?: number; // so viel dunkler (0 … 0,3) ist das Feld in der Grotte: Felswand oder Boden nah an ihr (nie auf Wegen, am Bett, im Licht)
   perch?: number; // Sitzplatz zum Hängen so hoch über dem Feld (unter dem Kristallbogen): Tiere mit Ruhehaltung hängen dort (`Species.roost`)
   slide?: true; // Rutschspur vom Eistor zum Schneebett (begehbar; glänzt, sobald das Tor offen ist)
   plate?: GateId; // Torplatte vor diesem Tor (mitten in der Bucht, eben und frei; Bild und Ton, öffnet das Eistor, mitwachsen-plate.ts)

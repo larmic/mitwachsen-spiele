@@ -410,7 +410,7 @@ describe('Luft der Grotte (2D und Ebene über 3D)', () => {
   const end = all.find(({ c }) => c.deco === 'jetty' && c.note === 1)!.p;
 
   it('bei reduzierter Bewegung kein Tropfen und keine Flugrunde, der Grottenolm zeigt sich still', () => {
-    const fresh = (): CaveFx => ({ chime: new Chime(), drips: new Drips(), olm: new Olm() });
+    const fresh = (): CaveFx => ({ chime: new Chime(), drips: new Drips(), olm: new Olm(), light: {} });
     const drip = fresh();
     drip.drips.tick(w, { player: { x: spring[0], y: spring[1] + 2 } }, 0, () => true);
     const bat = fresh();
@@ -432,7 +432,7 @@ describe('Luft der Grotte (2D und Ebene über 3D)', () => {
   });
 
   it('in 3D leuchtet eine klingende Säule auf der Ebene darüber, in 2D nicht (dort die Säule selbst)', () => {
-    const f: CaveFx = { chime: new Chime(), drips: new Drips(), olm: new Olm() };
+    const f: CaveFx = { chime: new Chime(), drips: new Drips(), olm: new Olm(), light: {} };
     f.chime.ring(...column.p, column.c.note!, 0);
     const flat = canvas();
     caveWeather(f)(flat.ctx, w, scene(100, false), P);
@@ -446,7 +446,7 @@ describe('Luft der Grotte (2D und Ebene über 3D)', () => {
   });
 
   it('im Nebel zeigt sich nichts', () => {
-    const f: CaveFx = { chime: new Chime(), drips: new Drips(), olm: new Olm() };
+    const f: CaveFx = { chime: new Chime(), drips: new Drips(), olm: new Olm(), light: {} };
     f.olm.surface(...end, 0);
     const c = canvas();
     caveWeather(f)(c.ctx, w, { ...scene(100, false), explored: () => false }, P);

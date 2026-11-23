@@ -12,7 +12,9 @@
 // Kreis um das Bett. Dazwischen die Füllung (mitwachsen-fill.ts): Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken,
 // Felsinseln mit Moos, Pfützen, unter den Schächten Moos und Farn; frei bleiben die Mitte, die Wege und die Spur des
 // künftigen Gleises von der Mündung zum Platz des Bahnhofs.
-// Licht ohne Punktlichter: Unter den Schächten und neben Kristallen und Leuchtpilzen ist der Boden heller (`Cell.light`).
+// Licht ohne Punktlichter: Unter den Schächten und neben Kristallen und Leuchtpilzen ist der Boden heller (`Cell.light`),
+// an den Felswänden dunkler, außer auf den Wegen (`Cell.dim`, mitwachsen-glow.ts). Rechts vorn am Bett steht der Sockel
+// der Kristall-Laterne (mitwachsen-lantern.ts).
 // Lagen rechnen von der Mündung aus. Teil des Welt-Pakets der Höhlenwelt (index.ts), nachgeladen.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
 
@@ -31,6 +33,7 @@ import { findSpawns } from '../../mitwachsen-spawns';
 import { OBSTACLE_GAP } from '../../mitwachsen-world';
 import { caveHaunts } from './mitwachsen-cave-haunts';
 import { corridorAt, fillGrotte, shadeGrotte } from './mitwachsen-fill';
+import { dimGrotte } from './mitwachsen-glow';
 import { siteOf, type Site } from './mitwachsen-site';
 
 const { rx, ry } = GROTTE.shape;
@@ -139,6 +142,8 @@ export function buildGrotte(
       map.set(k, { ...cliff(Math.max(2, c.h + 1)), region: 'hoehle' });
   }
   light(realm, at, map);
+  const path = pathsOf(site, bed, ringHome);
+  dimGrotte(realm, (x, y) => path(...site.uv(x, y)), map); // Ränder im Dunkel, Wege und Licht bleiben hell
   const stone: Point = [bed[0] + BED_STONE[0], bed[1] + BED_STONE[1]];
   const spots = spotsOf(site, reach, map);
   // Wohnorte der Höhlen-Tiere: das erste je Art an seinem Fundort, die anderen verteilt über die Grotte
@@ -193,17 +198,28 @@ const nearStation = (u: number, v: number) =>
  * Mitte bleibt licht), das Bett mit Mooswiese, das Gegenstück des Portals, die Zonen mit ihren eigenen Dingen
  * (Pilzgarten, Lehmhang, Kristallhalle, Felsbecken, See, Geröllhang) und die Plattform am Ende
  */
-function keepFree(site: Site, bed: Point, ring: Point) {
-  const { lamps, garden, clay, hall, lake, scree, portal } = GROTTE;
+/**
+ * Wege der Grotte (u, v): Mündung und Lampengang, der Weg durch die Mitte, Bett samt Wiese und Gegenstück des Portals,
+ * Bahnhof und Lokschuppen. Sie bleiben frei und hell (nie Schatten der Ränder, mitwachsen-glow.ts)
+ */
+function pathsOf(site: Site, bed: Point, ring: Point) {
   const [bu, bv] = site.uv(...bed);
   const [ru, rv] = site.uv(...ring);
   return (u: number, v: number) => {
     const [, o] = mouthward(u, v);
-    if (o < lamps.to + 4 && Math.abs(u) <= 6) return true; // Mündung und Lampengang
+    if (o < GROTTE.lamps.to + 4 && Math.abs(u) <= 6) return true; // Mündung und Lampengang
     if (Math.abs(u) <= 3) return true; // der Weg durch die Mitte
     if (Math.hypot(u - bu, v - bv) <= GROTTE.flat + 3) return true;
     if (Math.max(Math.abs(u - ru), Math.abs(v - rv)) <= PLATFORM_HALF + 3) return true;
-    if (nearStation(u, v)) return true;
+    return nearStation(u, v);
+  };
+}
+
+function keepFree(site: Site, bed: Point, ring: Point) {
+  const { garden, clay, hall, lake, scree, portal } = GROTTE;
+  const path = pathsOf(site, bed, ring);
+  return (u: number, v: number) => {
+    if (path(u, v)) return true;
     if (near(u, v, [garden.across, garden.out], garden.r)) return true;
     if (box(u, v, [clay.across - clay.step, clay.out], clay.step + 2, clay.long / 2 + 2)) return true;
     if (box(u, v, [hall.across, hall.out + 2], 7, 9)) return true; // Säulen und Bogen mit Platz ringsum
@@ -332,6 +348,7 @@ function homeGround(h: ReturnType<typeof placeHome>, set: (x: number, y: number,
   set(bx, by, { ...moss(), deco: 'bed', solid: true });
   set(...h.food, fixed('shroombowl'));
   set(...h.water, fixed('stonetrough'));
+  set(h.bed[0] + GROTTE.lantern[0], h.bed[1] + GROTTE.lantern[1], fixed('lantern')); // Sockel der Kristall-Laterne
   const { x0, y0, x1, y1 } = h.shelter;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, { ...moss(), garden: true, roof: true });
   for (let x = x0; x <= x1; x++) set(x, y0 - 1, fixed('shed')); // Rückwand: die Kristallwand, ihre Mitte ist `shelterStem`

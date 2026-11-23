@@ -63,8 +63,11 @@ export type Turn = { shown?: RegionId; from?: RegionId; at?: number };
  * Der Kern kennt nur diese Form, jede Welt füllt sie in ihrem Paket (Eis-Welt: worlds/eis/view-2d.ts).
  */
 export type Sky = {
-  /** Wetter in der Luft (die Ansicht ruft es, sobald die Welt Plätze hat) */
-  weather(ctx: CanvasRenderingContext2D, world: World, sc: SkyScene, P: Projection): void;
+  /**
+   * Wetter in der Luft (die Ansicht ruft es, sobald die Welt Plätze hat); `state`: der Zustand (Grotte: Lichtkreis um die
+   * Figur, größer mit der Kristall-Laterne)
+   */
+  weather(ctx: CanvasRenderingContext2D, world: World, sc: SkyScene, P: Projection, state?: State): void;
   /** Licht am Nachthimmel (Eis-Welt: Polarlicht über dem Schneebett, dazu leuchten in 2D die Eiskristalle) */
   aurora(ctx: CanvasRenderingContext2D, sc: SkyScene, P: Projection): void;
   /** Pfeil zum Tor über einem wartenden Tier (bei hx, hy) */
@@ -167,6 +170,7 @@ const PACKED: ReadonlySet<Deco> = new Set<Deco>([
   'column',
   'crystalarch',
   'crystalbush',
+  'lantern',
 ]);
 
 /**

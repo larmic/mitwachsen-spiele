@@ -23,7 +23,8 @@ const WHITE = [1, 1, 1] as const;
 
 /**
  * Boden eines Felds: Kacheln oben, oberste Seitenkachel, Seiten darunter; `top` färbt die Oberseite (Rutschspur),
- * `side` die Seiten (Eisfall); `light` macht die Oberseite so viel heller (0,35: um 35 %, Lichtfleck in der Grotte)
+ * `side` die Seiten (Eisfall); `light` macht die Oberseite so viel heller (0,35: um 35 %, Lichtfleck in der Grotte), negativ
+ * dunkler (−0,25: Rand im Dunkel)
  */
 export type Ground = { tiles: readonly [Tile, Tile, Tile]; top?: string; side?: string; light?: number };
 

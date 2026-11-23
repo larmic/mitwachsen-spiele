@@ -3,7 +3,8 @@
 // Leuchtpilze, Pilzbeete (voll oder abgeerntet; das Stück wird bei `gather` und `regrow` neu gebaut), Tropfquelle,
 // Tropfmoos, Stalagmiten und Holzsteg (Quader aus mitwachsen-cave-look.ts, wie in 2D; Säulen stehen still, ihr
 // Leuchten beim Klingen zeichnet die Ebene darüber, mitwachsen-cave-sky.ts), Boden und Klippen in den zart lila-grauen
-// Schichten des Höhlentors, Lichtflecken in den Farben der Ecken (keine Punktlichter) und der lila Höhlenhimmel ohne
+// Schichten des Höhlentors, Lichtflecken in den Farben der Ecken (keine Punktlichter), Ränder im Dunkel (Wände und
+// Boden an ihnen dunkler, mitwachsen-glow.ts), der Sockel der Kristall-Laterne und der lila Höhlenhimmel ohne
 // Decke mit seiner Nebel-Maske. Braucht Three.js (wie die 3D-Ansicht) und kommt darum erst, wenn die 3D-Ansicht es will
 // (`pack.view3d`, index.ts): im Build `_astro/welt-hoehle-3d.<hash>.js` mit eigener Grenze (scripts/verify-bundles.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
@@ -13,6 +14,7 @@ import type { Cell } from '../../mitwachsen-cell';
 import type { DrawDeco } from '../../mitwachsen-view';
 import type { Ground, View3D } from '../../mitwachsen-view-3d';
 import { band, caveBoxes } from './mitwachsen-cave-look';
+import { darken, isWall } from './mitwachsen-glow';
 
 const look: DrawDeco = (world, c, x, y) => caveBoxes(world, c, x, y);
 const bed: DrawDeco = (world, c, x, y, { picked }) => caveBoxes(world, c, x, y, !(`${x},${y}` in picked));
@@ -48,16 +50,19 @@ export const view3d: View3D = {
     clay: look,
     puddle: look,
     fern: look,
+    lantern: look, // Sockel; die Laterne darauf kommt als Körper (wie in 2D)
   },
   ground(c) {
     if (c.biome !== 'hoehle' || c.region === 'wild') return null;
-    const light = c.light;
-    // Grottenstein: Steinkachel, getönt in den zart lila-grauen Schichten (oben heller, Seiten je Höhe)
+    // Lichtfleck heller, Ränder im Dunkel dunkler (mitwachsen-glow.ts): beides über `Ground.light`, nie beides zugleich
+    const light = c.light || (c.dim ? -c.dim : undefined);
+    // Grottenstein: Steinkachel, getönt in den zart lila-grauen Schichten (oben heller, Seiten je Höhe); die Felswand im
+    // Schatten auch an ihren Seiten dunkler
     if (c.ground === 'grotto')
       return {
         tiles: ['stone', 'stone', 'stone'],
         top: c.region === 'border' ? GROTTE_COLORS.bands[0] : GROTTE_COLORS.floor[1],
-        side: band(c.h),
+        side: isWall(c) && c.dim ? darken(band(c.h), c.dim) : band(c.h),
         light,
       };
     const tiles = TILES[c.ground];

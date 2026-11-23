@@ -47,18 +47,19 @@ export type Kessel = {
  * des Glockenspiels klingt mit seiner Tonhöhe `note`, 0 tief. Höhlenwelt: eine Kristallsäule des Säulen-Glockenspiels
  * klingt mit ihrem Ton `note`, 0 = C5, `perch`: Sitzplatz im Kristallbogen nahe der Säule, an dem gerade eine Fledermaus
  * hängt (die verschlafene Fledermaus, die nach je vier Tönen eine Runde dreht), keiner: fehlt; der Grottenolm taucht am
- * Ende des Stegs auf (x, y: die Planke))
+ * Ende des Stegs auf (x, y: die Planke); die Figur nimmt die Kristall-Laterne von ihrem Sockel (x, y: der Sockel))
  */
 export type PackEvent =
   | { type: 'snowman'; x: number; y: number; stage: number }
   | { type: 'icicle'; x: number; y: number; note: number }
   | { type: 'column'; x: number; y: number; note: number; perch?: Point }
-  | { type: 'olm'; x: number; y: number };
+  | { type: 'olm'; x: number; y: number }
+  | { type: 'lantern'; x: number; y: number };
 
 /**
  * Was die Regeln einer Welt vom Zustand sehen und ändern dürfen: den gespeicherten Zustand der Welt-Pakete (`packs`, je
  * Paket unter seiner Kennung in seinem eigenen Format; der Kern trägt ihn nur und speichert ihn mit), Figur und Tiere,
- * Takt und Beginn des Rituals am Eistor (`ritual`, mitwachsen-guide.ts)
+ * Takt und Beginn des Rituals am Eistor (`ritual`, mitwachsen-guide.ts), die Laterne in der Hand (`lamp`, nicht gespeichert)
  */
 export type Ruled = {
   packs: Record<string, unknown>;
@@ -66,6 +67,7 @@ export type Ruled = {
   ritual: number;
   player: { x: number; y: number };
   animals: { species: SpeciesId; x: number; y: number; dir: Dir; mode: string; rest: number }[];
+  lamp?: RegionId; // die Figur trägt die Laterne dieser Gegend (Grotte: Kristall-Laterne; der Kern legt sie zurück)
 };
 
 /**

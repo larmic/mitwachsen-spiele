@@ -3,8 +3,9 @@
 // Licht, Portal am stillen See, Fundorte der acht Höhlen-Tiere, Pilzbeete, Tropfquelle und Tropfmoos zum Sammeln) und
 // die Zeichenteile der 2D-Ansicht samt den Modellen der Höhlen-Tiere (die Fledermaus auch kopfüber), dazu ihr Schmuck:
 // Säulen-Glockenspiel, Grottenolm am Steg und Tropfsteine (Regeln in mitwachsen-cave-rules.ts, Bild und Ton in
-// view-2d.ts), und ihre Füllung (mitwachsen-fill.ts). Die Regeln des Sammelns stehen bei den Handgriffen im Kern (mitwachsen-chores.ts). Tok und der Zug
-// kommen später.
+// view-2d.ts), ihre Füllung (mitwachsen-fill.ts) und ihr Licht: Ränder im Dunkel, Lichtkreis um die Figur und die
+// Kristall-Laterne am Bett (mitwachsen-glow.ts, mitwachsen-lantern.ts; die Regel der Laterne ist Teil von `rules`). Die
+// Regeln des Sammelns stehen bei den Handgriffen im Kern (mitwachsen-chores.ts). Tok und der Zug kommen später.
 // Das Spiel braucht es vorerst nie (das Höhlentor geht nie auf); nur der Entwickler-Schalter holt es
 // (`/spielen/?entwickler=hoehle`, mitwachsen-dev.ts). Nichts außerhalb dieses Ordners importiert statisch von hier
 // (geprüft durch `npm run arch`): im Build `_astro/welt-hoehle.<hash>.js` (Name aus astro.config.mjs), gemessen mit
@@ -27,7 +28,7 @@ export const pack: WorldPack<GuideRules, View2D, View3D, RideRules> = {
   gate: 'hoehle',
   build: buildGrotte,
   place: placeGrotte,
-  rules, // Säulen-Glockenspiel und Grottenolm am Steg
+  rules, // Säulen-Glockenspiel, Grottenolm am Steg, Kristall-Laterne
   view,
   view3d: () => import('./view-3d').then((m) => m.view3d),
   models: CAVE_MODELS,

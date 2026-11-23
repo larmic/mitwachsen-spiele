@@ -73,6 +73,7 @@ export type State = Omit<Progress, 'position'> & {
   shrooms: boolean; // Korb mit Leuchtpilzen auf dem Rücken (nach dem Sammeln am Pilzbeet, bis zur Pilzschale; nie zugleich mit Beeren)
   bucket: boolean; // Eimer mit Wasser in der Hand (nach dem Schöpfen, bis zum Wassertrog)
   fish: boolean; // Netz mit Fischen in der linken Hand (nach dem Fangen an der Fischkiste, bis zur Eisschale)
+  lamp?: RegionId; // Laterne dieser Gegend in der Hand (Grotte: Kristall-Laterne, Regel im Welt-Paket); bleibt in ihrer Gegend, über Nacht zurück an ihren Platz (nicht gespeichert)
   calm: number; // Tag, an dem der Pinguin auf die Schneewiese gezogen ist: an ihm weht kein Pustewind (nicht gespeichert)
   guideDue: number; // verlaufener Pinguin: Takt, ab dem er auftaucht bzw. aufgetaucht ist (nicht gespeichert, mitwachsen-guide.ts)
   ritual: number; // Takt, an dem das Ritual am Eistor beginnt, nach dem Vorspiel (-1: noch nicht; nicht gespeichert, worlds/eis/mitwachsen-ritual.ts)
@@ -316,7 +317,16 @@ export function step(
   } else if (cmd.type === 'action' && !s.ride) action(s, world, events); // im Fahrzeug: kein Singen, kein Schlafen
   wakePortals(s, world, explored, events); // Portal-Plattformen in der Nähe erwachen (mitwachsen-travel.ts)
   guide?.guide(s, world, cmd.type, events, explored); // der verlaufene Pinguin taucht auf und führt
+  keepLamp(s, world);
   return { state: s, events };
+}
+
+/**
+ * Die Laterne bleibt in ihrer Gegend: Wer sie verlässt (zu Fuß, mit Portal oder Fahrzeug), hat sie nicht mehr, sie steht
+ * wieder auf ihrem Platz
+ */
+function keepLamp(s: State, world: World) {
+  if (s.lamp && world.realm(s.player.x, s.player.y) !== s.lamp) delete s.lamp;
 }
 
 function tick(s: State, world: World, events: GameEvent[], ride?: RideRules) {
@@ -550,6 +560,7 @@ function sleep(s: State, world: World, events: GameEvent[]) {
   }
   s.followers = [];
   s.arrived = null;
+  delete s.lamp; // die Laterne steht über Nacht wieder auf ihrem Platz am Bett
   s.player = { x: bx, y: by, dir: 's' };
   events.push({ type: 'sleep' });
 }

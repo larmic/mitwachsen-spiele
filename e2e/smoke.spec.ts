@@ -8,7 +8,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { SCALE } from '../src/scripts/games/worlds/eis/mitwachsen-chime-look';
 import { needsBlink } from '../src/scripts/games/mitwachsen-turn';
-import { GROTTE_COLORS } from '../src/data/games/worlds/hoehle/mitwachsen-grotte';
+import { GROTTE, GROTTE_COLORS } from '../src/data/games/worlds/hoehle/mitwachsen-grotte';
 import {
   FRAME_MS,
   arrive,
@@ -234,6 +234,62 @@ test(
     expect(errors).toEqual([]);
   },
 );
+
+// Licht der Grotte per Entwickler-Schalter (2D): Um die wache Figur liegt ein Lichtkreis; läuft sie in den Sockel am
+// Höhlenbett, trägt sie die Kristall-Laterne, und der Kreis wächst; im Bett steht die Laterne wieder auf dem Sockel
+test('Spiel: Kristall-Laterne in der Grotte per Entwickler-Schalter, Lichtkreis wächst, über Nacht zurück, ohne Fehler', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  const game = await openGame(page, { clock: true, dev: 'hoehle' });
+  type Game = {
+    world: { homes: Record<string, { bed: [number, number] }> };
+    state: { player: { x: number; y: number; dir: string }; sleeping: boolean; wokeAt: number; lamp?: string };
+    renderer: { views: Map<string, { fx?: { light: { drawn?: { r: number; alpha: number } | null } } }> };
+    rides: { id: string }[];
+    apply(cmd: { type: 'move'; dir: string }): void;
+  };
+  await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+  await ticks(page, 10);
+  await render(page, 2);
+  const look = () =>
+    game.evaluate((node) => {
+      const el = node as unknown as Game;
+      return {
+        circle: el.renderer.views.get('hoehle')?.fx?.light.drawn ?? null,
+        lamp: el.state.lamp ?? null,
+        onPost: el.rides.some((r) => r.id === 'lantern'),
+        sleeping: el.state.sleeping,
+      };
+    });
+  const { r, alpha, lantern, lanternAlpha, grow } = GROTTE.circle;
+  expect(await look()).toEqual({ circle: { r, alpha }, lamp: null, onPost: true, sleeping: false });
+  // links neben den Sockel stellen und hineinlaufen
+  await game.evaluate((node, [dx, dy]) => {
+    const el = node as unknown as Game;
+    const [bx, by] = el.world.homes.hoehle!.bed;
+    el.state = { ...el.state, wokeAt: -1e6, player: { x: bx + dx - 1, y: by + dy, dir: 'e' } };
+  }, GROTTE.lantern);
+  await arrive(page);
+  await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 'e' }));
+  await play(page, grow + 200);
+  expect(await look()).toEqual({
+    circle: { r: lantern, alpha: lanternAlpha },
+    lamp: 'hoehle',
+    onPost: false,
+    sleeping: false,
+  });
+  // ins Bett: Die Laterne steht wieder auf dem Sockel, im Schlaf kein Lichtkreis
+  await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const [bx, by] = el.world.homes.hoehle!.bed;
+    el.state = { ...el.state, player: { x: bx, y: by + 1, dir: 'n' } };
+    el.apply({ type: 'move', dir: 'n' });
+  });
+  await render(page, 2);
+  expect(await look()).toEqual({ circle: null, lamp: null, onPost: true, sleeping: true });
+  expect(errors).toEqual([]);
+});
 
 // Je Welt ein Test, dass sie gezeichnet wird: im Projekt `game` in 2D, im Projekt `3d` mit WebGL samt dem 3D-Teil ihres
 // Welt-Pakets (Schmuck ihres Tors). Neue Welten kommen in die Liste
