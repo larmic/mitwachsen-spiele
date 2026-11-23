@@ -470,6 +470,28 @@ describe('Kristallgrotte: Gelände', () => {
       expect(Math.min(...mouthward.map(([, o]) => o))).toBe(0);
       const { station } = GROTTE;
       expect(mouthward.some(([a, o]) => o === station.out - 1 && a === station.side)).toBe(true);
+      // und hinüber bis an die Spur hinter dem Bahnsteig (dort hält der Zug, der Weg zum Bahnsteig kreuzt kein Gleis)
+      expect(mouthward.some(([a, o]) => o === station.out - 1 && a === station.side + station.wide)).toBe(true);
+    });
+
+    it(`Seed ${seed}: der Platz des Bahnhofs ist für die Bahn markiert, die Spur u −2 der Bucht kommt auf seiner Seite an`, () => {
+      const cells = placeOf(seed).cells.map((p) => ({ p, c: w.cell(...p) }));
+      const stops = cells.filter(({ c }) => c.stop === 'hoehle');
+      expect(stops.map(({ p }) => key(p)).sort()).toEqual(
+        cells
+          .filter(({ p }) => stationAt(...site.uv(...p)))
+          .map(({ p }) => key(p))
+          .sort(),
+      );
+      expect(stops).toHaveLength(GROTTE.station.long * GROTTE.station.wide);
+      // Spur u −2 der Bucht (u wächst nach [−out.y, out.x], mitwachsen-bay.ts) durch den Gang: in der Grotte bei u +2
+      const g = w.gates.get('hoehle')!;
+      const lane = (t: number): Point => [
+        g.mid[0] + 2 * g.out[1] + g.out[0] * t,
+        g.mid[1] - 2 * g.out[0] + g.out[1] * t,
+      ];
+      if (!site.turn) expect(site.uv(...lane(g.deep + 1))[0]).toBe(2);
+      expect(GROTTE.station.side).toBeGreaterThan(2); // der Bahnhof liegt auf der Seite u+
     });
   }
 });

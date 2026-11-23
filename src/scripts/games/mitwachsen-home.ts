@@ -60,6 +60,17 @@ export function placeHome(realm: RegionId, bed: Point): Homestead {
 export const LICHTUNG_HOME = placeHome('lichtung', [0, 0]);
 
 /**
+ * Bett und Plätze zum Aufwachen je Gegend, die ein Zuhause hat: die Lichtung und jede Welt aus einem Paket (`inner`: je
+ * Gegend hinter einem Tor ihr Bett und ihre Felder; ohne Felder keine Welt). Für Pakete, die in die Welten etwas legen
+ * (`WorldPack.lay`)
+ */
+export const bedsOf = (inner: ReadonlyMap<RegionId, { bed: Point; realm: ReadonlySet<string> }>) =>
+  new Map<RegionId, { bed: Point; wake: readonly Point[] }>([
+    ['lichtung', LICHTUNG_HOME],
+    ...[...inner].flatMap(([id, b]) => (b.realm.size ? [[id, placeHome(id, b.bed)] as const] : [])),
+  ]);
+
+/**
  * Gegenden einer Welt: die Lichtung (dazu die Landschaft draußen) und je Tor die Gegend dahinter (`inner`: Felder als
  * "x,y" und Bett, wie sie die Welt gebaut hat; bei der Eis-Welt Gletscherkessel und Gang ab seiner Mitte,
  * worlds/eis/mitwachsen-kessel.ts). Eine Gegend, die fehlt, hat ihr Bett vorerst am Bett der Lichtung.

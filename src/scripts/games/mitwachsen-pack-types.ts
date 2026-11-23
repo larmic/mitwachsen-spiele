@@ -12,10 +12,11 @@ import type { Cell } from './mitwachsen-cell';
 import type { Portal, PortalId } from './mitwachsen-portal';
 
 /**
- * Kennung eines Welt-Pakets: die Gegend hinter einem Tor, deren Welt es baut (Eis-Welt, Höhlenwelt). Unter ihr steht
- * auch sein Zustand in `State.packs`; je Kennung ein Lader in mitwachsen-packs.ts
+ * Kennung eines Welt-Pakets: die Gegend hinter einem Tor, deren Welt es baut (Eis-Welt, Höhlenwelt), oder ein Paket, das
+ * keine eigene Welt hat, sondern in die gebauten Welten etwas legt (`'bahn'`: das Gleis der Höhlenbahn auf Lichtung und
+ * Grotte, `WorldPack.lay`). Unter ihr steht auch sein Zustand in `State.packs`; je Kennung ein Lader in mitwachsen-packs.ts
  */
-export type PackId = Exclude<RegionId, 'lichtung'>;
+export type PackId = Exclude<RegionId, 'lichtung'> | 'bahn';
 
 /** Gang hinter einem Tor, in Koordinaten u (entlang des Tors) und t (nach außen) */
 export type Gang = {
@@ -147,9 +148,28 @@ export type WorldRules<Ride = never> = {
 /** Liegt ein Feld ganz hinter dem Felsring der Lichtung? */
 export type Beyond = (x: number, y: number) => boolean;
 
+/** Ein großes Tor, wie es `lay` sieht: Kennung, Felder der Tür, ihre Mitte, nach außen (`GatePlace` in mitwachsen-world.ts) */
+export type Door = { id: GateId; cells: readonly Point[]; mid: Point; out: Point };
+
 /**
- * Ein Welt-Paket. `build` baut die Welt in die Karte der festen Felder (`map`, dort liegt schon der Gang durch den
- * Felsring; `passage` liefert ein Feld des Gangs), `place` sagt nur, wo sie läge. `lead`: Regeln, die das Paket der
+ * Was `lay` von der gebauten Welt bekommt: die Karte der festen Felder (Lichtung, Gänge, Welten aus Paketen; `lay`
+ * ändert sie), die Tore und je Gegend mit Zuhause ihr Bett und die Felder, auf denen die Figur dort aufwacht; dazu der
+ * Spielstand der Pakete (`State.packs`), mit dem die Welt gebaut wird: Was ein Paket legt, darf nur davon abhängen
+ * (die Bahn legt ihr Gleis erst ab Ausbau 1, vorher bleibt die Lichtung, wie sie ist)
+ */
+export type Laid = {
+  seed: number;
+  map: Map<string, Cell>;
+  gates: ReadonlyMap<GateId, Door>;
+  beds: ReadonlyMap<RegionId, { bed: Point; wake: readonly Point[] }>;
+  packs: Readonly<Record<string, unknown>>;
+};
+
+/**
+ * Ein Welt-Paket. `build` baut die Welt hinter seinem Tor `gate` in die Karte der festen Felder (`map`, dort liegt schon
+ * der Gang durch den Felsring; `passage` liefert ein Feld des Gangs), `place` sagt nur, wo sie läge; beides hat nur ein
+ * Paket mit eigener Welt. `lay`: Ein Paket ohne eigene Welt (die Bahn) legt etwas in die fertig gebaute Karte (das Gleis
+ * auf Lichtung und Grotte), nachdem alle Welten stehen und bevor die Lichtung ihre unerreichbaren Ecken zu Fels macht. `lead`: Regeln, die das Paket der
  * Ansicht mitbringt (Eis-Welt: der verlaufene Pinguin führt zum Tor und öffnet es, `GuideRules`). `view`: ihre
  * Zeichenteile für die Ansicht (Eis-Welt: `View2D` aus mitwachsen-view.ts, Wetter und Bild der Weltgrenze). `view3d`:
  * lädt ihren 3D-Teil nach (`View3D` aus mitwachsen-view-3d.ts; braucht Three.js, darum ein eigener `import()`, erst wenn
@@ -159,15 +179,16 @@ export type Beyond = (x: number, y: number) => boolean;
  */
 export type WorldPack<Rules = unknown, View = unknown, View3 = unknown, Ride = unknown> = {
   id: PackId;
-  gate: GateId; // das Tor, hinter dem seine Welt liegt (`REGIONS`: `behind` der Gegend `id`)
-  build(
+  gate?: GateId; // das Tor, hinter dem seine Welt liegt (`REGIONS`: `behind` der Gegend `id`); ohne eigene Welt keins
+  build?(
     seed: number,
     gang: Gang,
     beyond: Beyond,
     passage: (x: number, y: number) => Cell,
     map: Map<string, Cell>,
   ): Kessel;
-  place(seed: number, gang: Gang, beyond: Beyond): KesselPlace;
+  place?(seed: number, gang: Gang, beyond: Beyond): KesselPlace;
+  lay?(laid: Laid): void;
   lead?: Rules;
   rules?: WorldRules<Ride>;
   view?: View;

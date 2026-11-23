@@ -3,7 +3,9 @@
 // Am liebsten gerade hinter dem Gang wie der Gletscherkessel. Liegt dort die Eis-Welt im Weg (ihr Tor steht gleich
 // daneben und zeigt in dieselbe Richtung), führt die Verlängerung des Gangs um eine Ecke: erst ein Stück geradeaus,
 // dann quer, von der Eis-Welt weg; die Grotte liegt dann mit ihrer Länge in dieser Richtung. Gewählt wird die kürzeste
-// Verlängerung, eine Ecke kostet so viel wie `TURN_COST` Felder geradeaus.
+// Verlängerung, eine Ecke kostet so viel wie `TURN_COST` Felder geradeaus. Die Grotte liegt so herum (wenn nötig
+// gespiegelt, quer zum Gang), dass die Spur des Gleises (u −2 der Bucht vor dem Tor, mitwachsen-bay.ts) in der Grotte auf
+// der Seite des Bahnhofs ankommt (u +2, `GROTTE.station`): So kreuzt das Gleis nie den Weg durch die Mitte.
 // Teil des Welt-Pakets der Höhlenwelt (index.ts), nachgeladen.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
 
@@ -71,7 +73,18 @@ function wallsOf(floor: readonly Point[], wall: number): Point[] {
  * Mitte `ry + C` Felder hinter dem Ende des Gangs. Um die Ecke: `k` Felder geradeaus, dann quer zur Seite `side`,
  * `m` Felder bis an die Klippen; Kosten `k + m + TURN_COST`.
  */
-export function siteOf(gang: Gang, beyond: Beyond, { rx, ry, gap }: { rx: number; ry: number; gap: number }): Site {
+export function siteOf(gang: Gang, beyond: Beyond, room: { rx: number; ry: number; gap: number }): Site {
+  const site = unmirrored(gang, beyond, room);
+  // Spur des Gleises in der Bucht: u −2 dort, wo u nach [−out.y, out.x] wächst (mitwachsen-bay.ts). Gerade wie um die
+  // Ecke kommt die Spur u des Gangs (`gang.at`) in der Grotte bei demselben u an; liegt sie bei u −2, wird gespiegelt
+  const o = gang.at(0, 0);
+  const across = [gang.at(1, 0)[0] - o[0], gang.at(1, 0)[1] - o[1]] as const;
+  const out = [gang.at(0, 1)[0] - o[0], gang.at(0, 1)[1] - o[1]] as const;
+  if (across[0] * out[1] - across[1] * out[0] > 0) return site; // die Spur liegt bei u +2 des Gangs
+  return { ...site, at: (u, v) => site.at(-u, v), uv: (x, y) => [-site.uv(x, y)[0], site.uv(x, y)[1]] };
+}
+
+function unmirrored(gang: Gang, beyond: Beyond, { rx, ry, gap }: { rx: number; ry: number; gap: number }): Site {
   const [A, B] = [rx + gap, ry + gap];
   const { half: h, wall, end } = gang;
   const o = gang.at(0, 0);

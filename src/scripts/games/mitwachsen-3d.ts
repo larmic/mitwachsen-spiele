@@ -162,6 +162,7 @@ export class World3D {
   private platforms!: Platforms3D; // Portal-Plattformen
   private chunks = new Map<string, Chunk>();
   private stale = new Set<string>(); // Stücke, die neu gebaut werden müssen; bis dahin bleibt das alte stehen
+  private stamp = ''; // was am Zustand der Pakete ihre Stücke ändert (`Views3D.stamp`): ändert es sich, alles neu
   private at: DecoAt = { now: 0, reduced: true, picked: {}, packs: {} }; // für drawDeco: leere Büsche, Schneemänner
   private day = 0; // Tag der Welt: bestimmt, was nachgewachsen ist
   private air: Air | undefined; // Luft der Welt, in der die Figur zuletzt war (Grotte), solange sie ausblendet
@@ -335,7 +336,9 @@ export class World3D {
     if (this.world !== world) this.reset(world);
     this.explored = sc.explored;
     this.at = { ...this.at, picked: state.picked, packs: state.packs }; // in 3D zuckt nichts
-    if (state.day !== this.day || state.openGates.join() !== this.opened.join()) {
+    const stamp = this.views.stamp(state.packs); // Zustand der Pakete, der ihre Stücke ändert (Ausbau der Bahn)
+    if (state.day !== this.day || state.openGates.join() !== this.opened.join() || stamp !== this.stamp) {
+      this.stamp = stamp;
       // ein neuer Tag: Stücke neu bauen, denn es sind Blumen und Pilze nachgewachsen (oder ein Tor ging auf, dann
       // glänzt etwa die Rutschspur)
       this.day = state.day;
@@ -579,7 +582,10 @@ export class World3D {
       for (let x = cx * CHUNK; x < (cx + 1) * CHUNK; x++) {
         const c = grown(world.seed, this.day, x, y, world.cell(x, y)); // mit allem, was schon nachgewachsen ist
         this.terrain(solid, water, lava, world, c, x, y);
-        if (!this.packed({ g: solid, blades: leaves, canopy, glow }, c, x, y))
+        // Gleis (3D-Teil der Bahn): Schwellen, Schienen, Prellbock, Portal; dort keine Büschel und Blumen
+        const rails = c.ride ? this.views.rails(c, x, y, this.at) : null;
+        for (const [bx, by, bz, w, d, bh, side, top] of rails ?? []) solid.box(bx, bz, by, w, bh, d, side, top);
+        if (!rails && !this.packed({ g: solid, blades: leaves, canopy, glow }, c, x, y))
           this.decoration(solid, leaves, canopy, bright, c, x, y);
       }
     const meshes: Mesh[] = [];

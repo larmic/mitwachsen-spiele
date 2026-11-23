@@ -43,7 +43,7 @@ export function behind(
   gate: GateId,
   closable = !!keyOf(gate) || !!regionBehind(gate)?.room, // kann das Tor aufgehen, oder liegt dahinter eine Welt?
 ): Behind {
-  if (pack) {
+  if (pack?.build) {
     const { stone, portal, ...rest } = pack.build(seed, gang, beyond, passage, map);
     const story = openStory(gate);
     return { ...rest, portals: [portal], stones: story ? [[story, stone]] : [], built: true };

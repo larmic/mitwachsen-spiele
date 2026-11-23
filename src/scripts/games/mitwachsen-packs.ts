@@ -8,7 +8,7 @@
 import type { Part } from '../../lib/games/front';
 import { REGIONS, SPECIES, type GateId, type Point, type SpeciesId } from '../../data/games/mitwachsen';
 import type { GuideRules, Hint } from './mitwachsen-guide';
-import { needsPack, type Need } from './mitwachsen-pack';
+import { bahnWanted, needsPack, type Need } from './mitwachsen-pack';
 import type { PackId, WorldPack } from './mitwachsen-pack-types';
 import type { RideRules } from './mitwachsen-rider';
 import type { View2D } from './mitwachsen-view';
@@ -26,11 +26,13 @@ export const RETRY_MS = 30_000;
 /**
  * Ein Lader je Welt-Paket (per import(), einziger Einstieg `worlds/<welt>/index.ts`). Eine Gegend ohne Eintrag hat noch
  * kein Paket: Hinter ihrem Tor baut die Welt dann, was ohne Paket dort steht (mitwachsen-behind.ts). Das Paket der
- * Höhlenwelt (die Kristallgrotte) braucht das Spiel vorerst nie, nur der Entwickler-Schalter holt es (`Packs.extra`).
+ * Höhlenwelt (die Kristallgrotte) braucht das Spiel vorerst nie, nur der Entwickler-Schalter holt es (`Packs.extra`);
+ * das Paket der Bahn (das Gleis auf Lichtung und Grotte) erst, wenn die Bahn-Phase freigeschaltet ist (`bahnWanted`).
  */
 const LOADERS: Partial<Record<PackId, () => Promise<LoadedPack>>> = {
   eis: () => import('./worlds/eis').then((m) => m.pack),
   hoehle: () => import('./worlds/hoehle').then((m) => m.pack),
+  bahn: () => import('./worlds/bahn').then((m) => m.pack),
 };
 /** Die Pakete, die es gibt (je Lader eines) */
 export const PACK_IDS = Object.keys(LOADERS) as PackId[];
@@ -78,7 +80,7 @@ export class Packs {
 
   /** Das geladene Paket der Welt hinter dem Tor `gate` (undefined: keines da) */
   at(gate: GateId | undefined): LoadedPack | undefined {
-    return this.ready.find((p) => p.gate === gate);
+    return gate && this.ready.find((p) => p.gate === gate);
   }
 
   /**
@@ -94,7 +96,8 @@ export class Packs {
 
   /**
    * Braucht der Spielstand ein Paket und fehlt es noch, wird es geholt; erfüllt, sobald alle nötigen da sind (oder
-   * scheiterten). Jedes Paket für sich: sein Tor (`behind` seiner Gegend), sein Laden, sein Neuversuch
+   * scheiterten). Jedes Paket für sich: sein Tor (`behind` seiner Gegend; die Bahn ohne eigenes Tor: `bahnWanted`), sein
+   * Laden, sein Neuversuch
    */
   want(need: Need, gates: ReadonlyMap<GateId, { mid: Point }>, now = performance.now()): Promise<void> {
     return Promise.all(this.ids.map((id) => this.wantOne(id, need, gates, now))).then(noop);
@@ -102,8 +105,9 @@ export class Packs {
 
   private wantOne(id: PackId, need: Need, gates: ReadonlyMap<GateId, { mid: Point }>, now: number) {
     const gate = REGIONS.find((r) => r.id === id)?.behind;
-    if (!gate || this.get(id) || !(this.extra.includes(id) || needsPack(need, gates, beyondRing, gate)))
-      return Promise.resolve();
+    const wanted =
+      this.extra.includes(id) || (gate ? needsPack(need, gates, beyondRing, gate) : id === 'bahn' && bahnWanted(need));
+    if (this.get(id) || !wanted) return Promise.resolve();
     if (!this.loading.has(id) && now - (this.failedAt.get(id) ?? -Infinity) >= RETRY_MS)
       this.loading.set(
         id,

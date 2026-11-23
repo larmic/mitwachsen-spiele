@@ -39,7 +39,7 @@ import { reshapes, type ChoreEvent } from './mitwachsen-chores';
 import { createWorld, gatePlaces, standHeight, type World } from './mitwachsen-world';
 import { GUIDE_GATE, pending, type GuideRules } from './mitwachsen-guide';
 import { PACK_IDS, Packs, type LoadedPack } from './mitwachsen-packs';
-import { glimpse, sandbox } from './mitwachsen-dev';
+import { devPacks, glimpse, sandbox } from './mitwachsen-dev';
 import { randomId, randomSeed, savedOrNew, showName } from './mitwachsen-world-list';
 import { platformLift, portalColor } from './mitwachsen-portal';
 import { HOME_STAGGER, SNAP_DELAY, hopOf, nibblers, snaps } from './mitwachsen-gait';
@@ -120,8 +120,9 @@ class LarmicMitwachsen extends HTMLElement {
   private gl3d: World3DType | null = null; // die geladene 3D-Ansicht, auch wenn ihr Kontext gerade fehlt
   private guide?: GuideRules; // Regeln des verlaufenen Pinguins (aus dem Paket der Eis-Welt), sobald er fällig ist
   private packs = new Packs((pack) => this.arrive(pack)); // Welt-Pakete (worlds/), geladen erst bei Bedarf
-  // Entwickler-Schalter (`?entwickler=hoehle`, mitwachsen-dev.ts): Welt, in die geblickt wird; dann wird nichts gespeichert
-  private dev = glimpse(location.search, PACK_IDS);
+  // Entwickler-Schalter (`?entwickler=hoehle`, mitwachsen-dev.ts): Pakete, in die geblickt wird; dann wird nichts gespeichert
+  private glimpse = glimpse(location.search, PACK_IDS);
+  private dev = this.glimpse.packs.length > 0;
   private opening = ''; // Welt, die gerade öffnet (wartet vielleicht auf ein Paket)
   private live = ''; // Welt, zu der `state` gehört; solange sie nicht `opening` ist, ruhen Takt und Speichern
   // Postkarte der Torfront, nachgeladen mit der ersten
@@ -154,7 +155,7 @@ class LarmicMitwachsen extends HTMLElement {
     this.store = this.dev ? sandbox(browserStore().store) : browserStore().store;
     this.sfx.muted = this.store.getItem('larmic.games.muted') === '1';
     this.tired = loadTired(this.store, Date.now());
-    if (this.dev) this.packs.extra = [this.dev]; // sein Paket holen, auch ohne Bedarf
+    this.packs.extra = this.glimpse.packs; // seine Pakete holen, auch ohne Bedarf
     void this.openWorld(loadIndex(this.store).current).then(() => this.begin());
   }
 
@@ -241,12 +242,16 @@ class LarmicMitwachsen extends HTMLElement {
     if (this.opening !== saved.id) return; // inzwischen wurde eine andere Welt geöffnet
     this.saved = { ...saved, visits: saved.visits + 1 };
     if (!this.dev) saveWorld(this.store, this.saved);
-    this.world = createWorld(this.saved.seed, this.packs.loaded);
+    // Entwickler-Schalter: Der Spielstand bekommt, was er vorspielt (die Bahn: ihren Ausbau), schon für den Bau der Welt
+    const progress = progressFrom(this.saved);
+    if (this.dev) progress.packs = { ...progress.packs, ...devPacks(this.glimpse.packs, location.search) };
+    this.world = createWorld(this.saved.seed, this.packs.loaded, progress.packs);
     this.seenAt = '';
-    this.state = initialState(this.world, progressFrom(this.saved), this.saved.seed ^ this.saved.visits);
+    this.state = initialState(this.world, progress, this.saved.seed ^ this.saved.visits);
     // Entwickler-Schalter: Die Figur schläft im Bett der Welt, in die geblickt wird (nur, wenn ihr Paket da ist)
-    if (this.dev && this.packs.get(this.dev)) {
-      const [x, y] = this.world.homes[this.dev].bed;
+    const { home } = this.glimpse;
+    if (home && this.packs.get(home)) {
+      const [x, y] = this.world.homes[home].bed;
       this.state = { ...this.state, player: { ...this.state.player, x, y } };
     }
     this.live = this.saved.id;
@@ -281,7 +286,7 @@ class LarmicMitwachsen extends HTMLElement {
    * 3D-Ansicht lädt ihre nach)
    */
   private arrive(pack: LoadedPack) {
-    if (pack.view) this.renderer.views.set(pack.gate, pack.view);
+    if (pack.view) this.renderer.views.set(pack.gate ?? pack.id, pack.view);
     this.gl3d?.use(pack); // sein 3D-Teil kommt nach (mit Three.js)
     if (!(this.world as World | undefined)) return; // entsteht gleich mit ihm; sonst immer einbauen (zweimal: egal)
     const { world, chunks } = this.world.attach(pack);
@@ -553,7 +558,7 @@ class LarmicMitwachsen extends HTMLElement {
         // das Eistor geht mit dem Pinguin auf: nach dem Vorspiel Eiszapfen-Lied, Türflügel, Rumms und Akkord, wenn die
         // Kamera vorn ist (`at` in Takten, worlds/eis/mitwachsen-ritual.ts); die Flügel im Takt der Regeln
         case 'gate':
-          this.sfx.score(this.packs.at(e.id)?.view?.sky.gateScore(e.at) ?? []); // Töne aus dem Paket seiner Welt
+          this.sfx.score(this.packs.at(e.id)?.view?.sky?.gateScore(e.at) ?? []); // Töne aus dem Paket seiner Welt
           this.gates.set(e.id, this.state.tick + e.at);
           persist = true;
           break;

@@ -371,7 +371,7 @@ export function rideRules(
       const at = stopsOf(r);
       const k = key(x, y);
       if (at.home.cells.has(k)) return true;
-      if (stage !== 'fest' && !world.cell(x, y).ride) return false; // die Lichtung erst nach der ersten Heimfahrt
+      if (stage !== 'fest' && world.cell(x, y).ride !== spec.id) return false; // die Lichtung erst nach der ersten Heimfahrt
       return at.out.cells.has(k) || (a.mode === 'wander' && r.on.has(k));
     },
   };

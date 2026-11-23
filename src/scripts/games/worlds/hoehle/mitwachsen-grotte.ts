@@ -18,6 +18,7 @@
 // Lagen rechnen von der Mündung aus. Teil des Welt-Pakets der Höhlenwelt (index.ts), nachgeladen.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
 
+import { fromKey } from '../../../../lib/games/chunks';
 import { hash, rand01, valueNoise } from '../../../../lib/games/rng';
 import type { Point } from '../../../../data/games/mitwachsen';
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
@@ -142,6 +143,7 @@ export function buildGrotte(
       map.set(k, { ...cliff(Math.max(2, c.h + 1)), region: 'hoehle' });
   }
   light(realm, at, map);
+  markStation(realm, site, map);
   const path = pathsOf(site, bed, ringHome);
   dimGrotte(realm, (x, y) => path(...site.uv(x, y)), map); // Ränder im Dunkel, Wege und Licht bleiben hell
   const stone: Point = [bed[0] + BED_STONE[0], bed[1] + BED_STONE[1]];
@@ -149,6 +151,14 @@ export function buildGrotte(
   // Wohnorte der Höhlen-Tiere: das erste je Art an seinem Fundort, die anderen verteilt über die Grotte
   const spawns = findSpawns(seed, caveHaunts(spots, map, at, bed), spots, bed);
   return { bed, realm, spots, spawns, stone, portal: [CAVE_PORTAL, portal] };
+}
+
+/** Platz des Bahnhofs Fledermaus: für das Paket der Bahn markiert (`Cell.stop`), das daneben sein Gleis legt */
+function markStation(realm: ReadonlySet<string>, site: Site, map: Map<string, Cell>) {
+  for (const k of realm) {
+    const c = map.get(k);
+    if (c && stationAt(...site.uv(...fromKey(k)))) map.set(k, { ...c, stop: 'hoehle' });
+  }
 }
 
 /** Winkel von `a` nach `b` */
@@ -183,7 +193,7 @@ const strip =
     const [, o] = mouthward(u, v);
     return u >= side && u < side + wide && o >= out && o < out + long;
   };
-/** Platz für den Bahnhof Fledermaus: Streifen seitlich neben dem Weg */
+/** Platz für den Bahnhof Fledermaus: Streifen seitlich neben dem Weg, auf der Seite, auf der das Gleis ankommt */
 export const stationAt = strip(GROTTE.station);
 /** Platz für den Lokschuppen: neben dem Bahnhof, zwei Felder weiter außen */
 export const shedAt = strip(GROTTE.shed);

@@ -9,6 +9,7 @@
 
 import { pack as eis } from './worlds/eis';
 import { pack as hoehle } from './worlds/hoehle';
+import { pack as bahn } from './worlds/bahn';
 import { DIRS } from '../../lib/games/front';
 import type { GateId } from '../../data/games/mitwachsen';
 import { canStep, createWorld, type World } from './mitwachsen-world';
@@ -20,17 +21,29 @@ addModels(hoehle.models, hoehle.roosts); // und der Höhlen-Tiere samt der Flede
 export const PACKS = [eis, hoehle] as const;
 export const EIS_PACK = eis;
 export const HOEHLE_PACK = hoehle;
+/**
+ * Das Paket der Bahn (Gleis auf Lichtung und Grotte): nicht in `PACKS`, denn bis zum Freischalten (`BAHN_LIVE`) holt das
+ * Spiel es nie von selbst; Tests der Bahn reichen es herein, mit einem Ausbau (`worldOf(seed, [HOEHLE_PACK, BAHN_PACK],
+ * BUILT)`; ohne Ausbau legt es nichts)
+ */
+export const BAHN_PACK = bahn;
+/** Spielstand der Pakete mit ganz gebautem Gleis (`packs.bahn.built` 2), für `worldOf` */
+export const BUILT: Readonly<Record<string, unknown>> = { bahn: { built: 2 } };
 
 const worlds = new Map<string, World>();
 /**
  * Die Welt eines Seeds mit den Paketen `packs`, je Seed und Paketen einmal gebaut. Ohne `packs` mit allen, wie im
  * Spiel (für Tests, die das Zusammenspiel prüfen); Tests einer Welt reichen nur ihr Paket herein, dann baut ein neues
- * Paket ihre Welten nicht mit
+ * Paket ihre Welten nicht mit; `saved`: Spielstand der Pakete, nach dem ein Paket ohne eigene Welt legt (`BUILT`)
  */
-export function worldOf(seed: number, packs: readonly WorldPack[] = PACKS): World {
-  const key = `${seed}:${packs.map((p) => p.id).join(',')}`;
+export function worldOf(
+  seed: number,
+  packs: readonly WorldPack[] = PACKS,
+  saved: Readonly<Record<string, unknown>> = {},
+): World {
+  const key = `${seed}:${packs.map((p) => p.id).join(',')}:${JSON.stringify(saved)}`;
   let w = worlds.get(key);
-  if (!w) worlds.set(key, (w = createWorld(seed, packs)));
+  if (!w) worlds.set(key, (w = createWorld(seed, packs, saved)));
   return w;
 }
 

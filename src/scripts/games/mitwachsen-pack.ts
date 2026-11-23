@@ -15,6 +15,7 @@ import {
   type Region,
   type RegionId,
 } from '../../data/games/mitwachsen';
+import { BAHN_LIVE } from '../../data/games/mitwachsen-rides';
 import { GUIDE_GATE, pending, type Guided } from './mitwachsen-guide';
 import type { Beyond } from './mitwachsen-pack-types';
 import { startRealm, type Realms } from './mitwachsen-home';
@@ -46,6 +47,15 @@ export function needsPack(
   // Nähe zählt nur an einem Tor, das aufgehen kann: Ein Tor, das nie aufgeht (das Höhlentor), lädt nichts im Vorbeigehen
   return !!keyOf(gate) && s.at.some((p) => !!p && packAt(p, gates, beyond, gate));
 }
+
+/**
+ * Braucht das Spiel das Paket der Bahn (worlds/bahn/: das Gleis der Höhlenbahn)? Nie, solange die Bahn-Phase nicht
+ * freigeschaltet ist (`live`, `BAHN_LIVE`): Dann holt es nur der Entwickler-Schalter. Freigeschaltet, sobald das Eistor
+ * offen ist (Tok kommt erst nach der Eis-Welt; wann genau, regelt der Schritt „Tok erscheint“). Was davon zu sehen ist,
+ * sagt der Ausbau (`packs.bahn.built`): bei 0 nichts
+ */
+export const bahnWanted = (s: Pick<Need, 'openGates'>, live = BAHN_LIVE): boolean =>
+  live && s.openGates.includes('eis');
 
 /**
  * Gehört ein Ort zur Welt hinter dem Tor `gate` oder ist ihr nah? Ja, wenn er höchstens `NEAR_GATE` Felder vom Tor

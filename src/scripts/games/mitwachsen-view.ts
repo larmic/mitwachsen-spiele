@@ -99,13 +99,53 @@ export type Trail = {
   draw(ctx: CanvasRenderingContext2D, world: World, P: Projection, y: number): void;
 };
 
-/** Zeichenteile einer Welt aus ihrem Paket */
+/**
+ * Gleis auf einem Feld mit Strecke (`Cell.ride`, Paket der Bahn): seine Quader (Schwellen, Schienen, Prellbock,
+ * Tunnelportal, Einschnitt), je nach Ausbau im Zustand der Pakete (`at.packs`); null: dort liegt (noch) nichts, das Feld
+ * zeigt sich wie sonst. Gleich für 2D und 3D. Liegt Gleis, zeigt das Feld weder Grasbüschel noch Blumen
+ */
+export type DrawRails = (c: Cell, x: number, y: number, at: Pick<DecoAt, 'packs'>) => readonly Box[] | null;
+
+/**
+ * Wann die 2D-Ansicht das Gleis eines Felds zeichnet: sonst in der Reihe seiner Vorderkante (`later`, wie die Dinge der
+ * Welt-Pakete) statt Büscheln, Blumen und Deko; auf einem Feld des Tors (die Tür des Höhlentors auf der Spur u −2) gleich
+ * (`now`) und danach die Tür darüber (`deco`), sonst fehlte ihr dort ein Streifen, solange sie zu ist oder aufgeht
+ */
+export function railsOrder(
+  c: Cell,
+  rails: readonly Box[],
+): { now: readonly Box[]; later: readonly Box[]; deco: boolean } {
+  return c.gate ? { now: rails, later: [], deco: true } : { now: [], later: rails, deco: false };
+}
+
+/**
+ * Gleis eines Felds mit Strecke (`Cell.ride`) in 2D zeichnen (`railsOrder`; `rails` fragt die Pakete, nur dort): gleich
+ * oder in `later`; false, wenn das Feld sonst nichts mehr zeigt (liegt kein Gleis, true)
+ */
+export function placeRails(
+  ctx: CanvasRenderingContext2D,
+  P: Projection,
+  c: Cell,
+  rails: () => readonly Box[] | null | undefined,
+  later: Box[],
+): boolean {
+  const boxes = c.ride ? rails() : null;
+  if (!boxes) return true;
+  const order = railsOrder(c, boxes);
+  for (const b of order.now) drawBox(ctx, P, b);
+  later.push(...order.later);
+  return order.deco;
+}
+
+/** Zeichenteile einer Welt aus ihrem Paket (ein Paket ohne eigene Welt, die Bahn, hat keinen Himmel, `sky`) */
 export type View2D = {
   /** je Deko-Art, die nur diese Welt hat, ihre Zeichnung */
   decos: Partial<Record<Deco, DrawDeco>>;
   /** flach auf dem Boden eines Felds (Rutschspur, glänzt bei offenem Tor der Welt), sonst null */
   ground(c: Cell, x: number, y: number, open: boolean): Box | null;
-  sky: Sky;
+  /** Gleis auf Feldern mit Strecke (Paket der Bahn) */
+  rails?: DrawRails;
+  sky?: Sky;
   /** Himmel hinter der Welt in 2D (drei Streifen von oben), solange die Figur in ihr ist (Grotte), sonst blau */
   heaven?: readonly string[];
   /** Wasser dieser Welt (Grotte: türkis): Farbe und Glanz, sonst blau wie überall */

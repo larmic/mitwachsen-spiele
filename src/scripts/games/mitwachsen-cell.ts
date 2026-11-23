@@ -1,6 +1,6 @@
 // Ein Feld der Welt von Mitwachsen: Boden, Höhe, Zierde und wozu es gehört. Nur Typen; gebaut wird in
 // mitwachsen-world.ts (Lichtung, Landschaft), worlds/eis/mitwachsen-kessel.ts (Eis-Welt) und
-// worlds/hoehle/mitwachsen-grotte.ts (Höhlenwelt).
+// worlds/hoehle/mitwachsen-grotte.ts (Höhlenwelt); das Gleis der Höhlenbahn legt worlds/bahn/mitwachsen-line.ts hinein.
 // Spezifikation: docs/specs/mitwachsen.md
 
 import type { GateId, RegionId } from '../../data/games/mitwachsen';
@@ -105,5 +105,15 @@ export type Cell = {
   perch?: number; // Sitzplatz zum Hängen so hoch über dem Feld (unter dem Kristallbogen): Tiere mit Ruhehaltung hängen dort (`Species.roost`)
   slide?: true; // Rutschspur vom Eistor zum Schneebett (begehbar; glänzt, sobald das Tor offen ist)
   plate?: GateId; // Torplatte vor diesem Tor (mitten in der Bucht, eben und frei; Bild und Ton, öffnet das Eistor, mitwachsen-plate.ts)
-  ride?: RideId; // Strecke dieses Fahrzeugs (nur in einer Welt und ihrem Gang, begehbar wie die Rutschspur; Welt-Paket)
+  ride?: RideId; // Strecke dieses Fahrzeugs (begehbar wie die Rutschspur; Welt-Paket): Schneespur in der Eis-Welt, Gleis der Höhlenbahn auf Lichtung und Grotte
+  rail?: Rail; // Stück des Gleises auf dem Feld (nur mit `ride`; Paket der Bahn, worlds/bahn/)
+  stop?: RideId; // Platz eines Halts dieses Fahrzeugs (Bahnsteig; den Platz in der Grotte hält ihr Paket frei, den Bahnsteig baut das Paket des Fahrzeugs)
 };
+
+/**
+ * Ein Stück Gleis (Paket der Bahn): `to` die Richtungen, in die es weiterführt (`n` oben, `e` rechts, `s` unten, `w`
+ * links; zwei, an den Enden eine), `stage` ab welchem Ausbau es liegt (1: Lichtung bis zum Prellbock in der Bucht, 2:
+ * durch Tor und Gang in die Grotte), `part` was dort steht: Prellbock am Ende einer Linie (`end`), Prellbock in der Bucht,
+ * solange der Ausbau 1 ist (`buffer`), Tunnelportal (`portal`), oben offener Einschnitt (`cut`)
+ */
+export type Rail = { to: string; stage: 1 | 2; part?: 'end' | 'buffer' | 'portal' | 'cut' };

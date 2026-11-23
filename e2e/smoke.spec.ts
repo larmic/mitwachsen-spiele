@@ -235,6 +235,110 @@ test(
   },
 );
 
+// Das Gleis der Höhlenbahn sieht bis zum Freischalten (`BAHN_LIVE`) nur der Entwickler-Schalter: Die Figur wacht im Bett
+// der Lichtung auf, das Höhlentor bleibt zu, der Schalter spielt den Ausbau 2 vor, das Gleis liegt von Bahnhof Bär bis vor
+// das Tor und wird gezeichnet (2D: Schienen und Schwellen im Bild, 3D: aus dem 3D-Teil der Bahn); gespeichert wird
+// nichts. Ohne Schalter kommt das Paket der Bahn nicht
+test(
+  'Spiel: Gleis der Höhlenbahn per Entwickler-Schalter, nur dort, speichert nichts, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    const game = await openGame(page, { clock: true, dev: 'bahn' });
+    const webgl = await expectView(page);
+    type Rail = { to: string; part?: string };
+    type Game = {
+      world: {
+        homes: Record<string, { bed: [number, number] }>;
+        gates: Map<string, { mid: [number, number]; out: [number, number] }>;
+        cell(x: number, y: number): { rail?: Rail; region: string };
+      };
+      state: { player: { x: number; y: number; dir: string }; openGates: string[]; packs: Record<string, unknown> };
+      packs: { get(id: string): unknown };
+      renderer: { views: Map<string, unknown> };
+      r3d: unknown;
+      gl3d: { views: { rails(c: unknown, x: number, y: number, at: unknown): unknown[] | null } } | null;
+      fog: { reveal(x: number, y: number, r: number): void };
+      apply(cmd: { type: 'move'; dir: string }): void;
+    };
+    // vom Prellbock vor der Tür (Spur u −2, Reihe −1) zurück bis an das Ende bei Bahnhof Bär
+    const line = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const { mid, out } = el.world.gates.get('hoehle')!;
+      const steps: Record<string, [number, number]> = { e: [1, 0], s: [0, 1], w: [-1, 0], n: [0, -1] };
+      let p: [number, number] = [mid[0] + 2 * out[1] - out[0], mid[1] - 2 * out[0] - out[1]];
+      const buffer = el.world.cell(...p).rail ?? null;
+      let n = 0;
+      for (; n < 300; n++) {
+        const r = el.world.cell(...p).rail;
+        if (!r || (n > 0 && r.to.length < 2)) break;
+        const [dx, dy] = steps[r.to[0]!]!;
+        p = [p[0] + dx, p[1] + dy];
+      }
+      const [bx, by] = el.world.homes.lichtung!.bed;
+      return {
+        buffer: buffer?.part ?? null,
+        cells: n + 1,
+        end: el.world.cell(...p).rail?.part ?? null,
+        start: p,
+        inBed: el.state.player.x === bx && el.state.player.y === by,
+        open: el.state.openGates,
+        built: el.state.packs.bahn,
+        bahn: !!el.packs.get('bahn') && el.renderer.views.has('bahn'),
+      };
+    });
+    expect(line).toMatchObject({
+      buffer: 'buffer',
+      end: 'end',
+      inBed: true,
+      open: [],
+      built: { built: 2 },
+      bahn: true,
+    });
+    expect(line.cells).toBeGreaterThan(20);
+    // an Bahnhof Bär stellen (der Nebel dort gelichtet) und zeichnen: mit Ausbau 2 Schienen und Schwellen von oben (2D),
+    // mit Ausbau 0 nicht; in 3D das Gleis aus dem 3D-Teil der Bahn, nur mit Ausbau
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    await ticks(page, 10);
+    await game.evaluate((node, [x, y]) => {
+      const el = node as unknown as Game;
+      el.state = { ...el.state, player: { x, y, dir: 's' } };
+      el.fog.reveal(x, y, 10);
+    }, line.start);
+    await arrive(page);
+    // je Ausbau: in 2D das Bild (jedes vierte Pixel), in 3D die Quader des Gleises am Bahnhof
+    const drawn = async (built: number) => {
+      await game.evaluate((node, b) => {
+        const el = node as unknown as Game;
+        el.state = { ...el.state, packs: { ...el.state.packs, bahn: { built: b } } };
+      }, built);
+      await render(page, 2);
+      return game.evaluate((node, start) => {
+        const el = node as unknown as Game;
+        if (el.r3d) return [el.gl3d?.views.rails(el.world.cell(...start), ...start, el.state)?.length ?? 0];
+        const cv = node.querySelector<HTMLCanvasElement>('canvas.mw-canvas')!;
+        const data = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
+        return Array.from({ length: data.length >> 4 }, (_, i) => data[i * 16]! + data[i * 16 + 1]! * 256);
+      }, line.start);
+    };
+    const [before, after] = [await drawn(0), await drawn(2)];
+    if (webgl) expect([before[0], after[0]! > 0]).toEqual([0, true]);
+    else expect(after.filter((v, i) => v !== before[i]).length).toBeGreaterThan(200); // Gleis im Bild
+    expect(await game.evaluate((el) => !!(el as unknown as Game).r3d)).toBe(webgl);
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    const saved = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')));
+    expect(saved).toEqual([]);
+    // ohne Schalter: kein Paket der Bahn, kein Gleis
+    const plain = await openGame(page, { clock: true, info: false });
+    const child = await plain.evaluate((node, [x, y]) => {
+      const el = node as unknown as Game;
+      return { bahn: !!el.packs.get('bahn'), rail: !!el.world.cell(x, y).rail };
+    }, line.start);
+    expect(child).toEqual({ bahn: false, rail: false });
+    expect(errors).toEqual([]);
+  },
+);
+
 // Licht der Grotte per Entwickler-Schalter (2D): Um die wache Figur liegt ein Lichtkreis; läuft sie in den Sockel am
 // Höhlenbett, trägt sie die Kristall-Laterne, und der Kreis wächst; im Bett steht die Laterne wieder auf dem Sockel
 test('Spiel: Kristall-Laterne in der Grotte per Entwickler-Schalter, Lichtkreis wächst, über Nacht zurück, ohne Fehler', async ({

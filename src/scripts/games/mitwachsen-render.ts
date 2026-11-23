@@ -41,7 +41,7 @@ import {
 } from '../../data/games/mitwachsen';
 import { carried } from './mitwachsen-carry';
 import { grown } from './mitwachsen-growth';
-import { drawBox, drawDeco, type Box, type DecoAt, type View2D } from './mitwachsen-view';
+import { drawBox, drawDeco, placeRails, type Box, type DecoAt, type View2D } from './mitwachsen-view';
 import { drawStone, heardStone } from './mitwachsen-story';
 import type { WeatherLook } from './mitwachsen-weather';
 import type { Pose } from './mitwachsen-tired';
@@ -52,6 +52,7 @@ import type { Cell, TreeKind, World } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
 import { drawPlate, drawPlatform } from './mitwachsen-platform-2d';
 import type { PlateFx } from './mitwachsen-plate';
+import type { PackId } from './mitwachsen-pack-types';
 import { BED_SNOW, flatColors } from './mitwachsen-ground-2d';
 import { bigGate } from './mitwachsen-gate-look';
 import type { Guest } from './mitwachsen-guest-look';
@@ -120,8 +121,8 @@ const PAL_PATH: Palette = { D: [['#c9a46e', 1]], d: [['#b48d58', 1]], e: [['#d8b
 export class Renderer {
   /** Quader der Welt-Pakete im Bild (Iglu, Eisschale, Trog, Kristallwand): jeder kommt in der Reihe seiner Vorderkante dran */
   private later: Box[] = [];
-  /** Zeichenteile je Welt aus ihrem Welt-Paket (nach ihrem Tor), sobald es geladen ist */
-  views = new Map<GateId, View2D>();
+  /** Zeichenteile je Welt aus ihrem Welt-Paket (nach ihrem Tor, ein Paket ohne eigene Welt nach seiner Kennung), sobald es geladen ist */
+  views = new Map<GateId | PackId, View2D>();
   private at: DecoAt = { now: 0, reduced: false, picked: {}, packs: {} };
   private album = new Album(); // Leiste unten
   private guest: Guest | null = null; // der Pinguin am Tor, solange er führt (Umriss, goldene Torplatte; nachgeladen)
@@ -277,14 +278,14 @@ export class Renderer {
   }
 
   /** Gast am Tor einer Welt (der führende Pinguin, aus ihrem Paket), sonst null */
-  guestAt = (world: World, state: State): Guest | null => this.first((v) => v.sky.guestAt(world, state)) ?? null;
+  guestAt = (world: World, state: State): Guest | null => this.first((v) => v.sky?.guestAt(world, state)) ?? null;
 
   /**
    * Wetter und Bild der Weltgrenze (aus dem Welt-Paket, worlds/<welt>/): das der Welt, in der die Figur ist (Eis-Welt:
    * worlds/eis/mitwachsen-ice-sky.ts), auf der Lichtung das der Eis-Welt, wenn das Eistor offen oder der verlaufene
    * Pinguin da ist (Gast-Platz mit Schneeflocke); sonst nichts. Dazu die Gegend, zu der es gehört
    */
-  private skyOf(world: World, state: State): [RegionId, View2D['sky'] | null] {
+  private skyOf(world: World, state: State): [RegionId, NonNullable<View2D['sky']> | null] {
     const realm = world.realm(state.player.x, state.player.y);
     const own = REGIONS.find((r) => r.id === realm)?.behind;
     const eis = state.openGates.includes('eis') || guideGate(state);
@@ -643,6 +644,8 @@ export class Renderer {
     if (!sc.explored(x, y)) return;
     const c = grown(world.seed, state.day, x, y, world.cell(x, y)); // mit allem, was schon nachgewachsen ist
     const { ctx } = this;
+    // Gleis (Paket der Bahn) statt Büscheln, Blumen und Deko; unter der Tür des Höhlentors die Tür darüber (`placeRails`)
+    if (!placeRails(ctx, P, c, () => this.first((v) => v.rails?.(c, x, y, this.at)), this.later)) return;
     const h = c.h;
     if (c.tufts) this.tufts(P, x, y, h, c.tufts);
     // Dinge einer Welt (Iglu, Eisschale, Wassertrog, Fischkiste, Kristallwand) zeichnet ihr Welt-Paket; solange es lädt,

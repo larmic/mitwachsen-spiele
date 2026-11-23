@@ -11,7 +11,7 @@ import type { GateId, RegionId } from '../../data/games/mitwachsen';
 import type { Cell } from './mitwachsen-cell';
 import type { GateLook } from './mitwachsen-gate-kit';
 import type { Tile } from './mitwachsen-geo';
-import type { View2D } from './mitwachsen-view';
+import type { Box, DecoAt, DrawRails, View2D } from './mitwachsen-view';
 import type { WorldPack } from './mitwachsen-pack-types';
 import type { Scene } from './mitwachsen-render';
 import type { State } from './mitwachsen-state';
@@ -43,18 +43,28 @@ export type Frame = readonly [string, string | null, Tile];
  */
 export type Layer = { object: Object3D; update(world: World, state: State, sc: Scene): void };
 
-/** Der 3D-Teil eines Welt-Pakets */
+/**
+ * Der 3D-Teil eines Welt-Pakets (ein Paket ohne eigene Welt, die Bahn, hat kein Tor, keinen Zugang und kein Bett, dafür
+ * das Gleis `rails`)
+ */
 export type View3D = {
   /** das Tor dieser Welt: Nur an ihm baut `look` mit */
-  gate: GateId;
+  gate?: GateId;
   /** Tür, Eiszapfen und Torplatte seines Zugangs */
-  look: GateLook;
+  look?: GateLook;
   /** je Deko-Art, die nur diese Welt hat, ihre Quader (wie in 2D, `DrawDeco`; in 3D zuckt nichts) */
   decos: View2D['decos'];
   /** Boden eines Felds dieser Welt (`open`: die offenen Tore), sonst null: wie auf der Lichtung */
   ground(c: Cell, open: readonly GateId[]): Ground | null;
   /** Rahmen des Betts dieser Welt, sonst null: Holz */
-  bedFrame(c: Cell): Frame | null;
+  bedFrame?(c: Cell): Frame | null;
+  /** Gleis auf Feldern mit Strecke (wie in 2D, `DrawRails`) */
+  rails?: DrawRails;
+  /**
+   * Was am Zustand der Pakete die Stücke dieses Pakets ändert (die Bahn: ihr Ausbau); ändert es sich, baut die 3D-Ansicht
+   * alle Stücke neu
+   */
+  stamp?(packs: Readonly<Record<string, unknown>>): string;
   /**
    * Farbe, mit der die Quader `'glow'` dieser Welt leuchten (multipliziert, 1 = wie gebaut), je nach Polarlicht (0 … 1),
    * reduzierter Bewegung und Zeit; fehlt sie, leuchten sie wie gebaut. Es gibt ein Leuchtmaterial für alle Welten, darum
@@ -151,9 +161,23 @@ export class Views3D {
   /** Rahmen des Betts aus dem 3D-Teil eines Pakets, sonst `wood` */
   bedFrame(c: Cell, wood: Frame): Frame {
     for (const v of this.views) {
-      const own = v.bedFrame(c);
+      const own = v.bedFrame?.(c);
       if (own) return own;
     }
     return wood;
+  }
+
+  /** Gleis auf einem Feld mit Strecke aus dem 3D-Teil eines Pakets (der Bahn), sonst null: wie sonst bauen */
+  rails(c: Cell, x: number, y: number, at: Pick<DecoAt, 'packs'>): readonly Box[] | null {
+    for (const v of this.views) {
+      const own = v.rails?.(c, x, y, at);
+      if (own) return own;
+    }
+    return null;
+  }
+
+  /** Was am Zustand der Pakete die Stücke ändert (`View3D.stamp` aller 3D-Teile, hintereinander) */
+  stamp(packs: Readonly<Record<string, unknown>>): string {
+    return this.views.map((v) => v.stamp?.(packs) ?? '').join('|');
   }
 }

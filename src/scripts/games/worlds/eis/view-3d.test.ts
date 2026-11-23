@@ -129,8 +129,8 @@ describe('3D-Teil des Welt-Pakets der Eis-Welt (view-3d.ts)', () => {
   });
 
   it('das Bett im Kessel ist aus Schnee, sonst sagt das Paket nichts (Holz)', () => {
-    expect(view3d.bedFrame({ ...snow, deco: 'bed' })).toEqual([...ICE_COLORS.snow, 'white']);
-    expect(view3d.bedFrame({ ...snow, deco: 'bed', biome: undefined, region: 'lichtung' })).toBeNull();
+    expect(view3d.bedFrame!({ ...snow, deco: 'bed' })).toEqual([...ICE_COLORS.snow, 'white']);
+    expect(view3d.bedFrame!({ ...snow, deco: 'bed', biome: undefined, region: 'lichtung' })).toBeNull();
   });
 });
 

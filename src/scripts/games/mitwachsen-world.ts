@@ -19,7 +19,7 @@ import {
 } from '../../data/games/mitwachsen';
 import { BED_STONE, type StoryId } from '../../data/games/mitwachsen-stories';
 import type { Cell, Ground, TreeKind } from './mitwachsen-cell';
-import { LICHTUNG_HOME, realmsOf, type Realms } from './mitwachsen-home';
+import { LICHTUNG_HOME, bedsOf, realmsOf, type Realms } from './mitwachsen-home';
 import type { Beyond, Gang, WorldPack } from './mitwachsen-pack-types';
 import { behind, hullOf, roomBehind, straightCentre, type Behind } from './mitwachsen-behind';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal, type PortalId } from './mitwachsen-portal';
@@ -189,6 +189,7 @@ function buildStart(
   seed: number,
   places: readonly Layout[],
   packs: readonly WorldPack[],
+  saved: Readonly<Record<string, unknown>>,
 ): { map: Map<string, Cell>; spawns: Map<string, Point>; spots: Point[]; inner: Map<RegionId, Behind> } {
   const map = new Map<string, Cell>();
   const set = (x: number, y: number, c: Cell) => map.set(key(x, y), c);
@@ -312,6 +313,8 @@ function buildStart(
         if (c && (c.region === 'lichtung' || c.deco === 'rock')) set(x, y, { ...grass('lichtung'), h: c.h || 1 });
       }
   smooth(map);
+  // Pakete ohne eigene Welt legen jetzt etwas in die fertige Karte, je nach ihrem Spielstand (die Bahn: das Gleis)
+  for (const p of packs) p.lay?.({ seed, map, gates: gatesOf(places), beds: bedsOf(inner), packs: saved });
 
   // Was man nicht erreichen kann, wird Fels: keine Ecken, die man sieht, aber nie betreten kann
   const reach = reachOf(map);
@@ -651,9 +654,13 @@ function dress(seed: number, x: number, y: number, c: Cell): Cell {
   return out;
 }
 
-/** Lage der Welt eines Pakets hinter seinem Tor (Eis-Welt: der Gletscherkessel); schnell, ohne die Welt zu bauen */
+/**
+ * Lage der Welt eines Pakets hinter seinem Tor (Eis-Welt: der Gletscherkessel); schnell, ohne die Welt zu bauen. Nur für
+ * Pakete mit eigener Welt (`place`, `gate`)
+ */
 export const kesselPlace = (seed: number, p: WorldPack) => {
   const l = layouts(seed);
+  if (!p.place || !p.gate) throw new Error(`Paket ${p.id} hat keine eigene Welt`);
   return p.place(seed, gangOf(l, p.gate), roomOf(l, p.gate));
 };
 /** Liegt ein Feld ganz hinter dem Felsring der Lichtung (Landschaft, Gänge ins Freie, Kessel)? */
@@ -667,18 +674,27 @@ const gatesOf = (places: readonly Layout[]) =>
     places.map(({ id, cells, mid, out, angle, deep }) => [id, { id, cells, mid, out, angle, deep }]),
   );
 
-/** Die Welt eines Seeds mit den geladenen Welt-Paketen (worlds/); die Lichtung ist mit und ohne sie dieselbe */
-export const createWorld = (seed: number, packs: readonly WorldPack[]): World => build(seed, packs).world;
+/**
+ * Die Welt eines Seeds mit den geladenen Welt-Paketen (worlds/); die Lichtung ist mit und ohne sie dieselbe. Nur ein
+ * Paket ohne eigene Welt (`lay`, die Bahn) ändert sie, und nur nach seinem Spielstand `saved` (`State.packs`: das Gleis
+ * erst ab Ausbau 1); ändert der sich, wird die Welt neu gebaut
+ */
+export const createWorld = (
+  seed: number,
+  packs: readonly WorldPack[],
+  saved: Readonly<Record<string, unknown>> = {},
+): World => build(seed, packs, saved).world;
 
 /** Welt bauen; `from`: die Welt vor dem Einbau eines Pakets, ihre unveränderten Stücke werden übernommen (`attach`) */
 function build(
   seed: number,
   packs: readonly WorldPack[],
+  saved: Readonly<Record<string, unknown>>,
   from?: { regions: ReadonlyMap<string, Cell>; cache: ChunkCache<Cell> },
 ): { world: World; chunks: readonly string[] } {
   const places = layouts(seed);
   const built = [...packs]; // gebaut mit diesen Paketen (die Liste draußen kann danach noch wachsen)
-  const { map: regions, spawns, spots, inner } = buildStart(seed, places, built);
+  const { map: regions, spawns, spots, inner } = buildStart(seed, places, built, saved);
   const realms = realmsOf(inner);
   const worlds = [...inner.values()];
   const cache = new ChunkCache<Cell>((cx, cy) => {
@@ -713,7 +729,9 @@ function build(
       return gate ? { id: gate, strength: 1 } : climateOf(seed, places, x, y);
     },
     attach: (pack) =>
-      built.some((p) => p.id === pack.id) ? { world, chunks: [] } : build(seed, [...built, pack], { regions, cache }),
+      built.some((p) => p.id === pack.id)
+        ? { world, chunks: [] }
+        : build(seed, [...built, pack], saved, { regions, cache }),
   };
   return { world, chunks: [...chunks] };
 }

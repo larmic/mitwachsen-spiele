@@ -165,18 +165,18 @@ describe('Zeichenteile der Grotte (2D)', () => {
     expect(lit[6]).toBe(glowOver(0.3));
     expect(glowOver(0.9)).toBe('rgba(255, 246, 220, 0.45)'); // nie grell
     expect(view.ground(cell(null), 2, 3, false)).toBeNull();
-    expect(view.sky.guestAt(w, {} as never)).toBeNull();
-    expect(view.sky.gateScore()).toEqual([]);
+    expect(view.sky!.guestAt(w, {} as never)).toBeNull();
+    expect(view.sky!.gateScore()).toEqual([]);
     expect(view.heaven).toEqual(GROTTE_COLORS.heaven);
   });
 
   it('die Leiste klappt beim Wechsel der Gegend um (bei reduzierter Bewegung sofort)', () => {
     const t: Turn = {};
-    expect(view.sky.turnAlbum(t, 'lichtung', 0, false)).toEqual(['lichtung', 1]);
-    expect(view.sky.turnAlbum(t, 'hoehle', 1000, false)).toEqual(['lichtung', 1]);
-    expect(view.sky.turnAlbum(t, 'hoehle', 1000 + TURN_MS / 4, false)).toEqual(['lichtung', 0.5]);
-    expect(view.sky.turnAlbum(t, 'hoehle', 1000 + TURN_MS, false)).toEqual(['hoehle', 1]);
-    expect(view.sky.turnAlbum({ shown: 'lichtung', at: 0 }, 'hoehle', 1, true)).toEqual(['hoehle', 1]);
+    expect(view.sky!.turnAlbum(t, 'lichtung', 0, false)).toEqual(['lichtung', 1]);
+    expect(view.sky!.turnAlbum(t, 'hoehle', 1000, false)).toEqual(['lichtung', 1]);
+    expect(view.sky!.turnAlbum(t, 'hoehle', 1000 + TURN_MS / 4, false)).toEqual(['lichtung', 0.5]);
+    expect(view.sky!.turnAlbum(t, 'hoehle', 1000 + TURN_MS, false)).toEqual(['hoehle', 1]);
+    expect(view.sky!.turnAlbum({ shown: 'lichtung', at: 0 }, 'hoehle', 1, true)).toEqual(['hoehle', 1]);
   });
 
   it('Zeichen der Gegend: Kristall der Grotte, Blatt der Lichtung, sonst keins', () => {
@@ -187,10 +187,10 @@ describe('Zeichenteile der Grotte (2D)', () => {
       },
       fillRect: () => {},
     } as unknown as CanvasRenderingContext2D;
-    view.sky.realmSign(ctx, 'hoehle', 50, 50, 16);
+    view.sky!.realmSign(ctx, 'hoehle', 50, 50, 16);
     expect(drawn).toContain(GROTTE_COLORS.crystals[0]);
     drawn.length = 0;
-    view.sky.realmSign(ctx, 'eis', 50, 50, 16);
+    view.sky!.realmSign(ctx, 'eis', 50, 50, 16);
     expect(drawn).toEqual([]);
   });
 });
@@ -205,13 +205,13 @@ describe('3D-Teil der Grotte', () => {
     expect(view3d.ground(cell(null, { ground: 'grass' }), [])).toBeNull();
     expect(view3d.ground(cell(null, { region: 'wild' }), [])).toBeNull();
     expect(view3d.ground(cell(null, { biome: 'eis' }), [])).toBeNull();
-    expect(view3d.bedFrame(cell('bed'))).toBeNull();
+    expect(view3d.bedFrame!(cell('bed'))).toBeNull();
   });
 
   it('Höhlenhimmel und Nebel-Maske nur in der Grotte; das Höhlentor hat keine Flügel', () => {
     expect(view3d.air).toEqual({ realm: 'hoehle', sky: GROTTE_COLORS.sky, mist: GROTTE_COLORS.mist });
     expect(view3d.gate).toBe('hoehle');
-    expect(view3d.look.door(1, false, 0)).toEqual([]);
-    expect(view3d.look.icicle(0, 0)).toBe('#ffffff');
+    expect(view3d.look!.door(1, false, 0)).toEqual([]);
+    expect(view3d.look!.icicle(0, 0)).toBe('#ffffff');
   });
 });

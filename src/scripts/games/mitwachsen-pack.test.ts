@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { REGIONS, regionAnimalList } from '../../data/games/mitwachsen';
-import { NEAR_GATE, holds, needsPack, packAt, type Need } from './mitwachsen-pack';
+import { NEAR_GATE, bahnWanted, holds, needsPack, packAt, type Need } from './mitwachsen-pack';
 import { beyondRing, createWorld, gatePlaces } from './mitwachsen-world';
 import { bareOf, worldOf } from './test-worlds';
 
@@ -98,5 +98,17 @@ describe('Welt-Pakete je Tor: das Höhlentor (noch ohne Schlüssel und ohne Pake
     expect(holds(bareOf(SEED), hoehleRegion, nearHoehle, beyondRing)).toBe(false); // das Höhlentor geht nie auf
     expect(holds(bareOf(SEED), REGIONS[0], [0, 0], beyondRing)).toBe(false); // die Lichtung liegt hinter keinem Tor
     expect(holds(createWorld(SEED, []), eisRegion, [0, 0], beyondRing)).toBe(false); // am Bett: nicht ihre Welt
+  });
+});
+
+describe('Welt-Pakete: wann das Paket der Bahn nötig ist (bahnWanted, Freigabe BAHN_LIVE)', () => {
+  it('vor dem Freischalten nie, wie weit das Kind auch ist; danach, sobald das Eistor offen ist', () => {
+    const at: Need['at'] = [[0, 0]];
+    expect(bahnWanted({ openGates: [] })).toBe(false);
+    expect(bahnWanted({ openGates: ['eis'] })).toBe(false); // BAHN_LIVE ist aus
+    expect(bahnWanted({ openGates: ['eis', 'hoehle'] }, false)).toBe(false);
+    expect(bahnWanted({ openGates: [] }, true)).toBe(false); // freigeschaltet: erst nach der Eis-Welt
+    expect(bahnWanted({ openGates: ['eis'] }, true)).toBe(true);
+    expect(at).toHaveLength(1);
   });
 });

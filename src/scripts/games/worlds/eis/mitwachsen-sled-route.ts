@@ -9,6 +9,8 @@
 
 import { fromKey } from '../../../../lib/games/chunks';
 import type { Point, RegionId } from '../../../../data/games/mitwachsen';
+import type { RideId } from '../../../../data/games/mitwachsen-rides';
+import type { Cell } from '../../mitwachsen-cell';
 import { crossings } from '../../mitwachsen-border';
 import { atHome } from '../../mitwachsen-meadow';
 import { platformCells } from '../../mitwachsen-portal';
@@ -25,6 +27,9 @@ export const STOP_STAGES = [{ r: 6 }, { r: 9 }, { r: 12 }] as const;
 export type StopStage = 0 | 1 | 2;
 /** So viele Reihen ab der Tür läuft die Strecke höchstens gerade in die Lichtung (solange es geht) */
 export const STRAIGHT = 13;
+const RIDE: RideId = 'schlitten';
+/** Gehört ein Feld einem anderen Fahrzeug (Gleis der Höhlenbahn, `Cell.ride`) oder seinem Bahnsteig (`Cell.stop`)? */
+const foreign = (c: Cell) => (!!c.ride && c.ride !== RIDE) || !!c.stop;
 /** Feste Warteplätze je Halt */
 export const RIDE_SEATS = 8;
 const SEAT_REACH = 8; // so weit (Schachbrett) liegen sie höchstens vom Halt
@@ -65,8 +70,8 @@ type Lichtung = { straight: Point[]; from: Map<string, string>; cost: (x: number
 
 /**
  * Kosten eines Schritts auf ein Feld der Lichtung: nie (Infinity) auf Wasser, Wiese samt einem Feld, Kreis der
- * Gegenstücke, Plattformen, Klangsteine, Tröge samt Nachbarn, Torplatte und den Platz des Pinguins daneben (`BESIDE`)
- * und den Durchgang des Eistors. Die Warteplätze an der Weltgrenze und die Felder direkt neben Plattformen und
+ * Gegenstücke, Plattformen, Klangsteine, Tröge samt Nachbarn, Torplatte und den Platz des Pinguins daneben (`BESIDE`),
+ * den Durchgang des Eistors und Gleis und Bahnsteige eines anderen Fahrzeugs (`foreign`, die Höhlenbahn). Die Warteplätze an der Weltgrenze und die Felder direkt neben Plattformen und
  * Klangsteinen nur, wo es nicht anders geht (`TIGHT`): Sie liegen dicht an der Bucht, und ist dort der Weg geradeaus
  * versperrt (Teich, Fels, Busch), führt er manchmal nur über sie hinaus. Sonst 1.
  */
@@ -88,7 +93,8 @@ function costs(world: World, g: GatePlace) {
   ]);
   return (x: number, y: number) => {
     const c = world.cell(x, y);
-    if (c.region !== 'lichtung' || world.realm(x, y) !== 'lichtung' || never.has(key(x, y))) return Infinity;
+    if (c.region !== 'lichtung' || world.realm(x, y) !== 'lichtung' || never.has(key(x, y)) || foreign(c))
+      return Infinity;
     // Wiese (r 6) samt einem Feld und der Kreis der Gegenstücke (r 9, Plattformen 3 × 3)
     if (Math.hypot(x - home.bed[0], y - home.bed[1]) <= home.portalRing + 2 || c.ground === 'water') return Infinity;
     return tight.has(key(x, y)) ? TIGHT : 1;
@@ -251,14 +257,14 @@ function loopless(path: readonly Point[]): Point[] {
  */
 function kesselPart(world: World, g: GatePlace): Point[] | undefined {
   const start = trackAt(g, 1);
-  if (!world.cell(...start).ride) return undefined;
+  if (world.cell(...start).ride !== RIDE) return undefined;
   const from = new Map<string, string>([[key(...start), '']]);
   const queue: Point[] = [start];
   for (let i = 0; i < queue.length; i++) {
     const [x, y] = queue[i]!;
     for (const [dx, dy] of ALL) {
       const k = key(x + dx, y + dy);
-      if (from.has(k) || !world.cell(x + dx, y + dy).ride || !both(world, x, y, x + dx, y + dy)) continue;
+      if (from.has(k) || world.cell(x + dx, y + dy).ride !== RIDE || !both(world, x, y, x + dx, y + dy)) continue;
       from.set(k, key(x, y));
       queue.push([x + dx, y + dy]);
     }
@@ -270,8 +276,8 @@ function kesselPart(world: World, g: GatePlace): Point[] | undefined {
 
 /**
  * Feste Warteplätze an einem Halt: Wohnplätze der Gegend (erreichbar, nicht auf der Wiese, nicht an Durchgängen und
- * Plattformen) bis `SEAT_REACH` vom Halt, nicht an der Strecke oder am Schuppen (`keep`), nicht am Klangstein und nicht
- * an der Weltgrenze; der nächste zuerst
+ * Plattformen) bis `SEAT_REACH` vom Halt, nicht an der Strecke oder am Schuppen (`keep`), nicht am Klangstein, nicht
+ * an der Weltgrenze und nicht auf Gleis oder Bahnsteig eines anderen Fahrzeugs; der nächste zuerst
  */
 function seatsAt(world: World, realm: RegionId, at: Point, keep: ReadonlySet<string>): Point[] {
   const crossing = crossings(world).flatMap((c) => [...c.cells, ...[...c.seats.values()].flat().map((p) => key(...p))]);
@@ -283,6 +289,7 @@ function seatsAt(world: World, realm: RegionId, at: Point, keep: ReadonlySet<str
         cheb(p, at) <= SEAT_REACH &&
         !keep.has(key(...p)) &&
         !busy.has(key(...p)) &&
+        !foreign(world.cell(...p)) &&
         atHome(world, { kind: 'region', region: realm }, ...p),
     )
     .sort(

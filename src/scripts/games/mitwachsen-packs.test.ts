@@ -4,6 +4,7 @@ import { ICE_MODELS } from '../../data/games/worlds/eis/mitwachsen-ice-models';
 import { BAT_ROOST, CAVE_MODELS } from '../../data/games/worlds/hoehle/mitwachsen-cave-models';
 import { PACK_IDS, PACK_WAIT_MS, Packs, RETRY_MS, type LoadedPack } from './mitwachsen-packs';
 import type { Need } from './mitwachsen-pack';
+import { BAHN_LIVE } from '../../data/games/mitwachsen-rides';
 import { HINT_AFTER } from './mitwachsen-guide';
 import { plateMid } from './mitwachsen-plate';
 import { initialState, type State } from './mitwachsen-state';
@@ -119,8 +120,8 @@ describe('Welt-Pakete laden (Packs)', () => {
     SPECIES.robbe.parts = robbe;
   });
 
-  it('je Paket ein Lader (Eis-Welt, Höhlenwelt); jedes Paket lädt für sich, nur wenn sein Tor es braucht', async () => {
-    expect(PACK_IDS).toEqual(['eis', 'hoehle']);
+  it('je Paket ein Lader (Eis-Welt, Höhlenwelt, Bahn); jedes Paket lädt für sich, nur wenn sein Tor es braucht', async () => {
+    expect(PACK_IDS).toEqual(['eis', 'hoehle', 'bahn']);
     const asked: string[] = [];
     const hoehle = { ...pack, id: 'hoehle', gate: 'hoehle' } as LoadedPack;
     const packs = new Packs(
@@ -139,6 +140,25 @@ describe('Welt-Pakete laden (Packs)', () => {
     expect(asked).toEqual(['eis', 'hoehle']);
     expect(packs.at('hoehle')).toBe(hoehle);
     expect(packs.get('hoehle')).toBe(hoehle);
+  });
+
+  it('Freigabe der Bahn (BAHN_LIVE aus): das Paket der Bahn kommt nie von selbst, auch nicht bei offenem Eistor', async () => {
+    expect(BAHN_LIVE).toBe(false);
+    const asked: string[] = [];
+    const bahn = { id: 'bahn' } as LoadedPack;
+    const hoehle = { ...pack, id: 'hoehle', gate: 'hoehle' } as LoadedPack;
+    const packs = new Packs(
+      () => {},
+      (id) => (asked.push(id), Promise.resolve({ eis: pack, hoehle, bahn }[id])),
+    );
+    await packs.want({ ...open, openGates: ['eis', 'hoehle'] }, gates);
+    expect(asked).not.toContain('bahn');
+    expect(packs.at(undefined)).toBeUndefined(); // ein Paket ohne Tor ist nie „das Paket hinter einem Tor“
+    packs.extra = ['bahn']; // nur der Entwickler-Schalter holt es
+    await packs.want(bed, gates);
+    expect(asked).toContain('bahn');
+    expect(packs.get('bahn')).toBe(bahn);
+    expect(packs.at('hoehle')).toBe(hoehle); // das Paket hinter dem Höhlentor bleibt die Höhlenwelt
   });
 
   it('scheitert ein Paket, lädt das andere trotzdem (still wie ein Netzfehler)', async () => {

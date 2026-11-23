@@ -61,7 +61,7 @@ describe('Haken der 2D-Ansicht für Welt-Pakete (drawDeco)', () => {
     const sc = { width: 40, height: 40, zoom: 1, now: 500, reduced: true, aurora: 1 } as SkyScene;
     const count = (now: number) => {
       rects = 0;
-      view.sky.aurora(ctx, { ...sc, now }, () => [0, 0]);
+      view.sky!.aurora(ctx, { ...sc, now }, () => [0, 0]);
       return rects;
     };
     const veil = count(400); // nur die Schleier am Himmel

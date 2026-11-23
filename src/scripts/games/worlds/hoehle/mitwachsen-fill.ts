@@ -21,15 +21,16 @@ const key = (x: number, y: number) => `${x},${y}`;
 type Keep = (u: number, v: number) => boolean;
 
 /**
- * Spur für das künftige Gleis (kommt mit dem Zug), in (u, v) von der Mitte: von der Mündung so breit wie der Gang
- * geradeaus, zwischen den Kristall-Lampen hindurch, hinter der letzten Lampe quer hinüber bis an den Platz des Bahnhofs
+ * Spur für das Gleis (Paket der Bahn, worlds/bahn/), in (u, v) von der Mitte: von der Mündung so breit wie der Gang
+ * geradeaus, zwischen den Kristall-Lampen hindurch, hinter der letzten Lampe quer hinüber bis an die Spur hinter dem
+ * Platz des Bahnhofs (ein Feld weiter außen als der Bahnsteig, dort hält der Zug: Der Weg zum Bahnsteig kreuzt kein Gleis)
  */
 export function corridorAt(u: number, v: number): boolean {
   const o = v + ry;
   const { station, lamps } = GROTTE;
   if (o < 0 || o >= station.out) return false;
   if (Math.abs(u) <= GATE_HALF) return true;
-  return o > lamps.to && u >= -GATE_HALF && u < station.side + station.wide;
+  return o > lamps.to && u >= -GATE_HALF && u <= station.side + station.wide;
 }
 
 /** Zonen der Füllung: Rand (nah an den Klippen), Tropfsteingrotte, sonst die Seiten */
