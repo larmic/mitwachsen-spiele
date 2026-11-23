@@ -16,6 +16,9 @@ set -euo pipefail
 
 CPUS=${CPUS:-2}
 E2E_WARN=240 # Browser-Tests über 4 min (alle Projekte nacheinander): Warnung, die Jobs der Pipeline haben 8–10 min samt Einrichten
+# Unit-Tests über alle Seeds über 150 s: ROT. Der Job static hat 5 min samt Einrichten (gut 50 s) und den übrigen Gates;
+# auf dem Runner lief test:deep zuletzt langsamer als hier (am 23.11.2026 hier 203 s grün, dort nach 5 min abgebrochen)
+DEEP_MAX=150
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT"
 
@@ -108,7 +111,12 @@ docker start -a "$NAME" | tee "$TMP/log" || RC=$?
 TOTAL=$(($(now) - START))
 
 E2E=$(sed -n 's/^::: e2e *\([0-9]*\)s.*/\1/p' "$TMP/log")
-echo "gates:ci: gesamt ${TOTAL}s, Browser-Tests ${E2E:-–}s ($CPUS CPUs)"
+DEEP=$(sed -n 's/^::: test:deep *\([0-9]*\)s.*/\1/p' "$TMP/log")
+echo "gates:ci: gesamt ${TOTAL}s, Unit-Tests über alle Seeds ${DEEP:-–}s, Browser-Tests ${E2E:-–}s ($CPUS CPUs)"
+if [ "$RC" -eq 0 ] && [ -n "$DEEP" ] && [ "$CPUS" -le 2 ] && [ "$DEEP" -gt "$DEEP_MAX" ]; then
+  echo "gates:ci: test:deep dauert ${DEEP}s, erlaubt sind ${DEEP_MAX}s – sonst bricht der Job static nach 5 min ab. Seed-Bereiche teilen oder verkleinern, nicht die Frist anheben" >&2
+  RC=1
+fi
 if [ -n "$E2E" ] && [ "$E2E" -gt "$E2E_WARN" ]; then
   echo "gates:ci: Warnung – Browser-Tests über $((E2E_WARN / 60)) min, die Jobs der Pipeline haben 8–10 min samt Einrichten" >&2
 fi
