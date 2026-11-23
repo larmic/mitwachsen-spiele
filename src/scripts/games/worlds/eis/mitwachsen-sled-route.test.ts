@@ -10,7 +10,7 @@ import { PLATE_ROW } from '../../mitwachsen-plate';
 import { canStep, createWorld, type World } from '../../mitwachsen-world';
 import { EIS_PACK, seedChunks, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import { BESIDE, plateRow } from './mitwachsen-bay';
-import { SHED_RING, SLIDE_GAP, shedOf, trackU } from './mitwachsen-sled-ground';
+import { SHED_NEAR, SLIDE_GAP, shedOf, trackU } from './mitwachsen-sled-ground';
 import { RIDE_SEATS, STOP_STAGES, onFootpath, sledRoute, trackAt, type Route } from './mitwachsen-sled-route';
 
 const ICE = [EIS_PACK];
@@ -98,19 +98,17 @@ function apartFaults(w: World, r: Route): string[] {
   return wrong;
 }
 
-/** Halt auf der Lichtung im Bereich seiner Stufe, neben dem Fußweg, zwei Felder weg von Wasser; Halte an den Enden */
+/**
+ * Halt auf der Lichtung neben der Plattform des Eistor-Portals am Bett (im Bereich seiner Stufe), nicht auf dem
+ * Fußweg, zwei Felder weg von Wasser; Halte an den Enden
+ */
 function stopFaults(w: World, r: Route): string[] {
   const wrong: string[] = [];
   const g = w.gates.get('eis')!;
-  const bed = w.homes.lichtung.bed;
+  const plate = w.portals.get('eis')!.home;
   const out = r.stops.out;
-  const { r: radius, deg } = STOP_STAGES[r.stage];
-  const dist = Math.hypot(out[0] - bed[0], out[1] - bed[1]);
-  const axis = Math.atan2(g.mid[1] - bed[1], g.mid[0] - bed[0]);
-  const turn = Math.atan2(out[1] - bed[1], out[0] - bed[0]) - axis;
-  const off = (Math.abs(((turn + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) * 180) / Math.PI;
-  if (dist < radius[0] || dist > radius[1] || off < deg[0] || off > deg[1])
-    wrong.push(`Halt ${keyOf(out)}: r ${dist.toFixed(1)}, ${off.toFixed(0)}°`);
+  const dist = Math.hypot(out[0] - plate[0], out[1] - plate[1]);
+  if (dist > STOP_STAGES[r.stage].r) wrong.push(`Halt ${keyOf(out)}: ${dist.toFixed(1)} von der Plattform`);
   if (onFootpath(w, g, out) || around(out, 1).some((q) => w.cell(...q).ground === 'water'))
     wrong.push('Halt am Weg oder Teich');
   if (keyOf(r.path.at(-1)!) !== keyOf(out) || keyOf(r.path[0]!) !== keyOf(r.stops.home)) wrong.push('Halte');
@@ -118,15 +116,15 @@ function stopFaults(w: World, r: Route): string[] {
 }
 
 /**
- * Schuppen 12 bis 16 Felder vom Schneebett, nicht auf der Strecke; kein Wohnort, kein Wohnplatz der Eis-Tiere auf
- * Strecke oder Schuppen; je Halt 8 feste Warteplätze abseits davon
+ * Schuppen gleich neben der Plattform des Eis-Portals am Schneebett, nicht auf der Strecke; kein Wohnort, kein
+ * Wohnplatz der Eis-Tiere auf Strecke oder Schuppen; je Halt 8 feste Warteplätze abseits davon
  */
 function shedFaults(w: World, r: Route): string[] {
   const wrong: string[] = [];
-  const snow = w.homes.eis.bed;
+  const plate = w.portals.get('eiskessel')!.home;
   const [sx, sy] = r.shed.reduce(([a, b], [x, y]) => [a + x / r.shed.length, b + y / r.shed.length], [0, 0]);
-  const shedR = Math.hypot(sx - snow[0], sy - snow[1]);
-  if (shedR < SHED_RING.near || shedR > SHED_RING.far) wrong.push(`Schuppen ${shedR.toFixed(1)} vom Schneebett`);
+  const shedR = Math.hypot(sx - plate[0], sy - plate[1]);
+  if (shedR < SHED_NEAR.near || shedR > SHED_NEAR.far) wrong.push(`Schuppen ${shedR.toFixed(1)} von der Plattform`);
   for (const p of r.shed)
     if (r.on.has(keyOf(p)) || w.realm(...p) !== 'eis' || w.cell(...p).solid) wrong.push(`Schuppen ${keyOf(p)}`);
   const taken = new Set([...r.path, ...r.shed].map(keyOf));

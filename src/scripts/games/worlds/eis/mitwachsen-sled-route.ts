@@ -2,7 +2,7 @@
 // den Feldern mit `ride` (gebaut von mitwachsen-sled-ground.ts), durch Tür und Bucht geht sie gerade bei u = −2 der
 // Torplatte (neben Platte und Platz des Pinguins, `BESIDE`) und weiter in die Lichtung, solange es geht (bis
 // `STRAIGHT` Reihen; vor der Bucht liegen oft Teich, Fels oder Busch), dann auf dem günstigsten Weg (`costs`) zum Halt
-// auf der Lichtung (`lichtungStop`): 13 bis 16 Felder vom Bett, 20 bis 30° neben der Linie Bett → Eistor. Auf der
+// auf der Lichtung (`lichtungStop`): gleich neben der Plattform des Eistor-Portals am Bett, außen am Ring. Auf der
 // Lichtung liegt sie nie im Feld (die Lichtung bleibt mit und ohne Paket gleich), nur hier.
 // Dazu je Halt 8 feste Warteplätze für die folgenden Tiere, abseits von Strecke und Schuppen.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Der Schlitten“)
@@ -17,12 +17,11 @@ import { BESIDE, plateRow } from './mitwachsen-bay';
 import { ALL, key } from './mitwachsen-flood';
 import { shedOf } from './mitwachsen-sled-ground';
 
-/** Halt auf der Lichtung: Abstand vom Bett und Winkel neben der Linie Bett → Eistor, je Ausweichstufe */
-export const STOP_STAGES = [
-  { r: [13, 16], deg: [20, 30] },
-  { r: [12, 17], deg: [15, 35] },
-  { r: [12, 17], deg: [0, 45] },
-] as const;
+/**
+ * Halt auf der Lichtung: höchstens so weit (Luftlinie) von der Mitte der Plattform des Eistor-Portals am Bett, je
+ * Ausweichstufe. Näher als 3 geht nicht (Plattform samt Nachbarn und Kreis der Gegenstücke sind gesperrt, `costs`)
+ */
+export const STOP_STAGES = [{ r: 6 }, { r: 9 }, { r: 12 }] as const;
 export type StopStage = 0 | 1 | 2;
 /** So viele Reihen ab der Tür läuft die Strecke höchstens gerade in die Lichtung (solange es geht) */
 export const STRAIGHT = 13;
@@ -159,33 +158,32 @@ export function onFootpath(world: World, g: Pick<GatePlace, 'mid'>, [x, y]: Poin
 }
 
 /**
- * Halt des Fahrzeugs auf der Lichtung: auf einem erreichbaren Feld ohne Aufpreis (`costs`), nicht auf dem Fußweg
- * (`onFootpath`), zwei Felder weg von Teichen, im Wunschbereich (`STOP_STAGES[0]`), zuerst auf der Seite der Strecke,
- * nah an 25° und 14,5 Feldern. Gibt es dort keins, weicht er Stufe für Stufe aus (`stage`). undefined ohne Eistor oder
- * Platz.
+ * Halt des Fahrzeugs auf der Lichtung: neben der Plattform des Eistor-Portals am Bett (dort, wo das Kind das Portal
+ * kennt), auf einem erreichbaren Feld ohne Aufpreis (`costs`), nicht auf dem Fußweg (`onFootpath`), zwei Felder weg
+ * von Teichen, im Wunschbereich (`STOP_STAGES[0]`), so nah wie möglich an der Plattform, bei Gleichstand auf der Seite
+ * der Strecke. Gibt es dort keins, weicht er Stufe für Stufe aus (`stage`). undefined ohne Eistor, Portal oder Platz.
  */
 export function lichtungStop(world: World): { at: Point; stage: StopStage } | undefined {
   const part = lichtung(world);
   const g = world.gates.get('eis');
-  if (!part || !g) return undefined;
+  const plate = world.portals.get('eis')?.home;
+  if (!part || !g || !plate) return undefined;
   const bed = world.homes.lichtung.bed;
   const axis = Math.atan2(g.mid[1] - bed[1], g.mid[0] - bed[0]);
   const end = part.straight.at(-1)!;
   const sideOf = (p: Point) => Math.sign(Math.sin(Math.atan2(p[1] - bed[1], p[0] - bed[0]) - axis));
   const side = sideOf(trackAt(g, -STRAIGHT)) || 1;
   for (let stage = 0; stage < STOP_STAGES.length; stage++) {
-    const { r, deg } = STOP_STAGES[stage]!;
+    const { r } = STOP_STAGES[stage]!;
     const found: { at: Point; rank: number[] }[] = [];
-    for (let y = -r[1]; y <= r[1]; y++)
-      for (let x = -r[1]; x <= r[1]; x++) {
-        const at: Point = [bed[0] + x, bed[1] + y];
+    for (let y = -r; y <= r; y++)
+      for (let x = -r; x <= r; x++) {
+        const at: Point = [plate[0] + x, plate[1] + y];
         const d = Math.hypot(x, y);
-        let off = Math.abs(((Math.atan2(y, x) - axis + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
-        off = (off * 180) / Math.PI;
-        if (d < r[0] || d > r[1] || off < deg[0] || off > deg[1] || !part.from.has(key(...at))) continue;
+        if (d > r || !part.from.has(key(...at))) continue;
         if ((at[0] === end[0] && at[1] === end[1]) || onFootpath(world, g, at) || wet(world, at)) continue;
         if (part.cost(...at) !== 1) continue;
-        found.push({ at, rank: [sideOf(at) === side ? 0 : 1, Math.abs(off - 25), Math.abs(d - 14.5), x, y] });
+        found.push({ at, rank: [Math.round(d * 2), sideOf(at) === side ? 0 : 1, x, y] });
       }
     found.sort((a, b) => {
       for (let i = 0; i < a.rank.length; i++) if (a.rank[i] !== b.rank[i]) return a.rank[i]! - b.rank[i]!;

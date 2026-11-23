@@ -210,7 +210,8 @@ describe('Fahrregeln des Schlittens (Eis-Welt)', () => {
     const ok = play(awakeAt(world, near, 'bereit'), world, [tap]);
     expect(rideEvents(ok.events, 'board')).toHaveLength(1);
     expect(at(ok.s)).toEqual(stop.seat);
-    const far = r.path[TAP_REACH + 3]!;
+    // das erste Feld der Strecke, das weiter als TAP_REACH (Schachbrett) vom Sitz liegt (die Strecke biegt am Schuppen ab)
+    const far = r.path.find((p) => Math.max(Math.abs(p[0] - stop.seat[0]), Math.abs(p[1] - stop.seat[1])) > TAP_REACH)!;
     const no = play(awakeAt(world, far, 'bereit'), world, [tap]);
     expect(no.events).toEqual([]);
     expect(at(no.s)).toEqual(far);

@@ -2,8 +2,9 @@
 // ganz zuletzt (nach Glockenspiel, vor Wohnplätzen und Wohnorten der Tiere): So wird nichts neu gewürfelt, und
 // gespeicherte Schneemänner bleiben, wo sie sind. Die Strecke ist eine Schneespur neben der Rutschspur: vom ersten
 // Feld hinter dem Tor gerade durch den Gang (zwei Felder neben der Rutschspur, `trackU`), dann auf dem günstigsten Weg
-// (Suche mit Kosten) bis vor den Schuppen. Der Schuppen (3 × 2 Felder, `shedOf`) steht 12 bis 16 Felder vom
-// Schneebett auf der Seite der Mündung; die Strecke läuft gerade in seine Tür. Auf Strecke und Schuppen weichen nur
+// (Suche mit Kosten) bis vor den Schuppen. Der Schuppen (3 × 2 Felder, `shedOf`) steht gleich neben der Plattform des
+// Eis-Portals am Schneebett (dort sieht man ihn vom Bett aus), auf der Seite der Strecke; die Strecke läuft gerade in
+// seine Tür. Auf Strecke und Schuppen weichen nur
 // Tannen und Eisblöcke; Felder der Strecke tragen `ride`. Den Schuppen zeigt erst das Fahrzeug (ein Körper, keine
 // Zierde im Feld). Auf der Lichtung liegt die Strecke nie im Feld (mitwachsen-sled-route.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Der Schlitten“)
@@ -15,8 +16,8 @@ import type { Cell } from '../../mitwachsen-cell';
 import type { Gang, KesselPlace } from '../../mitwachsen-pack-types';
 import { key } from './mitwachsen-flood';
 
-/** So weit (Luftlinie) steht die Mitte des Schuppens vom Schneebett */
-export const SHED_RING = { near: 12, far: 16 } as const;
+/** So weit (Luftlinie) steht die Mitte des Schuppens von der Mitte der Plattform des Eis-Portals am Schneebett */
+export const SHED_NEAR = { near: 4, far: 9 } as const;
 /** Die Strecke hält mindestens so viele Felder Abstand zur Rutschspur (Schachbrett-Abstand) */
 export const SLIDE_GAP = 2;
 /** … und so viele zu Plattformen des Eis-Portals (am Gegenstück, das auf der Achse der Rutschspur steht: |u| ≥ 4) */
@@ -139,35 +140,39 @@ export function sledGround(gang: Gang, place: KesselPlace, map: Map<string, Cell
 type ShedSpot = { stop: Point; dir: Point; shed: Point[]; cost: number };
 
 /**
- * Plätze für den Schuppen, der beste zuerst: Mitte 12 bis 16 Felder vom Schneebett, auf der Seite der Mündung und auf
- * der Seite der Strecke (über die Rutschspur führt sie nie), alle Felder samt Halt und dem Feld davor eben und erlaubt.
- * Bevorzugt, wo am wenigsten weichen muss, dann nah an 14 Feldern.
+ * Plätze für den Schuppen, der beste zuerst: Mitte `SHED_NEAR` von der Plattform des Eis-Portals am Schneebett, auf der
+ * Seite der Strecke (über die Rutschspur führt sie nie), alle Felder samt Halt und dem Feld davor eben und erlaubt.
+ * Bevorzugt, wo am wenigsten weichen muss, dann so nah wie möglich an der Plattform. Ohne Plattform keiner.
  */
 function shedSpots(
   gang: Gang,
-  { bed, cells }: KesselPlace,
+  { cells }: KesselPlace,
   map: ReadonlyMap<string, Cell>,
   no: (x: number, y: number) => boolean,
   height: (x: number, y: number) => number,
 ): ShedSpot[] {
   const [ox, oy] = gang.at(0, 0);
-  const out = [gang.at(0, 1)[0] - ox, gang.at(0, 1)[1] - oy] as const;
   const across = [gang.at(1, 0)[0] - ox, gang.at(1, 0)[1] - oy] as const;
   const side = Math.sign(trackU(gang));
+  const plate = cells.find(([x, y]) => {
+    const p = map.get(key(x, y))?.portal;
+    return p?.side === 'home' && p.at === 'centre';
+  });
+  if (!plate) return [];
   const spots: ShedSpot[] = [];
   for (const stop of cells)
     for (const dir of N4) {
-      const [cx, cy] = [stop[0] + dir[0] * 1.5 - bed[0], stop[1] + dir[1] * 1.5 - bed[1]];
+      const [cx, cy] = [stop[0] + dir[0] * 1.5 - plate[0], stop[1] + dir[1] * 1.5 - plate[1]];
       const r = Math.hypot(cx, cy);
-      if (r < SHED_RING.near || r > SHED_RING.far) continue;
-      if (cx * out[0] + cy * out[1] >= 0 || (cx * across[0] + cy * across[1]) * side <= 0) continue;
+      if (r < SHED_NEAR.near || r > SHED_NEAR.far) continue;
+      if ((cx * across[0] + cy * across[1]) * side <= 0) continue;
       const shed = shedOf(stop, dir);
       const all = [...shed, stop, [stop[0] - dir[0], stop[1] - dir[1]] as const];
       if (all.some(([x, y]) => no(x, y))) continue;
       const h = height(...stop);
       if (all.some(([x, y]) => height(x, y) !== h)) continue;
       const clear = all.filter(([x, y]) => blocked(map.get(key(x, y))!)).length;
-      spots.push({ stop, dir, shed, cost: clear * 100 + Math.abs(r - 14) });
+      spots.push({ stop, dir, shed, cost: clear * 100 + r });
     }
   return spots.sort((a, b) => a.cost - b.cost || a.stop[0] - b.stop[0] || a.stop[1] - b.stop[1]);
 }
