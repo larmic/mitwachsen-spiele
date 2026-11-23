@@ -33,6 +33,7 @@ describe('Dinge der Kristallgrotte, gleich für 2D und 3D', () => {
       'shroombed',
       'dripspring',
       'dripmoss',
+      'jetty',
     ] as const) {
       const c = cell(deco, { note: 2, color: '#6fd6f0' });
       const boxes = caveBoxes(w, c, 5, 7)!;
@@ -68,15 +69,19 @@ describe('Dinge der Kristallgrotte, gleich für 2D und 3D', () => {
     }
   });
 
-  it('Kristallbogen: Pfeiler nur an den Enden, der Bogen läuft über alle fünf; Säulen so hoch wie ihre Note', () => {
+  it('Kristallbogen: Pfeiler nur an den Enden, der Bogen läuft über alle fünf; Säulen so hoch wie ihr Ton', () => {
     const pillar = caveBoxes(w, cell('crystalarch', { note: 0 }), 0, 0)!;
     const span = caveBoxes(w, cell('crystalarch', { note: 2 }), 0, 0)!;
     expect(pillar.length).toBe(span.length + 1);
     expect(Math.min(...span.map((b) => b[2]))).toBeGreaterThanOrEqual(4); // darunter geht man durch
     // die Unterkante des Bogens ist der Sitzplatz der Fledermäuse (`Cell.perch`): sie hängen genau darunter
     expect(Math.min(...span.map((b) => b[2]))).toBe(1 + ARCH_PERCH);
-    const column = caveBoxes(w, cell('column', { note: 5 }), 0, 0)!;
-    expect(Math.max(...column.map((b) => b[2] + b[5]))).toBeCloseTo(6); // Boden 1 + Höhe 5
+    // Säulen so hoch, wie ihr Ton es sagt: der tiefste (C5) die höchste, Boden 1 + Höhe 5
+    const tops = [0, 1, 2, 3, 4].map((note) =>
+      Math.max(...caveBoxes(w, cell('column', { note }), 0, 0)!.map((b) => b[2] + b[5])),
+    );
+    expect(tops[0]).toBeCloseTo(6);
+    expect(tops.every((t, i) => i === 0 || t < tops[i - 1]!)).toBe(true);
   });
 
   it('Stalagmiten in drei Höhen, draußen in der Landschaft wie immer', () => {

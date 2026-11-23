@@ -46,8 +46,9 @@ import { windAt } from './mitwachsen-weather';
 import { Air, postures, stepSound } from './mitwachsen-air';
 import { heldTired, restPose, type Pose } from './mitwachsen-tired';
 import { advance, evening, freshDay, loadTired, saveTired, type Tired, type TiredEvent } from './mitwachsen-tired';
-import type { RideEvent } from './mitwachsen-pack-types';
+import type { PackEvent, RideEvent } from './mitwachsen-pack-types';
 import { seatOf, withHop, type RideBody } from './mitwachsen-ride-view';
+import { awayIn, packScore } from './mitwachsen-view';
 import { listenTap } from './mitwachsen-tap';
 import { SLEEP_EVENT, type GameMoment } from './pwa-update';
 import { browserStore } from './browser-store';
@@ -739,12 +740,15 @@ class LarmicMitwachsen extends HTMLElement {
   /**
    * Beeren gepflückt, Fische gefangen, nachgewachsen, Eimer geschöpft; Beeren, Fische oder Wasser in den Trog; ein
    * Schneehaufen wächst um eine Kugel (es ploppt, Töne aus dem Welt-Paket, und gleich gespeichert: der Schneemann
-   * bleibt); ein Eiszapfen klingt (Ton aus dem Welt-Paket) und glitzert, die Figur läuft weiter
+   * bleibt); ein Eiszapfen klingt (Ton aus dem Welt-Paket) und glitzert, die Figur läuft weiter; eine Kristallsäule
+   * klingt, der Grottenolm taucht am Steg auf (Bild und Ton aus dem Paket der Höhlenwelt)
    */
-  private chore(e: ChoreEvent | Extract<GameEvent, { type: 'snowman' | 'icicle' | 'bob' }>, now: number) {
+  private chore(e: ChoreEvent | Extract<GameEvent, { type: PackEvent['type'] | 'bob' }>, now: number) {
     if (e.type === 'bob') return void this.hops.set(e.id, now); // der Pinguin hüpft still neben der Torplatte
     if (reshapes(e)) this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]); // leer, wieder voll, gewachsen
-    if (e.type === 'snowman' || e.type === 'icicle') this.sfx.score(this.renderer.first((v) => v.score?.(e)) ?? []);
+    if (e.type === 'snowman' || e.type === 'icicle' || e.type === 'column' || e.type === 'olm')
+      this.sfx.score(packScore(this.renderer.views.values(), e)); // Töne aus dem Paket der Welt des Ereignisses
+    if (e.type === 'column' || e.type === 'olm') return; // Säule und Grottenolm: Bild und Ton aus dem Paket
     if (e.type === 'icicle')
       return this.burst('', SPARKS.eis, 6, { x: e.x, y: e.y - 0.35, z: this.world.cell(e.x, e.y).h }, true);
     if (e.type === 'regrow') return;
@@ -777,6 +781,34 @@ class LarmicMitwachsen extends HTMLElement {
       this.float('note', 'player', NOTE_COLORS.top, t);
   }
 
+  /** Je Bild: Klangsteine, dazu Töne der Umgebung aus den Welt-Paketen */
+  private sounds(t: number) {
+    this.storyFrame(t);
+    this.ambient(t);
+  }
+
+  /** Töne der Umgebung aus den Welt-Paketen (Grotte: „plink“ der Tropfsteine), nur, solange gespielt wird */
+  private ambient(t: number) {
+    if (!this.paused() && !this.state.sleeping)
+      this.sfx.score(this.renderer.all((v) => v.ambient?.(this.world, this.state, t, this.seen) ?? []));
+  }
+
+  /** Im Bett oder eingenickt über dem Buch: ab und zu steigt ein Zzz auf (nicht bei reduzierter Bewegung) */
+  private dozeFrame(t: number) {
+    const dozing = this.state.sleeping || this.pose === 'doze';
+    if (dozing && !this.floats.some((f) => f.kind === 'zzz' && t - f.born < 1000) && !this.reduced.matches)
+      this.floats.push({
+        kind: 'zzz',
+        who: this.state.sleeping ? 'bed' : 'player',
+        color: GAME_COLORS.star,
+        born: t,
+        x: this.state.player.x, // im Schlaf liegt die Figur im Bett ihrer Gegend: Dort steigt das Zzz auf
+        y: this.state.player.y,
+        z: 0,
+        age: 0,
+      });
+  }
+
   private frame(t: number) {
     // Eine Uhr für alles: Tasten, Ereignisse und Bild laufen über performance.now(). Die Bildzeit von rAF kann auf dem
     // Mac weit davon abweichen (z. B. nach dem Ruhezustand); dann lief ein gehaltener Pfeil nie weiter.
@@ -793,7 +825,7 @@ class LarmicMitwachsen extends HTMLElement {
     const night = this.state.sleeping ? fade(this.nightSince, 1500) : 1 - fade(this.dayAt, 900);
     this.rideFrame(t, night);
     this.glide(dt, t);
-    this.storyFrame(t);
+    this.sounds(t);
 
     const bump = t - (this.hops.get('bump') ?? -1e9);
     const shake = !this.reduced.matches && bump < 200 ? Math.sin(bump / 18) * 0.06 * (1 - bump / 200) : 0;
@@ -801,18 +833,7 @@ class LarmicMitwachsen extends HTMLElement {
     const cam = { x: player.x + shake, y: player.y };
 
     this.pose = restPose(this.state, this.paused(), t - this.lastInput);
-    const dozing = this.state.sleeping || this.pose === 'doze'; // im Bett oder eingenickt über dem Buch
-    if (dozing && !this.floats.some((f) => f.kind === 'zzz' && t - f.born < 1000) && !this.reduced.matches)
-      this.floats.push({
-        kind: 'zzz',
-        who: this.state.sleeping ? 'bed' : 'player',
-        color: GAME_COLORS.star,
-        born: t,
-        x: this.state.player.x, // im Schlaf liegt die Figur im Bett ihrer Gegend: Dort steigt das Zzz auf
-        y: this.state.player.y,
-        z: 0,
-        age: 0,
-      });
+    this.dozeFrame(t);
 
     // Schwebende Herzen und Noten folgen ihrem Wesen
     this.floats = this.floats.filter((f) => t - f.born < 1300);
@@ -860,6 +881,7 @@ class LarmicMitwachsen extends HTMLElement {
       reduced: this.reduced.matches,
       bottomInset: this.touchUi.offsetParent ? this.touchUi.offsetHeight + 16 : 0,
       explored: this.seen,
+      away: (x, y) => !this.reduced.matches && awayIn(this.renderer.views.values(), x, y, t), // Fledermaus auf Runde
       // Torplatte unter den Füßen (wo der Körper gerade ist, nicht das Ziel des Schritts): Ton, einsinken
       plate: this.plates(this.world, player, this.state.sleeping, this.packs.loaded, t),
       hint: this.hint(t), // „noch nicht“ an den Toren

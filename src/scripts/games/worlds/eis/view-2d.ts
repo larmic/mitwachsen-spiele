@@ -77,7 +77,12 @@ export const view: View2D = {
   // Fußspuren im Schnee, die langsam verwehen (mitwachsen-prints.ts)
   trail,
   // fröhliches Ploppen, wenn ein Schneemann wächst; heller Glockenton eines Eiszapfens (er schwingt ab jetzt)
-  score: (e) => (e.type === 'icicle' ? (ring(e.x, e.y, performance.now()), chimeScore(e)) : snowScore(e)),
+  score: (e) =>
+    e.type === 'icicle'
+      ? (ring(e.x, e.y, performance.now()), chimeScore(e))
+      : e.type === 'snowman'
+        ? snowScore(e)
+        : undefined, // Säule, Grottenolm: Grotte
   // Torplatte vor dem Eistor: Eisscholle mit Schneeflocke, Klirren statt Klonk (E7 und G7, Pentatonik)
   plate: ICE_FLOE,
   clink: [

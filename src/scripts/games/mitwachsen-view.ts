@@ -25,6 +25,17 @@ import type { PlateLook } from './mitwachsen-plate';
  */
 export type Box = readonly [number, number, number, number, number, number, string, string, ('see' | 'sway' | 'glow')?];
 
+/**
+ * Töne zu einem Ereignis aus den Regeln einer Welt: Jedes geladene Paket wird gefragt und antwortet nur auf die
+ * Ereignisse seiner Welt (Eis-Welt: Eiszapfen, Schneemann; Grotte: Säule, Grottenolm), so stört keins das andere
+ */
+export const packScore = (views: Iterable<View2D>, e: PackEvent): Scored[] =>
+  [...views].flatMap((v) => v.score?.(e) ?? []);
+
+/** Ist das Tier am Sitzplatz (x, y) gerade nur im Bild eines Pakets unterwegs (`View2D.away`)? */
+export const awayIn = (views: Iterable<View2D>, x: number, y: number, now: number) =>
+  [...views].some((v) => v.away?.(x, y, now) ?? false);
+
 /** Einen Quader von vorn zeichnen (nichts, wenn keiner da ist) */
 export function drawBox(ctx: CanvasRenderingContext2D, P: Projection, b: Box | null | undefined) {
   if (b) box(ctx, P, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]);
@@ -95,8 +106,21 @@ export type View2D = {
   /** Himmel hinter der Welt in 2D (drei Streifen von oben), solange die Figur in ihr ist (Grotte), sonst blau */
   heaven?: readonly string[];
   trail?: Trail;
-  /** Töne zu Ereignissen der Regeln dieser Welt (Eis-Welt: Ploppen, wenn ein Schneemann wächst) */
-  score?(e: PackEvent): Scored[];
+  /**
+   * Töne zu Ereignissen der Regeln dieser Welt (Eis-Welt: Ploppen, wenn ein Schneemann wächst); ein Ereignis einer
+   * anderen Welt: undefined. Gefragt werden alle geladenen Pakete (`packScore`)
+   */
+  score?(e: PackEvent): Scored[] | undefined;
+  /**
+   * Sitzplatz (x, y), dessen Tier gerade nur im Bild dieses Pakets unterwegs ist (Grotte: die verschlafene Fledermaus auf
+   * ihrer Runde): Die Ansichten zeichnen es solange nicht an seinem Platz (nicht bei reduzierter Bewegung)
+   */
+  away?(x: number, y: number, now: number): boolean;
+  /**
+   * Töne der Umgebung, je Bild gefragt, solange das Spiel läuft (nicht im Menü, nicht im Schlaf), in beiden Ansichten
+   * (Grotte: „plink“ der Tropfsteine); `explored`: was die Figur schon kennt (aus dem Nebel kommt nichts); meist leer
+   */
+  ambient?(world: World, state: State, now: number, explored: (x: number, y: number) => boolean): readonly Scored[];
   /** Klang der Torplatte vor dem Tor dieser Welt statt des Klonks (Eis-Welt: Klirren; `plateTones` in sfx.ts) */
   clink?: readonly Scored[];
   /** Schmuck der Torplatte vor dem Tor dieser Welt (Eis-Welt: Scholle mit Schneeflocke; wie `GateLook.plate` in 3D) */

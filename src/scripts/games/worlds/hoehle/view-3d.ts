@@ -1,7 +1,8 @@
 // 3D-Teil des Welt-Pakets der Höhlenwelt: Was die 3D-Ansicht nur für die Kristallgrotte baut. Pilzschale, Steintrog,
 // Unterstand mit Kristallwand (das Dach vor der Figur durchsichtig), Kristall-Lampen, Kristallsäulen, Kristallbogen,
 // Leuchtpilze, Pilzbeete (voll oder abgeerntet; das Stück wird bei `gather` und `regrow` neu gebaut), Tropfquelle,
-// Tropfmoos und Stalagmiten (Quader aus mitwachsen-cave-look.ts, wie in 2D), Boden und Klippen in den zart lila-grauen
+// Tropfmoos, Stalagmiten und Holzsteg (Quader aus mitwachsen-cave-look.ts, wie in 2D; Säulen stehen still, ihr
+// Leuchten beim Klingen zeichnet die Ebene darüber, mitwachsen-cave-sky.ts), Boden und Klippen in den zart lila-grauen
 // Schichten des Höhlentors, Lichtflecken in den Farben der Ecken (keine Punktlichter) und der lila Höhlenhimmel ohne
 // Decke mit seiner Nebel-Maske. Braucht Three.js (wie die 3D-Ansicht) und kommt darum erst, wenn die 3D-Ansicht es will
 // (`pack.view3d`, index.ts): im Build `_astro/welt-hoehle-3d.<hash>.js` mit eigener Grenze (scripts/verify-bundles.ts).
@@ -39,6 +40,7 @@ export const view3d: View3D = {
     dripspring: look,
     dripmoss: look,
     stalagmite: look,
+    jetty: look,
   },
   ground(c) {
     if (c.biome !== 'hoehle' || c.region === 'wild') return null;

@@ -64,12 +64,13 @@ export type Deco =
   | 'stonetrough' // Steintrog am Höhlenbett (Wasser, fest)
   | 'shed' // feste Rückwand des Unterstands am Höhlenbett, die Kristallwand (die Mitte zeichnet Dach und Pfosten)
   | 'cavelamp' // Kristall-Lampe im Lampengang hinter der Mündung (fest)
-  | 'column' // Kristallsäule in der Kristallhalle, `note` ist ihre Höhe (fest)
+  | 'column' // Kristallsäule des Säulen-Glockenspiels, `note` ist ihr Ton 0 = C5 … 4 = A5 (fest; Höhe aus `GROTTE.hall.columns`)
   | 'crystalarch' // Kristallbogen: `note` 0 und 4 die Pfeiler (fest), 1 bis 3 der Bogen darüber (begehbar)
   | 'glowshroom' // kleiner Leuchtpilz im Pilzgarten, Farbe in `color` (nur Zierde, begehbar)
   | 'shroombed' // Pilzbeet im Pilzgarten: Hineinlaufen sammelt seine drei Leuchtpilze in den Korb (fest wie ein Busch)
   | 'dripspring' // Tropfquelle über dem Felsbecken: Hineinlaufen füllt die Kanne wie das Wasser (fest)
   | 'dripmoss' // Tropfmoos auf dem Rand des Felsbeckens: daran naschen die Tiere selbst (nur Zierde, begehbar)
+  | 'jetty' // Planke des Holzstegs am stillen See (begehbar); `note` 1 an seinem Ende: dort taucht der Grottenolm auf
   | 'klangstein'; // Stein mit schwebender Note: Hineinlaufen spielt die Geschichte des Ortes
 export type TreeKind =
   'oak' | 'birch' | 'autumn' | 'red' | 'blossom' | 'winter' | 'pine' | 'snowpine' | 'palm' | 'dead';
@@ -93,7 +94,7 @@ export type Cell = {
   shade?: number; // Farbfleck im Boden: −1 dunkler … +1 heller (große, weiche Flecken)
   tint?: string; // Farbe, mit der Gras und Blätter auf der Lichtung getönt sind (Stimmung der Richtung)
   story?: StoryId; // Klangstein dieser Geschichte
-  note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz); Kristallgrotte: Teil oder Höhe
+  note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz); Kristallgrotte: Ton einer Säule, Teil, Höhe oder Ende des Stegs
   light?: number; // so viel heller (0 … 0,5) ist das Feld in der Grotte: Lichtschacht, Kristall oder Leuchtpilz daneben
   perch?: number; // Sitzplatz zum Hängen so hoch über dem Feld (unter dem Kristallbogen): Tiere mit Ruhehaltung hängen dort (`Species.roost`)
   slide?: true; // Rutschspur vom Eistor zum Schneebett (begehbar; glänzt, sobald das Tor offen ist)

@@ -1,16 +1,22 @@
 // Zeichenteile der Kristallgrotte für die 2D-Ansicht und die Ebene über 3D, im Welt-Paket der Höhlenwelt: Pilzschale,
-// Steintrog, Unterstand mit Kristallwand, Kristall-Lampen, Kristallsäulen, Kristallbogen, Leuchtpilze, Pilzbeete (voll
-// oder abgeerntet), Tropfquelle, Tropfmoos und Stalagmiten
+// Steintrog, Unterstand mit Kristallwand, Kristall-Lampen, Kristallsäulen (leuchten kurz heller, wenn sie klingen),
+// Kristallbogen, Leuchtpilze, Pilzbeete (voll oder abgeerntet), Tropfquelle, Tropfmoos, Stalagmiten und Holzsteg
 // (Quader aus mitwachsen-cave-look.ts, je Deko-Art an den Haken `drawDeco` des Kerns gehängt), Lichtflecken auf dem
-// Grottenboden, der lila Höhlenhimmel und das Zeichen der Gegend in der Leiste (ein Kristall). Wetter gibt es in der
-// Grotte keins, Polarlicht auch nicht, und das Höhlentor geht vorerst nie auf.
+// Grottenboden, der lila Höhlenhimmel und das Zeichen der Gegend in der Leiste (ein Kristall). Dazu der Schmuck der
+// Grotte: Töne des Säulen-Glockenspiels und „blubb“ des Grottenolms (`score`), „plink“ der Tropfsteine (`ambient`) und
+// in der Luft Tropfen, Grottenolm und die Fledermaus auf ihrer Runde (`sky.weather`, mitwachsen-cave-sky.ts). Wetter
+// gibt es in der Grotte keins, Polarlicht auch nicht, und das Höhlentor geht vorerst nie auf.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
 
 import { GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import type { RegionId } from '../../../../data/games/mitwachsen';
 import type { DrawDeco, Turn, View2D } from '../../mitwachsen-view';
 import { sprite } from '../../mitwachsen-glyphs';
-import { caveBoxes, glowOver } from './mitwachsen-cave-look';
+import { caveBoxes, columnBoxes, glowOver } from './mitwachsen-cave-look';
+import { caveWeather, type CaveFx } from './mitwachsen-cave-sky';
+import { Chime } from './mitwachsen-chime-look';
+import { Drips } from './mitwachsen-drips';
+import { Olm } from './mitwachsen-olm-look';
 
 /** Dinge der Grotte: Quader wie in 3D */
 const look: DrawDeco = (world, c, x, y) => caveBoxes(world, c, x, y);
@@ -42,24 +48,42 @@ export function turnAlbum(t: Turn, realm: RegionId, now: number, reduced: boolea
 
 const none = () => {};
 
+/** Was die Grotte sich fürs Bild merkt (nur Bild, kein Spielstand) */
+export const fx: CaveFx = { chime: new Chime(), drips: new Drips(), olm: new Olm() };
+
+/** Kristallsäule: leuchtet kurz heller, nachdem sie geklungen hat */
+const column: DrawDeco = (_world, c, x, y, { now }) => columnBoxes(c, x, y, fx.chime.glow(x, y, now));
+
 export const view: View2D = {
   decos: {
     shroombowl: look,
     stonetrough: look,
     shed: look,
     cavelamp: look,
-    column: look,
+    column,
     crystalarch: look,
     glowshroom: look,
     shroombed: bed,
     dripspring: look,
     dripmoss: look,
     stalagmite: look,
+    jetty: look,
   },
   // Lichtfleck unter einem Lichtschacht und neben Kristallen: helles Licht obenauf (der Kern ruft das nur auf Grottenboden)
   ground: (c, x, y) => (c.light ? [x, y, c.h, 1, 1, 0.01, glowOver(c.light), glowOver(c.light)] : null),
+  // Säule klingt (mit Echo; nach je vier Tönen zirpt die Fledermaus und fliegt), Grottenolm macht „blubb“
+  score: (e) =>
+    e.type === 'column'
+      ? fx.chime.ring(e.x, e.y, e.note, performance.now(), e.perch)
+      : e.type === 'olm'
+        ? fx.olm.surface(e.x, e.y, performance.now())
+        : undefined, // die anderen Ereignisse gehören anderen Welten
+  // die verschlafene Fledermaus auf ihrer Runde hängt solange nicht an ihrem Sitzplatz
+  away: (x, y, now) => fx.chime.away(x, y, now),
+  // „plink“: höchstens ein Tropfen je 2 s in der Nähe der Figur, nur an Erkundetem
+  ambient: (world, state, now, explored) => fx.drips.tick(world, state, now, explored),
   sky: {
-    weather: none,
+    weather: caveWeather(fx),
     aurora: none,
     waitArrow: none,
     realmSign: (ctx, realm, cx, bottom, size) => {

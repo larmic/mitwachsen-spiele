@@ -44,10 +44,16 @@ export type Kessel = {
 
 /**
  * Ereignis aus den Regeln einer Welt (Eis-Welt: ein Schneehaufen wächst um eine Kugel, Stufe 1 bis 3; ein Eiszapfen
- * des Glockenspiels klingt mit seiner Tonhöhe `note`, 0 tief)
+ * des Glockenspiels klingt mit seiner Tonhöhe `note`, 0 tief. Höhlenwelt: eine Kristallsäule des Säulen-Glockenspiels
+ * klingt mit ihrem Ton `note`, 0 = C5, `perch`: Sitzplatz im Kristallbogen nahe der Säule, an dem gerade eine Fledermaus
+ * hängt (die verschlafene Fledermaus, die nach je vier Tönen eine Runde dreht), keiner: fehlt; der Grottenolm taucht am
+ * Ende des Stegs auf (x, y: die Planke))
  */
 export type PackEvent =
-  { type: 'snowman'; x: number; y: number; stage: number } | { type: 'icicle'; x: number; y: number; note: number };
+  | { type: 'snowman'; x: number; y: number; stage: number }
+  | { type: 'icicle'; x: number; y: number; note: number }
+  | { type: 'column'; x: number; y: number; note: number; perch?: Point }
+  | { type: 'olm'; x: number; y: number };
 
 /**
  * Was die Regeln einer Welt vom Zustand sehen und ändern dürfen: den gespeicherten Zustand der Welt-Pakete (`packs`, je
@@ -59,7 +65,7 @@ export type Ruled = {
   tick: number;
   ritual: number;
   player: { x: number; y: number };
-  animals: { x: number; y: number; dir: Dir; mode: string; rest: number }[];
+  animals: { species: SpeciesId; x: number; y: number; dir: Dir; mode: string; rest: number }[];
 };
 
 /**
@@ -120,7 +126,7 @@ export type RideEvent = {
 /**
  * Regeln einer Welt aus ihrem Paket (Eis-Welt: Schneemänner bauen, Glockenspiel). `step` bekommt sie hereingereicht,
  * sobald das Paket da ist. `bump`: Die Figur läuft in das Feld (x, y) mit dem Inhalt `c`; `move` sagt, auf welchem
- * Feld sie steht (`here`) und ob der Schritt ginge (`walks`). true, wenn der Zug damit erledigt ist (sie bleibt stehen),
+ * Feld sie steht (`here`), ob der Schritt ginge (`walks`) und was auf anderen Feldern ist (`cell`). true, wenn der Zug damit erledigt ist (sie bleibt stehen),
  * sonst geht es weiter wie immer (auch nach einem Ereignis, etwa dem Ton eines Eiszapfens). `ride`: Regeln eines
  * Fahrzeugs (`RideRules` in mitwachsen-rider.ts; hier nur als Parameter, weil die Welt diese Datei kennt).
  */
@@ -131,7 +137,7 @@ export type WorldRules<Ride = never> = {
     x: number,
     y: number,
     events: { push(e: PackEvent | { type: 'hop' }): unknown }, // `hop`: Die Figur hüpft nur (Eistor im Vorspiel)
-    move: { here: Cell; walks: boolean },
+    move: { here: Cell; walks: boolean; cell: (x: number, y: number) => Cell },
   ): boolean;
   ride?: Ride;
 };

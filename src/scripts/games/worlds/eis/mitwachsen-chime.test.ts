@@ -303,7 +303,7 @@ describe('Eiszapfen-Glockenspiel (Eis-Welt): Bild und Klang', () => {
 
   it('der Ton kommt aus dem Paket, und ab dann schwingt der Zapfen in 2D', () => {
     const [x, y] = ROW[2]!;
-    const notes = EIS_PACK.view!.score!({ type: 'icicle', x, y, note: 2 });
+    const notes = EIS_PACK.view!.score!({ type: 'icicle', x, y, note: 2 })!;
     expect(notes[0]![0]).toBe(SCALE[2]);
     expect(since(x, y, performance.now())).toBeLessThan(100);
   });

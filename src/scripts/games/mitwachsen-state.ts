@@ -443,7 +443,11 @@ function move(
   // Handgriffe: Beeren pflücken, Fische fangen, Pilze sammeln, Wasser schöpfen, in die Tröge der Wiese bringen (mitwachsen-chores.ts)
   if (chore(s, world, tx, ty, events)) return;
   // Regeln der Welten aus ihren Paketen: etwa ein Schneehaufen, der um eine Kugel wächst (worlds/eis/mitwachsen-snowman.ts)
-  const move = { here: world.cell(p.x, p.y), walks: canStep(world, s.openGates, p.x, p.y, tx, ty) };
+  const move = {
+    here: world.cell(p.x, p.y),
+    walks: canStep(world, s.openGates, p.x, p.y, tx, ty),
+    cell: (x: number, y: number) => world.cell(x, y),
+  };
   if (packs.some((r) => r.rules?.bump(s, world.cell(tx, ty), tx, ty, events, move))) return;
   // Ins Bett laufen: Die Figur legt sich schlafen (nicht gleich nach dem Aufwachen, sonst schläft sie aus Versehen ein)
   if (world.cell(tx, ty).deco === 'bed' && s.tick - s.wokeAt >= WAKE_GRACE) return sleep(s, world, events);

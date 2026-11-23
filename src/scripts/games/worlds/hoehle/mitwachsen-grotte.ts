@@ -259,11 +259,15 @@ export function bedSpots(): Point[] {
   });
 }
 
-/** Kristallhalle: fünf Säulen in einer Reihe (je ein Feld dazwischen), dahinter der Kristallbogen, am Rand hohe Kristalle */
+/**
+ * Kristallhalle: fünf Säulen in einer Reihe (je ein Feld dazwischen), das Säulen-Glockenspiel (mitwachsen-cave-rules.ts),
+ * dahinter der Kristallbogen, am Rand hohe Kristalle
+ */
 function hallOf(put: Put) {
   const { hall } = GROTTE;
   const [kr, kt, kp] = GROTTE_COLORS.crystals;
-  hall.columns.forEach((h, i) => put([hall.across - 4 + 2 * i, hall.out - 3], thing('column', { note: h })));
+  // das Säulen-Glockenspiel: `note` ist der Ton (0 = C5 links … 4 = A5 rechts), die Höhe kommt aus `hall.columns`
+  hall.columns.forEach((_, note) => put([hall.across - 4 + 2 * note, hall.out - 3], thing('column', { note })));
   // Kristallbogen: Pfeiler an den Enden, darunter drei Felder, an deren Bogen man hängen kann (`perch`: die Fledermäuse)
   for (let i = 0; i < 5; i++)
     put(
@@ -279,17 +283,23 @@ function hallOf(put: Put) {
     put([hall.across + du, hall.out + dv], thing('crystal', { color }));
 }
 
-/** Stiller See, Kristallinsel in der Mitte (Kristalle an ihrem Rand), Steg vom vorderen Ufer zur Insel */
+/**
+ * Stiller See, Kristallinsel in der Mitte (Kristalle an ihrem Rand), Holzsteg vom vorderen Ufer zur Insel, drei Planken
+ * breit (`'jetty'`, begehbar); die Planken an der Insel (`note` 1) sind sein Ende: Dort taucht der Grottenolm auf
+ */
 function lakeOf(put: Put) {
   const { lake } = GROTTE;
   const isleCrystal = thing('crystal', { color: GROTTE_COLORS.crystals[1] });
+  const isle = (du: number, dv: number) => Math.hypot(du, dv) <= lake.isle;
   for (let dv = -lake.ry; dv <= lake.ry; dv++)
     for (let du = -lake.rx; du <= lake.rx; du++) {
       if ((du / lake.rx) ** 2 + (dv / lake.ry) ** 2 >= 1) continue;
       const p: [number, number] = [lake.across + du, lake.out + dv];
       const r = Math.hypot(du, dv);
       if (r <= lake.isle) put(p, r > lake.isle - 1 && (du + dv) % 2 === 0 && du !== 0 ? isleCrystal : floor());
-      else put(p, Math.abs(du) <= 1 && dv < 0 ? { ...floor(), ground: 'path' } : water());
+      else if (Math.abs(du) <= 1 && dv < 0)
+        put(p, { ...floor(), ground: 'path', deco: 'jetty', note: isle(du, dv + 1) ? 1 : 0 });
+      else put(p, water());
     }
 }
 

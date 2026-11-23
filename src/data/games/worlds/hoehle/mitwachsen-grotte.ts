@@ -47,16 +47,20 @@ export const GROTTE = {
    */
   garden: { across: -24, out: 47, r: 10, beds: 6, ring: 5 },
   /**
-   * Kristallhalle rechts: fünf geschliffene Säulen in einer Reihe (`columns`, Höhen 2 bis 5, je zwei Felder Abstand),
-   * dahinter der Kristallbogen (fünf Felder breit), ringsum hohe Kristalle
+   * Kristallhalle rechts: fünf geschliffene, freistehende Säulen in einer Reihe, je zwei Felder Abstand, das
+   * Säulen-Glockenspiel (Töne C5, D5, E5, G5, A5 von links nach rechts, `Cell.note` 0 bis 4); `columns` ihre Höhen je
+   * Ton, die tiefste die höchste wie bei einem Xylofon. Dahinter der Kristallbogen (fünf Felder breit), ringsum hohe Kristalle
    */
-  hall: { across: 25, out: 57, r: 12, columns: [2, 3, 5, 4, 3], arch: 8 },
+  hall: { across: 25, out: 57, r: 12, columns: [5, 4.5, 4, 3.5, 3], arch: 8 },
   /**
    * Tropfsteingrotte in der Mitte: Stalagmiten in drei Höhen, dazu ein Felsbecken 3 × 2 mit Moosrand (`basin`: seine Mitte,
    * quer von der Mitte der Zone); hinten über dem Becken die Tropfquelle, auf dem Rand ringsum Tropfmoos
    */
   drip: { across: 0, out: 88, r: 11, basin: -6 },
-  /** Stiller See hinten: flaches Wasser (Ellipse), ein Steg zur Kristallinsel (Radius `isle`) in seiner Mitte */
+  /**
+   * Stiller See hinten: flaches Wasser (Ellipse), ein Holzsteg (drei Planken breit, `'jetty'`) vom vorderen Ufer zur
+   * Kristallinsel (Radius `isle`) in seiner Mitte; neben seinem Ende taucht der Grottenolm auf
+   */
   lake: { across: 0, out: 118, rx: 13, ry: 8, isle: 2.5 },
   /** Geröllhang seitlich am See: drei Stufen (Höhe 2, 3, 4), jede `step` Felder tief */
   scree: { across: 27, out: 116, half: 6, step: 3 },
@@ -82,6 +86,8 @@ export const GROTTE_COLORS = {
   shrooms: SHROOM_COLORS,
   moss: ['#6f9a4a', '#86b45a'],
   wood: ['#8a5a34', '#a8723f'],
+  /** Planken des Holzstegs am stillen See */
+  jetty: ['#9a6a3e', '#b9864f'],
   roof: ['#8d86a8', '#a59fbf'],
   rock: ['#9a96b0', '#b8b4cc'],
   water: ['#5fc8d8', '#8fe0ea'],

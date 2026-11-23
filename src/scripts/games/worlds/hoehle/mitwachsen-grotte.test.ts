@@ -266,13 +266,11 @@ describe('Kristallgrotte: Gelände', () => {
         for (let y = y0; y <= y1; y++) if (!w.cell(x, y).roof || !w.cell(x, y).garden) shed.push(`Dach ${x},${y}`);
       }
       expect(shed, `Seed ${seed}`).toEqual([]);
-      expect(count(({ c }) => c.deco === 'column')).toBe(5);
-      expect(
-        all
-          .filter(({ c }) => c.deco === 'column')
-          .map(({ c }) => c.note)
-          .sort(),
-      ).toEqual([2, 3, 3, 4, 5]);
+      // Säulen-Glockenspiel: fünf Säulen in einer Reihe quer, Töne 0 (C5) bis 4 (A5) von links nach rechts
+      const columns = all.filter(({ c }) => c.deco === 'column').sort((a, b) => a.m[0] - b.m[0]);
+      expect(columns.map(({ c }) => c.note)).toEqual([0, 1, 2, 3, 4]);
+      expect(new Set(columns.map(({ m }) => m[1])).size).toBe(1);
+      expect(columns.every(({ c }) => c.solid && c.region === 'hoehle')).toBe(true);
       expect(count(({ c }) => c.deco === 'crystalarch')).toBe(5);
       expect(count(({ c }) => c.deco === 'crystalarch' && c.solid)).toBe(2); // nur die Pfeiler
       // unter dem Bogen drei Sitzplätze zum Hängen (die Fledermäuse), sonst nirgends
@@ -284,6 +282,15 @@ describe('Kristallgrotte: Gelände', () => {
       expect(count(({ c, m }) => c.ground === 'water' && m[1] > 100)).toBeGreaterThan(150); // der stille See
       expect(count(({ c, m }) => c.ground === 'water' && m[1] < 100)).toBe(6); // das Felsbecken 3 × 2
       expect(count(({ c }) => c.ground === 'path')).toBeGreaterThan(10); // der Steg
+      // der Holzsteg: jede Planke begehbar, drei Planken an seinem Ende (`note` 1) grenzen an die Kristallinsel, und
+      // neben dem Ende ist Wasser (dort taucht der Grottenolm auf)
+      const jetty = all.filter(({ c }) => c.deco === 'jetty');
+      expect(jetty.length).toBe(count(({ c }) => c.ground === 'path'));
+      expect(jetty.every(({ c }) => !c.solid && c.ground === 'path')).toBe(true);
+      const ends = jetty.filter(({ c }) => c.note === 1);
+      expect(ends.length).toBe(3);
+      expect(ends.every(({ m }) => m[1] === Math.max(...jetty.map((j) => j.m[1])))).toBe(true);
+      expect(ends.every(({ p }) => steps.has(key(p)))).toBe(true);
       const isle = w.cell(...site.at(...fromMouth([GROTTE.lake.across, GROTTE.lake.out])));
       expect(isle.ground).toBe('grotto');
       expect(steps.has(key(site.at(...fromMouth([GROTTE.lake.across, GROTTE.lake.out]))))).toBe(true); // über den Steg

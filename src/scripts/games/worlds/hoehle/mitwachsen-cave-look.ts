@@ -1,12 +1,12 @@
 // Aussehen der Dinge in der Kristallgrotte, gleich für 2D und 3D: Pilzschale, Steintrog mit Tropfmoos am Rand,
-// Unterstand mit der Kristallwand, Kristall-Lampen, Kristallsäulen, Kristallbogen, Leuchtpilze, Pilzbeete (voll und
-// leer), Tropfquelle, Tropfmoos und Stalagmiten in drei Höhen; dazu Boden
+// Unterstand mit der Kristallwand, Kristall-Lampen, Kristallsäulen (leuchten kurz heller, wenn sie klingen), Kristallbogen,
+// Leuchtpilze, Pilzbeete (voll und leer), Tropfquelle, Tropfmoos, Stalagmiten in drei Höhen und der Holzsteg; dazu Boden
 // und Klippen in den Schichten des Höhlentors und die Lichtflecken. Eigene Voxel-Grafik: keine Drusen, keine Loren, kein
 // Tropfstein mit Kessel. Rein (ohne DOM und Three.js): liefert Quader in Feldern, die beide Ansichten zeichnen. Teil des
 // Welt-Pakets der Höhlenwelt: 2D über view-2d.ts, 3D über den 3D-Teil view-3d.ts.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
 
-import { GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
+import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import { ARCH_PERCH } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-animals';
 import { hash } from '../../../../lib/games/rng';
 import type { Cell } from '../../mitwachsen-cell';
@@ -39,15 +39,13 @@ export function caveBoxes(world: Realms, c: Cell, x: number, y: number, full = t
         [x + 0.4, y + 0.42, h, 0.2, 0.16, 0.9, ...C.rock],
         [x + 0.33, y + 0.36, h + 0.9, 0.34, 0.28, 0.34, c.color ?? KR, c.color ?? KR],
       ];
-    case 'column': {
-      // geschliffene, freistehende Kristallsäule, Höhe aus `note`
-      const color = C.crystals[hash(3, x, y) % 3]!;
-      const top = c.note ?? 3;
+    case 'column':
+      return columnBoxes(c, x, y);
+    case 'jetty': // Planke des Holzstegs: zwei Bretter quer, dazwischen eine schmale Fuge
       return [
-        [x + 0.2, y + 0.25, h, 0.6, 0.5, 0.25, ...C.rock],
-        [x + 0.3, y + 0.33, h + 0.25, 0.4, 0.34, top - 0.25, color, color],
+        [x + 0.02, y + 0.04, h, 0.96, 0.44, 0.06, ...C.jetty],
+        [x + 0.02, y + 0.52, h, 0.96, 0.44, 0.06, ...C.jetty],
       ];
-    }
     case 'crystalarch': {
       // Kristallbogen: Pfeiler an den Enden (note 0 und 4), darüber durchgehend ein Bogen in drei Farben
       // Unterkante des Bogens auf der Höhe, an der die Fledermäuse hängen (`ARCH_PERCH`, `Cell.perch`)
@@ -77,6 +75,29 @@ export function caveBoxes(world: Realms, c: Cell, x: number, y: number, full = t
       return null;
   }
 }
+
+/** Farbe `hex` um `k` (0 … 1) zum Weiß hin aufhellen */
+export function lighten(hex: string, k: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (v: number) => Math.round(v + (255 - v) * Math.max(0, Math.min(1, k)));
+  return `#${[n >> 16, (n >> 8) & 255, n & 255].map((v) => mix(v).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/**
+ * Geschliffene, freistehende Kristallsäule des Säulen-Glockenspiels auf ihrem Sockel, so hoch wie ihr Ton es sagt
+ * (`GROTTE.hall.columns`, der tiefste Ton die höchste). `glow` (0 … 1): so viel heller leuchtet sie gerade, nachdem sie
+ * geklungen hat (mitwachsen-chime-look.ts); der Sockel bleibt Stein
+ */
+export function columnBoxes(c: Cell, x: number, y: number, glow = 0): Box[] {
+  const color = lighten(C.crystals[hash(3, x, y) % 3]!, glow * 0.6);
+  const top = C_HEIGHTS[c.note ?? 0] ?? C_HEIGHTS[0];
+  const h = c.h;
+  return [
+    [x + 0.2, y + 0.25, h, 0.6, 0.5, 0.25, ...C.rock],
+    [x + 0.3, y + 0.33, h + 0.25, 0.4, 0.34, top - 0.25, color, lighten(color, 0.15)],
+  ];
+}
+const C_HEIGHTS = GROTTE.hall.columns;
 
 /** Futter und Wasser: Pilzschale, Steintrog mit Tropfmoos am Rand, Tropfquelle über dem Becken, Tropfmoos */
 const SUPPLIES: ReadonlySet<Cell['deco']> = new Set<Cell['deco']>([

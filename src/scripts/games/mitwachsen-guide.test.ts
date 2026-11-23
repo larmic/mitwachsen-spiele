@@ -829,12 +829,14 @@ describe('Das Eistor geht mit dem Pinguin auf', () => {
       for (let k = -pre; k < RITUAL; k++) {
         const s = { ...opened().s, ritual: 100, tick: 100 + k };
         const ev: GameEvent[] = [];
-        expect(shut(s, gateCell, 0, 0, ev, { here: ground, walks: true }), `${pre} ${k}`).toBe(k < 0);
-        expect(shut(s, ground, 0, 0, ev, { here: ground, walks: true })).toBe(false);
+        expect(shut(s, gateCell, 0, 0, ev, { here: ground, walks: true, cell: () => ground }), `${pre} ${k}`).toBe(
+          k < 0,
+        );
+        expect(shut(s, ground, 0, 0, ev, { here: ground, walks: true, cell: () => ground })).toBe(false);
       }
     }
     const later = { ...opened().s, ritual: -1 }; // nach dem Laden: frei
-    expect(shut(later, gateCell, 0, 0, [], { here: ground, walks: true })).toBe(false);
+    expect(shut(later, gateCell, 0, 0, [], { here: ground, walks: true, cell: () => ground })).toBe(false);
   });
 
   it('nach dem Laden im Vorspiel ist das Tor offen, ohne Sperre, und der Pinguin wartet hinter der Gangmündung', () => {
