@@ -1,7 +1,7 @@
 // Welt-Pakete – nur Typen: Was eine Welt hinter einem Tor dem Kern liefert. Der Kern (Spielseite, sofort geladen) kennt
 // Regeln, Eingabe, Lichtung und Tiere; alles, was nur eine Welt braucht (Gelände, Wohnorte, Regeln ihres Schlüssels),
 // steckt in ihrem Paket unter src/scripts/games/worlds/<welt>/ und kommt per import() (einziger Einstieg: index.ts).
-// Fehlt ein Paket (noch nicht nötig oder Laden gescheitert), baut die Welt hinter dem Gang seines Tors eine Eisklippe;
+// Fehlt ein Paket (noch nicht nötig oder Laden gescheitert), baut die Welt hinter dem Gang seines Tors eine Klippe;
 // das Spiel läuft ohne. Wann es nötig ist, entscheidet mitwachsen-pack.ts (`needsPack`).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
@@ -26,8 +26,8 @@ export type Gang = {
   wall: number; // daneben auf jeder Seite so viele Felder Wand
 };
 
-/** Lage einer Welt hinter ihrem Gang: Mitte (dort steht ihr Bett) und alle Felder samt Klippen */
-export type KesselPlace = { bed: Point; centre: number; cells: readonly Point[] };
+/** Lage einer Welt hinter ihrem Gang: ihr Bett und alle Felder samt Klippen (wo ihre Mitte liegt, weiß nur ihr Paket) */
+export type KesselPlace = { bed: Point; cells: readonly Point[] };
 
 /**
  * Eine gebaute Welt: Bett, ihre Felder (`realm`, als "x,y"), Wohnplätze und Wohnorte ihrer Tiere, Klangstein und

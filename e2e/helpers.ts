@@ -81,7 +81,7 @@ export const view3d = (page: Page, id: string) =>
  * Die Spielseite aufrufen, ohne zu warten. Nur für Tests, die das Laden selbst prüfen (ohne JavaScript, ohne Netz, der
  * Hinweis für Eltern beim ersten Mal); sonst `openGame`
  */
-export const gotoGame = (page: Page) => page.goto('/spielen/');
+export const gotoGame = (page: Page, dev?: string) => page.goto(dev ? `/spielen/?entwickler=${dev}` : '/spielen/');
 
 /**
  * Test-Uhr der Seite, vor ihrem ersten Skript: `performance.now()` – die eine Uhr des Spiels für Takt, Tasten und Bild –
@@ -97,11 +97,12 @@ function installClock() {
 
 /**
  * Spiel öffnen, bis es steht, und den Hinweis für Eltern schließen. `info: false`: Er kommt nicht (schon gesehen,
- * etwa im zweiten Tab desselben Kontexts). `clock: true`: mit Test-Uhr (`ticks`, `render`), ein Bild ist gezeichnet
+ * etwa im zweiten Tab desselben Kontexts). `clock: true`: mit Test-Uhr (`ticks`, `render`), ein Bild ist gezeichnet.
+ * `dev`: mit dem Entwickler-Schalter in diese Welt blicken (`?entwickler=<welt>`, mitwachsen-dev.ts)
  */
-export async function openGame(page: Page, { info = true, clock = false } = {}) {
+export async function openGame(page: Page, { info = true, clock = false, dev = '' } = {}) {
   if (clock) await page.addInitScript(installClock);
-  await gotoGame(page);
+  await gotoGame(page, dev);
   await settled(page);
   if (info) await page.getByRole('button', { name: /Verstanden/ }).click();
   if (clock) await render(page);

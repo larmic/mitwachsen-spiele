@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Cell } from './mitwachsen-cell';
 import { Views3D, type Frame, type View3D } from './mitwachsen-view-3d';
 import { Group } from 'three';
-import { EIS_PACK, worldOf } from './test-worlds';
+import { EIS_PACK, HOEHLE_PACK, worldOf } from './test-worlds';
 import type { Scene } from './mitwachsen-render';
 import { initialState } from './mitwachsen-state';
 
@@ -13,6 +13,21 @@ const STATE = initialState(worldOf(1));
 const SC = { now: 0, reduced: false } as Scene;
 
 describe('Haken der 3D-Ansicht für Welt-Pakete (Views3D)', () => {
+  it('zwei Pakete nebeneinander: Luft nur aus der Grotte und nur in ihr, Dinge beider Welten, keine Deko doppelt', async () => {
+    const v = new Views3D();
+    expect(v.air('hoehle')).toBeUndefined(); // ohne 3D-Teil wie auf der Lichtung
+    await v.use(EIS_PACK, () => {});
+    await v.use(HOEHLE_PACK, () => {});
+    expect(v.air('hoehle')).toMatchObject({ sky: '#4a4370', mist: '#8a82b0' });
+    expect(v.air('lichtung')).toBeUndefined();
+    expect(v.air('eis')).toBeUndefined();
+    expect(v.look('hoehle')).toBeDefined();
+    const ice = Object.keys((await EIS_PACK.view3d!()).decos);
+    const cave = Object.keys((await HOEHLE_PACK.view3d!()).decos);
+    expect(ice.filter((d) => cave.includes(d))).toEqual([]); // ein Paket überschreibt nie die Dinge des anderen
+    expect(Object.keys(v.decos.decos)).toEqual([...ice, ...cave]);
+  });
+
   it('solange der 3D-Teil fehlt: schlicht (Boden wie auf der Lichtung, Bett aus Holz, kein Schmuck am Tor)', () => {
     const v = new Views3D();
     expect(v.ground(snow, ['eis'])).toBeNull();

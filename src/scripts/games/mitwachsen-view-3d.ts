@@ -7,7 +7,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
 import type { Object3D } from 'three';
-import type { GateId } from '../../data/games/mitwachsen';
+import type { GateId, RegionId } from '../../data/games/mitwachsen';
 import type { Cell } from './mitwachsen-cell';
 import type { GateLook } from './mitwachsen-gate-kit';
 import type { Tile } from './mitwachsen-geo';
@@ -23,9 +23,15 @@ const WHITE = [1, 1, 1] as const;
 
 /**
  * Boden eines Felds: Kacheln oben, oberste Seitenkachel, Seiten darunter; `top` färbt die Oberseite (Rutschspur),
- * `side` die Seiten (Eisfall)
+ * `side` die Seiten (Eisfall); `light` macht die Oberseite so viel heller (0,35: um 35 %, Lichtfleck in der Grotte)
  */
-export type Ground = { tiles: readonly [Tile, Tile, Tile]; top?: string; side?: string };
+export type Ground = { tiles: readonly [Tile, Tile, Tile]; top?: string; side?: string; light?: number };
+
+/**
+ * Luft einer Welt, solange die Figur in ihr ist (Grotte: lila Höhlenhimmel ohne Decke): Farbe des Himmels und der
+ * Nebel-Maske über dem Unerkundeten; nachts dunkeln beide wie der Himmel der Lichtung
+ */
+export type Air = { realm: RegionId; sky: string; mist: string };
 
 /** Rahmen des Betts: Farbe der Seiten, oben (null: wie die Seiten), Kachel */
 export type Frame = readonly [string, string | null, Tile];
@@ -56,6 +62,8 @@ export type View3D = {
   glow?(aurora: number, reduced: boolean, now: number): readonly [number, number, number];
   /** was sich je Bild ändert (Eis-Welt: Fußspuren und Schneespur); die 3D-Ansicht hängt es in ihre Szene */
   layer?: Layer;
+  /** Himmel und Nebel-Maske in ihrer Gegend (Grotte), sonst wie auf der Lichtung */
+  air?: Air;
 };
 
 /** Die 3D-Teile der Welt-Pakete, die die 3D-Ansicht schon hat, und ihr Nachladen */
@@ -125,6 +133,11 @@ export class Views3D {
       if (layer.object.parent !== into) into.add(layer.object);
       layer.update(world, state, sc);
     }
+  }
+
+  /** Himmel und Nebel-Maske der Gegend `realm` aus dem 3D-Teil ihres Pakets, sonst undefined (wie auf der Lichtung) */
+  air(realm: RegionId): Air | undefined {
+    return this.views.find((v) => v.air?.realm === realm)?.air;
   }
 
   /** Rahmen des Betts aus dem 3D-Teil eines Pakets, sonst `wood` */

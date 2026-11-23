@@ -22,6 +22,7 @@ import { ICE_STONE } from '../../../../data/games/mitwachsen-stories';
 import type { Cell } from '../../mitwachsen-cell';
 import { placeHome } from '../../mitwachsen-home';
 import type { Beyond, Gang, Kessel, KesselPlace } from '../../mitwachsen-pack-types';
+import { straightCentre } from '../../mitwachsen-behind';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from '../../mitwachsen-portal';
 import { findSpawns } from '../../mitwachsen-spawns';
 import { OBSTACLE_GAP, eisCell } from '../../mitwachsen-world';
@@ -65,28 +66,19 @@ const inside = (u: number, v: number) => (u / OUTER.rx) ** 2 + (v / OUTER.ry) **
 /** So weit (Anteil am Quadrat des Radius) wellt sich der Rand innen höchstens nach innen */
 const WOBBLE = 0.08;
 
+/** Lage des Tals: Bett, alle Felder samt Klippen und die Mitte (t im Gang) */
+export type Valley = KesselPlace & { centre: number };
+
+/** Platz des Tals samt Klippen und Abstand (`Region.room` der Eis-Welt sagt dem Kern dasselbe, gleich gehalten durch den Test) */
+export const KESSEL_ROOM = { rx: OUTER.rx, ry: OUTER.ry, gap: KESSEL.gap };
+
 /**
  * Wo das Tal liegt: so nah wie möglich hinter dem Gang, aber ganz hinter dem Felsring (`beyond`), mit `KESSEL.gap`
- * Feldern Abstand. Geprüft wird die ganze Hülle (Ellipse samt Abstand) an ihrem Rand: Die Lichtung samt Felsring ist
- * eine Ellipse um die Mitte der Welt, die nie in der Hülle liegt; berührt sie die Hülle, dann auch ihren Rand (ebenso
- * die Kreise um die Ausgänge der anderen Gänge, die `beyond` ausspart). Die Lage hängt nicht vom Seed ab, nur vom Gang.
+ * Feldern Abstand (`straightCentre`: geprüft wird die ganze Hülle an ihrem Rand). Die Lage hängt nicht vom Seed ab, nur
+ * vom Gang.
  */
-export function placeKessel(_seed: number, gang: Gang, beyond: Beyond): KesselPlace {
-  const A = OUTER.rx + KESSEL.gap,
-    B = OUTER.ry + KESSEL.gap;
-  let centre = gang.end + OUTER.ry;
-  const clear = (c: number) => {
-    for (let u = -A; u <= A; u++) {
-      const h = Math.ceil(B * Math.sqrt(1 - (u / A) ** 2));
-      if (!beyond(...gang.at(u, c - h)) || !beyond(...gang.at(u, c + h))) return false;
-    }
-    for (let v = -B; v <= B; v++) {
-      const h = Math.ceil(A * Math.sqrt(1 - (v / B) ** 2));
-      if (!beyond(...gang.at(-h, c + v)) || !beyond(...gang.at(h, c + v))) return false;
-    }
-    return true;
-  };
-  while (!clear(centre) && centre < gang.end + 400) centre++;
+export function placeKessel(_seed: number, gang: Gang, beyond: Beyond): Valley {
+  const centre = straightCentre(gang, beyond, KESSEL_ROOM);
   const cells: Point[] = []; // Boden und Klippen: alles innerhalb des festen Außenrands (wie `zone`, ohne Rauschen)
   for (let v = -OUTER.ry; v <= OUTER.ry; v++)
     for (let u = -OUTER.rx; u <= OUTER.rx; u++) if (inside(u, v)) cells.push(gang.at(u, centre + v));
@@ -156,7 +148,7 @@ export function buildKessel(
 function land(
   seed: number,
   gang: Gang,
-  place: KesselPlace,
+  place: Valley,
   free: (u: number, v: number) => boolean,
   lake: (u: number, v: number) => Cell | null,
   passage: (x: number, y: number) => Cell,
@@ -250,7 +242,7 @@ function floorCell(seed: number, bed: Point, x: number, y: number, pine: boolean
 function winter(
   seed: number,
   gang: Gang,
-  place: KesselPlace,
+  place: Valley,
   free: (u: number, v: number) => boolean,
   map: Map<string, Cell>,
 ): Wild[] {
@@ -323,7 +315,7 @@ function winter(
  * samt Eis ringsum und Steg, das Umfeld der Fischkisten, der Moosfleck und die Plattform am Talende. Die Rutschspur
  * hält `buildKessel` frei.
  */
-function keepFree(seed: number, gang: Gang, { centre, bed }: KesselPlace, holes: readonly Point[], berg: Iceberg) {
+function keepFree(seed: number, gang: Gang, { centre, bed }: Valley, holes: readonly Point[], berg: Iceberg) {
   const { hole, moss } = KESSEL;
   const [mu, mv] = fromBed([moss.across, moss.out]);
   const portal = fromBed(KESSEL.portal);
@@ -382,7 +374,7 @@ function level(cells: readonly Point[], map: Map<string, Cell>) {
 }
 
 /** Zuhause im Tal: Schneebett, Schneewiese mit Eisschale und Wassertrog, Iglu mit fester Rückwand */
-function home({ bed }: KesselPlace, set: (x: number, y: number, c: Cell) => void) {
+function home({ bed }: Valley, set: (x: number, y: number, c: Cell) => void) {
   const h = placeHome('eis', bed);
   const r = h.meadow;
   for (let dy = -r; dy <= r; dy++)
@@ -403,7 +395,7 @@ function home({ bed }: KesselPlace, set: (x: number, y: number, c: Cell) => void
  * Futter im Tal: sechs Fischkisten (fest wie ein Busch; einzeln, ringsum ebener Schnee) und ein Moosfleck als
  * Kulisse (grünes Moos unter dem Schnee, begehbar)
  */
-function forage(gang: Gang, { centre }: KesselPlace, map: Map<string, Cell>) {
+function forage(gang: Gang, { centre }: Valley, map: Map<string, Cell>) {
   const { across, out, r } = KESSEL.moss;
   const [mu, mv] = uv(centre, [across, out]);
   for (let dv = -2; dv <= 2; dv++)
@@ -424,7 +416,7 @@ function forage(gang: Gang, { centre }: KesselPlace, map: Map<string, Cell>) {
  * und im Kreis um das Schneebett (`HOMES.eis.portalRing`) in Richtung des Tors. Es erwacht, sobald die
  * Figur am Schneebett ankommt (`bed`).
  */
-function platforms(gang: Gang, { bed, centre }: KesselPlace, map: Map<string, Cell>): Portal {
+function platforms(gang: Gang, { bed, centre }: Valley, map: Map<string, Cell>): Portal {
   const [mx, my] = gang.at(0, gang.depth);
   const [home] = ringSpots([Math.atan2(my - bed[1], mx - bed[0])], HOMES.eis.portalRing, bed);
   const portal: Portal = { gate: gang.at(...uv(centre, KESSEL.portal)), home: home!, bed };
@@ -489,7 +481,7 @@ function slidePath(gang: Gang, bed: Point, map: ReadonlyMap<string, Cell>): Poin
  * Portal-Plattformen, nicht in der Mündung (zwei Felder Abstand zum Gang, so versperrt kein Tier den Weg hinein), nicht
  * auf Strecke und Schuppen des Schlittens (`sled`)
  */
-function spotsOf({ bed }: KesselPlace, map: ReadonlyMap<string, Cell>, sled: ReadonlySet<string>): Point[] {
+function spotsOf({ bed }: Valley, map: ReadonlyMap<string, Cell>, sled: ReadonlySet<string>): Point[] {
   const seen = new Set<string>();
   const queue = placeHome('eis', bed).wake.filter(([x, y]) => stand(map, x, y));
   for (const [x, y] of queue) seen.add(key(x, y));

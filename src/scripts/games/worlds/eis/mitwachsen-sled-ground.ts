@@ -16,6 +16,9 @@ import type { Cell } from '../../mitwachsen-cell';
 import type { Gang, KesselPlace } from '../../mitwachsen-pack-types';
 import { key } from './mitwachsen-flood';
 
+/** Lage des Tals samt Mitte (t im Gang), wie `placeKessel` sie liefert */
+type Valley = KesselPlace & { centre: number };
+
 /** So weit (Luftlinie) steht die Mitte des Schuppens von der Mitte der Plattform des Eis-Portals am Schneebett */
 export const SHED_NEAR = { near: 4, far: 9 } as const;
 /** Die Strecke hält mindestens so viele Felder Abstand zur Rutschspur (Schachbrett-Abstand) */
@@ -111,7 +114,7 @@ function forbidden(cells: readonly Point[], map: ReadonlyMap<string, Cell>) {
  * Strecke und Schuppen in die Karte bauen (`map`, der fertige Kessel): Liefert die Felder von Strecke und Schuppen
  * (als "x,y"; dort wohnt kein Tier). Findet sich kein Platz, bleibt alles, wie es war (dann gibt es keinen Schlitten).
  */
-export function sledGround(gang: Gang, place: KesselPlace, map: Map<string, Cell>): ReadonlySet<string> {
+export function sledGround(gang: Gang, place: Valley, map: Map<string, Cell>): ReadonlySet<string> {
   const u = trackU(gang);
   const straight: Point[] = [];
   let t = gang.depth + 1;
@@ -146,7 +149,7 @@ type ShedSpot = { stop: Point; dir: Point; shed: Point[]; cost: number };
  */
 function shedSpots(
   gang: Gang,
-  { cells }: KesselPlace,
+  { cells }: Valley,
   map: ReadonlyMap<string, Cell>,
   no: (x: number, y: number) => boolean,
   height: (x: number, y: number) => number,

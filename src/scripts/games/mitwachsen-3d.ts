@@ -66,7 +66,8 @@ import type { Cell, World } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
 import { turnHead } from './mitwachsen-air';
 import { drawDeco, type DecoAt } from './mitwachsen-view';
-import { Views3D } from './mitwachsen-view-3d';
+import { Views3D, type Air } from './mitwachsen-view-3d';
+import { DUSK_SKY, nightMix, sunLevel, type Rgb } from './mitwachsen-dusk';
 import { tree, tufts } from './mitwachsen-trees-3d';
 import type { PlateTurn } from './mitwachsen-turn-3d';
 import { CAM_REST, camPose } from './mitwachsen-camera';
@@ -112,12 +113,14 @@ const GROUND_TILES: Record<Exclude<Cell['ground'], 'water' | 'lava' | 'sky'>, [T
   cave: ['cave', 'cave', 'cave'],
   cloud: ['cloud', 'cloud', 'cloud'],
   moss: ['mossTop', 'mossSide', 'dirt'],
+  grotto: ['stone', 'stone', 'stone'], // Kristallgrotte: färbt der 3D-Teil ihres Pakets
 };
 /** Rahmen des Betts: aus Holz (Seite, oben, Kachel); in einer Welt hinter einem Tor sagt es ihr Paket */
 const WOOD_FRAME: readonly [string, string | null, Tile] = [GAME_COLORS.bed.frame, null, 'planks'];
 const SKY = new Color('#9fd6f0');
 const NIGHT_SKY = new Color('#141a3a');
 const CLOUD_SKY = new Color('#a9b4bf'); // Himmel bei Wolken und Regen
+const DUSK = new Color(DUSK_SKY); // Himmel der Lichtung in der Dämmerung (Tageslicht 0,4): so dunkel höchstens die Grotte
 const HEMI_SKY = '#cfe9ff'; // Himmelslicht von oben
 
 type Chunk = { meshes: Mesh[] };
@@ -161,6 +164,8 @@ export class World3D {
   private stale = new Set<string>(); // Stücke, die neu gebaut werden müssen; bis dahin bleibt das alte stehen
   private at: DecoAt = { now: 0, reduced: true, picked: {}, packs: {} }; // für drawDeco: leere Büsche, Schneemänner
   private day = 0; // Tag der Welt: bestimmt, was nachgewachsen ist
+  private air: Air | undefined; // Luft der Welt, in der die Figur zuletzt war (Grotte), solange sie ausblendet
+  private airMix = 0; // wie weit sie zu sehen ist (0 … 1)
   private opened: readonly GateId[] = []; // offene Tore: danach glänzt z. B. die Rutschspur zum Schneebett
   private views = new Views3D(); // 3D-Teile der Welt-Pakete, sobald geladen
   private houses!: GateHouses; // Torhäuser samt bewegten Teilen, je Tor neu gebaut, wenn sich dort etwas ändert
@@ -362,7 +367,6 @@ export class World3D {
     const target = snapToShadowTexel(new Vector3(...look), sunAt, SHADOW_TEXEL);
     this.sun.position.copy(target).add(sunAt);
     this.sun.target.position.copy(target);
-    const day = 1 - sc.night * 0.75;
     const cloud = sc.weather.cloud;
     // Licht der Richtung: Farbe und Helligkeit der Sonne, je näher am Tor, desto mehr
     const light = MOOD_LIGHT[sc.mood.id];
@@ -370,13 +374,26 @@ export class World3D {
     this.sun.color.set('#ffffff').lerp(new Color(light?.color ?? '#ffffff'), m * 0.2);
     this.hemi.color.set(HEMI_SKY).lerp(new Color(light?.color ?? HEMI_SKY), m * 0.1);
     const bright = 1 + ((light?.bright ?? 1) - 1) * m * 0.4;
-    this.sun.intensity = 2.4 * day * (1 - 0.5 * cloud) * bright; // Wolken dämpfen die Sonne
+    // Wolken dämpfen die Sonne; in der Grotte nie dunkler als die Dämmerung der Lichtung (mitwachsen-dusk.ts)
+    this.sun.intensity = 2.4 * sunLevel(sc.realm, sc.night, bright) * (1 - 0.5 * cloud);
     this.hemi.intensity = 1.35 * (1 - sc.night * 0.6) * (1 - 0.15 * cloud);
-    const sky = SKY.clone()
-      .lerp(CLOUD_SKY, cloud * 0.75)
-      .lerp(NIGHT_SKY, sc.night);
+    // Luft einer Welt aus dem 3D-Teil ihres Pakets (Grotte: lila Höhlenhimmel, Nebel-Maske), weich ein- und ausgeblendet
+    const air = this.views.air(sc.realm);
+    if (air) this.air = air;
+    this.airMix = sc.reduced ? +!!air : this.airMix + (+!!air - this.airMix) * 0.08;
+    const sky = SKY.clone().lerp(CLOUD_SKY, cloud * 0.75);
+    const mist = sky.clone();
+    if (this.air && this.airMix > 0.001) {
+      sky.lerp(new Color(this.air.sky), this.airMix);
+      mist.lerp(new Color(this.air.mist), this.airMix);
+    }
+    // zur Nacht gemischt, in der Grotte nur bis zum Himmel der Lichtung in der Dämmerung
+    const rgb = (c: Color): Rgb => [c.r, c.g, c.b];
+    const [n, d] = [rgb(NIGHT_SKY), rgb(DUSK)];
+    sky.lerp(NIGHT_SKY, nightMix(sc.realm, sc.night, rgb(sky), n, d));
+    mist.lerp(NIGHT_SKY, nightMix(sc.realm, sc.night, rgb(mist), n, d));
     (this.scene.background as Color).copy(sky);
-    this.fogUniforms.mwFogTint.value.copy(sky);
+    this.fogUniforms.mwFogTint.value.copy(mist);
     fog.color.copy(sky);
 
     this.updateFog(cam.x, cam.y);
@@ -626,7 +643,8 @@ export class World3D {
     // Seiten eines Bodens einer Welt getönt (`side`, Eisfall), sonst Farbflecken im Boden
     const tint = own?.side ? new Color(own.side) : new Color(1, 1, 1).multiplyScalar(0.93 + shade * 0.07);
     if (c.tint && c.ground === 'grass') tint.multiply(new Color(c.tint)); // Stimmung der Richtung
-    const top = own?.top ? new Color(own.top) : tint;
+    const top = own?.top ? new Color(own.top) : tint.clone();
+    if (own?.light) top.multiplyScalar(1 + own.light); // Lichtfleck (Grotte): Licht in den Farben der Ecken
     g.quad([x, h, y + 1], [x + 1, h, y + 1], [x + 1, h, y], [x, h, y], [0, 1, 0], topTile, top);
     const sides: [number, number, V3][] = [
       [0, 1, [0, 0, 1]],

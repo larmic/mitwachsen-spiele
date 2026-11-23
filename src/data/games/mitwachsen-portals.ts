@@ -9,17 +9,23 @@
 
 import { GATES, type GateId, type GateTheme, type RegionId } from './mitwachsen';
 
-/** Portale: je großes Tor eines (heißt wie das Tor) und das Eis-Portal im Gletscherkessel */
-export type PortalId = GateId | 'eiskessel';
+/**
+ * Portale: je großes Tor eines (heißt wie das Tor), das Eis-Portal im Gletscherkessel und das Portal am stillen See der
+ * Kristallgrotte (erwacht erst später, nach dem Maulwurf)
+ */
+export type PortalId = GateId | 'eiskessel' | 'hoehlensee';
 export const ICE_PORTAL = 'eiskessel' satisfies PortalId;
+export const CAVE_PORTAL = 'hoehlensee' satisfies PortalId;
 /**
  * Je Portal: Thema (Bild und Farben der Plattform, Funken) und Gegend, in der seine beiden Plattformen stehen.
  * Ein Portal verbindet immer nur Tor und Bett derselben Gegend: Die Portale der Tore stehen auf der Lichtung (neben dem
- * Tor und im Kreis um ihr Bett), das Eis-Portal im Kessel (hinter der Gangmündung und im Kreis um das Schneebett).
+ * Tor und im Kreis um ihr Bett), das Eis-Portal im Kessel (am Talende und im Kreis um das Schneebett), das Portal
+ * `hoehlensee` in der Grotte (hinter dem stillen See und im Kreis um das Höhlenbett).
  */
 export const PORTALS = Object.fromEntries([
   ...GATES.map((g) => [g.id, { theme: g.theme, realm: g.region }] as const),
   [ICE_PORTAL, { theme: 'eis', realm: 'eis' }],
+  [CAVE_PORTAL, { theme: 'hoehle', realm: 'hoehle' }],
 ]) as Readonly<Record<PortalId, { theme: GateTheme; realm: RegionId }>>;
 /** Alle Portal-Kennungen (Spielstände behalten nur diese) */
 export const PORTAL_IDS = Object.keys(PORTALS) as readonly PortalId[];

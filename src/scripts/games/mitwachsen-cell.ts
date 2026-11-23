@@ -1,5 +1,6 @@
 // Ein Feld der Welt von Mitwachsen: Boden, Höhe, Zierde und wozu es gehört. Nur Typen; gebaut wird in
-// mitwachsen-world.ts (Lichtung, Landschaft) und worlds/eis/mitwachsen-kessel.ts (Eis-Welt).
+// mitwachsen-world.ts (Lichtung, Landschaft), worlds/eis/mitwachsen-kessel.ts (Eis-Welt) und
+// worlds/hoehle/mitwachsen-grotte.ts (Höhlenwelt).
 // Spezifikation: docs/specs/mitwachsen.md
 
 import type { GateId, RegionId } from '../../data/games/mitwachsen';
@@ -21,7 +22,8 @@ export type Ground =
   | 'cave'
   | 'cloud'
   | 'sky' // Leere zwischen den Wolken
-  | 'moss';
+  | 'moss'
+  | 'grotto'; // heller, zart lila getönter Stein der Kristallgrotte (Boden und Klippen)
 export type Deco =
   | 'tree'
   | 'bush'
@@ -57,6 +59,14 @@ export type Deco =
   | 'fishcrate' // Fischkiste im Gletscherkessel: Hineinlaufen fängt Fische ins Netz (fest wie ein Busch)
   | 'snowheap' // Schneehaufen im Gletscherkessel: Hineinlaufen lässt eine Kugel wachsen, bis ein Schneemann steht (fest)
   | 'icicle' // Eiszapfen des Glockenspiels am Klippenfuß im Gletschertal: Hinlaufen lässt ihn klingen (begehbar)
+  // Kristallgrotte (zeichnet nur ihr Welt-Paket, solange es lädt: ein Block in Kartenfarbe)
+  | 'shroombowl' // Pilzschale auf der Mooswiese am Höhlenbett (Futter, fest)
+  | 'stonetrough' // Steintrog am Höhlenbett (Wasser, fest)
+  | 'shed' // feste Rückwand des Unterstands am Höhlenbett, die Kristallwand (die Mitte zeichnet Dach und Pfosten)
+  | 'cavelamp' // Kristall-Lampe im Lampengang hinter der Mündung (fest)
+  | 'column' // Kristallsäule in der Kristallhalle, `note` ist ihre Höhe (fest)
+  | 'crystalarch' // Kristallbogen: `note` 0 und 4 die Pfeiler (fest), 1 bis 3 der Bogen darüber (begehbar)
+  | 'glowshroom' // kleiner Leuchtpilz im Pilzgarten, Farbe in `color` (nur Zierde, begehbar)
   | 'klangstein'; // Stein mit schwebender Note: Hineinlaufen spielt die Geschichte des Ortes
 export type TreeKind =
   'oak' | 'birch' | 'autumn' | 'red' | 'blossom' | 'winter' | 'pine' | 'snowpine' | 'palm' | 'dead';
@@ -80,7 +90,8 @@ export type Cell = {
   shade?: number; // Farbfleck im Boden: −1 dunkler … +1 heller (große, weiche Flecken)
   tint?: string; // Farbe, mit der Gras und Blätter auf der Lichtung getönt sind (Stimmung der Richtung)
   story?: StoryId; // Klangstein dieser Geschichte
-  note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz)
+  note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz); Kristallgrotte: Teil oder Höhe
+  light?: number; // so viel heller (0 … 0,5) ist das Feld in der Grotte: Lichtschacht, Kristall oder Leuchtpilz daneben
   slide?: true; // Rutschspur vom Eistor zum Schneebett (begehbar; glänzt, sobald das Tor offen ist)
   plate?: GateId; // Torplatte vor diesem Tor (mitten in der Bucht, eben und frei; Bild und Ton, öffnet das Eistor, mitwachsen-plate.ts)
   ride?: RideId; // Strecke dieses Fahrzeugs (nur in einer Welt und ihrem Gang, begehbar wie die Rutschspur; Welt-Paket)

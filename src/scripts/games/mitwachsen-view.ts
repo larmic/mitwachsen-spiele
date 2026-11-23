@@ -92,6 +92,8 @@ export type View2D = {
   /** flach auf dem Boden eines Felds (Rutschspur, glänzt bei offenem Tor der Welt), sonst null */
   ground(c: Cell, x: number, y: number, open: boolean): Box | null;
   sky: Sky;
+  /** Himmel hinter der Welt in 2D (drei Streifen von oben), solange die Figur in ihr ist (Grotte), sonst blau */
+  heaven?: readonly string[];
   trail?: Trail;
   /** Töne zu Ereignissen der Regeln dieser Welt (Eis-Welt: Ploppen, wenn ein Schneemann wächst) */
   score?(e: PackEvent): Scored[];
@@ -125,7 +127,18 @@ export type View2D = {
 };
 
 /** Deko-Arten, die nur ein Welt-Paket zeichnet: Ohne seine Zeichnung steht dort ein einfacher Block */
-const PACKED: ReadonlySet<Deco> = new Set<Deco>(['igloo', 'icebowl', 'fishcrate', 'snowheap']);
+const PACKED: ReadonlySet<Deco> = new Set<Deco>([
+  'igloo',
+  'icebowl',
+  'fishcrate',
+  'snowheap',
+  'shroombowl',
+  'stonetrough',
+  'shed',
+  'cavelamp',
+  'column',
+  'crystalarch',
+]);
 
 /**
  * Quader eines Dings, das ein Welt-Paket zeichnet (`view`, null solange es lädt): seine Zeichnung je Deko-Art, ohne sie

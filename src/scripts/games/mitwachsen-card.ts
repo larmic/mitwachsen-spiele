@@ -11,14 +11,14 @@ import type { GateId } from '../../data/games/mitwachsen';
 import type { World3D } from './mitwachsen-3d';
 import { drawPostcard } from './mitwachsen-postcard';
 import type { State } from './mitwachsen-state';
-import type { View2D } from './mitwachsen-view';
+import type { Guest } from './mitwachsen-guest-look';
 import type { World } from './mitwachsen-world';
 
 /**
  * Postkarte auf `canvas`: liefert eine Funktion für jedes Bild, vor dem Bild der 3D-Ansicht (`r3d`, sonst 2D): `id`
  * das Tor, dessen Front sie zeigt (oder null; dreht die 3D-Ansicht, zeigt sie nichts), `open` wie weit jedes Tor offen
- * ist, `view` die Zeichenteile der Eis-Welt (mit ihnen der Pinguin am Tor: in 2D sein Umriss auf der Tür; in 3D steht
- * er schon im Bild)
+ * ist, `guestAt` der Gast am Tor aus den Zeichenteilen der Welten (der Pinguin: in 2D sein Umriss auf der Tür; in 3D
+ * steht er schon im Bild)
  */
 export function postcardView(canvas: HTMLCanvasElement) {
   let shown: GateId | null = null; // Tor, dessen Front sie gerade zeigt
@@ -30,7 +30,7 @@ export function postcardView(canvas: HTMLCanvasElement) {
     state: State,
     r3d: Pick<World3D, 'postcard' | 'turns'> | null,
     open: ReadonlyMap<string, number>,
-    view: View2D | null,
+    guestAt: (world: World, state: State) => Guest | null,
   ) => {
     if (r3d?.turns()) id = null; // die Kamera dreht selbst zur Front
     const o = (id && open.get(id)) ?? 0;
@@ -40,7 +40,7 @@ export function postcardView(canvas: HTMLCanvasElement) {
       [drawn, last] = [[], o];
     }
     if (!id) return;
-    const guest = r3d ? null : (view?.sky.guestAt(world, state) ?? null);
+    const guest = r3d ? null : guestAt(world, state);
     // 3D: beim Betreten, dann erst wieder, wenn das Tor in der Szene ganz offen steht (kein Dauer-Rendern)
     const now = r3d ? [last >= 1] : [o, guest];
     last = o;

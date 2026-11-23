@@ -12,6 +12,7 @@ import { GAME_COLORS, LOOK, SPECIES, TIRED_TALK, realmOfAnimal, type GateId } fr
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
 import { SPARKS, fly, glints, sparks } from './mitwachsen-glyphs';
 import { Sfx } from './sfx';
+import { nightIn } from './mitwachsen-dusk';
 import { plateToy } from './mitwachsen-plate-toy';
 import { postcard } from './mitwachsen-plate';
 import { NOTE_COLORS, StoryPlayer } from './mitwachsen-story';
@@ -36,7 +37,8 @@ import { attachPack, initialState, progressOf, step, type Cmd, type GameEvent, t
 import { reshapes, type ChoreEvent } from './mitwachsen-chores';
 import { createWorld, gatePlaces, standHeight, type World } from './mitwachsen-world';
 import { GUIDE_GATE, pending, type GuideRules } from './mitwachsen-guide';
-import { Packs, type LoadedPack } from './mitwachsen-packs';
+import { PACK_IDS, Packs, type LoadedPack } from './mitwachsen-packs';
+import { glimpse, sandbox } from './mitwachsen-dev';
 import { randomId, randomSeed, savedOrNew, showName } from './mitwachsen-world-list';
 import { platformLift, portalColor } from './mitwachsen-portal';
 import { HOME_STAGGER, SNAP_DELAY, hopOf, snaps } from './mitwachsen-gait';
@@ -116,6 +118,8 @@ class LarmicMitwachsen extends HTMLElement {
   private gl3d: World3DType | null = null; // die geladene 3D-Ansicht, auch wenn ihr Kontext gerade fehlt
   private guide?: GuideRules; // Regeln des verlaufenen Pinguins (aus dem Paket der Eis-Welt), sobald er fällig ist
   private packs = new Packs((pack) => this.arrive(pack)); // Welt-Pakete (worlds/), geladen erst bei Bedarf
+  // Entwickler-Schalter (`?entwickler=hoehle`, mitwachsen-dev.ts): Welt, in die geblickt wird; dann wird nichts gespeichert
+  private dev = glimpse(location.search, PACK_IDS);
   private opening = ''; // Welt, die gerade öffnet (wartet vielleicht auf ein Paket)
   private live = ''; // Welt, zu der `state` gehört; solange sie nicht `opening` ist, ruhen Takt und Speichern
   // Postkarte der Torfront, nachgeladen mit der ersten
@@ -144,9 +148,11 @@ class LarmicMitwachsen extends HTMLElement {
     this.mapCtx = this.map.getContext('2d')!;
     this.touchUi = this.querySelector('.mw-touch')!;
     this.renderer = new Renderer(this.ctx);
-    this.store = browserStore().store;
+    // mit dem Entwickler-Schalter schreibt nichts in den Spielstand des Kindes, auch das Menü nicht
+    this.store = this.dev ? sandbox(browserStore().store) : browserStore().store;
     this.sfx.muted = this.store.getItem('larmic.games.muted') === '1';
     this.tired = loadTired(this.store, Date.now());
+    if (this.dev) this.packs.extra = [this.dev]; // sein Paket holen, auch ohne Bedarf
     void this.openWorld(loadIndex(this.store).current).then(() => this.begin());
   }
 
@@ -232,10 +238,15 @@ class LarmicMitwachsen extends HTMLElement {
     await this.packs.wait({ ...p, at: [p.position] }, gatePlaces(saved.seed));
     if (this.opening !== saved.id) return; // inzwischen wurde eine andere Welt geöffnet
     this.saved = { ...saved, visits: saved.visits + 1 };
-    saveWorld(this.store, this.saved);
+    if (!this.dev) saveWorld(this.store, this.saved);
     this.world = createWorld(this.saved.seed, this.packs.loaded);
     this.seenAt = '';
     this.state = initialState(this.world, progressFrom(this.saved), this.saved.seed ^ this.saved.visits);
+    // Entwickler-Schalter: Die Figur schläft im Bett der Welt, in die geblickt wird (nur, wenn ihr Paket da ist)
+    if (this.dev && this.packs.get(this.dev)) {
+      const [x, y] = this.world.homes[this.dev].bed;
+      this.state = { ...this.state, player: { ...this.state.player, x, y } };
+    }
     this.live = this.saved.id;
     // Nebel: Am Anfang ist nur ein kleines Stück um das Bett zu sehen (die Figur liegt darin), ebenso, wenn das Bett
     // noch im Nebel liegt (etwa nach dem Umzug in das Gletschertal, Spielstand Version 5)
@@ -254,7 +265,8 @@ class LarmicMitwachsen extends HTMLElement {
   }
 
   private save() {
-    if (!this.saved || this.opening !== this.live) return; // eine Welt öffnet: `state` gehört nicht zu `saved`
+    // eine Welt öffnet (`state` gehört nicht zu `saved`), oder der Entwickler-Schalter blickt nur hinein
+    if (!this.saved || this.opening !== this.live || this.dev) return;
     this.saved = { ...withProgress(this.saved, progressOf(this.state)), explored: this.fog.serialize() };
     saveWorld(this.store, this.saved);
     saveTired(this.store, this.tired);
@@ -267,7 +279,7 @@ class LarmicMitwachsen extends HTMLElement {
    * 3D-Ansicht lädt ihre nach)
    */
   private arrive(pack: LoadedPack) {
-    this.renderer.view = pack.view ?? null;
+    if (pack.view) this.renderer.views.set(pack.gate, pack.view);
     this.gl3d?.use(pack); // sein 3D-Teil kommt nach (mit Three.js)
     if (!(this.world as World | undefined)) return; // entsteht gleich mit ihm; sonst immer einbauen (zweimal: egal)
     const { world, chunks } = this.world.attach(pack);
@@ -339,7 +351,7 @@ class LarmicMitwachsen extends HTMLElement {
     const { now, held } = heldTired(this.tiredLater, event, !!this.state.ride);
     this.tiredLater = held;
     if (now) this.getTired(now);
-    if (performance.now() - this.lastTiredSave > 5000) {
+    if (!this.dev && performance.now() - this.lastTiredSave > 5000) {
       saveTired(this.store, this.tired);
       this.lastTiredSave = performance.now();
     }
@@ -589,7 +601,7 @@ class LarmicMitwachsen extends HTMLElement {
    * reduzierter Bewegung); was zählt (erschienen, Fest), gleich speichern
    */
   private ride(e: RideEvent, now: number) {
-    const fx = this.renderer.view?.rideFx?.(e, this.state);
+    const fx = this.renderer.first((v) => v.rideFx?.(e, this.state));
     this.sfx.score(fx?.score ?? []);
     if (fx?.who) this.hops.set(fx.who, now);
     if (fx?.who && fx.heart) this.float('heart', fx.who, GAME_COLORS.heart, now + 150);
@@ -614,7 +626,7 @@ class LarmicMitwachsen extends HTMLElement {
   private rideFrame(t: number, night: number) {
     const lit = night > 0.3 || (!this.state.sleeping && evening(this.tired) > 0.3);
     const at = { now: t, frac: Math.min(1, (t - this.tickAt) / TICK_MS), reduced: this.reduced.matches, lit };
-    this.rides = this.renderer.view?.bodies?.(this.state, this.world, at) ?? [];
+    this.rides = this.renderer.all((v) => v.bodies?.(this.state, this.world, at) ?? []);
   }
 
   /** Ins Bett gebracht: Schlaflied, Nacht; der Tag ist zu Ende, morgen ist die Figur wieder ausgeschlafen */
@@ -729,7 +741,7 @@ class LarmicMitwachsen extends HTMLElement {
   private chore(e: ChoreEvent | Extract<GameEvent, { type: 'snowman' | 'icicle' | 'bob' }>, now: number) {
     if (e.type === 'bob') return void this.hops.set(e.id, now); // der Pinguin hüpft still neben der Torplatte
     if (reshapes(e)) this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]); // leer, wieder voll, gewachsen
-    if (e.type === 'snowman' || e.type === 'icicle') this.sfx.score(this.renderer.view?.score?.(e) ?? []);
+    if (e.type === 'snowman' || e.type === 'icicle') this.sfx.score(this.renderer.first((v) => v.score?.(e)) ?? []);
     if (e.type === 'icicle')
       return this.burst('', SPARKS.eis, 6, { x: e.x, y: e.y - 0.35, z: this.world.cell(e.x, e.y).h }, true);
     if (e.type === 'regrow') return;
@@ -815,6 +827,7 @@ class LarmicMitwachsen extends HTMLElement {
 
     const { dpr, w, h, zoom } = this.size;
     const mood = this.world.climate(Math.round(player.x), Math.round(player.y));
+    const realm = this.world.realm(Math.round(player.x), Math.round(player.y));
     const { weather, glance, aurora } = this.air.frame(this.world, this.state, this.paused(), this.reduced.matches);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ctx.imageSmoothingEnabled = false;
@@ -825,13 +838,14 @@ class LarmicMitwachsen extends HTMLElement {
       cam,
       bodies: this.bodies,
       gates: gates as Scene['gates'],
-      night,
+      night: nightIn(realm, night), // die Grotte bleibt hell wie die Dämmerung
       evening: this.state.sleeping ? 0 : evening(this.tired),
       weather,
       aurora: aurora * night,
       glance,
       pose: this.pose,
       mood,
+      realm,
       lit3d: !!this.r3d,
       wind: this.reduced.matches ? 0 : windAt(mood, weather),
       floats,
@@ -868,7 +882,7 @@ class LarmicMitwachsen extends HTMLElement {
    * mitwachsen-card.ts lädt erst mit der ersten Postkarte nach
    */
   private postcard(id: GateId | null, open: Map<string, number>) {
-    this.card(id)?.(id, this.world, this.state, this.r3d, open, this.renderer.view);
+    this.card(id)?.(id, this.world, this.state, this.r3d, open, this.renderer.guestAt);
   }
 
   // ---------- Kopf und Menü ----------

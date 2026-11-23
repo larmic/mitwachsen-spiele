@@ -1,4 +1,4 @@
-// Böden der Welten hinter den Toren in der 2D-Ansicht (Schnee, Eis, Basalt, Höhle, Wolken, Moos) als einfache Blöcke in
+// Böden der Welten hinter den Toren in der 2D-Ansicht (Schnee, Eis, Basalt, Höhle, Grotte, Wolken, Moos) als einfache Blöcke in
 // ihren Farben, dazu die Eisklippen der Eis-Welt und ihr Schneebett. Die Eis-Welt bringt ihre übrigen Farben mit ihrem
 // Welt-Paket (`ICE_COLORS` in src/data/games/worlds/eis/mitwachsen-ice-colors.ts); Klippen und Schneebett braucht der
 // Kern auch, solange das Paket lädt (dann steht hinter dem Gang des Eistors eine Eisklippe), darum stehen sie hier.
@@ -20,6 +20,7 @@ const FLAT: Partial<Record<Cell['ground'], Colors>> = {
   cave: ['#2a2c33', '#3c3f47'],
   cloud: ['#e6eef7', '#ffffff'],
   moss: ['#6a4a3a', '#8a76cc'],
+  grotto: ['#b4aecb', '#cfc9e0'], // Kristallgrotte: zart lila getöntes Grau wie die Schichten am Höhlentor
 };
 /** Gefärbtes Eis der Eis-Welt: Klippen und Eisfall, auf dem Boden die Stufen des Eisbergs (`color`) */
 const iceWall = (c: Cell) => c.biome === 'eis' && (c.region === 'border' || (c.ground === 'ice' && !!c.color));

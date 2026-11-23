@@ -25,10 +25,12 @@ export const RETRY_MS = 30_000;
 
 /**
  * Ein Lader je Welt-Paket (per import(), einziger Einstieg `worlds/<welt>/index.ts`). Eine Gegend ohne Eintrag hat noch
- * kein Paket (die Höhlenwelt): Hinter ihrem Tor baut die Welt dann, was ohne Paket dort steht (mitwachsen-behind.ts).
+ * kein Paket: Hinter ihrem Tor baut die Welt dann, was ohne Paket dort steht (mitwachsen-behind.ts). Das Paket der
+ * Höhlenwelt (die Kristallgrotte) braucht das Spiel vorerst nie, nur der Entwickler-Schalter holt es (`Packs.extra`).
  */
 const LOADERS: Partial<Record<PackId, () => Promise<LoadedPack>>> = {
   eis: () => import('./worlds/eis').then((m) => m.pack),
+  hoehle: () => import('./worlds/hoehle').then((m) => m.pack),
 };
 /** Die Pakete, die es gibt (je Lader eines) */
 export const PACK_IDS = Object.keys(LOADERS) as PackId[];
@@ -52,6 +54,8 @@ export class Packs {
   private failedAt = new Map<PackId, number>();
   /** Höchstens so lange wartet `wait`; ein Test setzt es hoch, wenn er den wartenden Start prüft (langsame Pipeline) */
   waitMs = PACK_WAIT_MS;
+  /** Diese Pakete holt `want` immer, auch ohne Bedarf (Entwickler-Schalter, mitwachsen-dev.ts) */
+  extra: readonly PackId[] = [];
 
   /** `arrive`: ein Paket ist angekommen (einbauen), `load` holt es (im Test ersetzbar), `ids`: diese Pakete gibt es */
   constructor(
@@ -95,7 +99,8 @@ export class Packs {
 
   private wantOne(id: PackId, need: Need, gates: ReadonlyMap<GateId, { mid: Point }>, now: number) {
     const gate = REGIONS.find((r) => r.id === id)?.behind;
-    if (!gate || this.get(id) || !needsPack(need, gates, beyondRing, gate)) return Promise.resolve();
+    if (!gate || this.get(id) || !(this.extra.includes(id) || needsPack(need, gates, beyondRing, gate)))
+      return Promise.resolve();
     if (!this.loading.has(id) && now - (this.failedAt.get(id) ?? -Infinity) >= RETRY_MS)
       this.loading.set(
         id,

@@ -36,8 +36,10 @@ import {
   BUCKET_PARTS,
   BOOK_PARTS,
   SLEEPY_EYES,
+  regionBehind,
   type GateId,
   type Look,
+  type RegionId,
 } from '../../data/games/mitwachsen';
 import { FISH_PARTS } from '../../data/games/mitwachsen-eis';
 import { grown } from './mitwachsen-growth';
@@ -81,6 +83,7 @@ export type Scene = {
   glance: boolean; // die Figur dreht bei einer Böe kurz den Kopf zur Seite
   pose: Pose; // was die wache Figur tut, wenn niemand spielt (lesen, einnicken)
   mood: Climate; // Stimmung dort, wo die Figur steht (Richtung des nächsten Tors, Stärke)
+  realm: RegionId; // Gegend, in der die Figur steht (Himmel der Grotte)
   wind: number; // 0 still … 1 windig (Gras wiegt sich, Blätter fliegen)
   lit3d: boolean; // die 3D-Ansicht liegt darunter und färbt das Licht selbst
   floats: Float[];
@@ -117,9 +120,10 @@ const PAL_SAND: Palette = { D: [['#e3cf95', 1]], d: [['#d4bd7d', 1]], e: [['#efd
 const PAL_PATH: Palette = { D: [['#c9a46e', 1]], d: [['#b48d58', 1]], e: [['#d8b783', 1]] };
 
 export class Renderer {
-  /** Eis-Quader des Bilds (Iglu, Eisschale, Trog): jeder kommt in der Reihe seiner Vorderkante dran */
+  /** Quader der Welt-Pakete im Bild (Iglu, Eisschale, Trog, Kristallwand): jeder kommt in der Reihe seiner Vorderkante dran */
   private later: Box[] = [];
-  view: View2D | null = null; // Zeichenteile der Eis-Welt aus ihrem Welt-Paket, sobald es geladen ist
+  /** Zeichenteile je Welt aus ihrem Welt-Paket (nach ihrem Tor), sobald es geladen ist */
+  views = new Map<GateId, View2D>();
   private at: DecoAt = { now: 0, reduced: false, picked: {}, packs: {} };
   private album = new Album(); // Leiste unten
   private guest: Guest | null = null; // der Pinguin am Tor, solange er führt (Umriss, goldene Torplatte; nachgeladen)
@@ -163,15 +167,15 @@ export class Renderer {
       const row = Math.ceil(r.y - 1e-6);
       rides.set(row, [...(rides.get(row) ?? []), r]);
     }
-    const marks = byRow(this.view?.marks?.(state, world) ?? []); // Schneespur des Fahrzeugs
+    const marks = byRow(this.all((v) => v.marks?.(state, world) ?? [])); // Schneespur des Fahrzeugs
 
     this.later = [];
     this.at = { now: sc.now, reduced: sc.reduced, picked: state.picked, packs: state.packs };
-    this.guest = this.view?.sky.guestAt(world, state) ?? null;
+    this.guest = this.guestAt(world, state);
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) this.ground(P, world, x, y, sc);
       for (const b of marks.get(y) ?? []) if (sc.explored(Math.floor(b[0]), y)) drawBox(ctx, P, b);
-      this.view?.trail?.draw(ctx, world, P, y); // Fußspuren im Schnee (aus dem Welt-Paket)
+      for (const v of this.views.values()) v.trail?.draw(ctx, world, P, y); // Fußspuren im Schnee (aus dem Welt-Paket)
       for (let x = x0; x <= x1; x++) this.deco(P, world, state, sc, x, y);
       for (const b of this.later) if (Math.ceil(b[1] + b[4] - 1e-6) - 1 === y) drawBox(ctx, P, b);
       for (const r of rides.get(y) ?? []) this.ride(P, sc, r);
@@ -220,11 +224,11 @@ export class Renderer {
     const { ctx } = this;
     const z = sc.zoom;
     const followers = new Set(state.followers);
-    this.view?.trail?.step(world, state, sc); // Spuren merken, in beiden Ansichten (nur Bild)
+    for (const v of this.views.values()) v.trail?.step(world, state, sc); // Spuren merken, in beiden Ansichten (nur Bild)
     if (sc.evening > 0) this.eveningGlow(sc);
     this.weather(sc);
-    const ice = this.iceSky(world, state); // Wetter der Eis-Welt und Bild der Weltgrenze, erst nachgeladen
-    if (world.spotsOf('eis').length) ice?.weather(ctx, world, sc, P); // ohne Paket der Eis-Welt kein Iglu, kein Wetter
+    const [realm, ice] = this.skyOf(world, state); // Wetter einer Welt und Bild der Weltgrenze, erst nachgeladen
+    if (world.spotsOf(realm).length) ice?.weather(ctx, world, sc, P); // ohne Paket der Welt kein Iglu, kein Wetter
     for (const a of state.animals) {
       const b = sc.bodies.get(a.id);
       if (!b || !sc.explored(Math.round(b.x), Math.round(b.y))) continue; // im Nebel nichts verraten
@@ -255,18 +259,40 @@ export class Renderer {
     this.album.draw(ctx, state, sc, world.realm(state.player.x, state.player.y), ice);
   }
 
+  /** Erstes Ergebnis der Zeichenteile aller geladenen Welten (undefined: keine hat eins) */
+  first<T>(f: (v: View2D) => T | null | undefined): T | undefined {
+    for (const v of this.views.values()) {
+      const out = f(v);
+      if (out != null) return out;
+    }
+    return undefined;
+  }
+
+  /** Was die Zeichenteile aller geladenen Welten liefern, hintereinander */
+  all<T>(f: (v: View2D) => readonly T[]): T[] {
+    return [...this.views.values()].flatMap(f);
+  }
+
+  /** Gast am Tor einer Welt (der führende Pinguin, aus ihrem Paket), sonst null */
+  guestAt = (world: World, state: State): Guest | null => this.first((v) => v.sky.guestAt(world, state)) ?? null;
+
   /**
-   * Wetter der Eis-Welt und Bild der Weltgrenze (aus ihrem Welt-Paket, worlds/eis/mitwachsen-ice-sky.ts): nur, wenn die
-   * Figur im Kessel, das Eistor offen oder der verlaufene Pinguin da ist (Gast-Platz mit Schneeflocke); sonst nichts
+   * Wetter und Bild der Weltgrenze (aus dem Welt-Paket, worlds/<welt>/): das der Welt, in der die Figur ist (Eis-Welt:
+   * worlds/eis/mitwachsen-ice-sky.ts), auf der Lichtung das der Eis-Welt, wenn das Eistor offen oder der verlaufene
+   * Pinguin da ist (Gast-Platz mit Schneeflocke); sonst nichts. Dazu die Gegend, zu der es gehört
    */
-  private iceSky(world: World, state: State) {
+  private skyOf(world: World, state: State): [RegionId, View2D['sky'] | null] {
     const realm = world.realm(state.player.x, state.player.y);
-    return realm === 'eis' || state.openGates.includes('eis') || guideGate(state) ? (this.view?.sky ?? null) : null;
+    const own = REGIONS.find((r) => r.id === realm)?.behind;
+    const eis = state.openGates.includes('eis') || guideGate(state);
+    const gate = own ?? (eis ? 'eis' : undefined);
+    return [gate ? (regionBehind(gate)?.id ?? realm) : realm, (gate && this.views.get(gate)?.sky) || null];
   }
 
   private sky(sc: Scene) {
     const { ctx } = this;
-    ['#79c7ea', '#8dd0ee', '#a6dbf2'].forEach((c, i) => {
+    const own = REGIONS.find((r) => r.id === sc.realm)?.behind; // Himmel einer Welt (Grotte: lila Höhlenhimmel)
+    ((own && this.views.get(own)?.heaven) || ['#79c7ea', '#8dd0ee', '#a6dbf2']).forEach((c, i) => {
       ctx.fillStyle = c;
       ctx.fillRect(0, (sc.height * i) / 3, sc.width, sc.height / 3 + 1);
     });
@@ -291,7 +317,7 @@ export class Renderer {
       const frontH = world.cell(x, y + 1).h;
       for (let k = Math.max(0, Math.min(c.h - 1, frontH)); k < c.h; k++) box(this.ctx, P, x, y, k, 1, 1, 1, ...flat);
       // Rutschspur zum Schneebett (aus dem Welt-Paket): flach im Boden, unter Kanten und Nebelrand
-      drawBox(this.ctx, P, this.view?.ground(c, x, y, sc.gates.has('eis')));
+      if (c.biome) drawBox(this.ctx, P, this.views.get(c.biome)?.ground(c, x, y, sc.gates.has(c.biome)));
       this.edges(P, world, x, y, c.h);
       this.plate(P, world, c, x, y, sc);
       return this.haze(P, x, y, c.h, sc);
@@ -339,7 +365,7 @@ export class Renderer {
   /** Torplatte auf dem Feld (nach dem Boden, vor dem Nebelrand: Sinkt sie ein, verdeckt das Feld davor ihre Vorderkante) */
   private plate(P: Projection, world: World, c: Cell, x: number, y: number, sc: Scene) {
     if (c.plate) {
-      const look = c.plate === 'eis' ? this.view?.plate : undefined; // Schmuck aus dem Paket der Eis-Welt
+      const look = this.views.get(c.plate)?.plate; // Schmuck aus dem Paket der Welt dahinter (Eis-Welt: Scholle)
       // goldener Rand, solange der Pinguin zu diesem Tor führt (aus dem Paket)
       const gold = this.guest?.rim(c.plate, sc.now, sc.reduced);
       drawPlate(this.ctx, P, world, c.plate, x, y, c.h, sc.plate, sc.now, sc.reduced, look, gold);
@@ -614,8 +640,9 @@ export class Renderer {
     const { ctx } = this;
     const h = c.h;
     if (c.tufts) this.tufts(P, x, y, h, c.tufts);
-    // Dinge der Eis-Welt (Iglu, Eisschale, Wassertrog, Fischkiste) zeichnet ihr Welt-Paket; solange es lädt, ein Block
-    const ice = c.biome === 'eis' ? drawDeco(this.view, world, c, x, y, this.at) : null;
+    // Dinge einer Welt (Iglu, Eisschale, Wassertrog, Fischkiste, Kristallwand) zeichnet ihr Welt-Paket; solange es lädt,
+    // ein Block
+    const ice = c.biome ? drawDeco(this.views.get(c.biome) ?? null, world, c, x, y, this.at) : null;
     // gezeichnet erst in der Reihe ihrer Vorderkante: sonst deckte der Boden der Reihen davor die Kuppel unten zu
     if (ice) return void this.later.push(...ice);
     switch (c.deco) {

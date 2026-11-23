@@ -118,8 +118,8 @@ describe('Welt-Pakete laden (Packs)', () => {
     SPECIES.robbe.parts = robbe;
   });
 
-  it('je Paket ein Lader: heute nur die Eis-Welt; jedes Paket lädt für sich, nur wenn sein Tor es braucht', async () => {
-    expect(PACK_IDS).toEqual(['eis']);
+  it('je Paket ein Lader (Eis-Welt, Höhlenwelt); jedes Paket lädt für sich, nur wenn sein Tor es braucht', async () => {
+    expect(PACK_IDS).toEqual(['eis', 'hoehle']);
     const asked: string[] = [];
     const hoehle = { ...pack, id: 'hoehle', gate: 'hoehle' } as LoadedPack;
     const packs = new Packs(
@@ -140,10 +140,37 @@ describe('Welt-Pakete laden (Packs)', () => {
     expect(packs.get('hoehle')).toBe(hoehle);
   });
 
-  it('scheitert ein Paket, lädt das andere trotzdem; ohne Lader scheitert es still wie ein Netzfehler', async () => {
-    const packs = new Packs(() => {}, undefined, ['hoehle', 'eis']); // die Höhlenwelt hat keinen Lader
+  it('scheitert ein Paket, lädt das andere trotzdem (still wie ein Netzfehler)', async () => {
+    const load = (id: string) => (id === 'eis' ? Promise.resolve(pack) : Promise.reject(new Error('Netz')));
+    const packs = new Packs(() => {}, load, ['hoehle', 'eis']);
     await packs.want({ ...open, openGates: ['eis', 'hoehle'] }, gates);
     expect(packs.loaded.map((p) => p.id)).toEqual(['eis']);
+  });
+
+  it('Entwickler-Schalter: `extra` holt ein Paket auch ohne Bedarf (das Höhlentor bleibt zu)', async () => {
+    const asked: string[] = [];
+    const hoehle = { ...pack, id: 'hoehle', gate: 'hoehle' } as LoadedPack;
+    const packs = new Packs(
+      () => {},
+      (id) => (asked.push(id), Promise.resolve(id === 'eis' ? pack : hoehle)),
+      ['eis', 'hoehle'],
+    );
+    await packs.want(bed, gates);
+    expect(asked).toEqual([]);
+    packs.extra = ['hoehle'];
+    await packs.want(bed, gates);
+    expect(asked).toEqual(['hoehle']);
+    expect(bed.openGates).not.toContain('hoehle');
+  });
+
+  it('der echte Lader der Höhlenwelt bringt ihr Paket (Tor, Bau, Zeichenteile, 3D-Teil auf Abruf)', async () => {
+    const packs = new Packs(() => {});
+    packs.extra = ['hoehle'];
+    await packs.want(bed, gates);
+    const cave = packs.get('hoehle')!;
+    expect(cave.gate).toBe('hoehle');
+    expect(typeof cave.view3d).toBe('function');
+    expect((await cave.view3d!()).gate).toBe('hoehle');
   });
 
   it('test-worlds.ts trägt beim Import die Modelle aller Eis-Tiere ein (Tests sehen sie nur über diesen Helfer)', () => {

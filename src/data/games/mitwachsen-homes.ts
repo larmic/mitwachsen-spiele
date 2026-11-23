@@ -66,16 +66,17 @@ export const HOMES: Record<RegionId, HomePlan> = {
     lee: [4, -4], // der Pustewind weht nach rechts (+x): rechts neben dem Iglu ist es windstill
     huddle: true,
   },
-  // Grotte (vorläufig wie die Lichtung): Moosbett, Wiese, Tröge, Unterstand im Lokschuppen legt die Grotte fest (Schritt 7).
-  // Solange die Höhlenwelt kein Paket hat, baut die Welt dieses Zuhause nirgends hin
+  // Kristallgrotte: Höhlenbett unter dem ersten Lichtschacht, Mooswiese, Pilzschale und Steintrog, dahinter ein
+  // Unterstand (vorn offen, wie das Iglu), dessen Rückwand die Kristallwand ist. Der Lokschuppen kommt mit dem Zug an
+  // den Bahnhof (`GROTTE.shed`)
   hoehle: {
     wake: WAKE,
     clear: 2,
-    portalRing: 9,
-    meadow: 6,
-    food: [-4, 3],
-    water: [4, 3],
-    shelter: { x0: -3, y0: -5, x1: 3, y1: -3 },
-    shelterStem: [0, -4],
+    portalRing: 9, // Platz für das Gegenstück des Portals am stillen See
+    meadow: 6, // Mooswiese
+    food: [-4, 3], // Pilzschale
+    water: [4, 3], // Steintrog
+    shelter: { x0: -3, y0: -5, x1: 3, y1: -3 }, // unter dem Dach an der Kristallwand
+    shelterStem: [0, -6], // Mitte der Kristallwand (x −3 … 3), sie zeichnet Dach und Pfosten
   },
 };

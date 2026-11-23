@@ -112,9 +112,34 @@ describe('Eis-Portal (Gletscherkessel)', () => {
   it('Thema Eis (Eisscholle, Schneeflocke) und Gegend Eis-Welt; die Portale der Tore stehen auf der Lichtung', () => {
     expect(PORTALS.eiskessel).toEqual({ theme: 'eis', realm: 'eis' });
     expect(portalColor('eiskessel')).toBe(portalColor('eis'));
-    expect(PORTAL_IDS).toHaveLength(9);
-    for (const id of PORTAL_IDS.filter((p) => p !== 'eiskessel'))
+    expect(PORTAL_IDS).toHaveLength(10);
+    for (const id of PORTAL_IDS.filter((p) => p !== 'eiskessel' && p !== 'hoehlensee'))
       expect(PORTALS[id], id).toEqual({ theme: id, realm: 'lichtung' });
+  });
+});
+
+describe('Portal am stillen See (Kristallgrotte)', () => {
+  const all = () => true;
+  const cave = new Map<PortalId, Portal>([
+    ['hoehlensee', { gate: [0, 130], home: [0, 19], bed: [0, 28], later: true }],
+  ]);
+
+  it('erwacht noch nicht, weder am Höhlenbett noch an der Plattform (erst nach dem Maulwurf, kommt später)', () => {
+    for (const [x, y] of [
+      [1, 28], // am Bett
+      [0, 130], // auf der Plattform am See
+      [0, 19], // auf dem Gegenstück
+    ] as const)
+      expect(platformsToWake(cave, [], x, y, all), `${x},${y}`).toEqual([]);
+    // ohne `later` erwachte es am Bett wie das Eis-Portal
+    expect(
+      platformsToWake(new Map([['hoehlensee', { ...cave.get('hoehlensee')!, later: undefined }]]), [], 1, 28, all),
+    ).toEqual(['hoehlensee']);
+  });
+
+  it('Thema Höhle (Kristallnest), Gegend Höhlenwelt', () => {
+    expect(PORTALS.hoehlensee).toEqual({ theme: 'hoehle', realm: 'hoehle' });
+    expect(portalColor('hoehlensee')).toBe(portalColor('hoehle'));
   });
 });
 

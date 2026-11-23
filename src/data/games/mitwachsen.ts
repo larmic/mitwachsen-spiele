@@ -50,7 +50,19 @@ export type Region = {
   herd: number;
   /** Tor, hinter dem die Gegend liegt: Solange es zu ist, kommt man nicht hin (die Lichtung liegt hinter keinem) */
   behind?: GateId;
+  /**
+   * Platz der Welt hinter dem Tor, wenn sie eine Welt aus einem Paket hat: Halbachsen samt Klippen (quer zum Gang und vom
+   * Tor weg) und so viele Felder Abstand ringsum (`gap`). Damit weiß der Kern ohne das Paket, wo sie liegt: Jede spätere
+   * Gegend in `REGIONS` hält diese Hülle frei (mitwachsen-behind.ts, `hullOf`), und fehlt das Paket, steht hinter dem
+   * Gang eine Klippe
+   */
+  room?: Room; // `bend`: Ihr Gang darf um eine Ecke führen (die Grotte), dann kommt nach ihr keine Welt mehr (Test)
+  /** So dunkel wird die Nacht hier höchstens (0 … 1; 0,8 heißt Tageslicht 0,4, die Dämmerung der Lichtung) */
+  night?: number;
 };
+
+/** Platz einer Welt hinter ihrem Tor: Halbachsen samt Klippen und Abstand ringsum (`Region.room`) */
+export type Room = { rx: number; ry: number; gap: number; bend?: true };
 
 export type Gate = {
   id: GateId;
@@ -91,7 +103,7 @@ export function regionAnimalList(region: Region): { id: string; species: Species
  * Am Anfang gibt es nur die Lichtung mit dem Bett. Ringsum Felsen mit acht großen Toren, die vorerst zu sind.
  * Dahinter liegen die Welten der Tore als endlose Landschaft. Hinter dem Eistor liegt die Eis-Welt, ein Gletscherkessel
  * mit eigenem Zuhause und zehn eigenen Tierarten (noch unerreichbar, solange das Tor zu ist). Hinter dem Höhlentor
- * entsteht die Höhlenwelt (noch ohne Paket und ohne Tiere).
+ * liegt die Höhlenwelt, eine Kristallgrotte (noch ohne Tiere, nur per Entwickler-Schalter zu sehen).
  */
 export const REGIONS: readonly [Region & { shape: { rx: number; ry: number } }, ...Region[]] = [
   {
@@ -121,15 +133,18 @@ export const REGIONS: readonly [Region & { shape: { rx: number; ry: number } }, 
     animals: (Object.keys(ICE_SPECIES) as IceSpeciesId[]).map((species) => ({ species })),
     herd: 5, // zehn Arten, je fünf Tiere: das lange Tal ist fast so groß wie die Lichtung (gleiche Dichte)
     behind: 'eis',
+    room: { rx: 49, ry: 85, gap: 2 }, // `KESSEL`: Tal 44 × 80, Klippen 5, Abstand 2 (gleich gehalten durch den Test)
   },
   {
     id: 'hoehle',
     name: 'Höhlenwelt',
-    // Grotte hinter dem Höhlentor: Form, Wohnorte und Tiere kommen mit ihrem Welt-Paket (worlds/hoehle/). Bis dahin ohne
-    // Tiere; das Höhlentor geht nie auf, also baut die Welt dahinter nichts (mitwachsen-behind.ts)
+    // Kristallgrotte hinter dem Höhlentor: Form und Gelände kommen mit ihrem Welt-Paket (worlds/hoehle/), die Tiere
+    // später (Schritt 8). Das Höhlentor geht vorerst nie auf; die Grotte sieht nur, wer den Entwickler-Schalter nutzt
     animals: [],
     herd: 4,
     behind: 'hoehle',
+    room: { rx: 51, ry: 77, gap: 2, bend: true }, // `GROTTE`: Grotte 46 × 72, Klippen 5, Abstand 2 (Test hält es gleich)
+    night: 0.8, // hell, ohne Decke: nie dunkler als die Lichtung in der Dämmerung
   },
 ];
 

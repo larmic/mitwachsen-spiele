@@ -39,6 +39,7 @@ const WORLD_GROUND: Partial<Record<Cell['ground'], string>> = {
   cloud: '#ffffff',
   sky: '#c9e6f7',
   moss: '#8a76cc',
+  grotto: '#d6d2e6',
 };
 
 /** Aus Holz wie ein Zauntor: Tor, Tröge, Fischkiste */

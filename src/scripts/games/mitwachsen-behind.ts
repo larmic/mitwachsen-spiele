@@ -1,10 +1,11 @@
 // Was hinter dem Gang eines Tors liegt – rein und deterministisch: die Welt aus ihrem Paket (worlds/<welt>/) oder,
-// wenn das Paket fehlt (noch nicht geladen, Laden gescheitert), eine Klippe am Ende des Gangs (am Eistor aus Eis).
-// Hinter einem Tor, das nie aufgeht, steht ohne Paket nichts: Der Gang endet in der Landschaft. Teil von
-// mitwachsen-world.ts, je Gegend hinter einem Tor einmal.
+// wenn das Paket fehlt (noch nicht geladen, Laden gescheitert), eine Klippe am Ende des Gangs (am Eistor aus Eis, am
+// Höhlentor aus Fels). Hinter einem Tor ohne Welt, das nie aufgeht, steht nichts: Der Gang endet in der Landschaft.
+// Wo eine Welt liegen darf: hinter dem Felsring, fern der anderen Gänge und außerhalb der Hülle jeder Welt, die in
+// `REGIONS` vor ihr steht (`hullOf`, ohne deren Paket berechnet). Teil von mitwachsen-world.ts, je Gegend einmal.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
-import { keyOf, type GateId, type Point } from '../../data/games/mitwachsen';
+import { keyOf, regionBehind, type GateId, type Point, type Room } from '../../data/games/mitwachsen';
 import { openStory, type StoryId } from '../../data/games/mitwachsen-stories';
 import type { Cell, Ground } from './mitwachsen-cell';
 import type { Beyond, Gang, Kessel, WorldPack } from './mitwachsen-pack-types';
@@ -28,9 +29,9 @@ const CLIFF: Partial<Record<GateId, Ground>> = { eis: 'ice' };
  * Die Welt hinter dem Gang des Tors `gate` in die Karte bauen (`map`, dort liegt schon der Gang). Mit Paket erzählt ihr
  * Klangstein die zweite Fassung der Geschichte des Tors (`openStory`, beim Eistor „Wenn das Tor offen ist“). Ohne Paket
  * steht hinter dem Gang eines Tors, das aufgehen kann (`closable`: es hat einen Schlüssel), eine Klippe (am Eistor aus
- * Eis, sonst aus Fels, `CLIFF`); hinter einem, das nie
- * aufgeht, gar nichts. Die Welt hat dann keine Felder, keine Wohnorte und kein Portal; ihr Bett liegt am Ende des Gangs
- * (in der Klippe), nur damit jede Gegend ein Zuhause hat.
+ * Eis, sonst aus Fels, `CLIFF`), ebenso hinter einem, dessen Gegend eine Welt hat (`Region.room`: das Höhlentor);
+ * hinter einem anderen, das nie aufgeht, gar nichts. Die Welt hat dann keine Felder, keine Wohnorte und kein Portal;
+ * ihr Bett liegt am Ende des Gangs (in der Klippe), nur damit jede Gegend ein Zuhause hat.
  */
 export function behind(
   pack: WorldPack | undefined,
@@ -40,7 +41,7 @@ export function behind(
   passage: (x: number, y: number) => Cell,
   map: Map<string, Cell>,
   gate: GateId,
-  closable = !!keyOf(gate), // kann das Tor aufgehen? (es hat einen Schlüssel)
+  closable = !!keyOf(gate) || !!regionBehind(gate)?.room, // kann das Tor aufgehen, oder liegt dahinter eine Welt?
 ): Behind {
   if (pack) {
     const { stone, portal, ...rest } = pack.build(seed, gang, beyond, passage, map);
@@ -63,6 +64,51 @@ export function behind(
 
 /** So viele Felder bleibt die Welt hinter einem Tor (samt Klippen) mindestens von den Ausgängen der anderen Gänge weg */
 export const EXIT_GAP = 12;
+
+/**
+ * Wo eine Welt mit dem Platz `room` gerade hinter dem Gang liegt (wie der Gletscherkessel): t ihrer Mitte, so nah wie
+ * möglich am Ende des Gangs, aber mit ihrer ganzen Hülle (Ellipse samt Abstand) in `beyond`. Geprüft wird die Hülle an
+ * ihrem Rand: Die Lichtung samt Felsring ist eine Ellipse um die Mitte der Welt, die nie in der Hülle liegt; berührt sie
+ * die Hülle, dann auch ihren Rand (ebenso die Kreise um die Ausgänge der anderen Gänge und die Hüllen anderer Welten).
+ */
+export function straightCentre(gang: Gang, beyond: Beyond, { rx, ry, gap }: Room): number {
+  const A = rx + gap,
+    B = ry + gap;
+  let centre = gang.end + ry;
+  const clear = (c: number) => {
+    for (let u = -A; u <= A; u++) {
+      const h = Math.ceil(B * Math.sqrt(1 - (u / A) ** 2));
+      if (!beyond(...gang.at(u, c - h)) || !beyond(...gang.at(u, c + h))) return false;
+    }
+    for (let v = -B; v <= B; v++) {
+      const h = Math.ceil(A * Math.sqrt(1 - (v / B) ** 2));
+      if (!beyond(...gang.at(-h, c + v)) || !beyond(...gang.at(h, c + v))) return false;
+    }
+    return true;
+  };
+  while (!clear(centre) && centre < gang.end + 400) centre++;
+  return centre;
+}
+
+/** Lage (u, t) eines Felds im Raster des Gangs (umgekehrt zu `gang.at`) */
+export function gangCoords(gang: Pick<Gang, 'at'>, [x, y]: Point): Point {
+  const [ox, oy] = gang.at(0, 0);
+  const [ax, ay] = gang.at(1, 0);
+  const [tx, ty] = gang.at(0, 1);
+  return [(x - ox) * (ax - ox) + (y - oy) * (ay - oy), (x - ox) * (tx - ox) + (y - oy) * (ty - oy)];
+}
+
+/**
+ * Hülle einer Welt, die gerade hinter ihrem Gang liegt (`straightCentre`, Mitte bei t = `centre`): ihre Ellipse samt
+ * Abstand und die Verlängerung ihres Gangs bis dorthin (samt Wänden und Abstand). Eine spätere Welt bleibt draußen.
+ */
+export function hullOf(gang: Gang, centre: number, { rx, ry, gap }: Room): Beyond {
+  const [A, B, side] = [rx + gap, ry + gap, gang.half + gang.wall + gap];
+  return (x, y) => {
+    const [u, t] = gangCoords(gang, [x, y]);
+    return (u / A) ** 2 + ((t - centre) / B) ** 2 < 1 || (Math.abs(u) <= side && t > gang.end && t < centre);
+  };
+}
 
 /**
  * Wo die Welt hinter dem Tor `own` liegen darf (`Beyond` für ihr Paket): ganz hinter dem Felsring (`beyond`) und

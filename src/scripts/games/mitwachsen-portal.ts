@@ -11,9 +11,10 @@ export type { PortalId };
 
 /**
  * Ein Portal: Mittelfelder der Plattform am Tor und ihres Gegenstücks am Bett (dort kommt man an). Mit `bed` (das
- * Eis-Portal) erwacht es nicht durch Nähe, sondern sobald die Figur an diesem Bett ankommt.
+ * Eis-Portal) erwacht es nicht durch Nähe, sondern sobald die Figur an diesem Bett ankommt. Mit `later` (das Portal am
+ * stillen See der Grotte) erwacht es noch gar nicht: Es wartet auf eine Regel, die erst später kommt (der Maulwurf).
  */
-export type Portal = { gate: Point; home: Point; bed?: Point };
+export type Portal = { gate: Point; home: Point; bed?: Point; later?: true };
 /** Teil einer Plattform: Mittelfeld, Seitenmitte oder Eckfeld (beide begehbarer Rand; in den Ecken steht Zierde) */
 export type PlatformPart = 'centre' | 'edge' | 'corner';
 /** Was auf einem Feld einer Plattform liegt */
@@ -86,7 +87,8 @@ export const platformArea = (portals: ReadonlyMap<PortalId, Portal>): string[] =
  * Plattformen am Tor, die jetzt erwachen: noch schlafend, die Figur bei (x, y) höchstens PORTAL_WAKE Felder davon
  * entfernt (auch schräg), und ihr Mittelfeld schon erkundet (im Nebel leuchtet nichts auf). Die Gegenstücke am Bett
  * wecken nichts: Sie erwachen mit ihrer Plattform am Tor und verraten vorher nicht, wohin sie führen. Ein Portal mit
- * `bed` erwacht stattdessen, sobald die Figur höchstens BED_ARRIVAL Felder vor diesem Bett steht (und es erkundet ist).
+ * `bed` erwacht stattdessen, sobald die Figur höchstens BED_ARRIVAL Felder vor diesem Bett steht (und es erkundet ist),
+ * eines mit `later` noch nie.
  */
 export function platformsToWake(
   portals: ReadonlyMap<PortalId, Portal>,
@@ -98,7 +100,7 @@ export function platformsToWake(
   const near = ({ gate, bed }: Portal) =>
     bed ? cheb(x, y, bed[0], bed[1]) <= BED_ARRIVAL : cheb(x, y, gate[0], gate[1]) <= PLATFORM_HALF + PORTAL_WAKE;
   return [...portals]
-    .filter(([id, p]) => !awake.includes(id) && near(p))
+    .filter(([id, p]) => !awake.includes(id) && !p.later && near(p))
     .filter(([, { gate, bed = gate }]) => explored(bed[0], bed[1]))
     .map(([id]) => id);
 }

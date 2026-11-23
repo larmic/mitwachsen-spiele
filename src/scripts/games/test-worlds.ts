@@ -8,6 +8,7 @@
 // Modelle leer (geprüft in mitwachsen-packs.test.ts).
 
 import { pack as eis } from './worlds/eis';
+import { pack as hoehle } from './worlds/hoehle';
 import { DIRS } from '../../lib/games/front';
 import type { GateId } from '../../data/games/mitwachsen';
 import { canStep, createWorld, type World } from './mitwachsen-world';
@@ -15,8 +16,9 @@ import { addModels } from './mitwachsen-packs';
 import type { WorldPack } from './mitwachsen-pack-types';
 
 addModels(eis.models); // wie im Spiel, wenn das Paket ankommt: Modelle der Eis-Tiere
-export const PACKS = [eis] as const;
+export const PACKS = [eis, hoehle] as const;
 export const EIS_PACK = eis;
+export const HOEHLE_PACK = hoehle;
 
 const worlds = new Map<string, World>();
 /**

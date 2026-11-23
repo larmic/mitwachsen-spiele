@@ -20,8 +20,8 @@ import {
 import { BED_STONE, type StoryId } from '../../data/games/mitwachsen-stories';
 import type { Cell, Ground, TreeKind } from './mitwachsen-cell';
 import { LICHTUNG_HOME, realmsOf, type Realms } from './mitwachsen-home';
-import type { Gang, WorldPack } from './mitwachsen-pack-types';
-import { behind, roomBehind, type Behind } from './mitwachsen-behind';
+import type { Beyond, Gang, WorldPack } from './mitwachsen-pack-types';
+import { behind, hullOf, roomBehind, straightCentre, type Behind } from './mitwachsen-behind';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal, type PortalId } from './mitwachsen-portal';
 import { findSpawns } from './mitwachsen-spawns';
 import { GATE_FLOOR, forecourt } from './mitwachsen-apron';
@@ -343,8 +343,19 @@ function buildBehind(seed: number, places: readonly Layout[], packs: readonly Wo
 
 /**
  * Wo die Welt hinter dem Tor `gate` liegen darf: hinter dem Felsring, fern der Ausgänge der anderen Gänge (`roomBehind`)
+ * und außerhalb der Hülle (`hullOf`, aus `Region.room`, ohne Paket) jeder Welt, die in `REGIONS` vor ihr steht: So
+ * liegt jede Welt gleich, welche Pakete schon da sind. Eine Welt, deren Gang biegen darf (`bend`), steht zuletzt
  */
-const roomOf = (places: readonly Layout[], gate: GateId) => roomBehind(outside, GATE_HALF + TOWER, places, gate);
+function roomOf(places: readonly Layout[], gate: GateId): Beyond {
+  const own = roomBehind(outside, GATE_HALF + TOWER, places, gate);
+  const hulls: Beyond[] = [];
+  for (const r of REGIONS) {
+    if (r.behind === gate) break;
+    const gang = r.behind && r.room && gangOf(places, r.behind);
+    if (gang) hulls.push(hullOf(gang, straightCentre(gang, roomOf(places, r.behind!), r.room!), r.room!));
+  }
+  return hulls.length ? (x, y) => own(x, y) && !hulls.some((h) => h(x, y)) : own;
+}
 
 /** Gang hinter dem Tor `gate`: Er führt in seine Welt (Eistor: in den Gletscherkessel) */
 function gangOf(places: readonly Layout[], gate: GateId): Gang {

@@ -2,11 +2,12 @@
 // Einzelnen prüft mitwachsen-valley.test.ts
 import { describe, expect, it } from 'vitest';
 import { DIRS } from '../../../../lib/games/front';
-import { type GateId } from '../../../../data/games/mitwachsen';
+import { REGIONS, type GateId } from '../../../../data/games/mitwachsen';
 import { ICE_STONE } from '../../../../data/games/mitwachsen-stories';
 import { platformArea, withNeighbours } from '../../mitwachsen-portal';
 import { ICE_ANIMALS, KESSEL } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
 import { HAUNTS } from './mitwachsen-haunts';
+import { KESSEL_ROOM } from './mitwachsen-kessel';
 import { SEATS, crossings } from '../../mitwachsen-border';
 import { GATE_HALF, TOWER, beyondRing, canStep, gatePlaces, kesselPlace, standHeight } from '../../mitwachsen-world';
 import { wildAnimals } from '../../mitwachsen-wild';
@@ -21,6 +22,10 @@ const START = LICHTUNG.wake[0]!;
 const RING_1 = [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => [dx, dy] as const));
 
 describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
+  it('der Kern kennt seinen Platz (`Region.room`) wie das Paket: Spätere Welten (die Grotte) halten ihn frei', () => {
+    expect(REGIONS.find((r) => r.id === 'eis')!.room).toEqual(KESSEL_ROOM);
+  });
+
   const span = GATE_HALF + TOWER;
   /** Felder eines Torhauses und seines Gangs: Reihe für Reihe nach außen, bis eine ganz hinter dem Felsring liegt */
   function gangCells(mid: readonly [number, number], out: readonly [number, number]) {
@@ -295,7 +300,11 @@ describe('Gletscherkessel hinter dem Eistor (Eis-Welt)', () => {
 
     it(`Seed ${seed}: Weltgrenze: erstes Feld je Seite; Warteplätze erreichbar, außerhalb der Durchgänge, nicht im Gang`, () => {
       const all = crossings(w);
-      expect(all.map((c) => [c.gate.id, ...c.realms])).toEqual([['eis', 'lichtung', 'eis']]);
+      // dazu der Durchgang durch das Höhlentor (dahinter ohne Paket die Felswand)
+      expect(all.map((c) => [c.gate.id, ...c.realms])).toEqual([
+        ['eis', 'lichtung', 'eis'],
+        ['hoehle', 'lichtung', 'hoehle'],
+      ]);
       const c = all[0]!;
       const key = ([x, y]: readonly [number, number]) => `${x},${y}`;
       // Durchgang: Torreihe, Gang und Mündung, bei offenem Tor begehbar, bis vor den Boden des Kessels

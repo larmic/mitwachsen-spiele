@@ -8,6 +8,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { SCALE } from '../src/scripts/games/worlds/eis/mitwachsen-chime-look';
 import { needsBlink } from '../src/scripts/games/mitwachsen-turn';
+import { GROTTE_COLORS } from '../src/data/games/worlds/hoehle/mitwachsen-grotte';
 import {
   FRAME_MS,
   arrive,
@@ -155,6 +156,67 @@ test('Spiel: Portal-Plattform erwacht beim Herangehen, die Mitte bringt zum Bett
   expect(errors).toEqual([]);
 });
 
+// Die Grotte sieht vorerst nur der Entwickler-Schalter: Die Figur wacht im Höhlenbett auf, gezeichnet wird die Grotte
+// (in 3D mit ihrem 3D-Teil und dem lila Höhlenhimmel), gespeichert wird nichts; ohne Schalter wieder auf der Lichtung
+test(
+  'Spiel: Welt hoehle wird per Entwickler-Schalter gezeichnet, speichert nichts, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    const game = await openGame(page, { clock: true, dev: 'hoehle' });
+    const webgl = await expectView(page);
+    type Game = {
+      world: { homes: Record<string, { bed: [number, number] }>; realm(x: number, y: number): string };
+      state: { player: { x: number; y: number }; openGates: string[]; sleeping: boolean };
+      r3d: unknown;
+      gl3d: { views: { look(gate: string): unknown; air(realm: string): unknown } } | null;
+      apply(cmd: { type: 'move'; dir: string }): void;
+      saved: { id: string };
+      live: string;
+    };
+    const first = await game.evaluate((el) => (el as unknown as Game).live);
+    const at = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const { x, y } = el.state.player;
+      const bed = el.world.homes.hoehle!.bed;
+      return { realm: el.world.realm(x, y), inBed: x === bed[0] && y === bed[1], open: el.state.openGates };
+    });
+    expect(at).toEqual({ realm: 'hoehle', inBed: true, open: [] }); // das Höhlentor bleibt zu
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    await ticks(page, 10);
+    await render(page, 10);
+    // gezeichnet: in 3D mit dem 3D-Teil der Grotte und ihrer Luft, in 2D mit lila Höhlenhimmel und Grottenboden (leicht
+    // getönt von der Stimmung der Richtung, daher mit Spielraum)
+    const palette = [...GROTTE_COLORS.heaven, ...GROTTE_COLORS.floor].map((c) =>
+      [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)),
+    );
+    await expect
+      .poll(async () => {
+        await render(page);
+        return game.evaluate((node, palette) => {
+          const el = node as unknown as Game;
+          if (el.r3d) return !!el.gl3d?.views.look('hoehle') && !!el.gl3d.views.air('hoehle');
+          const cv = node.querySelector<HTMLCanvasElement>('canvas.mw-canvas')!;
+          const data = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
+          let grotto = 0;
+          for (let i = 0; i < data.length; i += 64)
+            if (palette.some((c) => c.every((v, j) => Math.abs(v - data[i + j]!) <= 12))) grotto++;
+          return grotto > 50;
+        }, palette);
+      })
+      .toBe(true);
+    expect(await game.evaluate((el) => !!(el as unknown as Game).r3d)).toBe(webgl);
+    // nichts gespeichert, auch nicht beim Verlassen der Seite und über das Menü (neue Welt): Ohne Schalter wacht die
+    // Figur wieder auf der Lichtung auf
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    await page.locator('.mw-settings [data-act="new"]').evaluate((b) => (b as HTMLElement).click());
+    await expect.poll(() => game.evaluate((el) => (el as unknown as Game).live)).not.toBe(first); // die neue Welt ist offen
+    const saved = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')));
+    expect(saved).toEqual([]);
+    expect(errors).toEqual([]);
+  },
+);
+
 // Je Welt ein Test, dass sie gezeichnet wird: im Projekt `game` in 2D, im Projekt `3d` mit WebGL samt dem 3D-Teil ihres
 // Welt-Pakets (Schmuck ihres Tors). Neue Welten kommen in die Liste
 for (const realm of ['lichtung', 'eis'] as const)
@@ -234,7 +296,7 @@ test(
       world: { cell(x: number, y: number): { garden?: boolean; solid: boolean; roof?: boolean } };
       state: { dayStart: number; tick: number };
       air: { frame(world: unknown, state: unknown, quiet: boolean, reduced: boolean): { weather: { wind: number } } };
-      renderer: { view: { sky: { weather?: unknown } } | null };
+      renderer: { views: Map<string, { sky: { weather?: unknown } }> };
     };
     // Über die Komponente (wie die Regeln es sehen): Tor offen, die Figur steht wach neben dem Schneebett
     const realm = await game.evaluate((node) => {
@@ -316,7 +378,7 @@ test(
         return game.evaluate((node) => {
           const el = node as unknown as Game & WindGame;
           const sheltered = el.state.animals.filter((a) => a.realm === 'eis' && el.world.cell(a.x, a.y).roof).length;
-          return { sheltered: sheltered > 5, loaded: typeof el.renderer.view?.sky.weather === 'function' };
+          return { sheltered: sheltered > 5, loaded: typeof el.renderer.views.get('eis')?.sky.weather === 'function' };
         });
       })
       .toEqual({ sheltered: true, loaded: true });
@@ -634,7 +696,7 @@ test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten
     };
     apply(cmd: { type: 'move'; dir: string }): void;
     lift(): void;
-    renderer: { view: { sky: { waitArrow?: unknown } } | null; album: { turn: { shown?: string } } };
+    renderer: { views: Map<string, { sky: { waitArrow?: unknown } }>; album: { turn: { shown?: string } } };
   };
   await withIce(game);
   // Über die Komponente: Tor offen, die Figur steht wach in der Bucht vor dem Eistor, drei Tiere der Lichtung folgen ihr
@@ -681,7 +743,7 @@ test('Spiel: Weltgrenze am Eistor (Tor im Test offen): Tiere der Lichtung warten
   await expect
     .poll(async () => {
       await render(page);
-      return game.evaluate((el) => typeof (el as unknown as Game).renderer.view?.sky.waitArrow);
+      return game.evaluate((el) => typeof (el as unknown as Game).renderer.views.get('eis')?.sky.waitArrow);
     })
     .toBe('function');
   // Durch den Gang bis in den Kessel: Die Leiste zeigt die Eis-Welt
