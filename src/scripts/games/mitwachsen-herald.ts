@@ -6,7 +6,9 @@
 // zum Freischalten der Bahn-Phase, `BAHN_LIVE`), gibt es ihn nicht. Teil der Regeln (mitwachsen-state.ts) und der Ansicht.
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Tok erscheint)
 
+import type { GateId } from '../../data/games/mitwachsen';
 import type { Guided } from './mitwachsen-guide';
+import type { PackEvent } from './mitwachsen-pack-types';
 import type { MoveCmd, RideEngine, RideEvents, RideRules, Rider, Vehicle } from './mitwachsen-rider';
 import type { World } from './mitwachsen-world';
 
@@ -52,9 +54,14 @@ export type HeraldEvent = {
   relay?: true;
 };
 
-/** Ereignisse, die ein Bote ausgibt (und die er liest: `wake`, `sleep`); `hop`: Die Figur hüpft nur (er baut) */
+/**
+ * Ereignisse, die ein Bote ausgibt (und die er liest: `wake`, `sleep`); `hop`: Die Figur hüpft nur (er baut); beim
+ * Hau-ruck (`WorldRules.ritual`) ein Stoß (`heave`, `PackEvent`) und das Tor geht auf (`gate`, sofort gespeichert)
+ */
 export type HeraldEvents = { readonly type: string }[] & {
-  push(...e: (HeraldEvent | { type: 'bump' } | { type: 'hop' })[]): unknown;
+  push(
+    ...e: (HeraldEvent | PackEvent | { type: 'bump' } | { type: 'hop' } | { type: 'gate'; id: GateId; at: number })[]
+  ): unknown;
 };
 
 /**
@@ -81,7 +88,7 @@ export const heraldOf = <A extends { mode: string }>(s: { animals: readonly A[] 
 /** Ohne Boten (sein Paket fehlt): Er tut nichts */
 const NONE: HeraldRules = { step: () => {}, meet: () => false };
 
-type Hooks = { rules?: { ride?: RideEngine; vehicle?: Vehicle; herald?: HeraldRules } };
+type Hooks = { rules?: { ride?: RideEngine; vehicle?: Vehicle; herald?: HeraldRules; ritual?: HeraldRules } };
 // je Fahr-Engine die zuletzt gebauten Regeln: `step` fragt in jedem Befehl, die Fahrzeuge ändern sich nur, wenn ein Paket kommt
 const built = new WeakMap<RideEngine, { vehicles: readonly Vehicle[]; rules: RideRules }>();
 
@@ -101,13 +108,19 @@ function ridesOf(rules: readonly Hooks[]): RideRules | undefined {
 /**
  * Die Haken aus den geladenen Paketen für `step`: Fahrzeuge (`ride`: die Fahr-Engine aus dem Paket der Fahrzeuge mit den
  * Fahrzeugen der Pakete, Schlitten und Zug; ohne Engine oder ohne Fahrzeug keine), Bote (`herald`, Tok; ohne Paket einer,
- * der nichts tut) und was vor dem Schritt der Figur kommt (`meet`: am Fahrzeug einsteigen, anstoßen, winken; in den
+ * der nichts tut; danach das Ritual am Tor einer Welt, `ritual`, das Hau-ruck aus dem Paket der Höhlenwelt) und was vor
+ * dem Schritt der Figur kommt (`meet`: beim Hau-ruck ein Stoß; am Fahrzeug einsteigen, anstoßen, winken; in den
  * schlafenden Boten laufen); true, wenn der Zug damit erledigt ist
  */
 export function hooksOf(rules: readonly Hooks[]) {
   const ride = ridesOf(rules);
-  const herald = rules.find((r) => r.rules?.herald)?.rules?.herald ?? NONE;
+  const one = rules.find((r) => r.rules?.herald)?.rules?.herald ?? NONE;
+  const ritual = rules.find((r) => r.rules?.ritual)?.rules?.ritual ?? NONE;
+  const herald: HeraldRules = {
+    step: (...a) => (one.step(...a), ritual.step(...a)),
+    meet: (...a) => ritual.meet(...a) || one.meet(...a),
+  };
   const meet = (s: Rider & Heralded, world: World, cmd: MoveCmd, events: RideEvents & HeraldEvents) =>
-    !!ride?.move(s, world, cmd, events) || herald.meet(s, world, cmd, events);
+    ritual.meet(s, world, cmd, events) || !!ride?.move(s, world, cmd, events) || one.meet(s, world, cmd, events);
   return { ride, herald, meet };
 }

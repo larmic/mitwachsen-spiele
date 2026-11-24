@@ -11,7 +11,9 @@
 // im Weg: Läuft die Figur in ihn hinein, während er an seinem Platz steht, beginnt er Bau 1 (mitwachsen-build.ts; nur
 // in einer Welt, in der Bahnhof Bär Platz hat), sonst singt und hüpft er; schläft er, schnarcht er leise. Nach der ersten
 // Fahrt wartet er in der Bucht an seinem Platz neben der Torplatte (`BESIDE`, mitwachsen-train.ts): nachts wach neben dem
-// Bett der Lichtung, morgens ruft er und geht zurück an seinen Platz (`inBay`).
+// Bett der Lichtung, morgens ruft er und geht zurück an seinen Platz (`inBay`); nach dem Laden ebenso (`backToBay`: die
+// erste Fahrt ist gemacht, `gefahren`, und der Zug fährt noch nicht in die Grotte). So geht es auch zu Fuß: Tok hüpft
+// der Figur voraus in die Bucht, und das Hau-ruck am Höhlentor (Paket der Höhlenwelt) beginnt mit ihm dort.
 // Bis zum Freischalten (`BAHN_LIVE`) holt das Spiel dieses Paket nie von selbst: Dann gibt es Tok nur im Blick hinein.
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Tok erscheint)
 
@@ -28,7 +30,8 @@ import { builtOf } from './mitwachsen-built';
 import { beatTick, buildStep, building, canBuild, startBuild } from './mitwachsen-build';
 import { futureBear } from './mitwachsen-line';
 import { REAR_ROW } from './mitwachsen-station-look';
-import { sledHome, tokOf, withTok } from '../../mitwachsen-ride-save';
+import { ridden, sledHome, tokOf, withTok } from '../../mitwachsen-ride-save';
+import { farOf } from './mitwachsen-train';
 
 /** Tok unter den Wesen: ein Gast aus der Höhlenwelt (wie der Pinguin `eis:pinguin`) */
 export const TOK = animalId('hoehle', 'tok');
@@ -166,7 +169,9 @@ export function tokStep(
   const t = s.animals.find((a) => a.id === TOK);
   if (!tokWanted(s)) {
     s.heraldDue = -1;
-    if (t?.mode === 'herald' && builtOf(s.packs) >= 1) inBay(s, world, t, cmd, events); // nach der ersten Fahrt
+    if (t?.mode === 'herald' && builtOf(s.packs) >= 1)
+      inBay(s, world, t, cmd, events); // nach der ersten Fahrt
+    else if (!t) backToBay(s, world);
     return;
   }
   const woke = events.some((e) => e.type === 'wake');
@@ -420,6 +425,32 @@ export function inBay(s: Heralded, world: World, t: Walker, cmd: 'move' | 'actio
     return;
   }
   if (s.tick % PACE.lead === 0) stepTo(s, world, t, (x, y) => at.field.get(key(x, y)) ?? Infinity);
+}
+
+/**
+ * Nach dem Laden, wenn die erste Fahrt schon gemacht ist (`gefahren`, Ausbau 1, der Zug fährt noch nicht in die Grotte,
+ * `farOf`): Tok wartet wieder in der Bucht, nicht im Zug. Schläft die Figur (nach dem Laden immer), sitzt er wach neben
+ * dem Bett der Lichtung und hüpft am Morgen an seinen Platz neben der Torplatte (`inBay`); sonst gleich dort (besetzt:
+ * das nächste freie Feld mit Weg dorthin)
+ */
+export function backToBay(s: Heralded, world: World) {
+  if (builtOf(s.packs) < 1 || !ridden(s.packs, 'hoehle') || farOf(s) || s.work) return;
+  const t = tokAt(s, [s.player.x, s.player.y]);
+  s.animals.push(t);
+  if (s.sleeping) {
+    if (bedside(s, world, t, false)) return;
+  } else {
+    const at = bayOf(world);
+    const free = (x: number, y: number) => !!at?.field.has(key(x, y));
+    const spot = at && (occupied(s, ...at.post, TOK) ? freeNear(s, world, at.post, free, TOK) : at.post);
+    const g = world.gates.get('hoehle');
+    if (spot && g) {
+      [t.x, t.y] = spot;
+      t.dir = dirTo(g.mid[0] - t.x, g.mid[1] - t.y); // schaut zum Tor
+      return;
+    }
+  }
+  s.animals.pop();
 }
 
 /** Toks Regeln für `step` (`WorldRules.herald`) */

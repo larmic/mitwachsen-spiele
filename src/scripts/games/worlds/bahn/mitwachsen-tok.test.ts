@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { DIRS, type Dir, type Part } from '../../../../lib/games/front';
 import { REGIONS, SPECIES, figureParts, LOOK, regionAnimalList, type Point } from '../../../../data/games/mitwachsen';
-import { BAHN_LIVE } from '../../../../data/games/mitwachsen-rides';
+import { BAHN_LIVE } from '../../../../data/games/mitwachsen-live';
 import { TOK_COLORS, TOK_MODEL } from '../../../../data/games/worlds/bahn/mitwachsen-tok-model';
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
 import { slots } from '../../mitwachsen-album';
@@ -450,7 +450,11 @@ describe('Tok: Bild, Ton, Leiste, Hinweis', () => {
     const due = ready(world);
     expect(lacks(due, 'hoehle')).toBe('tok'); // fällig
     expect(lacks(r.s, 'hoehle')).toBe('tok'); // gekommen
-    expect(lacks({ ...due, packs: { ...SLED_HOME, bahn: { built: 1 } } }, 'hoehle')).toBeUndefined();
+    // nach Bau 1: Tok fehlt dem Tor, solange er im Zug sitzt; wartet er draußen (Bucht) oder ist das Tor offen, nicht
+    const built = { ...due, packs: { ...SLED_HOME, bahn: { built: 1 } }, animals: [] };
+    expect(lacks(built, 'hoehle')).toBe('tok');
+    expect(lacks({ ...built, animals: r.s.animals.filter((a) => a.id === TOK) }, 'hoehle')).toBeUndefined();
+    expect(lacks({ ...built, openGates: [...built.openGates, 'hoehle'] }, 'hoehle')).toBeUndefined();
     expect(lacks(due, 'eis')).toBeUndefined();
     // vorher nichts von Tok: Eis-Leiste nicht voll, noch keine Heimfahrt mit dem Schlitten, Eistor zu
     expect(lacks(ready(world, { garden: FULL.slice(1) }), 'hoehle')).toBeUndefined();

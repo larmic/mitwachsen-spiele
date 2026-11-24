@@ -9,7 +9,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Begriff „Drehung zur Torfront“, „Was angezeigt wird“: Torplatte: Drehung)
 
 import type { GateId } from '../../data/games/mitwachsen';
-import { GUIDE_GATE, RITUAL, guideGate, opening } from './mitwachsen-guide';
+import { GUIDE_GATE, RITUAL, guideGate, heaveLeft, opening } from './mitwachsen-guide';
 import type { PlateFx } from './mitwachsen-plate';
 import type { State } from './mitwachsen-state';
 import { RULE_TICK_MS, TARGET_DEG, lageOf, type Lage } from './mitwachsen-turn-pace';
@@ -121,17 +121,17 @@ export class PlateTurn {
    * Eingabe des Drehreglers: Platte unter den Füßen, Schritt (der Körper gleitet noch), Pfeil (die Stehzeit der Regeln
    * zählt nicht), Bedingung des Tors erfüllt oder Vorspiel (dann ohne Wartezeit; läuft die Figur weg, dreht es zurück);
    * während des Rituals bleibt die Kamera vorn (`lead`), auch wenn die Figur hüpft, in seinen letzten 0,6 s fährt sie
-   * zurück (`back`, Süd blinzelt), beim Blinzeln wächst nichts
+   * zurück (`back`, Süd blinzelt), beim Blinzeln wächst nichts. Ebenso beim Hau-ruck am Höhlentor (`heave`), schon ab
+   * seinem Vorspiel (jeder Pfeil ist dort ein Stoß, die Figur geht nicht weg)
    */
   private input(world: World, state: State, sc: Frame): TurnInput {
     const t = state.tick - state.ritual; // Takte seit Beginn des Rituals, negativ im Vorspiel
-    this.busy = t >= 0 && opening(state, RITUAL); // Ritual, nicht schon das Vorspiel
+    const { back, gate, heave } = this.ritual(state, t);
     const on = !!sc.plate?.on && !state.sleeping && !state.ride; // im Fahrzeug dreht die Kamera nie, sie folgt nur
-    const back = this.busy && t >= RITUAL - (CAMERA_BACK_S * 1000) / RULE_TICK_MS;
     if (back && backNeedsBlink(this.lage)) this.blinker.ask(this.view.yaw, sc.now, () => {}); // einmal: danach 0°
-    // im Ritual das Eistor; im Vorspiel (noch nicht `busy`) ist es das Tor der Platte, auf der die Figur steht, und
-    // läuft sie weg, bleibt `id`, wie es war: Das Eistor
-    if (this.busy) this.id = GUIDE_GATE;
+    // im Ritual das Eistor (beim Hau-ruck sein Tor); im Vorspiel (noch nicht `busy`) ist es das Tor der Platte, auf der
+    // die Figur steht, und läuft sie weg, bleibt `id`, wie es war: Das Eistor
+    if (gate) this.id = gate;
     else if (on && sc.plate) this.id = sc.plate.id;
     const g = this.id ? world.gates.get(this.id) : undefined;
     if (g) [this.lage, this.to] = [lageOf(g.out), [g.out[0], g.out[1]]];
@@ -141,10 +141,25 @@ export class PlateTurn {
       onPlate: on,
       moving: !!body && Math.abs(body.x - state.player.x) + Math.abs(body.y - state.player.y) > 0.02,
       held: state.still === 0,
-      ready: t < 0 || (!!g && guideGate(state) === g.id && !state.openGates.includes(g.id)),
+      ready: t < 0 || heave || (!!g && guideGate(state) === g.id && !state.openGates.includes(g.id)),
       reduce: this.still,
       mode: this.mode(on, back),
     };
+  }
+
+  /**
+   * Läuft ein Ritual (`busy`)? Am Eistor ab seinem Beginn (`t`: Takte seit dem Beginn, nicht schon im Vorspiel), beim
+   * Hau-ruck am Höhlentor die ganze Zeit (`heave`). `back`: in seinen letzten `CAMERA_BACK_S` fährt die Kamera zurück;
+   * `gate`: sein Tor, solange es läuft
+   */
+  private ritual(state: State, t: number): { back: boolean; gate: GateId | null; heave: boolean } {
+    const left = heaveLeft(state) ?? 0; // Takte bis zum Ende des Hau-rucks (0: keins)
+    const heave = left > 0 && !!state.heave;
+    this.busy = (t >= 0 && opening(state, RITUAL)) || heave;
+    const backTicks = (CAMERA_BACK_S * 1000) / RULE_TICK_MS;
+    const back = this.busy && (heave ? left <= backTicks : t >= RITUAL - backTicks);
+    const gate = heave && state.heave ? state.heave.gate : this.busy ? GUIDE_GATE : null;
+    return { back, gate, heave };
   }
 
   /**

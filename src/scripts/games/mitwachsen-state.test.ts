@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { DIRS as DIRECTIONS, type Dir } from '../../lib/games/front';
-import { GATES, REGIONS, animalId, type RegionId } from '../../data/games/mitwachsen';
+import { GATES, REGIONS, animalId, keyOf, type RegionId } from '../../data/games/mitwachsen';
 import {
   SLEEP_LOCK,
   REGROW,
@@ -922,10 +922,12 @@ describe('Wiese ums Bett', () => {
 });
 
 describe('Große Tore', () => {
-  const never = GATES.filter((g) => g.opens === 'never').map((g) => g.id);
+  // das Höhlentor auch, bis zum Freischalten der Bahn-Phase (`keyOf`: Schlüssel Tok erst mit `bahnOn`)
+  const never = GATES.filter((g) => !keyOf(g.id)).map((g) => g.id);
 
-  it('die anderen sieben Tore öffnen nie (`never`); das Eistor öffnet nur der Pinguin, kein anderes Tier', () => {
+  it('die anderen sieben Tore öffnen nie (`never`, das Höhlentor bis zur Bahn-Phase); das Eistor öffnet nur der Pinguin, kein anderes Tier', () => {
     expect(never).toHaveLength(7);
+    expect(never).toContain('hoehle');
     expect(never).not.toContain('eis');
     expect(GATES.find((g) => g.id === 'eis')!.opens).toEqual({ key: 'pinguin' });
     // alle Tiere der Lichtung und alle Eis-Tiere außer dem Pinguin zu Hause: Er ist nicht dabei, also bleibt alles zu

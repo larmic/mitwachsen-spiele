@@ -7,7 +7,7 @@ import { REGIONS, regionAnimalList, type Point } from '../../../../data/games/mi
 import { BUILD, LINE } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import { TRAIN_COLORS } from '../../../../data/games/worlds/bahn/mitwachsen-train-model';
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
-import { BAHN_LIVE } from '../../../../data/games/mitwachsen-rides';
+import { BAHN_LIVE } from '../../../../data/games/mitwachsen-live';
 import { unstick } from '../../mitwachsen-free';
 import type { HeraldEvent } from '../../mitwachsen-herald';
 import { bahnWanted } from '../../mitwachsen-pack';

@@ -208,6 +208,12 @@ export type View2D = {
    * auf das 0,7-Fache, nie dunkler als die Dämmerung (`tunnelNight` in mitwachsen-dusk.ts), in 2D und 3D gleich
    */
   dim?(state: State, world: World): number;
+  /**
+   * Tor dieser Welt, das ihr Paket gerade Stück für Stück öffnet, und wie weit (0 … 1, wie die Ansicht ihn sonst führt):
+   * das Hau-ruck am Höhlentor rollt den Stein in Dritteln (worlds/hoehle/mitwachsen-heave-look.ts); null: keins. Je Bild
+   * gefragt, gilt in 2D, 3D und auf der Postkarte; bei reduzierter Bewegung springt es
+   */
+  ajar?(state: State, reduced: boolean): readonly [GateId, number] | null;
   /** Bote dieser Welt (Bahn: Tok, worlds/bahn/mitwachsen-tok-look.ts): Ton, Hüpfer, Herz und Funken zu seinen Ereignissen */
   heraldFx?(e: HeraldEvent, state: State): RideFx;
   /**

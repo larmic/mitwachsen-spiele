@@ -156,7 +156,9 @@ describe('Start auf der Lichtung', () => {
           expect(w.cell(x, y).gate).toBe(g.id);
           expect(standHeight(w, [], x, y)).toBeNull();
         }
-        expect(g.opens).toEqual(g.id === 'eis' ? { key: 'pinguin' } : 'never'); // das Eistor öffnet der Pinguin
+        // das Eistor öffnet der Pinguin, das Höhlentor Tok (erst mit der Bahn-Phase)
+        const opens = { eis: { key: 'pinguin' }, hoehle: { key: 'tok', live: 'bahn' } } as Record<string, unknown>;
+        expect(g.opens).toEqual(opens[g.id] ?? 'never');
       }
     });
 

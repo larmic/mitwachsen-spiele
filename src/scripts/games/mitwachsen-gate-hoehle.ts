@@ -1,7 +1,8 @@
 // Zugang zur Höhlenwelt in 3D (Entwurf „Welten-Zugänge“, Höhlenmund mit Rollstein): eine geschichtete Felswand mit
 // rundem Höhlenmund, Tropfsteinen an der Kante, Moos und Kristallen in den Ritzen. Im Mund steckt ein großer runder
-// Rollstein (zu); beim Öffnen wackelt er, rollt nach rechts in seine Nische und dreht sich dabei sichtbar (Moos und
-// Kristallader wandern mit), dann gehen im Gang und am Mund Kristall-Lampen an (offen). Auf der Felsbrücke über dem
+// Rollstein (zu); beim Öffnen wackelt er, rollt in Dritteln nach rechts in seine Nische (je Stoß des Hau-rucks ein
+// Drittel, `THIRDS`) und dreht sich dabei sichtbar (Moos und Kristallader wandern mit), dann gehen paarweise von außen
+// nach innen Kristall-Lampen an, erst am Mund, dann im Gang (offen). Auf der Felsbrücke über dem
 // Mund steht eine leuchtende Kristallgruppe als Wahrzeichen, daneben eine Steinscheibe mit Kristall, die zur Kamera
 // schaut. Gehört zur 3D-Ansicht und wird nur mit ihr nachgeladen (Three.js).
 //
@@ -68,10 +69,27 @@ function stoneTop(x: number) {
   return Math.abs(d) < R ? R + Math.sqrt(R * R - d * d) : 0;
 }
 
-/** Wo der Stein beim Öffnen steht: erst wackeln, dann in die Nische rollen */
+/**
+ * Öffnungsgrad t, bei dem der Stein zu ist, ein Drittel, zwei Drittel und ganz in der Nische liegt: Jeder Stoß des
+ * Hau-rucks (worlds/hoehle/mitwachsen-heave-look.ts, `HEAVE_T`, ein Test hält beide gleich) rollt ihn ein Drittel weiter,
+ * jedes Drittel sanft an- und auslaufend. Auf Schritten von `OPEN_STEPS`, in denen die 3D-Ansicht das Torhaus neu baut
+ */
+export const THIRDS = [0.15, 0.4, 0.6, 0.8] as const;
+/**
+ * In so vielen Schritten baut die 3D-Ansicht das Höhlentor beim Öffnen neu (`openStep` in mitwachsen-gates-3d.ts; die
+ * anderen Tore in Zehnteln): je 0,04, damit nach der Nische (0,8) jeder Schritt genau ein Lampenpaar mehr anzündet
+ */
+export const OPEN_STEPS = 25;
+/** Ab hier gehen die Lampen an, paarweise je `LAMP_STEP` (der Stein liegt schon in der Nische); zwischen den Schritten */
+const LAMP_FROM = 0.82;
+const LAMP_STEP = 1 / OPEN_STEPS;
+
+/** Wo der Stein beim Öffnen steht: erst wackeln, dann in Dritteln in die Nische rollen */
 export function stoneX(t: number) {
   const wobble = Math.sin(seg(t, 0, 0.15) * Math.PI * 2) * 0.0625;
-  return wobble + ease(seg(t, 0.15, 0.8)) * NICHE_X;
+  const k = t < THIRDS[1] ? 0 : t < THIRDS[2] ? 1 : 2;
+  const [a, b] = [THIRDS[k] ?? 0, THIRDS[k + 1] ?? 1];
+  return wobble + ((k + ease(seg(t, a, b))) / 3) * NICHE_X;
 }
 
 // ---------- Fels aus Quadern ----------
@@ -299,17 +317,18 @@ function post(v: Vox, i: number, k: number, on: boolean, c: string) {
   for (let j = 0; j < 5; j++)
     for (const kk of [k, k + 1]) v.set(i, j, kk, on ? (j === 4 ? '#ffffff' : c) : DULL, on ? 'bright' : 'solid');
 }
-/** Lampen gehen paarweise an, wenn der Stein in der Nische liegt: vom Mund in den Gang hinein, zuletzt am Mund */
+/** Lampen gehen paarweise an, wenn der Stein in der Nische liegt: von außen nach innen, erst am Mund, dann in den Gang hinein */
+export const lampOn = (t: number, n: number) => t >= LAMP_FROM + n * LAMP_STEP;
 function lamps(v: Vox, t: number) {
-  const on = (n: number) => t >= 0.8 + n * 0.04;
+  const on = (n: number) => lampOn(t, n);
   for (let n = 0; n < 4; n++) {
     // links x −2,625 … −2,5, rechts 2,5 … 2,625; vorn im Mund bis hinten in den Gang
-    post(v, -21, -n * 6, on(n), KR[n % 2] ?? '#b48cf0');
-    post(v, 20, -n * 6, on(n), KR[(n + 1) % 2] ?? '#6fd6f0');
+    post(v, -21, -n * 6, on(n + 1), KR[n % 2] ?? '#b48cf0');
+    post(v, 20, -n * 6, on(n + 1), KR[(n + 1) % 2] ?? '#6fd6f0');
   }
   for (const [x, n] of [
-    [-3.75, 4],
-    [6.6875, 4],
+    [-3.75, 0],
+    [6.6875, 0],
   ] as const) {
     const lit = on(n);
     const glow = lit

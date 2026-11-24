@@ -4,7 +4,7 @@ import { ICE_MODELS } from '../../data/games/worlds/eis/mitwachsen-ice-models';
 import { BAT_ROOST, CAVE_MODELS } from '../../data/games/worlds/hoehle/mitwachsen-cave-models';
 import { PACK_IDS, PACK_WAIT_MS, Packs, RETRY_MS, type LoadedPack } from './mitwachsen-packs';
 import type { Need } from './mitwachsen-pack';
-import { BAHN_LIVE } from '../../data/games/mitwachsen-rides';
+import { BAHN_LIVE } from '../../data/games/mitwachsen-live';
 import { HINT_AFTER } from './mitwachsen-guide';
 import { plateMid } from './mitwachsen-plate';
 import { initialState, type State } from './mitwachsen-state';
@@ -136,7 +136,7 @@ describe('Welt-Pakete laden (Packs)', () => {
     expect(packs.at('eis')).toBe(pack);
     expect(packs.at('hoehle')).toBeUndefined();
     const door = gates.get('hoehle')!;
-    await packs.want({ ...bed, at: [door.mid] }, gates); // nah am Höhlentor: nichts, es geht nie auf
+    await packs.want({ ...bed, at: [door.mid] }, gates); // nah am Höhlentor: nichts, es geht bis zur Bahn-Phase nie auf
     expect(asked).toEqual(['eis']);
     await packs.want({ ...bed, openGates: ['hoehle'] }, gates); // das Höhlentor ist offen: jetzt auch die Höhlenwelt
     expect(asked).toEqual(['eis', 'hoehle']);

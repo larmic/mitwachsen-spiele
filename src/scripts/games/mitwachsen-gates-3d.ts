@@ -9,7 +9,7 @@ import { build as eis } from './mitwachsen-gate-eis';
 import { build as sand, plate as sandPlate } from './mitwachsen-gate-sand';
 import { build as wasser, motion as wasserMotion, plate as wasserPlate } from './mitwachsen-gate-wasser';
 import { build as lava, motion as lavaMotion, plate as lavaPlate } from './mitwachsen-gate-lava';
-import { build as hoehle, plate as hoehlePlate } from './mitwachsen-gate-hoehle';
+import { OPEN_STEPS as HOEHLE_STEPS, build as hoehle, plate as hoehlePlate } from './mitwachsen-gate-hoehle';
 import { build as wald, plate as waldPlate } from './mitwachsen-gate-wald';
 import { build as wolken, plate as wolkenPlate } from './mitwachsen-gate-wolken';
 import { build as pilze, motion as pilzeMotion, plate as pilzePlate } from './mitwachsen-gate-pilze';
@@ -26,6 +26,17 @@ const PLATE: Partial<Record<GateTheme, PlateLook>> = {
   wald: waldPlate,
   wolken: wolkenPlate,
   pilze: pilzePlate,
+};
+
+/** Öffnung in Schritten je Zugang: sonst Zehntel; das Höhlentor feiner, damit seine Lampen paarweise angehen */
+const STEPS: Partial<Record<GateTheme, number>> = { hoehle: HOEHLE_STEPS };
+/**
+ * Öffnung `open` gerundet auf die Schritte, in denen die 3D-Ansicht ein Torhaus neu baut (beim Aufgehen höchstens so oft,
+ * nicht in jedem Bild): Zehntel, das Höhlentor in `OPEN_STEPS` (mitwachsen-gate-hoehle.ts)
+ */
+export const openStep = (theme: GateTheme, open: number) => {
+  const n = STEPS[theme] ?? 10;
+  return Math.round(open * n) / n;
 };
 
 /**

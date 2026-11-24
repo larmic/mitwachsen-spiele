@@ -10,6 +10,7 @@ import { projection } from '../../lib/games/front';
 import type { World3D as World3DType } from './mitwachsen-3d';
 import { GAME_COLORS, LOOK, SPECIES, TIRED_TALK, realmOfAnimal, type GateId } from '../../data/games/mitwachsen';
 import { LANTERN_SPARKS } from '../../data/games/mitwachsen-hoehle';
+import { tryBahn } from '../../data/games/mitwachsen-live';
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
 import { SPARKS, fly, glints, sparks } from './mitwachsen-glyphs';
 import { Sfx } from './sfx';
@@ -164,6 +165,7 @@ class LarmicMitwachsen extends HTMLElement {
     this.sfx.muted = this.store.getItem('larmic.games.muted') === '1';
     this.tired = loadTired(this.store, Date.now());
     this.packs.extra = this.glimpse.packs; // seine Pakete holen, auch ohne Bedarf
+    if (this.glimpse.packs.includes('bahn')) tryBahn(); // Blick hinein: Bahn-Phase an, das Höhlentor hat seinen Schlüssel
     void this.openWorld(loadIndex(this.store).current).then(() => this.begin());
   }
 
@@ -807,9 +809,22 @@ class LarmicMitwachsen extends HTMLElement {
   private chore(e: ChoreEvent | Extract<GameEvent, { type: PackEvent['type'] | 'bob' }>, now: number) {
     if (e.type === 'bob') return void this.hops.set(e.id, now); // der Pinguin hüpft still neben der Torplatte
     if (reshapes(e)) this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]); // leer, wieder voll, gewachsen
-    if (e.type === 'snowman' || e.type === 'icicle' || e.type === 'column' || e.type === 'olm' || e.type === 'lantern')
+    if (
+      e.type === 'snowman' ||
+      e.type === 'icicle' ||
+      e.type === 'column' ||
+      e.type === 'olm' ||
+      e.type === 'lantern' ||
+      e.type === 'heave'
+    )
       this.sfx.score(packScore(this.renderer.views.values(), e)); // Töne aus dem Paket der Welt des Ereignisses
     if (e.type === 'column' || e.type === 'olm') return; // Säule und Grottenolm: Bild und Ton aus dem Paket
+    if (e.type === 'heave') {
+      // Hau-ruck am Höhlentor: Figur und Tok lehnen sich an den Stein (Bild und Ton aus dem Paket der Höhlenwelt)
+      if (e.n > 0) this.hops.set('player', now);
+      if (e.n > 0 && e.who) this.hops.set(e.who, now);
+      return;
+    }
     if (e.type === 'lantern') {
       // Kristall-Laterne genommen: Die Figur hüpft, es glitzert (der Lichtkreis wächst im Bild des Pakets)
       this.hops.set('player', now);
@@ -921,6 +936,9 @@ class LarmicMitwachsen extends HTMLElement {
     // in Takten seit dem Aufschwingen (Schritte von 0,1 s; die 3D-Ansicht baut ohnehin nur in Zehnteln neu)
     for (const [id, at] of this.gates)
       gates.set(id, at ? Math.max(0, fade(t - (this.state.tick - at) * TICK_MS, 900)) : 1);
+    // ein Tor, das ein Paket Stück für Stück öffnet (Hau-ruck: der Rollstein des Höhlentors in Dritteln)
+    const ajar = this.renderer.first((v) => v.ajar?.(this.state, this.reduced.matches));
+    if (ajar) gates.set(ajar[0], ajar[1]);
 
     const { dpr, w, h, zoom } = this.size;
     const mood = this.world.climate(Math.round(player.x), Math.round(player.y));

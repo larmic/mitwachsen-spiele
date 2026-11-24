@@ -34,4 +34,17 @@ describe('Haken der Pakete (hooksOf)', () => {
     const { meet } = hooksOf([]);
     expect(meet({} as never, {} as never, { type: 'move', dir: 'n' }, [] as never)).toBe(false);
   });
+
+  it('Ritual am Tor (`ritual`, Hau-ruck aus dem Paket der Höhlenwelt): kommt vor Fahrzeug und Boten dran; `step` nach dem Boten', () => {
+    const order: string[] = [];
+    const herald = { step: () => void order.push('herald'), meet: () => (order.push('herald'), false) };
+    const ritual = { step: () => void order.push('ritual'), meet: () => (order.push('ritual'), true) };
+    const engine: RideEngine = () => ({ ...RULES, move: () => (order.push('ride'), false) });
+    const hooks = hooksOf([{ rules: { herald, vehicle: train, ride: engine } }, { rules: { ritual } }]);
+    expect(hooks.meet({} as never, {} as never, { type: 'move', dir: 'n' }, [] as never)).toBe(true);
+    expect(order).toEqual(['ritual']); // ein Stoß erledigt den Zug
+    order.length = 0;
+    hooks.herald.step({} as never, {} as never, 'tick', [] as never, () => true);
+    expect(order).toEqual(['herald', 'ritual']);
+  });
 });

@@ -1070,7 +1070,7 @@ describe('„Noch nicht“ am Eistor', () => {
 
 describe('„Noch nicht“ an den Toren, die nie aufgehen', () => {
   const world = worldOf(1);
-  const never = GATES.filter((g) => g.opens === 'never');
+  const never = GATES.filter((g) => !keyOf(g.id)); // das Höhlentor auch, bis zum Freischalten der Bahn-Phase
   /** Wache Figur auf `at`, alle Tiere der Lichtung zu Hause, keine Tiere unterwegs */
   const alone = (at: Point): State => ({
     ...initialState(world, { garden: everyone() }),

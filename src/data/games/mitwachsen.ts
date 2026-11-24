@@ -6,6 +6,7 @@ import { eyes, type Part } from '../../lib/games/front';
 import { ICE_SPECIES, type IceSpeciesId } from './mitwachsen-eis';
 import { CAVE_BEINGS, CAVE_SPECIES, type CaveBeingId, type CaveSpeciesId } from './mitwachsen-hoehle';
 import type { SpeciesOf } from './mitwachsen-species';
+import { bahnOn } from './mitwachsen-live';
 
 /**
  * Die Gegenden, in fester Reihenfolge: zuerst die Lichtung, dann die Welten hinter ihren Toren (Eis-Welt, Höhlenwelt).
@@ -72,8 +73,12 @@ export type Gate = {
   region: RegionId; // Gegend, in der das Tor steht
   leadsTo: string; // was dahinter liegt (kommt später)
   theme: GateTheme; // Blöcke oben auf dem Tor verraten, worum es dahinter geht
-  /** Wann das Tor aufgeht: nie, oder wenn sein Bote es aufschließt (`key`, der Schlüssel; je Tor einer, `keyOf`) */
-  opens: 'never' | { key: SpeciesId };
+  /**
+   * Wann das Tor aufgeht: nie, oder wenn sein Bote es aufschließt (`key`, der Schlüssel; je Tor einer, `keyOf`). `live`:
+   * erst, wenn diese Phase freigeschaltet ist (`'bahn'`: Tok und das Höhlentor hinter `BAHN_LIVE`, `bahnOn` in
+   * mitwachsen-rides.ts); bis dahin gilt das Tor als eines, das nie aufgeht
+   */
+  opens: 'never' | { key: SpeciesId; live?: 'bahn' };
   sign?: Point; // Tafel mit den Tieren der Gegend (noch keine)
 };
 
@@ -153,23 +158,35 @@ export const REGIONS: readonly [Region & { shape: { rx: number; ry: number } }, 
 /**
  * Die großen Tore: eines je Welt. Wo sie im Felsring stehen und in welcher Reihenfolge, würfelt der Seed jeder Welt.
  * Hinter jedem Tor liegt in seiner Richtung die passende Landschaft. Das Eistor öffnet der verlaufene Pinguin
- * (`{ key: 'pinguin' }`, worlds/eis/mitwachsen-ritual.ts), die anderen gehen vorerst nie auf (`opens: 'never'`).
+ * (`{ key: 'pinguin' }`, worlds/eis/mitwachsen-ritual.ts), das Höhlentor Tok mit dem Hau-ruck (`{ key: 'tok' }`,
+ * worlds/hoehle/mitwachsen-heave.ts), aber erst, wenn die Bahn-Phase freigeschaltet ist (`live: 'bahn'`); die anderen
+ * gehen vorerst nie auf (`opens: 'never'`).
  */
 export const GATES: readonly Gate[] = [
   { id: 'eis', theme: 'eis', kind: 'grosstor', region: 'lichtung', leadsTo: 'Eiswelt', opens: { key: 'pinguin' } },
   { id: 'sand', theme: 'sand', kind: 'grosstor', region: 'lichtung', leadsTo: 'Sandwelt', opens: 'never' },
   { id: 'wasser', theme: 'wasser', kind: 'grosstor', region: 'lichtung', leadsTo: 'Wasserwelt', opens: 'never' },
   { id: 'lava', theme: 'lava', kind: 'grosstor', region: 'lichtung', leadsTo: 'Lavaberge', opens: 'never' },
-  { id: 'hoehle', theme: 'hoehle', kind: 'grosstor', region: 'lichtung', leadsTo: 'Höhlenwelt', opens: 'never' },
+  {
+    id: 'hoehle',
+    theme: 'hoehle',
+    kind: 'grosstor',
+    region: 'lichtung',
+    leadsTo: 'Höhlenwelt',
+    opens: { key: 'tok', live: 'bahn' },
+  },
   { id: 'wald', theme: 'wald', kind: 'grosstor', region: 'lichtung', leadsTo: 'Wald', opens: 'never' },
   { id: 'wolken', theme: 'wolken', kind: 'grosstor', region: 'lichtung', leadsTo: 'Wolkenwelt', opens: 'never' },
   { id: 'pilze', theme: 'pilze', kind: 'grosstor', region: 'lichtung', leadsTo: 'Pilzwald', opens: 'never' },
 ];
 
-/** Schlüssel eines Tors: die Art seines Boten, der es aufschließt; undefined, wenn es nie aufgeht */
+/**
+ * Schlüssel eines Tors: die Art seines Boten, der es aufschließt; undefined, wenn es nie aufgeht oder seine Phase noch
+ * nicht freigeschaltet ist (`live`; das Höhlentor erst mit der Bahn, `bahnOn`)
+ */
 export function keyOf(gate: GateId): SpeciesId | undefined {
   const opens = GATES.find((g) => g.id === gate)?.opens;
-  return opens && opens !== 'never' ? opens.key : undefined;
+  return opens && opens !== 'never' && (!opens.live || bahnOn()) ? opens.key : undefined;
 }
 
 /** Das Tor, das der Bote dieser Art aufschließt (undefined: keines) */

@@ -8,6 +8,7 @@ import { HOEHLE_PACK, worldOf } from '../../test-worlds';
 import { SHED_H, band, caveBoxes, glowOver } from './mitwachsen-cave-look';
 import { TURN_MS, view } from './view-2d';
 import { view3d } from './view-3d';
+import { openScore } from './mitwachsen-heave-look';
 
 const w = worldOf(1, [HOEHLE_PACK]);
 const at: DecoAt = { now: 0, reduced: false, picked: {}, packs: {} };
@@ -159,14 +160,14 @@ describe('Füllung der Grotte', () => {
 });
 
 describe('Zeichenteile der Grotte (2D)', () => {
-  it('Lichtfleck als helles Licht obenauf, sonst nichts; kein Wetter, kein Gast, keine Töne am Tor', () => {
+  it('Lichtfleck als helles Licht obenauf, sonst nichts; kein Wetter, kein Gast; Töne am Tor aus dem Hau-ruck', () => {
     const lit = view.ground(cell(null, { light: 0.3 }), 2, 3, false)!;
     expect(lit.slice(0, 6)).toEqual([2, 3, 1, 1, 1, 0.01]);
     expect(lit[6]).toBe(glowOver(0.3));
     expect(glowOver(0.9)).toBe('rgba(255, 246, 220, 0.45)'); // nie grell
     expect(view.ground(cell(null), 2, 3, false)).toBeNull();
     expect(view.sky!.guestAt(w, {} as never)).toBeNull();
-    expect(view.sky!.gateScore()).toEqual([]);
+    expect(view.sky!.gateScore()).toEqual(openScore());
     expect(view.heaven).toEqual(GROTTE_COLORS.heaven);
   });
 

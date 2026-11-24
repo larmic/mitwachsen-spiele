@@ -193,12 +193,12 @@ describe('Strecke des Schlittens (Eis-Welt)', () => {
     expect(sledRoute(w)).toBe(sledRoute(w));
   });
 
-  // Tief (MITWACHSEN_DEEP) Seeds 1 bis 50 in zwei Abschnitten, sonst die Stichprobe. Eine ganze Welt zu bauen kostet
+  // Tief (MITWACHSEN_DEEP) Seeds 1 bis 25 in zwei Abschnitten, sonst die Stichprobe. Eine ganze Welt zu bauen kostet
   // gut 0,2 s, 500 Seeds sprengten die Frist des Jobs `static` (gemessen: über 1 bis 500 lief alles grün); 100 Seeds
-  // kosteten 24 s und brachten test:deep in gates:ci über 150 s (Schritt 4 der Bahn), darum 50 wie die übrigen
-  // Strecken-Prüfungen weit über den 20 Seeds der anderen Welt-Tests. Die Welten werden hier frisch gebaut (nicht
-  // `worldOf`), sonst blieben sie alle im Speicher
-  it.each(seedChunks(seedsFor(seedRange(1, 50)), 25))(
+  // kosteten 24 s und brachten test:deep in gates:ci über 150 s (Schritt 4 der Bahn), 50 Seeds (12,5 s) mit dem
+  // Hau-ruck (Schritt 11) auf 147 s, darum 25, noch über den 20 Seeds der anderen Welt-Tests. Die Welten werden hier
+  // frisch gebaut (nicht `worldOf`), sonst blieben sie alle im Speicher
+  it.each(seedChunks(seedsFor(seedRange(1, 25)), 13))(
     'Strecke, Schuppen und Halte: zusammenhängend und begehbar, neben der Rutschspur, fern von Platte, Warteplätzen und Plattformen, Halt im Bereich, Fußweg frei (Seeds $label)',
     ({ seeds }) => {
       const wrong: string[] = [];

@@ -3,8 +3,8 @@
 // `RIDES` dazu. Die Fahrregeln aller Fahrzeuge bringt das Paket der Fahrzeuge mit (worlds/fahrt/), Strecke und Bild das
 // Paket des Fahrzeugs (Schlitten: worlds/eis/mitwachsen-sled*.ts; Zug: worlds/bahn/mitwachsen-train*.ts). Die Liste steht
 // hier, weil die Pakete einander nicht importieren und jedes seinen Eintrag braucht; der Kern kennt nur die Typen
-// (`RideId`) und die Freigabe `BAHN_LIVE`. Die Höhlenbahn (`'hoehle'`, Paket worlds/bahn/) gibt es nur hinter dem
-// Schalter `BAHN_LIVE`: Bis zum Freischalten sieht das Kind nichts von ihr, nur der Entwickler-Schalter zeigt sie.
+// (`RideId`). Die Höhlenbahn (`'hoehle'`, Paket worlds/bahn/) gibt es nur hinter dem Schalter `BAHN_LIVE`
+// (mitwachsen-live.ts): Bis zum Freischalten sieht das Kind nichts von ihr, nur der Entwickler-Schalter zeigt sie.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Der Schlitten“ und „Tok und die Bahn“)
 
 import type { GateId } from './mitwachsen';
@@ -12,13 +12,6 @@ import type { GateId } from './mitwachsen';
 /** Fahrzeuge: der Schlitten der Eis-Welt, die Höhlenbahn (`'hoehle'`, das Gleis von der Lichtung in die Grotte) */
 export type RideId = 'schlitten' | 'hoehle';
 
-/**
- * Freigabe der Bahn-Phase (Tok, Gleis, Zug, Hau-ruck am Höhlentor): Solange false, lädt das Spiel das Paket der Bahn
- * nie von selbst (`bahnWanted` in mitwachsen-pack.ts), das Kind sieht nichts davon und das Höhlentor bleibt zu; nur der
- * Entwickler-Schalter (`?entwickler=bahn`, mitwachsen-dev.ts) zeigt sie. Der letzte Schritt („Freischalten“) setzt ihn
- * auf true
- */
-export const BAHN_LIVE: boolean = false;
 /**
  * Vorladen am Halt (`RIDE_PRELOAD`, Konzept „Reisewege“): Steht die Figur höchstens so viele Felder (Schachbrett) vor
  * einem Halt eines Fahrzeugs, holt das Spiel die Pakete, die es zum Fahren braucht (Fahr-Engine, Ziel-Gegend). Fehlt

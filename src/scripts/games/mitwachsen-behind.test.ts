@@ -48,7 +48,7 @@ describe('Was hinter dem Gang eines Tors liegt (behind)', () => {
     expect(map.get('0,7')).toMatchObject({ h: 4, ground: 'stone', solid: true, region: 'border', biome: 'sand' });
   });
 
-  it('hinter dem Höhlentor (geht nie auf, aber dahinter liegt eine Welt): ohne Paket eine Felswand', () => {
+  it('hinter dem Höhlentor (geht bis zur Bahn-Phase nie auf, aber dahinter liegt eine Welt): ohne Paket eine Felswand', () => {
     const map = new Map<string, Cell>();
     const b = behind(undefined, 1, GANG, everywhere, passage, map, 'hoehle');
     expect(b.built).toBe(true);

@@ -27,8 +27,8 @@ export const RULES: Rule[] = [
     name: 'Spiel lädt 3D erst bei Bedarf',
     pages: /^spielen\//,
     // Kern: Regeln, Welt, 2D-Ansicht und Daten des Spiels; 3D (Three.js) und die Welt-Pakete kommen erst per import().
-    // Gemessen 148 385 Bytes (144,9 KB)
-    budget: 151 * 1024,
+    // Gemessen 146,9 KB (mit dem Hau-ruck am Höhlentor: Schlüssel hinter der Freigabe, Haken `ajar` und `ritual`)
+    budget: 162 * 1024,
     // Probe: Der Höhlenhimmel der Grotte steht nur in ihrem Welt-Paket (GROTTE_COLORS.sky)
     forbidden: /WebGLRenderer|three\.module|#4a4370/,
   },
@@ -79,13 +79,14 @@ export const RULES: Rule[] = [
       // Tropfmoos), ihr Schmuck (Säulen-Glockenspiel mit Fledermaus-Runde, Grottenolm am Steg, Tropfsteine), ihre Füllung
       // (Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken, Felsinseln, Pfützen, Moos und Farn, Lehmhang), ihr Licht
       // (Ränder im Dunkel, Lichtkreis, Kristall-Laterne), Zeichenteile der 2D-Ansicht und Modelle der Höhlen-Tiere; nur
-      // der Entwickler-Schalter holt sie (das Höhlentor geht vorerst nie auf)
+      // der Entwickler-Schalter holt sie (bis zum Freischalten der Bahn geht das Höhlentor nie auf); dazu das Hau-ruck am
+      // Höhlentor (Regeln, Hände auf dem Stein, Fledermaus, Glühwürmchen, Töne)
       { chunks: /\/welt-hoehle\.[\w-]+\.js$/ },
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Welt
       { chunks: /\/welt-hoehle-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-hoehle)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 32 617 Bytes (31,9 KB)
-    budget: 36 * 1024,
+    // Gemessen 37,7 KB (mit dem Hau-ruck)
+    budget: 42 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

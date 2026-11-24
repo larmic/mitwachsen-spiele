@@ -3,15 +3,19 @@
 // findet ihn nicht. Mit ihm holt die Seite die genannten Pakete (mehrere mit Komma: `?entwickler=hoehle,bahn`), die
 // Figur wacht im Bett der ersten genannten Welt auf (die Bahn hat keine: dann im Bett der Lichtung), und es wird nichts
 // gespeichert, auch nicht über das Menü (`sandbox`; der Spielstand des Kindes bleibt, wie er war; nach dem Neuladen ohne
-// Schalter wacht die Figur wieder dort auf, wo sie war). Die Tore bleiben zu: Hinaus geht es nur durch Neuladen ohne
-// Schalter. Die Bahn (`bahn`, hinter `BAHN_LIVE`) holt die Grotte mit, damit das Gleis bis zum Bahnhof Fledermaus liegt,
-// und die Fahr-Engine mit und spielt einen Ausbau vor (`devProgress`: `&bau=1` bis zum Prellbock in der Bucht, sonst 2,
-// die ganze Linie; der Zug steht dann am Bahnhof Bär, Stufe `bereit`, die Figur kann einsteigen und fahren). Mit
-// `&bau=0` spielt sie den Stand vor, in dem Tok kommt: noch nichts gebaut, Eistor offen (dafür holt sie das Paket der
-// Eis-Welt mit), Eis-Leiste voll, erste Heimfahrt mit dem Schlitten gemacht; `&abend=1` macht es Abend (Tok kommt
-// schlafend, `devLate`); `&vorladen=1` bringt die Grotte nicht mit: Sie kommt erst, wenn die Figur 6 Felder vor einem
-// Halt steht (`RIDE_PRELOAD`), bis dahin schläft der Zug (bei Ausbau 2, dem Standard; mit `&bau=1` fährt er ohne sie
-// bis zum Prellbock, sie wird nur vorgeladen).
+// Schalter wacht die Figur wieder dort auf, wo sie war). Die Tore bleiben zu, bis auf das Höhlentor mit der Bahn (unten):
+// Hinaus geht es sonst nur durch Neuladen ohne Schalter. Die Bahn (`bahn`, hinter `BAHN_LIVE`) schaltet die Bahn-Phase für
+// diese Seite an (`tryBahn` in der Spielseite: Das Höhlentor hat dann seinen Schlüssel Tok und geht mit dem Hau-ruck auf),
+// holt die Grotte mit, damit das Gleis bis zum Bahnhof Fledermaus liegt, und die Fahr-Engine mit und spielt einen
+// Ausbau vor (`devProgress`: `&bau=1` bis zum Prellbock in der Bucht, sonst 2, die ganze Linie; der Zug steht dann am
+// Bahnhof Bär, Stufe `bereit`, die Figur kann einsteigen und fahren; bei 2 ist das Höhlentor schon offen, Stufe
+// `offen`, denn Bau 2 kommt erst nach dem Hau-ruck, außer mit `&vorladen=1`). Mit `&bau=1&bucht=1` ist die erste Fahrt schon gemacht: Tok wartet
+// in der Bucht (er sitzt zuerst neben dem Bett und hüpft hin, wenn die Figur aufwacht), zu Fuß zur Torplatte beginnt das
+// Hau-ruck. Mit `&bau=0` spielt sie den Stand vor, in dem Tok kommt: noch nichts gebaut, Eistor offen (dafür holt sie das
+// Paket der Eis-Welt mit), Eis-Leiste voll, erste Heimfahrt mit dem Schlitten gemacht; `&abend=1` macht es Abend (Tok
+// kommt schlafend, `devLate`); `&vorladen=1` bringt die Grotte nicht mit: Sie kommt erst, wenn die Figur 6 Felder vor
+// einem Halt steht (`RIDE_PRELOAD`), bis dahin schläft der Zug (bei Ausbau 2, dem Standard; mit `&bau=1` fährt er ohne
+// sie bis zum Prellbock, sie wird nur vorgeladen).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Die Kristallgrotte“, Entwickler-Schalter, und „Tok und die Bahn“)
 
 import { REGIONS, animalId, type RegionId } from '../../data/games/mitwachsen';
@@ -30,6 +34,8 @@ export const DEV_EVENING = 'abend';
  * einem Halt steht (`RIDE_PRELOAD`); bis dahin schläft der Zug am Bahnhof (ab Ausbau 2)
  */
 export const DEV_PRELOAD = 'vorladen';
+/** Erste Fahrt schon gemacht vorspielen (`&bucht=1`, mit `&bau=1`): Tok wartet in der Bucht vor dem Höhlentor */
+export const DEV_BAY = 'bucht';
 /** Pakete, die ein Paket im Blick hinein mitbringt: die Bahn die Grotte (dort endet ihr Gleis) und die Fahr-Engine (der Zug fährt) */
 const WITH: Partial<Record<PackId, readonly PackId[]>> = { bahn: ['hoehle', 'fahrt'] };
 
@@ -66,8 +72,10 @@ export function glimpse(search: string, ids: readonly PackId[]): Glimpse {
 /**
  * Was der Schalter dem Spielstand vorspielt (nur im Arbeitsspeicher, `sandbox`): mit der Bahn ihren Ausbau
  * (`packs.bahn.built`, aus `&bau=`: 0, 1 oder 2, sonst 2), ab 1 den Zug am Bahnhof (`packs.fahrt.hoehle`, Stufe
- * `bereit`, wenn dort noch nichts steht); bei 0 dazu den Stand, in dem Tok kommt: Eistor offen, von
- * jeder Eis-Art ein Tier auf der Schneewiese (die Eis-Leiste voll) und die erste Heimfahrt mit dem Schlitten gemacht
+ * `bereit`, wenn dort noch nichts steht; mit `&bucht=1` die erste Fahrt gemacht, `gefahren`); bei 2 dazu das offene
+ * Höhlentor (Stufe `offen`: Bau 2 kommt erst nach dem Hau-ruck; nicht mit `&vorladen=1`, sonst käme die Grotte schon
+ * mit dem offenen Tor); bei 0 dazu den Stand, in dem Tok kommt: Eistor offen,
+ * von jeder Eis-Art ein Tier auf der Schneewiese (die Eis-Leiste voll) und die erste Heimfahrt mit dem Schlitten gemacht
  * (`packs.fahrt.schlitten`, Stufe `fest`). Ohne Bahn bleibt der Spielstand, wie er ist
  */
 export function devProgress(dev: readonly PackId[], search: string, p: Progress): Progress {
@@ -76,9 +84,14 @@ export function devProgress(dev: readonly PackId[], search: string, p: Progress)
   const packs = { ...p.packs, bahn: { built } };
   const fahrt = typeof p.packs.fahrt === 'object' && p.packs.fahrt !== null ? p.packs.fahrt : {};
   // gebaut: Der Zug steht da (Stufe `bereit`, wie nach Bau 1), wenn der Spielstand nicht schon weiter ist
-  const was = (fahrt as { hoehle?: { stage?: unknown } }).hoehle;
-  const train = was?.stage === 'offen' || was?.stage === 'fest' ? was : { stage: 'bereit' };
-  if (built) return { ...p, packs: { ...packs, fahrt: { ...fahrt, hoehle: train } } };
+  const was = (fahrt as { hoehle?: { stage?: unknown; gefahren?: unknown } }).hoehle;
+  // Ausbau 2 mit offenem Höhlentor; nur `&vorladen=1` lässt es zu, damit die Grotte nicht schon mit dem Tor kommt
+  const opened = built === 2 && new URLSearchParams(search).get(DEV_PRELOAD) !== '1';
+  const stage = was?.stage === 'offen' || was?.stage === 'fest' ? was.stage : opened ? 'offen' : 'bereit';
+  const ridden = stage === 'bereit' && (new URLSearchParams(search).get(DEV_BAY) === '1' || was?.gefahren === true);
+  const train = { stage, ...(ridden && { gefahren: true }) };
+  const open = opened ? [...new Set([...p.openGates, 'hoehle' as const])] : p.openGates;
+  if (built) return { ...p, openGates: open, packs: { ...packs, fahrt: { ...fahrt, hoehle: train } } };
   const eis = REGIONS.find((r) => r.id === 'eis')?.animals ?? [];
   const home = new Set(p.garden.map((a) => a.id));
   return {

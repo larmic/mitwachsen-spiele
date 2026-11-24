@@ -9,7 +9,7 @@ import { Group, Mesh, type BufferGeometry } from 'three';
 import type { GateId } from '../../data/games/mitwachsen';
 import { parts, type GateLook, type Parts } from './mitwachsen-gate-kit';
 import { MovingGates } from './mitwachsen-gate-motion-3d';
-import { gate, moves, plate } from './mitwachsen-gates-3d';
+import { gate, moves, openStep, plate } from './mitwachsen-gates-3d';
 import { ritualGlow } from './mitwachsen-guest-look';
 import { GUIDE_GATE, guideGate } from './mitwachsen-guide';
 import type { Plates3D } from './mitwachsen-plate-3d';
@@ -67,8 +67,9 @@ export class GateHouses {
     const shut = !!guest && !state.openGates.includes(guest); // Goldrand der Platte, bis das Tor aufgeht (wie in 2D)
     this.bay = turn?.front ?? null;
     for (const g of world.gates.values()) {
-      // Öffnung in Zehnteln: Beim Aufschwingen wird ein Torhaus höchstens zehnmal neu gebaut, nicht in jedem Bild
-      const open = Math.round((sc.gates.get(g.id) ?? 0) * 10) / 10;
+      // Öffnung in Schritten (Zehntel, Höhlentor feiner): Beim Aufgehen wird ein Torhaus nur so oft neu gebaut, nicht in
+      // jedem Bild
+      const open = openStep(g.id, sc.gates.get(g.id) ?? 0);
       const glow = g.id === GUIDE_GATE ? lit : 0;
       const key = `${open}|${g.id === guest}|${shut}|${glow}`;
       this.place(g, key, (m) => this.build(world, g, m, key, open, g.id === guest, glow, shut), turn);

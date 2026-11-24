@@ -18,7 +18,7 @@ import {
   signOutline,
   silhouette,
 } from './mitwachsen-hint-look';
-import { GATES } from '../../data/games/mitwachsen';
+import { GATES, keyOf } from '../../data/games/mitwachsen';
 import { GOLD } from '../../data/games/mitwachsen-portals';
 import { HINT_AFTER, HINT_EVERY } from './mitwachsen-guide';
 import { plateMid } from './mitwachsen-plate';
@@ -171,7 +171,7 @@ describe('„Noch nicht“: Umriss dessen, was fehlt', () => {
 });
 
 describe('„Noch nicht“ an den Toren, die nie aufgehen: das Zeichen ihrer Welt', () => {
-  const NEVER = GATES.filter((g) => g.opens === 'never').map((g) => g.id);
+  const NEVER = GATES.filter((g) => !keyOf(g.id)).map((g) => g.id); // mit dem Höhlentor (Bahn-Phase aus)
 
   it('Umriss des Bilds ihrer Portal-Plattform: 16 × 16, nur der Rand, je Welt verschieden, kein Tier', () => {
     const rows = NEVER.map(signOutline);

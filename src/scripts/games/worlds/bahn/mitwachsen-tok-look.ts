@@ -10,7 +10,7 @@ import { SPECIES, type GateId, type SpeciesId } from '../../../../data/games/mit
 import { BUILD } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import { TOK_CRUMBS } from '../../../../data/games/worlds/bahn/mitwachsen-tok-model';
 import { RULE_TICK_MS } from '../../mitwachsen-turn-pace';
-import type { HeraldEvent, Heralded } from '../../mitwachsen-herald';
+import { heraldOf, type HeraldEvent, type Heralded } from '../../mitwachsen-herald';
 import type { RideFx } from '../../mitwachsen-ride-view';
 import type { Scored } from '../../sfx';
 import { builtOf } from './mitwachsen-built';
@@ -93,11 +93,16 @@ export function heraldFx(e: HeraldEvent): RideFx {
 }
 
 /**
- * Was dem Höhlentor fehlt, als nächster Schritt für das Kind: Tok, sobald er fällig ist (`tokWanted`) oder schon kam,
- * solange noch nichts gebaut ist (Ausbau 0). Vorher (Eis-Welt nicht fertig, keine Heimfahrt mit dem Schlitten) und
- * danach nichts von hier: Das Tor zeigt das Zeichen seiner Welt
+ * Was dem Höhlentor fehlt, als nächster Schritt für das Kind, solange es zu ist: Tok, sobald er fällig ist
+ * (`tokWanted`) oder schon kam, solange noch nichts gebaut ist (Ausbau 0); nach Bau 1, solange er nicht draußen ist
+ * (er sitzt noch im Zug: Mit ihm in die Bucht fahren, dann kommt das Hau-ruck). Vorher (Eis-Welt nicht fertig, keine
+ * Heimfahrt mit dem Schlitten) nichts von hier: Das Tor zeigt das Zeichen seiner Welt
  */
-export const lacks = (state: Pick<Heralded, 'openGates' | 'garden' | 'packs'>, gate: GateId): SpeciesId | undefined =>
-  gate === 'hoehle' && builtOf(state.packs) === 0 && (tokWanted(state) || tokOf(state.packs) !== undefined)
-    ? 'tok'
-    : undefined;
+export const lacks = (
+  state: Pick<Heralded, 'openGates' | 'garden' | 'packs' | 'animals'>,
+  gate: GateId,
+): SpeciesId | undefined => {
+  if (gate !== 'hoehle' || state.openGates.includes(gate)) return undefined;
+  if (builtOf(state.packs) >= 1) return heraldOf(state) ? undefined : 'tok';
+  return tokWanted(state) || tokOf(state.packs) !== undefined ? 'tok' : undefined;
+};

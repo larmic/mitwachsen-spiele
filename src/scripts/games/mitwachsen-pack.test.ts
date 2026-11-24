@@ -83,7 +83,7 @@ describe('Welt-Pakete je Tor: das Höhlentor (noch ohne Schlüssel und ohne Pake
       expect(needsPack(n, gates, beyondRing, 'hoehle')).toBe(false);
     }
     expect(needsPack(need({ openGates: ['hoehle'] }), gates, beyondRing, 'hoehle')).toBe(true); // Tor offen
-    // nah an seinem Tor: nichts, es geht nie auf (die Höhlenwelt ist noch nicht für das Kind)
+    // nah an seinem Tor: nichts, es geht bis zur Bahn-Phase nie auf (die Höhlenwelt ist noch nicht für das Kind)
     expect(needsPack(need({ at: [nearHoehle] }), gates, beyondRing, 'hoehle')).toBe(false);
     expect(needsPack(need({ at: [hoehle.mid] }), gates, beyondRing, 'hoehle')).toBe(false);
     expect(needsPack(need({ at: [nearHoehle] }), gates, beyondRing, 'eis')).toBe(false);
@@ -95,7 +95,7 @@ describe('Welt-Pakete je Tor: das Höhlentor (noch ohne Schlüssel und ohne Pake
     const nearEis: [number, number] = [eis.mid[0] - eis.out[0] * 3, eis.mid[1] - eis.out[1] * 3];
     expect(holds(bareOf(SEED), eisRegion, nearEis, beyondRing)).toBe(true); // Paket fehlt: festhalten
     expect(holds(worldOf(SEED), eisRegion, nearEis, beyondRing)).toBe(false); // Paket da
-    expect(holds(bareOf(SEED), hoehleRegion, nearHoehle, beyondRing)).toBe(false); // das Höhlentor geht nie auf
+    expect(holds(bareOf(SEED), hoehleRegion, nearHoehle, beyondRing)).toBe(false); // das Höhlentor geht bis zur Bahn-Phase nie auf
     expect(holds(bareOf(SEED), REGIONS[0], [0, 0], beyondRing)).toBe(false); // die Lichtung liegt hinter keinem Tor
     expect(holds(createWorld(SEED, []), eisRegion, [0, 0], beyondRing)).toBe(false); // am Bett: nicht ihre Welt
   });

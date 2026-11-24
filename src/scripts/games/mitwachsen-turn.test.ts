@@ -43,7 +43,7 @@ import {
 import { STEP_MS } from './input-pace';
 import { CALM_KEY } from './mitwachsen-menu';
 import { OPEN_TICKS } from './worlds/eis/mitwachsen-ritual';
-import { GUIDE_GATE, RITUAL } from './mitwachsen-guide';
+import { GUIDE_GATE, HEAVE_END, RITUAL } from './mitwachsen-guide';
 import { PlateTurn } from './mitwachsen-turn-3d';
 import type { State } from './mitwachsen-state';
 import type { World } from './mitwachsen-world';
@@ -324,6 +324,61 @@ describe('Drehung zur Torfront (mitwachsen-turn.ts)', () => {
     }
     expect(pressed).toBeGreaterThan(0);
     expect(pressed).toBeLessThan(pre);
+    clock.mockRestore();
+  });
+
+  it('Hau-ruck am Höhlentor: vorn ab dem Vorspiel, Pfeile blinzeln nicht, zurück erst in den letzten 0,6 s, Ziel ist sein Tor', () => {
+    // Höhlentor im Osten (ohne Blinzeln zurück); unter den Füßen meldet die Szene noch die Platte des Eistors im Norden
+    const cave = { id: 'hoehle', mid: [0, 0], out: OUT.O, cells: [] };
+    const ice = { id: 'eis', mid: [0, 0], out: OUT.N, cells: [] };
+    const world = {
+      gates: new Map([
+        ['hoehle', cave],
+        ['eis', ice],
+      ]),
+    } as unknown as World;
+    const START = 4; // die Figur stand 0,4 s still auf der Platte: das Hau-ruck beginnt mit seinem Vorspiel
+    const AT = 24; // erster Stoß frühestens hier (davor Vorspiel)
+    const PUSH = [AT, AT + 10, AT + 20]; // drei Stöße
+    const END = (PUSH[2] ?? 0) + HEAVE_END; // Ende des Hau-rucks
+    const backTicks = (CAMERA_BACK_S * 1000) / RULE_TICK_MS;
+    const heave = (tick: number) => {
+      const n = PUSH.filter((p) => p <= tick).length;
+      return tick < START || tick >= END ? undefined : { gate: 'hoehle', n, at: n ? (PUSH[n - 1] ?? AT) : AT };
+    };
+    let now = 0;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const turn = new PlateTurn(null);
+    const at = (tick: number) =>
+      ({
+        tick,
+        ritual: -1, // kein Ritual am Eistor
+        still: tick < START ? tick + 1 : (tick - START) % 6, // ab dem Vorspiel alle 6 Takte ein Pfeil (Stoß bzw. Hüpfer)
+        sleeping: false,
+        player: { x: 0, y: 2 },
+        openGates: ['eis'],
+        animals: [],
+        heave: heave(tick),
+      }) as unknown as State;
+    const sc = () => ({ now, reduced: false, plate: { id: 'eis' as const, since: 0, on: true }, bodies: new Map() });
+    let blinks = 0;
+    const yaws: number[] = [];
+    for (; now < END * RULE_TICK_MS; now += DT * 1000) {
+      const tick = Math.floor(now / RULE_TICK_MS);
+      const yaw = turn.frame(world, at(tick), sc()).yaw;
+      yaws[tick] = yaw;
+      if (tick >= START && (tick - START) % 6 === 0 && turn.blink(() => {})) blinks++; // jeder Pfeil fragt: kein Blinzeln im Hau-ruck
+      // davor zielte sie aufs Tor der Platte (Norden), ab dem Hau-ruck auf sein Tor
+      expect(turn.to, `Takt ${tick}`).toEqual(tick < START ? OUT.N : OUT.O);
+      // ab dem Vorspiel dreht sie hin (ohne 350 ms Wartezeit, obwohl die Pfeile die Stehzeit zurücksetzen) …
+      if (tick > START && tick < AT) expect(yaw, `Takt ${tick}`).toBeLessThan(0);
+      // … und ist vor dem ersten Stoß vorn, bleibt dort bis 0,6 s vor dem Ende
+      if (tick >= AT && tick < END - backTicks)
+        expect(Math.abs(yaw - TARGET_DEG.O), `Takt ${tick}`).toBeLessThanOrEqual(SWAY_DEG + 1);
+    }
+    expect(blinks).toBe(0);
+    // in den letzten 0,6 s fährt sie zurück
+    expect(Math.abs(yaws[END - 1] ?? -99)).toBeLessThan(Math.abs(yaws[END - backTicks - 1] ?? 0) - 10);
     clock.mockRestore();
   });
 

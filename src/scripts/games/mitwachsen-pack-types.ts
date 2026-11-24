@@ -50,14 +50,17 @@ export type Kessel = {
  * des Glockenspiels klingt mit seiner Tonhöhe `note`, 0 tief. Höhlenwelt: eine Kristallsäule des Säulen-Glockenspiels
  * klingt mit ihrem Ton `note`, 0 = C5, `perch`: Sitzplatz im Kristallbogen nahe der Säule, an dem gerade eine Fledermaus
  * hängt (die verschlafene Fledermaus, die nach je vier Tönen eine Runde dreht), keiner: fehlt; der Grottenolm taucht am
- * Ende des Stegs auf (x, y: die Planke); die Figur nimmt die Kristall-Laterne von ihrem Sockel (x, y: der Sockel))
+ * Ende des Stegs auf (x, y: die Planke); die Figur nimmt die Kristall-Laterne von ihrem Sockel (x, y: der Sockel);
+ * Hau-ruck am Höhlentor: das Hau-ruck beginnt (`n` 0) bzw. ein Stoß rollt den Stein (`n` 1 bis 3; x, y: Mitte der Tür;
+ * `who`: Tok, er lehnt sich mit an den Stein))
  */
 export type PackEvent =
   | { type: 'snowman'; x: number; y: number; stage: number }
   | { type: 'icicle'; x: number; y: number; note: number }
   | { type: 'column'; x: number; y: number; note: number; perch?: Point }
   | { type: 'olm'; x: number; y: number }
-  | { type: 'lantern'; x: number; y: number };
+  | { type: 'lantern'; x: number; y: number }
+  | { type: 'heave'; x: number; y: number; n: number; who?: string };
 
 /**
  * Was die Regeln einer Welt vom Zustand sehen und ändern dürfen: den gespeicherten Zustand der Welt-Pakete (`packs`, je
@@ -141,6 +144,8 @@ export type RideEvent = {
  * aller Fahrzeuge (Paket der Fahrzeuge; `RideEngine` in mitwachsen-rider.ts, hier nur als Parameter, weil die Welt diese
  * Datei kennt). `vehicle`: das Fahrzeug einer Welt (Eis-Welt: der Schlitten, Bahn: der Zug; `Vehicle`, ebenso). `herald`:
  * Regeln des Boten einer Welt (Paket der Bahn: Tok; `HeraldRules` in mitwachsen-herald.ts, ebenso nur als Parameter).
+ * `ritual`: das Ritual am Tor dieser Welt, das ihr Bote aufschließt, in derselben Form (Höhlenwelt: Hau-ruck mit Tok,
+ * worlds/hoehle/mitwachsen-heave.ts; Tok selbst kommt aus dem Paket der Bahn).
  */
 export type WorldRules<Ride = never, Herald = never, Vehicle = never> = {
   bump(
@@ -153,6 +158,7 @@ export type WorldRules<Ride = never, Herald = never, Vehicle = never> = {
   ): boolean;
   ride?: Ride;
   herald?: Herald;
+  ritual?: Herald;
   vehicle?: Vehicle;
 };
 

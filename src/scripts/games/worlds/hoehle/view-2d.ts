@@ -6,8 +6,10 @@
 // Grotte: Töne des Säulen-Glockenspiels und „blubb“ des Grottenolms (`score`), „plink“ der Tropfsteine (`ambient`) und
 // in der Luft Tropfen, Grottenolm und die Fledermaus auf ihrer Runde (`sky.weather`, mitwachsen-cave-sky.ts). Licht der
 // Grotte (mitwachsen-glow.ts): Schatten der Ränder auf Boden und Wand (`ground`), der Lichtkreis um die Figur in der
-// Luft; die Kristall-Laterne auf ihrem Sockel als Körper (`bodies`) und ihr Ton beim Nehmen (mitwachsen-lantern.ts). Wetter
-// gibt es in der Grotte keins, Polarlicht auch nicht, und das Höhlentor geht vorerst nie auf.
+// Luft; die Kristall-Laterne auf ihrem Sockel als Körper (`bodies`) und ihr Ton beim Nehmen (mitwachsen-lantern.ts). Das
+// Hau-ruck am Höhlentor (mitwachsen-heave-look.ts): Hände auf dem Stein, Fledermaus und Glühwürmchen als Körper, der
+// Stein in Dritteln (`ajar`), Töne der Stöße (`score`) und des Öffnens (`sky.gateScore`). Wetter gibt es in der Grotte
+// keins, Polarlicht auch nicht.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
 
 import { GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
@@ -21,6 +23,7 @@ import { Drips } from './mitwachsen-drips';
 import { Olm } from './mitwachsen-olm-look';
 import { isWall, shadowOver } from './mitwachsen-glow';
 import { lanternBodies, lanternScore } from './mitwachsen-lantern';
+import { heaveAjar, heaveBodies, heaveScore, openScore } from './mitwachsen-heave-look';
 
 /** Dinge der Grotte: Quader wie in 3D */
 const look: DrawDeco = (world, c, x, y) => caveBoxes(world, c, x, y);
@@ -101,12 +104,15 @@ export const view: View2D & { fx: CaveFx } = {
   score: (e) => {
     if (e.type === 'column') return fx.chime.ring(e.x, e.y, e.note, performance.now(), e.perch);
     if (e.type === 'olm') return fx.olm.surface(e.x, e.y, performance.now());
+    if (e.type === 'heave') return heaveScore(e.n); // Hau-ruck: Trommel, Geröll
     if (e.type !== 'lantern') return undefined; // die anderen Ereignisse gehören anderen Welten
     fx.light.since = performance.now();
     return lanternScore();
   },
-  // die Kristall-Laterne auf ihrem Sockel am Bett, solange die Figur sie nicht trägt
-  bodies: (state, world) => lanternBodies(state, world),
+  // die Kristall-Laterne auf ihrem Sockel am Bett, solange die Figur sie nicht trägt; beim Hau-ruck die Hände auf dem
+  // Stein, danach Fledermaus und Glühwürmchen
+  bodies: (state, world, at) => [...lanternBodies(state, world), ...heaveBodies(state, world, at)],
+  ajar: (state, reduced) => heaveAjar(state, reduced), // der Rollstein in Dritteln
   // die verschlafene Fledermaus auf ihrer Runde hängt solange nicht an ihrem Sitzplatz
   away: (x, y, now) => fx.chime.away(x, y, now),
   // „plink“: höchstens ein Tropfen je 2 s in der Nähe der Figur, nur an Erkundetem
@@ -121,7 +127,7 @@ export const view: View2D & { fx: CaveFx } = {
     },
     turnAlbum,
     guestAt: () => null,
-    gateScore: () => [],
+    gateScore: openScore, // Akkord, „plopp“, Lampen mit Echo, die Fledermaus zirpt
   },
   heaven: GROTTE_COLORS.heaven,
   water: GROTTE_COLORS.water, // türkis: Felsbecken, See

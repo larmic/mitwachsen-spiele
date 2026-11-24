@@ -2,7 +2,8 @@
 // werden und wann es schläft. Die Regeln des schlafenden Zugs prüft worlds/bahn/mitwachsen-train.test.ts
 import { describe, expect, it } from 'vitest';
 import type { Point } from '../../data/games/mitwachsen';
-import { BAHN_LIVE, RIDE_PRELOAD } from '../../data/games/mitwachsen-rides';
+import { BAHN_LIVE } from '../../data/games/mitwachsen-live';
+import { RIDE_PRELOAD } from '../../data/games/mitwachsen-rides';
 import { bahnWanted } from './mitwachsen-pack';
 import { dozingOf, preloadOf } from './mitwachsen-preload';
 import { withTok } from './mitwachsen-ride-save';

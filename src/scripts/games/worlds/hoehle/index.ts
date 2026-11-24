@@ -5,9 +5,11 @@
 // Säulen-Glockenspiel, Grottenolm am Steg und Tropfsteine (Regeln in mitwachsen-cave-rules.ts, Bild und Ton in
 // view-2d.ts), ihre Füllung (mitwachsen-fill.ts) und ihr Licht: Ränder im Dunkel, Lichtkreis um die Figur und die
 // Kristall-Laterne am Bett (mitwachsen-glow.ts, mitwachsen-lantern.ts; die Regel der Laterne ist Teil von `rules`). Die
-// Regeln des Sammelns stehen bei den Handgriffen im Kern (mitwachsen-chores.ts). Tok und der Zug kommen später.
-// Das Spiel braucht es vorerst nie (das Höhlentor geht nie auf); nur der Entwickler-Schalter holt es
-// (`/spielen/?entwickler=hoehle`, mitwachsen-dev.ts). Nichts außerhalb dieses Ordners importiert statisch von hier
+// Regeln des Sammelns stehen bei den Handgriffen im Kern (mitwachsen-chores.ts). Dazu das Hau-ruck am Höhlentor: Tok
+// (aus dem Paket der Bahn) und die Figur schieben den Rollstein in drei Stößen in seine Nische (`rules.ritual`,
+// mitwachsen-heave.ts; Bild und Ton in mitwachsen-heave-look.ts). Bis zum Freischalten der Bahn-Phase (`BAHN_LIVE`)
+// geht das Höhlentor nie auf und das Spiel braucht dieses Paket nie; nur der Entwickler-Schalter holt es
+// (`/spielen/?entwickler=hoehle`, mit der Bahn auch `?entwickler=bahn`, mitwachsen-dev.ts). Nichts außerhalb dieses Ordners importiert statisch von hier
 // (geprüft durch `npm run arch`): im Build `_astro/welt-hoehle.<hash>.js` (Name aus astro.config.mjs), gemessen mit
 // eigener Grenze (scripts/verify-bundles.ts). Sein 3D-Teil (view-3d.ts) kommt erst, wenn die 3D-Ansicht ihn will
 // (`view3d`): `_astro/welt-hoehle-3d.<hash>.js`, ebenfalls mit eigener Grenze.
@@ -21,6 +23,7 @@ import type { View2D } from '../../mitwachsen-view';
 import type { View3D } from '../../mitwachsen-view-3d';
 import { buildGrotte, placeGrotte } from './mitwachsen-grotte';
 import { rules } from './mitwachsen-cave-rules';
+import { HEAVE } from './mitwachsen-heave';
 import { view } from './view-2d';
 import { BAT_ROOST, CAVE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
 
@@ -29,7 +32,7 @@ export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules
   gate: 'hoehle',
   build: buildGrotte,
   place: placeGrotte,
-  rules, // Säulen-Glockenspiel, Grottenolm am Steg, Kristall-Laterne
+  rules: { ...rules, ritual: HEAVE }, // Säulen-Glockenspiel, Grottenolm am Steg, Kristall-Laterne; Hau-ruck am Höhlentor
   view,
   view3d: () => import('./view-3d').then((m) => m.view3d),
   models: CAVE_MODELS,

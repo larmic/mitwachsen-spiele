@@ -15,7 +15,7 @@ import {
   type Region,
   type RegionId,
 } from '../../data/games/mitwachsen';
-import { BAHN_LIVE } from '../../data/games/mitwachsen-rides';
+import { BAHN_LIVE } from '../../data/games/mitwachsen-live';
 import { GUIDE_GATE, pending, type Guided } from './mitwachsen-guide';
 import type { Beyond, PackId } from './mitwachsen-pack-types';
 import { startRealm, type Realms } from './mitwachsen-home';
@@ -48,7 +48,7 @@ export function needsPack(
   const realm = regionBehind(gate)?.id;
   if (s.openGates.includes(gate) || pending(s, gate)) return true;
   if (realm && s.garden.some((a) => realmOfAnimal(a.id) === realm)) return true;
-  // Nähe zählt nur an einem Tor, das aufgehen kann: Ein Tor, das nie aufgeht (das Höhlentor), lädt nichts im Vorbeigehen
+  // Nähe zählt nur an einem Tor, das aufgehen kann: Ein Tor, das nie aufgeht (das Höhlentor bis zur Bahn-Phase), lädt nichts im Vorbeigehen
   return !!keyOf(gate) && s.at.some((p) => !!p && packAt(p, gates, beyond, gate));
 }
 

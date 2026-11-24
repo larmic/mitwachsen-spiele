@@ -154,8 +154,9 @@ export function inTunnel(s: Pick<Rider, 'ride' | 'player' | 'packs' | 'openGates
 /**
  * Nach dem Aussteigen (`Vehicle.landed`): Kam der Zug am Prellbock in der Bucht an (Ausbau 1, nur bis dorthin) und
  * sitzt Tok noch im hinteren Wagen, hüpft er heraus an seinen Platz neben der Torplatte (`BESIDE`; besetzt: das nächste
- * freie Feld in der Nähe) und ist wieder ein Wesen (`guest`). Dort wartet er; wo, wird nicht gespeichert (nach dem
- * Laden sitzt er wieder im Zug)
+ * freie Feld in der Nähe) und ist wieder ein Wesen (`guest`). Dort wartet er; wo, wird nicht gespeichert: Nach dem
+ * Laden setzt ihn `backToBay` (mitwachsen-tok.ts) wieder in die Bucht (schläft die Figur, neben das Bett), solange der
+ * Zug noch nicht in die Grotte fährt
  */
 export function tokOut(s: Rider, world: World, end: End, events: RideEvents) {
   const g = world.gates.get('hoehle');

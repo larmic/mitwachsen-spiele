@@ -292,7 +292,7 @@ test(
       buffer: 'buffer',
       end: 'end',
       inBed: true,
-      open: [],
+      open: ['hoehle'], // Ausbau 2 kommt erst nach dem Hau-ruck: das Höhlentor ist offen
       built: { built: 2 },
       bahn: true,
     });
@@ -478,6 +478,68 @@ test('Spiel: Tok erscheint per Entwickler-Schalter, am Abend schlafend, speicher
   expect(loaded).toContain('eis');
   expect(loaded).not.toContain('bahn');
   expect(fetched).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+// Hau-ruck am Höhlentor per Entwickler-Schalter (`?entwickler=bahn&bau=1&bucht=1`, 2D): Die erste Fahrt ist gemacht,
+// Tok wartet neben der Torplatte; steht die Figur still auf der Platte, beginnen die Hände auf dem Stein zu leuchten,
+// ohne Druck stößt Tok allein, nach drei Stößen ist das Höhlentor offen (Stufe `offen`). Gespeichert wird im Blick
+// hinein nichts; ohne Schalter hat das Höhlentor keinen Schlüssel (Freigabe `BAHN_LIVE` aus)
+test('Spiel: Hau-ruck am Höhlentor per Entwickler-Schalter, Tok stößt allein, das Tor geht auf, ohne Fehler', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  type Game = {
+    world: {
+      gates: Map<string, { mid: [number, number]; out: [number, number] }>;
+      cell(x: number, y: number): { plate?: string };
+    };
+    state: {
+      tick: number;
+      player: { x: number; y: number; dir: string };
+      openGates: string[];
+      animals: { id: string; x: number; y: number }[];
+      packs: Record<string, unknown>;
+      heave?: { n: number };
+    };
+    rides: { id: string }[];
+    fog: { reveal(x: number, y: number, r: number): void };
+    apply(cmd: { type: 'move'; dir: string }): void;
+  };
+  const game = await openGame(page, { clock: true, dev: 'bahn&bau=1&bucht=1' });
+  await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+  await ticks(page, 2);
+  // Figur auf die Mitte der Torplatte, Tok auf seinen Platz daneben (u +2), wie nach dem Weg in die Bucht
+  await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const { mid, out } = el.world.gates.get('hoehle')!;
+    const row = (u: number): [number, number] => [mid[0] - out[0] * 2 - out[1] * u, mid[1] - out[1] * 2 + out[0] * u];
+    const [px, py] = row(0);
+    const [tx, ty] = row(2);
+    const animals = el.state.animals.map((a) => (a.id === 'hoehle:tok' ? { ...a, x: tx, y: ty } : a));
+    el.state = { ...el.state, animals, player: { x: px, y: py, dir: 'n' } };
+    el.fog.reveal(px, py, 10);
+  });
+  await ticks(page, 4 + 40); // Stehen, Vorspiel (höchstens 3,5 s), dann rollt der Stein
+  await render(page, 2);
+  const pushing = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    return {
+      plate: el.world.cell(el.state.player.x, el.state.player.y).plate,
+      heave: !!el.state.heave,
+      hands: el.rides.some((r) => r.id === 'heave:hands'),
+    };
+  });
+  expect(pushing).toEqual({ plate: 'hoehle', heave: true, hands: true });
+  await ticks(page, 3 * 15 + 31); // drei Stöße von Tok, dann 3 s bis zum Ende
+  await render(page, 2);
+  const open = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    return { open: el.state.openGates, heave: !!el.state.heave, fahrt: el.state.packs.fahrt };
+  });
+  expect(open).toEqual({ open: ['hoehle'], heave: false, fahrt: { hoehle: { stage: 'offen', gefahren: true } } });
+  await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual([]);
   expect(errors).toEqual([]);
 });
 

@@ -43,6 +43,17 @@ export const PACE = { lead: 2, chase: 2 };
 // hinter das Tor (2,4 s); so lange dauert das Ritual, in dem jeder Pfeil die Figur nur hüpfen lässt (3 s, in jeder Lage)
 export const SLIDE = 24;
 export const RITUAL = 30;
+/**
+ * Hau-ruck am Tor eines Boten aus einem anderen Paket (Höhlentor mit Tok, worlds/hoehle/mitwachsen-heave.ts; nicht
+ * gespeichert): das Tor, wie viele Stöße schon (0 … 3) und der Takt des letzten Stoßes (vor dem ersten: Ende des
+ * Vorspiels, in dem die Kamera zur Front dreht). Nach dem dritten Stoß ist das Tor offen; `HEAVE_END` Takte danach ist
+ * es vorbei (Stein in der Nische, Lampen, Fledermaus, Toks Freude), solange hüpft die Figur nur
+ */
+export type Heave = { gate: GateId; n: number; at: number };
+export const HEAVE_END = 30;
+/** Takte, bis das Hau-ruck vorbei ist: bis zum dritten Stoß unbestimmt (Infinity); undefined, wenn keins läuft */
+export const heaveLeft = (s: { tick: number; heave?: Heave }): number | undefined =>
+  !s.heave ? undefined : s.heave.n < 3 ? Infinity : Math.max(0, s.heave.at + HEAVE_END - s.tick);
 
 export type GuideEvent =
   | { type: 'guide'; id: string; species: SpeciesId; x: number; y: number } // taucht neben der Figur auf
@@ -78,6 +89,7 @@ export type Guided = Omit<Crowd, 'player' | 'animals' | 'openGates'> & {
   day: number;
   calm: number; // Tag, an dem der Pinguin eingezogen ist: an ihm kein Pustewind
   ritual: number; // Takt, an dem das Ritual am Eistor beginnt, nach dem Vorspiel (-1: noch nicht)
+  heave?: Heave; // Hau-ruck am Tor eines Boten (Höhlentor mit Tok), solange es läuft (nicht gespeichert)
   still: number; // Takte, die die Figur schon auf demselben Feld steht (jeder Schritt: 0; nicht gespeichert)
   // Takt, ab dem er auftaucht; ist er da, der Takt seines Auftauchens, solange er erst zur Figur watschelt (-1: weder
   // fällig noch unterwegs zur Figur; nicht gespeichert)
@@ -174,28 +186,34 @@ const ripe = (s: Pick<Guided, 'still' | 'tick'>, last: number) =>
  */
 export const hint = (s: Guided, world: World, last: number): SpeciesId | undefined => {
   const gate = world.cell(s.player.x, s.player.y).plate;
-  return gate && ripe(s, last) && keyed(s.openGates, gate) && s.guideDue < 0 && !leader(s)
+  return gate === GUIDE_GATE && ripe(s, last) && keyed(s.openGates, gate) && s.guideDue < 0 && !leader(s)
     ? missing(s, gate)
     : undefined;
 };
 /**
- * „Noch nicht“ an einem Tor, das nie aufgeht (`opens: 'never'`, rein, ändert nichts, öffnet nichts): Steht die Figur
- * seit `HINT_AFTER` Takten auf seiner Torplatte, zeigt es freundlich das Zeichen seiner Welt, getaktet wie am Eistor (je
- * Stehen einmal, höchstens alle `HINT_EVERY` Takte; `last` wie bei `hint`). Keine Bedingung, kein Tier: Es fehlt
- * nichts, was das Kind tun könnte. Liefert das Tor, sonst undefined; Bild und Ton macht mitwachsen-hint-look.ts
+ * „Noch nicht“ an jedem anderen Tor, solange es zu ist (rein, ändert nichts, öffnet nichts): an denen, die nie aufgehen
+ * (`opens: 'never'`), und am Tor eines Boten aus einem anderen Paket (Höhlentor, Tok), solange kein Hau-ruck läuft
+ * (`heave`). Steht die Figur seit `HINT_AFTER` Takten auf seiner Torplatte, zeigt es freundlich das Zeichen seiner Welt
+ * (oder den fehlenden Schritt, `View2D.lacks`), getaktet wie am Eistor (je Stehen einmal, höchstens alle `HINT_EVERY`
+ * Takte; `last` wie bei `hint`). Das Eistor hat sein eigenes „noch nicht“ (`hint`). Liefert das Tor, sonst undefined;
+ * Bild und Ton macht mitwachsen-hint-look.ts
  */
 export const nope = (s: Guided, world: World, last: number): GateId | undefined => {
   const id = world.cell(s.player.x, s.player.y).plate;
-  return ripe(s, last) && GATES.some((g) => g.id === id && g.opens === 'never') ? id : undefined;
+  return id && id !== GUIDE_GATE && !s.openGates.includes(id) && !s.heave && ripe(s, last) ? id : undefined;
 };
 
 /**
  * Braucht es die Regeln des Boten eines Tors (beim Eistor der Pinguin, worlds/eis/mitwachsen-lead.ts)? Solange er
- * fällig ist und nach dem Öffnen, bis er auf der Wiese seiner Gegend wohnt (beim Pinguin die Schneewiese)
+ * fällig ist und nach dem Öffnen, bis er auf der Wiese seiner Gegend wohnt (beim Pinguin die Schneewiese). Fällig nach
+ * der vollen Leiste wird nur der Pinguin; wann Tok kommt, regelt sein Paket (worlds/bahn/mitwachsen-tok.ts)
  */
 export const pending = (s: Pick<Guided, 'openGates' | 'garden'>, gate: GateId = GUIDE_GATE): boolean => {
   const id = keyAnimal(gate);
-  return wanted(s, gate) || (!!id && s.openGates.includes(gate) && !s.garden.some((p) => p.id === id));
+  return (
+    (gate === GUIDE_GATE && wanted(s, gate)) ||
+    (!!id && s.openGates.includes(gate) && !s.garden.some((p) => p.id === id))
+  );
 };
 
 /** Der Pinguin, wenn er da ist: Er führt zum Tor bzw. ist nach dem Öffnen auf dem Weg zum Schneebett */

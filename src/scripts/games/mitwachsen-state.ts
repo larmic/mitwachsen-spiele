@@ -7,8 +7,8 @@ import { chunkOf } from '../../lib/games/chunks';
 import { DIRS, type Dir } from '../../lib/games/front';
 import { cycle, nextRandom, pick } from '../../lib/games/rng';
 import {
-  GATES,
   REGIONS,
+  keyOf,
   realmOfAnimal,
   regionAnimalList,
   type GateId,
@@ -30,7 +30,7 @@ import { PENGUIN, atHome, meadowSpots, shelterPlaces, slipPast, windOk, type Hom
 import { comesHome, homeward, ownSpot, walkHome } from './mitwachsen-arrive';
 import { dirTo, freeNear, occupied } from './mitwachsen-free';
 import { crossBorder, type BorderEvent, type Mode } from './mitwachsen-border';
-import { lost, type GuideEvent, type GuideRules } from './mitwachsen-guide';
+import { lost, type GuideEvent, type GuideRules, type Heave } from './mitwachsen-guide';
 import type { PackEvent, Ride, RideEvent, WorldRules } from './mitwachsen-pack-types';
 import type { MoveCmd, RideEngine, RideRules, Vehicle } from './mitwachsen-rider';
 import type { RideId } from '../../data/games/mitwachsen-rides';
@@ -82,6 +82,7 @@ export type State = Omit<Progress, 'position'> & {
   calm: number; // Tag, an dem der Pinguin auf die Schneewiese gezogen ist: an ihm weht kein Pustewind (nicht gespeichert)
   guideDue: number; // verlaufener Pinguin: Takt, ab dem er auftaucht bzw. aufgetaucht ist (nicht gespeichert, mitwachsen-guide.ts)
   ritual: number; // Takt, an dem das Ritual am Eistor beginnt, nach dem Vorspiel (-1: noch nicht; nicht gespeichert, worlds/eis/mitwachsen-ritual.ts)
+  heave?: Heave; // Hau-ruck am Höhlentor mit Tok, solange es läuft (nicht gespeichert: ein halb geschobener Stein bleibt zu, worlds/hoehle/mitwachsen-heave.ts)
   still: number; // Takte, die die Figur auf demselben Feld steht: jeder Schritt setzt ihn auf 0 (nicht gespeichert; Torplatte)
   held?: readonly [number, number]; // gespeicherte Position, solange ein Welt-Paket fehlt: bleibt im Spielstand (Abschnitt „Welt-Pakete“)
   ride?: Ride; // laufende Fahrt mit einem Fahrzeug (nicht gespeichert; Regeln aus dem Welt-Paket, `WorldRules.ride`)
@@ -176,8 +177,8 @@ const settle = (id: string, species: SpeciesId, [x, y]: Point, mode: Mode, home:
 
 export function initialState(world: World, saved: Partial<Progress> = {}, rngSeed = 1): State {
   const garden = saved.garden ?? [];
-  // Nur Tore, die überhaupt aufgehen können, bleiben aus dem Spielstand offen
-  const open = (saved.openGates ?? []).filter((id) => GATES.some((g) => g.id === id && g.opens !== 'never'));
+  // Nur Tore, die überhaupt aufgehen können, bleiben aus dem Spielstand offen (das Höhlentor erst mit der Bahn-Phase)
+  const open = (saved.openGates ?? []).filter((id) => !!keyOf(id));
   const animals = placeAnimals(world, open, garden, new Set());
   const [bx, by] = world.homes[wakeRealm(world, open, saved.position, beyondRing)].bed;
   const s: State = {

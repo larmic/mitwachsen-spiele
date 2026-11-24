@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEV_BAY,
   DEV_BUILT,
   DEV_EVENING,
   DEV_PARAM,
@@ -12,7 +13,8 @@ import {
 import type { Progress } from './mitwachsen-state';
 import { PACK_IDS } from './mitwachsen-packs';
 import type { PackId } from './mitwachsen-pack-types';
-import { REGIONS } from '../../data/games/mitwachsen';
+import { GATES, REGIONS, keyOf } from '../../data/games/mitwachsen';
+import { BAHN_LIVE, tryBahn } from '../../data/games/mitwachsen-live';
 import { full } from './mitwachsen-guide';
 
 describe('Entwickler-Schalter', () => {
@@ -67,6 +69,14 @@ describe('Entwickler-Schalter', () => {
       ...saved,
       packs: { ...saved.packs, bahn: { built: 1 }, fahrt: { hoehle: { stage: 'bereit' } } },
     }); // der Zug steht am Bahnhof (Stufe `bereit` wie nach Bau 1), sonst bleibt alles
+    // Ausbau 2 kommt erst nach dem Hau-ruck: das Höhlentor offen, Stufe `offen`
+    expect(devProgress(['bahn'], '?entwickler=bahn', saved)).toEqual({
+      ...saved,
+      openGates: [...saved.openGates, 'hoehle'],
+      packs: { ...saved.packs, bahn: { built: 2 }, fahrt: { hoehle: { stage: 'offen' } } },
+    });
+    // mit `&vorladen=1` bleibt es zu (die Grotte kommt erst über das Vorladen am Halt, nicht mit dem offenen Tor)
+    expect(devProgress(['bahn'], '?entwickler=bahn&vorladen=1', saved).openGates).toEqual(saved.openGates);
     const further = { ...saved, packs: { fahrt: { hoehle: { stage: 'fest' }, schlitten: { stage: 'fest' } } } };
     expect(devProgress(['bahn'], '?entwickler=bahn', further).packs.fahrt).toEqual(further.packs.fahrt); // schon weiter
     expect(devProgress(['hoehle'], '?entwickler=hoehle&bau=1', saved)).toBe(saved); // ohne Bahn nichts
@@ -134,9 +144,27 @@ describe('Entwickler-Schalter', () => {
     ]); // der echte Speicher bleibt, wie er war
   });
 
-  it('Höhlenpaket und Bahn gibt es (Lader), das Höhlentor geht trotzdem nie auf', async () => {
+  it('`&bucht=1` (mit `&bau=1`): die erste Fahrt ist gemacht, Tok wartet in der Bucht (zu Fuß zum Hau-ruck)', () => {
+    expect(DEV_BAY).toBe('bucht');
+    expect(devProgress(['bahn'], '?entwickler=bahn&bau=1&bucht=1', saved).packs.fahrt).toEqual({
+      hoehle: { stage: 'bereit', gefahren: true },
+    });
+    expect(devProgress(['bahn'], '?entwickler=bahn&bau=1&bucht=1', saved).openGates).toEqual(saved.openGates); // Tor zu
+  });
+
+  it('Höhlenpaket und Bahn gibt es (Lader); das Höhlentor hat seinen Schlüssel nur mit der Bahn-Phase (beide Stellungen)', () => {
     expect(PACK_IDS).toEqual(['eis', 'hoehle', 'bahn', 'fahrt']);
-    const { GATES } = await import('../../data/games/mitwachsen');
-    expect(GATES.find((g) => g.id === 'hoehle')?.opens).toBe('never');
+    expect(GATES.find((g) => g.id === 'hoehle')?.opens).toEqual({ key: 'tok', live: 'bahn' });
+    expect(BAHN_LIVE).toBe(false);
+    expect(keyOf('hoehle')).toBeUndefined(); // für das Kind geht es nie auf
+    tryBahn(); // wie die Spielseite mit `?entwickler=bahn`
+    try {
+      expect(keyOf('hoehle')).toBe('tok');
+      expect(keyOf('eis')).toBe('pinguin');
+      expect(keyOf('sand')).toBeUndefined();
+    } finally {
+      tryBahn(false);
+    }
+    expect(keyOf('hoehle')).toBeUndefined();
   });
 });
