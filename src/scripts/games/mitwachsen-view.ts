@@ -5,7 +5,8 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
 import { box, type Projection } from '../../lib/games/front';
-import type { RegionId } from '../../data/games/mitwachsen';
+import type { GateId, RegionId, SpeciesId } from '../../data/games/mitwachsen';
+import type { HeraldEvent } from './mitwachsen-herald';
 import type { Deco } from './mitwachsen-cell';
 import type { PackEvent, RideEvent } from './mitwachsen-pack-types';
 import type { RideAt, RideBody, RideFx } from './mitwachsen-ride-view';
@@ -193,6 +194,13 @@ export type View2D = {
   bodies?(state: State, world: World, at: RideAt): readonly RideBody[];
   marks?(state: State, world: World): readonly Box[];
   rideFx?(e: RideEvent, state: State): RideFx;
+  /** Bote dieser Welt (Bahn: Tok, worlds/bahn/mitwachsen-tok-look.ts): Ton, Hüpfer, Herz und Funken zu seinen Ereignissen */
+  heraldFx?(e: HeraldEvent, state: State): RideFx;
+  /**
+   * Was dem Tor `gate` als nächster Schritt fehlt, wenn es eines ist, das nie aufgeht (Bahn: am Höhlentor Tok, solange
+   * nichts gebaut ist): „noch nicht“ zeigt dann seinen Umriss statt des Zeichens der Welt (mitwachsen-hint-look.ts)
+   */
+  lacks?(state: State, gate: GateId): SpeciesId | undefined;
 };
 
 /** Deko-Arten, die nur ein Welt-Paket zeichnet: Ohne seine Zeichnung steht dort ein einfacher Block */

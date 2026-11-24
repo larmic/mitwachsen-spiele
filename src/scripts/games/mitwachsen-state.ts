@@ -33,6 +33,7 @@ import { crossBorder, type BorderEvent, type Mode } from './mitwachsen-border';
 import { lost, type GuideEvent, type GuideRules } from './mitwachsen-guide';
 import type { PackEvent, Ride, RideEvent, WorldRules } from './mitwachsen-pack-types';
 import type { MoveCmd, RideRules } from './mitwachsen-rider';
+import { hooksOf, type HeraldEvent, type HeraldRules } from './mitwachsen-herald';
 import { listen } from './mitwachsen-listen';
 import { roostAt } from './mitwachsen-roost';
 
@@ -54,6 +55,7 @@ export type Animal = {
   realm: RegionId; // Gegend, zu der das Tier gehört: Zu Hause ist es nur auf der Wiese ihres Betts
   spawn: readonly [number, number];
   rest: number; // Takte bis zum nächsten Schritt beim Umherlaufen
+  nap?: true; // ein Bote schläft (Tok, am Abend gekommen; mitwachsen-herald.ts)
 };
 export type HomeAnimal = { id: string; species: SpeciesId };
 
@@ -81,6 +83,8 @@ export type State = Omit<Progress, 'position'> & {
   held?: readonly [number, number]; // gespeicherte Position, solange ein Welt-Paket fehlt: bleibt im Spielstand (Abschnitt „Welt-Pakete“)
   ride?: Ride; // laufende Fahrt mit einem Fahrzeug (nicht gespeichert; Regeln aus dem Welt-Paket, `WorldRules.ride`)
   rideDue: number; // Takt, ab dem das Fahrzeug erscheint, danach: herbeigetrabt bzw. angestoßen (-1: nie; nicht gespeichert)
+  heraldDue: number; // Bote einer Welt (Tok): Takt, ab dem er auftaucht bzw. aufgetaucht ist (-1: nicht fällig; nicht gespeichert, mitwachsen-herald.ts)
+  late: boolean; // Abend: Die Uhr des Kinds hat `BED_AT` erreicht (die Komponente setzt es, mitwachsen-tired.ts; nicht gespeichert)
 };
 
 /** Was gespeichert wird (und im Zustand steht, bis auf die Position: die hat die Figur) */
@@ -118,6 +122,7 @@ export type GameEvent =
   | GuideEvent // der verlaufene Pinguin taucht auf und piept (mitwachsen-guide.ts)
   | PackEvent // Regeln einer Welt aus ihrem Paket: Schneehaufen wächst, Eiszapfen klingt (mitwachsen-pack-types.ts)
   | RideEvent // Fahrzeug aus einem Welt-Paket: erscheint, einsteigen, fahren, ankommen (mitwachsen-pack-types.ts)
+  | HeraldEvent // Bote einer Welt aus ihrem Paket (Tok): taucht auf, kommt an, ruft, schläft (mitwachsen-herald.ts)
   | { type: 'call' }
   | { type: 'sleep' }
   | { type: 'wake' };
@@ -195,6 +200,8 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     ritual: -1,
     still: 0,
     rideDue: -1,
+    heraldDue: -1,
+    late: false,
     packs: { ...saved.packs }, // auch ohne Paket bleibt sein Zustand, wie er ist
   };
   // Fehlt das Paket der Welt, zu der die Position gehört (hinter einem Tor, das aufgehen kann), wüsste die Welt nicht,
@@ -270,7 +277,7 @@ export const regionAnimals = (region: RegionId): string[] =>
  * erwacht eine Portal-Plattform. Ohne Angabe gilt alles als erkundet. `guide` sind die Regeln des verlaufenen Pinguins
  * (worlds/eis/mitwachsen-lead.ts, aus dem Welt-Paket), die die Ansicht erst hereinreicht, wenn er fällig ist; ohne sie
  * taucht er nicht auf. `rules`: Regeln der Welten aus ihren geladenen Paketen (`WorldPack.rules`, Eis-Welt: Schneemänner;
- * `ride`: ein Fahrzeug, mitwachsen-rider.ts).
+ * `ride`: ein Fahrzeug, mitwachsen-rider.ts; `herald`: der Bote einer Welt, Tok, mitwachsen-herald.ts).
  */
 export function step(
   state: State,
@@ -278,7 +285,7 @@ export function step(
   cmd: Cmd,
   explored: Explored = EVERYWHERE,
   guide?: GuideRules,
-  rules: readonly { rules?: WorldRules<RideRules> }[] = [],
+  rules: readonly { rules?: WorldRules<RideRules, HeraldRules> }[] = [],
 ): Step {
   // Flache Kopie: Tiere werden beim Ändern ersetzt, nie verändert – alte Zustände bleiben gültig
   const s: State = {
@@ -297,15 +304,15 @@ export function step(
   // Stehzeit (Torplatte): Es zählen nur Takte ohne gedrückten Pfeil; jede Eingabe setzt sie auf 0, und nur Eingaben
   // versetzen die Figur (Schritt, Reise, Bett), Takte nie
   s.still = cmd.type === 'tick' && !cmd.held ? s.still + 1 : 0;
-  const ride = rules.find((r) => r.rules?.ride)?.rules?.ride; // Fahrzeug (Welt-Paket): fällig, erscheinen, fahren
+  const { ride, herald, meet } = hooksOf(rules); // aus den Paketen: Fahrzeug (fällig, erscheinen, fahren), Bote (Tok)
   if (cmd.type === 'tick') {
     tick(s, world, events, ride);
     ride?.tick(s, world, events);
   } else if (s.sleeping) {
     if (cmd.type !== 'move' || !cmd.tap) wake(s, world, events); // Antippen des Fahrzeugs weckt nicht, es steigt nur ein
-  } else if (cmd.type === 'move' && !ride?.move(s, world, cmd, events) && !guide?.hold(s, events)) {
-    // Ein Schritt (am Fahrzeug: einsteigen, anstoßen, unterwegs winken; während das Eistor aufgeht, hüpft die Figur
-    // stattdessen nur: `hold` in worlds/eis/mitwachsen-ritual.ts)
+  } else if (cmd.type === 'move' && !meet(s, world, cmd, events) && !guide?.hold(s, events)) {
+    // Ein Schritt (am Fahrzeug: einsteigen, anstoßen, unterwegs winken; in den schlafenden Boten: Er schnarcht; während
+    // das Eistor aufgeht, hüpft die Figur stattdessen nur: `hold` in worlds/eis/mitwachsen-ritual.ts)
     const from: Point = [s.player.x, s.player.y];
     move(s, world, cmd.dir, events, rules);
     guide?.meetGuide(s, world, events); // in den führenden Pinguin gelaufen: Er hüpft voraus oder tauscht den Platz
@@ -317,6 +324,7 @@ export function step(
   } else if (cmd.type === 'action' && !s.ride) action(s, world, events); // im Fahrzeug: kein Singen, kein Schlafen
   wakePortals(s, world, explored, events); // Portal-Plattformen in der Nähe erwachen (mitwachsen-travel.ts)
   guide?.guide(s, world, cmd.type, events, explored); // der verlaufene Pinguin taucht auf und führt
+  herald.step(s, world, cmd.type, events, explored); // der Bote einer Welt (Tok) taucht auf und wartet
   keepLamp(s, world);
   return { state: s, events };
 }
@@ -436,7 +444,7 @@ function move(
   world: World,
   dir: Dir,
   events: GameEvent[],
-  packs: readonly { rules?: WorldRules<unknown> }[],
+  packs: readonly { rules?: WorldRules<unknown, unknown> }[],
 ) {
   const p = s.player;
   p.dir = dir;

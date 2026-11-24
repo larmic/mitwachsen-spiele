@@ -271,6 +271,19 @@ describe('„Noch nicht“ an den Toren, die nie aufgehen: das Zeichen ihrer Wel
     const eis = plateMid(world.gates.get('eis')!);
     const ice = { ...on(900, 300), player: { x: eis[0], y: eis[1], dir: 'n' as const } };
     expect(never()(ice, world, 30000, false, sfx)).toBeNull();
+    // fehlt einem solchen Tor ein nächster Schritt aus einem Paket (am Höhlentor Tok): dessen Umriss, die Live-Region nennt ihn
+    const cave = plateMid(world.gates.get('hoehle')!);
+    const tok = { ...on(2000, HINT_AFTER), player: { x: cave[0], y: cave[1], dir: 'n' as const } };
+    const shown = never()(tok, world, 40000, false, sfx, undefined, null, 'tok');
+    expect(shown?.id).toBe('hoehle');
+    vi.advanceTimersByTime(150);
+    expect(say.textContent).toBe('Noch nicht. Es fehlt noch: Tok');
+    const r = recorder();
+    shown!.draw!(r.ctx, world, P, 40400);
+    const signRects = recorder();
+    never()(tok, world, 40000, false, sfx)!.draw!(signRects.ctx, world, P, 40400);
+    expect(r.rects.length).toBeGreaterThan(0);
+    expect(r.rects).not.toEqual(signRects.rects); // nicht das Zeichen der Welt
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });

@@ -9,8 +9,22 @@ import type { Cell, World } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
 import { portalColor } from './mitwachsen-portal';
 import { guideGate } from './mitwachsen-guide';
+import { heraldOf } from './mitwachsen-herald';
 
 export const MAP_RADIUS = 28; // Felder vom Mittelpunkt bis zum Rand
+
+/**
+ * Wohin der Pfeil der Karte zeigt: zum Tor, solange der Pinguin führt; zu Tok, solange er wach wartet und die Figur auf
+ * der Lichtung steht (in einer anderen Gegend bleibt es beim Weg nach Hause); sonst zum Bett der Gegend der Figur
+ */
+export function arrowTo(state: State, world: World): readonly [number, number] {
+  const { x, y } = state.player;
+  const gate = [...world.gates.values()].find((g) => g.id === guideGate(state));
+  if (gate) return gate.mid;
+  const herald = heraldOf(state);
+  if (herald && !herald.nap && world.realm(x, y) === 'lichtung') return [herald.x, herald.y];
+  return homeAt(world, x, y).bed;
+}
 
 const COLORS = {
   fog: '#e4edf3',
@@ -105,13 +119,14 @@ export function drawMap(
     }
   }
 
-  // Bett der Gegend, in der die Figur steht, als Häuschen, sonst ein Pfeil am Rand dorthin (führt der Pinguin: zum Tor)
+  // Bett der Gegend, in der die Figur steht, als Häuschen, sonst ein Pfeil am Rand dorthin (führt der Pinguin: zum Tor;
+  // wartet Tok wach, der Bote der Höhlenwelt: zu ihm)
   const [bx, by] = homeAt(world, state.player.x, state.player.y).bed;
   const hx = ox + (bx + 0.5) * cell,
     hy = oy + (by + 0.5) * cell;
   const s = Math.max(5, cell * 1.6);
   const shown = (px: number, py: number) => px > s && px < size - s && py > s && py < size - s;
-  const [gx, gy] = [...world.gates.values()].find((g) => g.id === guideGate(state))?.mid ?? [bx, by];
+  const [gx, gy] = arrowTo(state, world);
   const [tx, ty] = [ox + (gx + 0.5) * cell, oy + (gy + 0.5) * cell]; // wohin der Pfeil zeigt
   if (shown(hx, hy)) {
     ctx.fillStyle = COLORS.ink;

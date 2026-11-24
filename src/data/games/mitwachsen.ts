@@ -4,7 +4,7 @@
 
 import { eyes, type Part } from '../../lib/games/front';
 import { ICE_SPECIES, type IceSpeciesId } from './mitwachsen-eis';
-import { CAVE_SPECIES, type CaveSpeciesId } from './mitwachsen-hoehle';
+import { CAVE_BEINGS, CAVE_SPECIES, type CaveBeingId, type CaveSpeciesId } from './mitwachsen-hoehle';
 import type { SpeciesOf } from './mitwachsen-species';
 
 /**
@@ -28,7 +28,7 @@ export type SpeciesId =
   | 'baer'
   | 'ziege'
   | IceSpeciesId // die Tiere der Eis-Welt stehen in mitwachsen-eis.ts
-  | CaveSpeciesId; // die Tiere der Höhlenwelt in mitwachsen-hoehle.ts
+  | CaveBeingId; // die Tiere der Höhlenwelt in mitwachsen-hoehle.ts, dazu Tok, ihr Bote (kein Tier der Leiste, `TOK_SPECIES`)
 export type GateTheme = 'eis' | 'sand' | 'wasser' | 'lava' | 'hoehle' | 'wald' | 'wolken' | 'pilze';
 export type GateId = GateTheme; // je Welt genau ein Tor
 
@@ -466,7 +466,7 @@ export const SPECIES: Record<SpeciesId, Species> = {
     ],
   },
   ...ICE_SPECIES,
-  ...CAVE_SPECIES,
+  ...CAVE_BEINGS,
 };
 
 /** Arten, die frei in der endlosen Landschaft unterwegs sind */

@@ -131,9 +131,10 @@ export type RideEvent = {
  * sobald das Paket da ist. `bump`: Die Figur läuft in das Feld (x, y) mit dem Inhalt `c`; `move` sagt, auf welchem
  * Feld sie steht (`here`), ob der Schritt ginge (`walks`) und was auf anderen Feldern ist (`cell`). true, wenn der Zug damit erledigt ist (sie bleibt stehen),
  * sonst geht es weiter wie immer (auch nach einem Ereignis, etwa dem Ton eines Eiszapfens). `ride`: Regeln eines
- * Fahrzeugs (`RideRules` in mitwachsen-rider.ts; hier nur als Parameter, weil die Welt diese Datei kennt).
+ * Fahrzeugs (`RideRules` in mitwachsen-rider.ts; hier nur als Parameter, weil die Welt diese Datei kennt). `herald`: Regeln
+ * des Boten einer Welt (Paket der Bahn: Tok; `HeraldRules` in mitwachsen-herald.ts, ebenso nur als Parameter).
  */
-export type WorldRules<Ride = never> = {
+export type WorldRules<Ride = never, Herald = never> = {
   bump(
     s: Ruled,
     c: Cell,
@@ -143,6 +144,7 @@ export type WorldRules<Ride = never> = {
     move: { here: Cell; walks: boolean; cell: (x: number, y: number) => Cell },
   ): boolean;
   ride?: Ride;
+  herald?: Herald;
 };
 
 /** Liegt ein Feld ganz hinter dem Felsring der Lichtung? */
@@ -175,9 +177,11 @@ export type Laid = {
  * lädt ihren 3D-Teil nach (`View3D` aus mitwachsen-view-3d.ts; braucht Three.js, darum ein eigener `import()`, erst wenn
  * die 3D-Ansicht da ist). `models`: Modelle der Tiere dieser Welt (`addModels`), `roosts` ihre Ruhehaltungen (Höhlenwelt:
  * die Fledermaus kopfüber, `Species.roost`). `rules`: Regeln, die nur in dieser
- * Welt gelten (Eis-Welt: Schneehaufen wachsen zu Schneemännern, `ride`: Fahrzeug), `step` hereingereicht.
+ * Welt gelten (Eis-Welt: Schneehaufen wachsen zu Schneemännern, `ride`: Fahrzeug; Bahn: `herald`, Tok), `step` hereingereicht.
+ * `dawn`: Ein neuer echter Spieltag beginnt (mehr als `BREAK` Pause, mitwachsen-tired.ts): neuer Zustand der Pakete (Bahn:
+ * Tok, der am Abend schlafend kam, wacht auf); die Spielseite fragt es beim Start und nach langer Pause.
  */
-export type WorldPack<Rules = unknown, View = unknown, View3 = unknown, Ride = unknown> = {
+export type WorldPack<Rules = unknown, View = unknown, View3 = unknown, Ride = unknown, Herald = unknown> = {
   id: PackId;
   gate?: GateId; // das Tor, hinter dem seine Welt liegt (`REGIONS`: `behind` der Gegend `id`); ohne eigene Welt keins
   build?(
@@ -190,7 +194,8 @@ export type WorldPack<Rules = unknown, View = unknown, View3 = unknown, Ride = u
   place?(seed: number, gang: Gang, beyond: Beyond): KesselPlace;
   lay?(laid: Laid): void;
   lead?: Rules;
-  rules?: WorldRules<Ride>;
+  rules?: WorldRules<Ride, Herald>;
+  dawn?(packs: Readonly<Record<string, unknown>>): Record<string, unknown>;
   view?: View;
   view3d?: () => Promise<View3>;
   models?: Partial<Record<SpeciesId, readonly Part[]>>;

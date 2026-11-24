@@ -11,12 +11,20 @@ import type { GuideRules, Hint } from './mitwachsen-guide';
 import { bahnWanted, needsPack, type Need } from './mitwachsen-pack';
 import type { PackId, WorldPack } from './mitwachsen-pack-types';
 import type { RideRules } from './mitwachsen-rider';
+import type { HeraldRules } from './mitwachsen-herald';
 import type { View2D } from './mitwachsen-view';
 import type { View3D } from './mitwachsen-view-3d';
 import { beyondRing } from './mitwachsen-world';
 
 /** Ein geladenes Welt-Paket mit den Regeln und Zeichenteilen, die es der Ansicht mitbringt (3D-Teil auf Abruf) */
-export type LoadedPack = WorldPack<GuideRules, View2D, View3D, RideRules>;
+export type LoadedPack = WorldPack<GuideRules, View2D, View3D, RideRules, HeraldRules>;
+
+/**
+ * Ein neuer echter Spieltag (mehr als `BREAK` Pause, mitwachsen-tired.ts): Zustand der Pakete nach den Haken `dawn` der
+ * geladenen Pakete (Bahn: Tok, der am Abend schlafend kam, wacht auf); ohne Haken bleibt er, wie er ist
+ */
+export const dawnOf = (packs: readonly Pick<LoadedPack, 'dawn'>[], saved: Record<string, unknown>) =>
+  packs.reduce((p, pack) => pack.dawn?.(p) ?? p, saved);
 
 /** So lange wartet der Start höchstens auf ein Paket, das die Welt gleich braucht; dann geht es ohne los */
 export const PACK_WAIT_MS = 4000;

@@ -166,3 +166,25 @@ const eaters = (food: 'pilze' | 'tropfmoos'): ReadonlySet<string> =>
 export const SHROOM_EATERS = eaters('pilze');
 /** Moosfresser: Wird der Steintrog gefüllt, naschen sie am frischen Tropfmoos an seinem Rand (Schnapp-Hüpfer) */
 export const MOSS_EATERS = eaters('tropfmoos');
+
+/**
+ * Tok, der Gleisbauer: der Bote der Höhlenwelt (ein Gast wie der verlaufene Pinguin, kein Tier der Leiste). Der Kern
+ * kennt Name, Ton und Gangart, damit er singt, hüpft und in der Leiste als Gast steht; sein Modell (0,8-mal so groß wie
+ * die Figur, roter Helm mit Lampe, Maulwurf obendrauf, Spitzhacke über der Schulter) bringt das Paket der Bahn mit
+ * (`TOK_MODEL` in worlds/bahn/mitwachsen-tok-model.ts, eingetragen mit `addModels`). Ruf „Ju-hu“: E4–G4–E4 im Rechteck,
+ * wie der Pinguin, aber erkennbar jemand anderes. Den Namen hört man nie im Spiel, nur die Live-Region sagt ihn
+ */
+export const TOK_SPECIES: { tok: SpeciesOf<'tok'> } = {
+  tok: {
+    id: 'tok',
+    name: 'Tok',
+    scale: 1, // das Modell hat schon seine Größe
+    gait: 'huepfen',
+    tone: { notes: [329.63, 392, 329.63], wave: 'square', len: 0.09, gap: 0.03, gain: 0.05 },
+    parts: [], // Modell aus dem Paket der Bahn (TOK_MODEL)
+  },
+};
+
+/** Die Arten der Höhlenwelt samt Tok, ihrem Boten (für `SPECIES`, `SpeciesId`) */
+export type CaveBeingId = CaveSpeciesId | 'tok';
+export const CAVE_BEINGS: { [K in CaveBeingId]: SpeciesOf<K> } = { ...CAVE_SPECIES, ...TOK_SPECIES };

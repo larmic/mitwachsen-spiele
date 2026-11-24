@@ -1,7 +1,8 @@
 // Leiste unten: die Tiere der Gegend, in der die Figur steht. Ist das Eistor offen (es gibt dann zwei Gegenden), steht
 // links ihr Zeichen, und beim Wechsel an der Gangmitte klappt die Leiste um; beides kommt mit dem Bild der Weltgrenze
 // (worlds/eis/mitwachsen-border-view.ts) aus dem Welt-Paket der Eis-Welt. Führt der verlaufene Pinguin die Figur zum Eistor,
-// hat er auf der Lichtung einen Gast-Platz mit Schneeflocke. Gleich für 2D und die Ebene über 3D.
+// hat er auf der Lichtung einen Gast-Platz mit Schneeflocke; ebenso Tok, der Bote der Höhlenwelt, solange er auf der
+// Lichtung wartet (mit Helm, mitwachsen-herald.ts). Gleich für 2D und die Ebene über 3D.
 // Spezifikation: docs/specs/mitwachsen.md („Was angezeigt wird“, Leiste unten)
 
 import { TILE_W, drawModel, projection } from '../../lib/games/front';
@@ -17,6 +18,7 @@ import {
 } from '../../data/games/mitwachsen';
 import { ASK, HEART, sprite } from './mitwachsen-glyphs';
 import { guideGate, leader } from './mitwachsen-guide';
+import { heraldOf } from './mitwachsen-herald';
 import type { State } from './mitwachsen-state';
 import type { Sky, Turn } from './mitwachsen-view';
 
@@ -93,8 +95,10 @@ export function slots(state: State, realm: RegionId): Slot[][] {
     );
   // Gast: der verlaufene Pinguin, solange er die Figur zum Eistor führt (er gehört in die Eis-Welt; nach dem Öffnen nicht),
   // in der Leiste der Gegend, in der sein Tor steht
+  // Ebenso Tok, der Bote der Höhlenwelt, solange er da ist (Gast mit Helm), in der Leiste der Lichtung
   const gate = guideGate(state);
-  const guest = gate && GATES.some((g) => g.id === gate && g.region === realm) ? leader(state) : undefined;
+  const herald = realm === 'lichtung' ? heraldOf(state) : undefined;
+  const guest = gate && GATES.some((g) => g.id === gate && g.region === realm) ? leader(state) : herald;
   if (guest)
     groups.push([
       {

@@ -14,6 +14,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Welt-Pakete“ und „Die Kristallgrotte“)
 
 import type { GuideRules } from '../../mitwachsen-guide';
+import type { HeraldRules } from '../../mitwachsen-herald';
 import type { WorldPack } from '../../mitwachsen-pack-types';
 import type { RideRules } from '../../mitwachsen-rider';
 import type { View2D } from '../../mitwachsen-view';
@@ -23,7 +24,7 @@ import { rules } from './mitwachsen-cave-rules';
 import { view } from './view-2d';
 import { BAT_ROOST, CAVE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
 
-export const pack: WorldPack<GuideRules, View2D, View3D, RideRules> = {
+export const pack: WorldPack<GuideRules, View2D, View3D, RideRules, HeraldRules> = {
   id: 'hoehle',
   gate: 'hoehle',
   build: buildGrotte,

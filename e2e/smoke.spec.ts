@@ -9,6 +9,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { SCALE } from '../src/scripts/games/worlds/eis/mitwachsen-chime-look';
 import { needsBlink } from '../src/scripts/games/mitwachsen-turn';
 import { GROTTE, GROTTE_COLORS } from '../src/data/games/worlds/hoehle/mitwachsen-grotte';
+import { REGIONS, animalId } from '../src/data/games/mitwachsen';
 import {
   FRAME_MS,
   arrive,
@@ -392,6 +393,91 @@ test('Spiel: Kristall-Laterne in der Grotte per Entwickler-Schalter, Lichtkreis 
   });
   await render(page, 2);
   expect(await look()).toEqual({ circle: null, lamp: null, onPost: true, sleeping: true });
+  expect(errors).toEqual([]);
+});
+
+// Tok erscheint per Entwickler-Schalter (`?entwickler=bahn&bau=0`, 2D): Der Schalter spielt den Stand vor, in dem er
+// kommt (Eistor offen, Eis-Leiste voll, erste Heimfahrt mit dem Schlitten); beim Aufwachen im Bett der Lichtung hüpft
+// er neben der Figur heraus, wird gezeichnet und hat einen Gast-Platz; am Abend (`&abend=1`) liegt er schlafend neben
+// dem Bett. Gespeichert wird nichts; ohne Schalter gibt es ihn nicht (Freigabe `BAHN_LIVE` aus), auch nicht in einem
+// Spielstand, in dem alles für ihn gilt: Das Paket der Bahn wird nie geholt
+test('Spiel: Tok erscheint per Entwickler-Schalter, am Abend schlafend, speichert nichts, ohne Fehler', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  type Game = {
+    world: { homes: Record<string, { bed: [number, number] }> };
+    state: {
+      openGates: string[];
+      animals: { id: string; mode: string; x: number; y: number; nap?: true }[];
+      packs: Record<string, unknown>;
+    };
+    bodies: Map<string, unknown>;
+    apply(cmd: { type: 'move'; dir: string }): void;
+  };
+  const tok = (game: Locator) =>
+    game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const t = el.state.animals.find((a) => a.id === 'hoehle:tok');
+      const [bx, by] = el.world.homes.lichtung!.bed;
+      return {
+        mode: t?.mode ?? null,
+        nap: !!t?.nap,
+        near: !!t && Math.max(Math.abs(t.x - bx), Math.abs(t.y - by)) <= 12,
+        drawn: el.bodies.has('hoehle:tok'),
+        open: el.state.openGates,
+        fahrt: el.state.packs.fahrt,
+      };
+    });
+  const wake = (game: Locator) => game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' }));
+  const game = await openGame(page, { clock: true, dev: 'bahn&bau=0' });
+  await wake(game);
+  await ticks(page, 5);
+  await render(page, 2);
+  expect(await tok(game)).toEqual({
+    mode: 'herald',
+    nap: false,
+    near: true,
+    drawn: true,
+    open: ['eis'],
+    fahrt: { schlitten: { stage: 'fest' }, hoehle: { stage: 'faellig' } },
+  });
+  await play(page, 3000); // er hüpft zur Figur und an seinen Platz, ruft dort
+  await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual([]);
+  // am Abend: schlafend neben dem Bett
+  const evening = await openGame(page, { clock: true, dev: 'bahn&bau=0&abend=1', info: false });
+  await wake(evening);
+  await ticks(page, 5);
+  await render(page, 2);
+  expect(await tok(evening)).toMatchObject({ mode: 'herald', nap: true, near: true, drawn: true });
+  // ohne Schalter, im Spielstand des Kindes alles, was Tok braucht (Eistor offen, Eis-Leiste voll, erste Heimfahrt mit
+  // dem Schlitten): Freigabe aus, also kein Paket der Bahn und kein Tok
+  const ice = (REGIONS.find((r) => r.id === 'eis')?.animals ?? []).map(({ species }) => ({
+    id: animalId('eis', species),
+    species,
+  }));
+  const plain = await openGame(page, { clock: true, info: false });
+  await plain.evaluate((node, garden) => {
+    const el = node as unknown as Game & { state: { garden: unknown[] }; save(): void };
+    const packs = { ...el.state.packs, fahrt: { schlitten: { stage: 'fest' } } };
+    el.state = { ...el.state, openGates: ['eis'], garden: [...el.state.garden, ...garden], packs };
+    el.save();
+  }, ice);
+  const fetched: string[] = [];
+  page.on('request', (r) => {
+    if (/\/welt-bahn/.test(new URL(r.url()).pathname)) fetched.push(r.url());
+  });
+  await reloadGame(page);
+  await wake(plain);
+  await ticks(page, 30);
+  expect(await tok(plain)).toMatchObject({ mode: null, open: ['eis'], fahrt: { schlitten: { stage: 'fest' } } });
+  const loaded = await plain.evaluate((node) =>
+    (node as unknown as { packs: { loaded: { id: string }[] } }).packs.loaded.map((p) => p.id),
+  );
+  expect(loaded).toContain('eis');
+  expect(loaded).not.toContain('bahn');
+  expect(fetched).toEqual([]);
   expect(errors).toEqual([]);
 });
 

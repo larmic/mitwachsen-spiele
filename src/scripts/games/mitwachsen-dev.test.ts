@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DEV_BUILT, DEV_PARAM, devPacks, glimpse, sandbox } from './mitwachsen-dev';
+import { DEV_BUILT, DEV_EVENING, DEV_PARAM, devLate, devProgress, glimpse, sandbox } from './mitwachsen-dev';
+import type { Progress } from './mitwachsen-state';
 import { PACK_IDS } from './mitwachsen-packs';
+import type { PackId } from './mitwachsen-pack-types';
+import { REGIONS } from '../../data/games/mitwachsen';
+import { full } from './mitwachsen-guide';
 
 describe('Entwickler-Schalter', () => {
   it('blickt nur in eine Welt mit Paket, und nur über die Adresse', () => {
@@ -15,19 +19,65 @@ describe('Entwickler-Schalter', () => {
   });
 
   it('die Bahn: holt die Grotte mit, die Figur wacht im Bett der Lichtung auf (oder der zuerst genannten Welt)', () => {
-    expect(glimpse('?entwickler=bahn', PACK_IDS)).toEqual({ packs: ['bahn', 'hoehle'], home: null });
+    expect(glimpse('?entwickler=bahn', PACK_IDS)).toEqual({ packs: ['bahn', 'hoehle'], home: 'lichtung' });
     expect(glimpse('?entwickler=hoehle,bahn', PACK_IDS)).toEqual({ packs: ['hoehle', 'bahn'], home: 'hoehle' });
     expect(glimpse('?entwickler=bahn,eis', PACK_IDS)).toEqual({ packs: ['bahn', 'eis', 'hoehle'], home: 'eis' });
-    expect(glimpse('?entwickler=bahn', ['eis', 'bahn'])).toEqual({ packs: ['bahn'], home: null }); // ohne Grotte
+    expect(glimpse('?entwickler=bahn', ['eis', 'bahn'])).toEqual({ packs: ['bahn'], home: 'lichtung' }); // ohne Grotte
+    // vor Tok (`&bau=0`) braucht es die Eis-Welt: ihr Tor ist dann offen
+    expect(glimpse('?entwickler=bahn&bau=0', PACK_IDS)).toEqual({ packs: ['bahn', 'hoehle', 'eis'], home: 'lichtung' });
   });
+
+  const saved: Progress = {
+    met: [],
+    garden: [{ id: 'lichtung:hase', species: 'hase' }],
+    openGates: [],
+    portals: [],
+    position: [3, 4],
+    day: 2,
+    heard: [],
+    packs: { eis: { snowmen: 1 }, fahrt: { hoehle: { stage: 'faellig' } } },
+  };
 
   it('spielt der Bahn ihren Ausbau vor (nur im Arbeitsspeicher): 2, mit `&bau=1` nur bis zum Prellbock', () => {
     expect(DEV_BUILT).toBe('bau');
-    expect(devPacks(['bahn', 'hoehle'], '?entwickler=bahn')).toEqual({ bahn: { built: 2 } });
-    expect(devPacks(['bahn', 'hoehle'], '?entwickler=bahn&bau=1')).toEqual({ bahn: { built: 1 } });
-    expect(devPacks(['bahn'], '?entwickler=bahn&bau=7')).toEqual({ bahn: { built: 2 } });
-    expect(devPacks(['hoehle'], '?entwickler=hoehle&bau=1')).toEqual({}); // ohne Bahn nichts
-    expect(devPacks([], '')).toEqual({});
+    const built = (dev: PackId[], search: string) => devProgress(dev, search, saved).packs.bahn;
+    expect(built(['bahn', 'hoehle'], '?entwickler=bahn')).toEqual({ built: 2 });
+    expect(built(['bahn', 'hoehle'], '?entwickler=bahn&bau=1')).toEqual({ built: 1 });
+    expect(built(['bahn'], '?entwickler=bahn&bau=7')).toEqual({ built: 2 });
+    expect(devProgress(['bahn'], '?entwickler=bahn&bau=1', saved)).toEqual({
+      ...saved,
+      packs: { ...saved.packs, bahn: { built: 1 } },
+    }); // sonst bleibt alles
+    expect(devProgress(['hoehle'], '?entwickler=hoehle&bau=1', saved)).toBe(saved); // ohne Bahn nichts
+    expect(devProgress([], '', saved)).toBe(saved);
+  });
+
+  it('`&bau=0`: der Stand, in dem Tok kommt (Eistor offen, Eis-Leiste voll, erste Heimfahrt mit dem Schlitten)', () => {
+    const p = devProgress(['bahn', 'hoehle', 'eis'], '?entwickler=bahn&bau=0', saved);
+    expect(p.openGates).toEqual(['eis']);
+    const eis = REGIONS.find((r) => r.id === 'eis')!.animals.map((a) => `eis:${a.species}`);
+    expect(p.garden.map((a) => a.id)).toEqual(['lichtung:hase', ...eis]);
+    expect(p.packs).toEqual({
+      eis: { snowmen: 1 },
+      bahn: { built: 0 },
+      fahrt: { hoehle: { stage: 'faellig' }, schlitten: { stage: 'fest' } },
+    });
+    expect(
+      full(
+        p,
+        REGIONS.find((r) => r.id === 'eis')!,
+      ),
+    ).toBe(true);
+    // zweimal vorgespielt: nichts doppelt
+    expect(devProgress(['bahn'], '?entwickler=bahn&bau=0', p).garden).toEqual(p.garden);
+    expect([p.position, p.met, p.day]).toEqual([saved.position, saved.met, saved.day]);
+  });
+
+  it('`&abend=1`: Abend für die Regeln, nur im Blick hinein', () => {
+    expect(DEV_EVENING).toBe('abend');
+    expect(devLate(['bahn'], '?entwickler=bahn&bau=0&abend=1')).toBe(true);
+    expect(devLate(['bahn'], '?entwickler=bahn&bau=0')).toBe(false);
+    expect(devLate([], '?abend=1')).toBe(false); // ohne Schalter nie
   });
 
   it('Speicher im Blick hinein: liest den Spielstand, schreibt nur in den Arbeitsspeicher', () => {

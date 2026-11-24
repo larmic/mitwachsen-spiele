@@ -169,7 +169,8 @@ export function signOutline(id: GateId): string[] {
  * dem Elternschalter aus nach 1 s Stehen. Dann pulsiert das Zeichen der Welt zweimal als goldener Umriss am Tor
  * (`HINT_MS`), es klingt „hm-hm?“ (`notYet` in der Pentatonik der Welt, ohne Riegel) und die Live-Region sagt „Noch nicht.“ Kein Tier,
  * keine Bedingung, nie ein Fehlerton. Liefert das, solange es zu sehen ist, sonst null. Läuft der Takt zurück (eine
- * andere Welt), zählt das letzte Mal nicht mehr.
+ * andere Welt), zählt das letzte Mal nicht mehr. Fehlt dem Tor ein nächster Schritt (`lack`, aus dem Haken
+ * `View2D.lacks` eines Pakets: am Höhlentor Tok), pulsiert statt des Zeichens dessen Umriss, und die Live-Region nennt ihn.
  */
 export function never() {
   let shown: Hint & { t: number } = { t: -1e9 };
@@ -181,12 +182,13 @@ export function never() {
     sfx: Pick<Sfx, 'score'>,
     _lift?: unknown,
     r3d?: { arrived(): boolean } | null,
+    lack?: SpeciesId,
   ): Hint | null => {
     const id = r3d?.arrived() === false ? undefined : nope(state, world, state.tick < shown.t ? -1e9 : shown.t);
     if (id) {
       sfx.score(notYet(id, true)); // ohne Riegel: Diese Tore haben keine Flügel, nichts wackelt
-      say('Noch nicht.');
-      const rows = signOutline(id);
+      say(lack ? `Noch nicht. Es fehlt noch: ${SPECIES[lack].name}` : 'Noch nicht.');
+      const rows = lack ? silhouette(SPECIES[lack].parts) : signOutline(id);
       shown = { t: state.tick, id, at: now, draw: (ctx, w, P, t) => hintOutline(ctx, w, P, id, rows, t - now) };
     }
     return now - (shown.at ?? -1e9) < HINT_MS ? shown : null;

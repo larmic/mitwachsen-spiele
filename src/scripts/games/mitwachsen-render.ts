@@ -238,7 +238,10 @@ export class Renderer {
       if (sc.away(a.x, a.y) && hangAt(a, world.cell(a.x, a.y)) !== undefined) continue; // fliegt gerade ihre Runde
       const [hx, hy] = P(b.x + 0.5, b.y + 0.5, b.z + labelHeight(a, world.cell(a.x, a.y), b.hop)); // hängend: am Sitzplatz
       if (followers.has(a.id)) sprite(ctx, HEART, GAME_COLORS.heart, hx, hy, 2.5 * z);
-      else if (a.mode === 'wait')
+      else if (a.nap) {
+        // ein schlafender Bote (Tok am Abend): leise „Zzz“, sanft auf und ab (bei reduzierter Bewegung kein Zzz)
+        if (!sc.reduced) sprite(ctx, ZZZ, GAME_COLORS.note, hx + 6 * z, hy + Math.sin(sc.now / 700) * 3 * z, 2 * z);
+      } else if (a.mode === 'wait')
         ice?.waitArrow(ctx, world, P, a, b, [hx, hy], 3 * z); // Pfeil zum Tor
       else if (!state.met.includes(a.id)) {
         // Verloren: ein Fragezeichen schwebt über dem Kopf

@@ -231,8 +231,11 @@ function lichtungLine(map: Map<string, Cell>, g: Door, home: { bed: Point; wake:
  * Das Gleis der Höhlenbahn in die Karte legen (`WorldPack.lay`): Lichtung bis zum Prellbock, mit der Grotte (ihre
  * Felder sind da) weiter bis zum Bahnhof Fledermaus. Liefert die Linie, null, wenn auf der Lichtung keine passt
  */
-export function layLine({ map, gates, beds, packs }: Laid): Line | null {
-  if (!builtOf(packs)) return null; // vor Ausbau 1 bleibt die Lichtung, wie sie ist
+export function layLine({ seed, map, gates, beds, packs }: Laid): Line | null {
+  if (!builtOf(packs)) {
+    remember(seed, map, gates, beds); // vor Ausbau 1 bleibt die Lichtung, wie sie ist (Tok rechnet nur den Platz)
+    return null;
+  }
   const g = gates.get('hoehle');
   const home = beds.get('lichtung');
   const lichtung = g && home && lichtungLine(map, g, home);
@@ -308,4 +311,36 @@ function grotto(
   }
   if (!best || !clean([...before, ...best.cells])) return null;
   return { station: { lane: best.cells.slice(-lane.length), platform }, cells: best.cells };
+}
+
+/** Vor Ausbau 1: Kopie der Karte je Seed, aus der `futureBear` den künftigen Bahnhof Bär rechnet (höchstens `KEEP` Seeds) */
+const before = new Map<number, Pick<Laid, 'map' | 'gates' | 'beds'>>();
+/** Gerechnete künftige Bahnhöfe Bär je Seed (null: Auf der Lichtung passt keine Linie) */
+const bears = new Map<number, Station | null>();
+const KEEP = 4;
+
+function remember(seed: number, map: Map<string, Cell>, gates: Laid['gates'], beds: Laid['beds']) {
+  before.delete(seed);
+  bears.delete(seed);
+  before.set(seed, { map: new Map(map), gates, beds }); // die Karte wie bei Ausbau 1, bevor die Lichtung sich schließt
+  for (const k of before.keys()) if (before.size > KEEP) before.delete(k);
+}
+
+/**
+ * Wo Bahnhof Bär liegen wird, solange noch nichts gebaut ist (Ausbau 0; Tok wartet dort): derselbe Platz, den Ausbau 1
+ * legt, gerechnet auf einer Kopie der Karte, ohne die Welt zu ändern, erst wenn Tok ihn braucht, und je Seed einmal
+ * (die Suche dauert im Mittel gut 40 ms). null, wenn auf der Lichtung keine Linie passt; undefined, wenn das Paket die
+ * Welt dieses Seeds nicht vor Ausbau 1 gesehen hat
+ */
+export function futureBear(seed: number): Station | null | undefined {
+  if (bears.has(seed)) return bears.get(seed);
+  const laid = before.get(seed);
+  if (!laid) return undefined;
+  const g = laid.gates.get('hoehle');
+  const home = laid.beds.get('lichtung');
+  const found = (g && home && lichtungLine(laid.map, g, home)?.station) || null;
+  bears.set(seed, found);
+  before.delete(seed); // gerechnet: Die Kopie braucht es nicht mehr
+  for (const k of bears.keys()) if (bears.size > KEEP) bears.delete(k);
+  return found;
 }

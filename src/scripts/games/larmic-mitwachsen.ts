@@ -38,16 +38,17 @@ import { attachPack, initialState, progressOf, step, type Cmd, type GameEvent, t
 import { reshapes, type ChoreEvent } from './mitwachsen-chores';
 import { createWorld, gatePlaces, standHeight, type World } from './mitwachsen-world';
 import { GUIDE_GATE, pending, type GuideRules } from './mitwachsen-guide';
-import { PACK_IDS, Packs, type LoadedPack } from './mitwachsen-packs';
-import { devPacks, glimpse, sandbox } from './mitwachsen-dev';
+import { PACK_IDS, Packs, dawnOf, type LoadedPack } from './mitwachsen-packs';
+import { devLate, devProgress, glimpse, sandbox } from './mitwachsen-dev';
 import { randomId, randomSeed, savedOrNew, showName } from './mitwachsen-world-list';
 import { platformLift, portalColor } from './mitwachsen-portal';
 import { HOME_STAGGER, SNAP_DELAY, hopOf, nibblers, snaps } from './mitwachsen-gait';
 import { windAt } from './mitwachsen-weather';
 import { Air, postures, stepSound } from './mitwachsen-air';
 import { heldTired, restPose, type Pose } from './mitwachsen-tired';
-import { advance, evening, freshDay, loadTired, saveTired, type Tired, type TiredEvent } from './mitwachsen-tired';
-import type { PackEvent, RideEvent } from './mitwachsen-pack-types';
+import { advance, evening, freshDay, late, loadTired, newDay, saveTired, type Tired } from './mitwachsen-tired';
+import type { TiredEvent } from './mitwachsen-tired';
+import type { PackEvent } from './mitwachsen-pack-types';
 import { seatOf, withHop, type RideBody } from './mitwachsen-ride-view';
 import { awayIn, packScore } from './mitwachsen-view';
 import { listenTap } from './mitwachsen-tap';
@@ -77,6 +78,7 @@ class LarmicMitwachsen extends HTMLElement {
   private tired!: Tired;
   private lastTiredSave = 0;
   private sitUntil = 0; // bis dahin sitzt die müde Figur
+  private dawned = false; // in dieser Welt begann ein neuer echter Spieltag (`WorldPack.dawn` auch für spät geladene)
   private tiredLater: TiredEvent | null = null; // Gähnen oder „ins Bett“ während einer Fahrt: kommt nach dem Aussteigen
   private rides: readonly RideBody[] = []; // Körper eines Fahrzeugs in diesem Bild (aus dem Welt-Paket)
   private tickAt = 0; // wann der letzte Takt lief (das Fahrzeug gleitet zwischen den Takten weiter)
@@ -138,7 +140,9 @@ class LarmicMitwachsen extends HTMLElement {
   private hint = (now: number, { state, world } = this) => {
     const plate = world.cell(state.player.x, state.player.y).plate;
     const a = [state, world, now, this.reduced.matches, this.sfx, this.lift, this.r3d] as const;
-    return this.never(plate)?.(...a) ?? this.packs.hint(...a); // die Haken der Pakete je Bild, auch neben der Platte
+    // fehlt einem Tor, das nie aufgeht, ein nächster Schritt aus einem Paket (am Höhlentor Tok), zeigt es dessen Umriss
+    const lack = plate && this.renderer.first((v) => v.lacks?.(state, plate));
+    return this.never(plate)?.(...a, lack) ?? this.packs.hint(...a); // die Haken der Pakete je Bild, auch neben der Platte
   };
 
   connectedCallback() {
@@ -242,15 +246,21 @@ class LarmicMitwachsen extends HTMLElement {
     if (this.opening !== saved.id) return; // inzwischen wurde eine andere Welt geöffnet
     this.saved = { ...saved, visits: saved.visits + 1 };
     if (!this.dev) saveWorld(this.store, this.saved);
-    // Entwickler-Schalter: Der Spielstand bekommt, was er vorspielt (die Bahn: ihren Ausbau), schon für den Bau der Welt
-    const progress = progressFrom(this.saved);
-    if (this.dev) progress.packs = { ...progress.packs, ...devPacks(this.glimpse.packs, location.search) };
+    // Entwickler-Schalter: Der Spielstand bekommt, was er vorspielt (die Bahn: ihren Ausbau, bei 0 den Stand, in dem Tok
+    // kommt), schon für den Bau der Welt
+    let progress = progressFrom(this.saved);
+    if (this.dev) progress = devProgress(this.glimpse.packs, location.search, progress);
+    // Start nach mehr als `BREAK` Pause, ein neuer echter Spieltag: Was am Abend schlafend kam (Tok), wacht auf
+    // (`WorldPack.dawn`; die Uhr des Kinds läuft erst nach dem Start weiter, beim Wechsel der Welt ist es nie so)
+    this.dawned = newDay(this.tired, Date.now()); // auch für Pakete, die erst später kommen (`arrive`)
+    if (this.dawned) progress.packs = dawnOf(this.packs.loaded, progress.packs);
     this.world = createWorld(this.saved.seed, this.packs.loaded, progress.packs);
     this.seenAt = '';
     this.state = initialState(this.world, progress, this.saved.seed ^ this.saved.visits);
-    // Entwickler-Schalter: Die Figur schläft im Bett der Welt, in die geblickt wird (nur, wenn ihr Paket da ist)
+    // Entwickler-Schalter: Die Figur schläft im Bett der Welt, in die geblickt wird (nur, wenn ihr Paket da ist; die Bahn
+    // allein: im Bett der Lichtung)
     const { home } = this.glimpse;
-    if (home && this.packs.get(home)) {
+    if (home && (home === 'lichtung' || this.packs.get(home))) {
       const [x, y] = this.world.homes[home].bed;
       this.state = { ...this.state, player: { ...this.state.player, x, y } };
     }
@@ -291,6 +301,8 @@ class LarmicMitwachsen extends HTMLElement {
     if (!(this.world as World | undefined)) return; // entsteht gleich mit ihm; sonst immer einbauen (zweimal: egal)
     const { world, chunks } = this.world.attach(pack);
     this.world = world;
+    // kam es nach einem neuen echten Spieltag (Start oder lange Pause), gilt sein Haken `dawn` noch (Tok wacht auf)
+    if (this.dawned && pack.dawn) this.state = { ...this.state, packs: pack.dawn(this.state.packs) };
     this.state = attachPack(this.state, world);
     this.gl3d?.adopt(world, chunks);
   }
@@ -335,6 +347,9 @@ class LarmicMitwachsen extends HTMLElement {
     else if (cmd.type === 'move' && this.pace.lastFresh && !cmd.fresh) cmd = { ...cmd, fresh: true };
     const go = () => (this.pace.halt('pause', performance.now()), this.apply(cmd)); // nach Blinzeln: Takt frisch
     if (cmd.type === 'move' && (performance.now() < this.sitUntil || this.r3d?.blink(go))) return; // müde, gedreht
+    // Abend für die Regeln (Tok kommt dann schon schlafend): aus der Uhr des Kinds, im Blick hinein auch per `&abend=1`
+    const dusk = late(this.tired, Date.now()) || devLate(this.glimpse.packs, location.search);
+    if (this.state.late !== dusk) this.state = { ...this.state, late: dusk };
     const { state, events } = step(this.state, this.world, cmd, this.seen, this.guide, this.packs.loaded);
     this.state = state;
     // Ist die Leiste der Lichtung voll, gelten die Regeln des Pinguins aus dem Paket der Eis-Welt (bis er im Kessel wohnt)
@@ -354,6 +369,11 @@ class LarmicMitwachsen extends HTMLElement {
 
   /** Spielzeit fortschreiben (läuft im Takt, also nur bei sichtbarer Seite und geschlossenem Menü) */
   private ageTired() {
+    // nach mehr als `BREAK` Pause (Seite lange im Hintergrund) beginnt ein neuer echter Spieltag: Tok wacht auf
+    if (newDay(this.tired, Date.now())) {
+      this.dawned = true;
+      this.state = { ...this.state, packs: dawnOf(this.packs.loaded, this.state.packs) };
+    }
     // Liest oder döst die Figur, spielt gerade niemand: Die Uhr fürs Müdewerden läuft dann nicht
     const { tired, event } = advance(this.tired, Date.now(), !this.state.sleeping && this.pose === 'stand');
     this.tired = tired;
@@ -576,13 +596,12 @@ class LarmicMitwachsen extends HTMLElement {
           this.dayAt = now;
           this.hops.set('player', now);
           break;
-        case 'ride': // Fahrzeug aus einem Welt-Paket (mitwachsen-rider.ts): Bild und Ton kommen mit seiner Ansicht
-          this.ride(e, now);
-          break;
         default:
           // Ein Tier ruft und hüpft (Wiese, Weltgrenze, der Pinguin), sonst Handgriffe: pflücken, fangen, nachwachsen,
-          // schöpfen, füttern, tränken; und was die Regeln einer Welt melden (Schneemann, Eiszapfen)
+          // schöpfen, füttern, tränken; und was die Regeln einer Welt melden (Schneemann, Eiszapfen); Fahrzeug und Bote
+          // aus einem Welt-Paket (Schlitten, Tok): Bild und Ton kommen mit seiner Ansicht
           if ('species' in e) this.cheer(e, now);
+          else if ('what' in e) this.effect(e, now);
           else this.chore(e, now);
       }
     }
@@ -607,11 +626,13 @@ class LarmicMitwachsen extends HTMLElement {
   }
 
   /**
-   * Ein Fahrzeug (Welt-Paket): Töne, Hüpfer, Herz und Funken, wie seine Ansicht sagt (`View2D.rideFx`; Funken nicht bei
-   * reduzierter Bewegung); was zählt (erschienen, Fest), gleich speichern
+   * Ein Fahrzeug oder Bote aus einem Welt-Paket (Schlitten, Tok): Töne, Hüpfer, Herz und Funken, wie seine Ansicht sagt
+   * (`View2D.rideFx`, `View2D.heraldFx`; Funken nicht bei reduzierter Bewegung); was zählt (erschienen, Fest), gleich speichern
    */
-  private ride(e: RideEvent, now: number) {
-    const fx = this.renderer.first((v) => v.rideFx?.(e, this.state));
+  private effect(e: Extract<GameEvent, { type: 'ride' | 'herald' }>, now: number) {
+    const fx = this.renderer.first((v) =>
+      e.type === 'ride' ? v.rideFx?.(e, this.state) : v.heraldFx?.(e, this.state),
+    );
     this.sfx.score(fx?.score ?? []);
     if (fx?.who) this.hops.set(fx.who, now);
     if (fx?.who && fx.heart) this.float('heart', fx.who, GAME_COLORS.heart, now + 150);

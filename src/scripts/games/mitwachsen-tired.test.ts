@@ -10,6 +10,8 @@ import {
   YAWN_AT,
   advance,
   evening,
+  late,
+  newDay,
   freshDay,
   heldTired,
   loadTired,
@@ -69,6 +71,18 @@ describe('Müde werden', () => {
     expect(next.tired.played).toBe(0);
     expect(next.tired.told).toBe(0);
     expect(next.event).toBeNull();
+  });
+
+  it('Abend für die Regeln ab `BED_AT`; ein neuer echter Spieltag nach mehr als `BREAK` Pause (Tok wacht auf)', () => {
+    expect(late({ played: BED_AT - 1, seen: 0, told: 0 }, 10)).toBe(false);
+    expect(late({ played: BED_AT, seen: 0, told: 0 }, 10)).toBe(true);
+    // nach langer Pause nie Abend, auch bevor `advance` den Tag neu begonnen hat (Tok käme sonst schlafend)
+    expect(late({ played: BED_AT, seen: 0, told: 0 }, BREAK + 1)).toBe(false);
+    const t = freshDay(1000);
+    expect(newDay(t, 1000 + BREAK)).toBe(false);
+    expect(newDay(t, 1000 + BREAK + 1)).toBe(true);
+    // dieselbe Regel, nach der `advance` den Tag neu beginnt
+    expect(advance({ ...t, played: 30 * MIN }, 1000 + BREAK + 1, true).tired.played).toBe(0);
   });
 
   it('meldet verpasste Hinweise nur einmal', () => {

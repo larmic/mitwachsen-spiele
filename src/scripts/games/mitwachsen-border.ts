@@ -17,10 +17,11 @@ export const SEATS = 16; // feste Warteplätze je Seite: genug für eine lange K
 const REACH = 12; // so weit liegen die Warteplätze höchstens vom ersten Feld ihrer Seite
 
 /**
- * Was ein Tier tut: umherlaufen, folgen, auf der Wiese wohnen, an der Weltgrenze warten oder (der verlaufene Pinguin)
- * die Figur zum Tor führen (mitwachsen-guide.ts)
+ * Was ein Tier tut: umherlaufen, folgen, auf der Wiese wohnen, an der Weltgrenze warten, (der verlaufene Pinguin)
+ * die Figur zum Tor führen (mitwachsen-guide.ts) oder (Tok, der Bote der Höhlenwelt) an seinem Platz warten; was er tut,
+ * regelt sein Paket (mitwachsen-herald.ts)
  */
-export type Mode = 'wander' | 'follow' | 'home' | 'wait' | 'lead';
+export type Mode = 'wander' | 'follow' | 'home' | 'wait' | 'lead' | 'herald';
 
 /** Durchgang zwischen zwei Gegenden: Torreihe, Gang und Mündung, das erste Feld je Seite und die Warteplätze davor */
 export type Crossing = {

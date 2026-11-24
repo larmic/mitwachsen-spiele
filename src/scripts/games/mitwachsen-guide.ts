@@ -69,6 +69,7 @@ export type Guided = Omit<Crowd, 'player' | 'animals' | 'openGates'> & {
     realm: RegionId;
     spawn: Point;
     rest: number; // beim führenden Pinguin: Takte bis zum nächsten Piep
+    nap?: true; // ein Bote schläft (Tok, am Abend gekommen: mitwachsen-herald.ts)
     wait?: number; // beim führenden Pinguin: Takte, die er mit der Figur in der Bucht wartet (nicht gespeichert)
   }[];
   garden: { id: string; species: SpeciesId }[];

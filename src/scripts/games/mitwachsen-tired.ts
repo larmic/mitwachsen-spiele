@@ -70,6 +70,18 @@ export function heldTired(
   return riding ? { now: null, held: due } : { now: due, held: null };
 }
 
+/**
+ * Beginnt jetzt ein neuer echter Spieltag? Seit der letzten Messung mehr als `BREAK` Pause (dieselbe Regel, nach der
+ * `advance` den Tag neu beginnt): Dann wacht ein Bote auf, der am Abend schlafend kam (`WorldPack.dawn`)
+ */
+export const newDay = (t: Tired, now: number): boolean => now - t.seen > BREAK;
+
+/**
+ * Ist es Abend für die Regeln? Die Figur möchte schon ins Bett (`BED_AT` gespielt): Dann kommt ein Bote schon schlafend
+ * (Tok, worlds/bahn/mitwachsen-tok.ts). Nach langer Pause (`newDay`) nie, auch bevor `advance` den Tag neu begonnen hat
+ */
+export const late = (t: Tired, now: number): boolean => t.played >= BED_AT && !newDay(t, now);
+
 /** Wie abendlich der Himmel ist: 0 bis 20 Minuten Tag, bis 25 Minuten gut zur Hälfte golden, bis 35 Minuten ganz */
 export function evening(t: Tired): number {
   const m = t.played / MIN;

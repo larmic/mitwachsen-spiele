@@ -11,6 +11,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
 import type { GuideRules } from '../../mitwachsen-guide';
+import type { HeraldRules } from '../../mitwachsen-herald';
 import type { WorldPack } from '../../mitwachsen-pack-types';
 import type { RideRules } from '../../mitwachsen-rider';
 import type { View2D } from '../../mitwachsen-view';
@@ -24,7 +25,7 @@ import { rules as snowman } from './mitwachsen-snowman';
 import { rules as chime } from './mitwachsen-chime';
 import { sled } from './mitwachsen-sled';
 
-export const pack: WorldPack<GuideRules, View2D, View3D, RideRules> = {
+export const pack: WorldPack<GuideRules, View2D, View3D, RideRules, HeraldRules> = {
   id: 'eis',
   gate: 'eis',
   build: buildKessel,
