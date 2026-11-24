@@ -18,7 +18,7 @@ import { stageAt } from './mitwachsen-snowman';
 import { snowBoxes, snowScore, wobble } from './mitwachsen-snowman-look';
 import { chimeBoxes, chimeScore, ring, since, swing } from './mitwachsen-chime-look';
 import { plateHint } from './mitwachsen-plate-hint';
-import { rideFx, sledBodies, sledMarks } from './mitwachsen-sled-look';
+import { SLED_ID, rideFx, sledBodies, sledMarks } from './mitwachsen-sled-look';
 
 /** Iglu, Eisschale, Eistrog: Quader wie in 3D */
 const look: DrawDeco = (world, c, x, y) => iceBoxes(world, c, x, y);
@@ -94,5 +94,5 @@ export const view: View2D = {
   // Schlitten mit Schlittenrentier und Schuppen, Schneespur und Fleck am Halt, Ton und Freude (mitwachsen-sled-look.ts)
   bodies: sledBodies,
   marks: sledMarks,
-  rideFx,
+  rideFx: (e, state) => (e.id === SLED_ID.slice(5) ? rideFx(e, state) : undefined), // nur seine Ereignisse
 };

@@ -24,6 +24,7 @@ describe('Welt-Pakete laden (Packs)', () => {
     const packs = new Packs(
       (p) => arrived.push(p.id),
       () => (loads++, Promise.resolve(pack)),
+      ['eis'],
     );
     await packs.want(bed, gates);
     expect(loads).toBe(0);
@@ -41,6 +42,7 @@ describe('Welt-Pakete laden (Packs)', () => {
     const packs = new Packs(
       () => {},
       () => (++loads === 1 ? Promise.reject(new Error('Netz')) : Promise.resolve(pack)),
+      ['eis'],
     );
     await packs.want(open, gates);
     expect(packs.loaded).toEqual([]);
@@ -120,8 +122,8 @@ describe('Welt-Pakete laden (Packs)', () => {
     SPECIES.robbe.parts = robbe;
   });
 
-  it('je Paket ein Lader (Eis-Welt, Höhlenwelt, Bahn); jedes Paket lädt für sich, nur wenn sein Tor es braucht', async () => {
-    expect(PACK_IDS).toEqual(['eis', 'hoehle', 'bahn']);
+  it('je Paket ein Lader (Eis-Welt, Höhlenwelt, Bahn, Fahrzeuge); jedes Paket lädt für sich, nur wenn sein Tor es braucht', async () => {
+    expect(PACK_IDS).toEqual(['eis', 'hoehle', 'bahn', 'fahrt']);
     const asked: string[] = [];
     const hoehle = { ...pack, id: 'hoehle', gate: 'hoehle' } as LoadedPack;
     const packs = new Packs(
@@ -149,7 +151,7 @@ describe('Welt-Pakete laden (Packs)', () => {
     const hoehle = { ...pack, id: 'hoehle', gate: 'hoehle' } as LoadedPack;
     const packs = new Packs(
       () => {},
-      (id) => (asked.push(id), Promise.resolve({ eis: pack, hoehle, bahn }[id])),
+      (id) => (asked.push(id), Promise.resolve({ eis: pack, hoehle, bahn, fahrt: { id: 'fahrt' } as LoadedPack }[id])),
     );
     await packs.want({ ...open, openGates: ['eis', 'hoehle'] }, gates);
     expect(asked).not.toContain('bahn');
@@ -159,6 +161,38 @@ describe('Welt-Pakete laden (Packs)', () => {
     expect(asked).toContain('bahn');
     expect(packs.get('bahn')).toBe(bahn);
     expect(packs.at('hoehle')).toBe(hoehle); // das Paket hinter dem Höhlentor bleibt die Höhlenwelt
+  });
+
+  it('das Paket der Fahrzeuge kommt, sobald es ein Fahrzeug geben kann (Eistor offen), mit dem Schalter der Bahn auch so', async () => {
+    const asked: string[] = [];
+    const fahrt = { id: 'fahrt' } as LoadedPack;
+    const make = () =>
+      new Packs(
+        () => {},
+        (id) => (asked.push(id), Promise.resolve(id === 'fahrt' ? fahrt : pack)),
+        ['eis', 'fahrt'],
+      );
+    await make().want(bed, gates); // Tor zu: kein Fahrzeug, keine Fahr-Engine
+    expect(asked).toEqual([]);
+    const packs = make();
+    await packs.want(open, gates); // Eistor offen: der Schlitten kann kommen
+    expect(asked.sort()).toEqual(['eis', 'fahrt']);
+    expect(packs.get('fahrt')).toBe(fahrt);
+    expect(packs.at('eis')).toBe(pack); // die Fahr-Engine ist kein Paket hinter einem Tor
+    asked.length = 0;
+    const dev = make();
+    dev.extra = ['fahrt']; // der Entwickler-Schalter der Bahn bringt sie mit (mitwachsen-dev.ts)
+    await dev.want(bed, gates);
+    expect(asked).toEqual(['fahrt']);
+  });
+
+  it('ohne eigenen Lader kommt das echte Paket der Fahrzeuge (import()): nur Regeln, die Fahr-Engine', async () => {
+    const packs = new Packs(() => {});
+    await packs.want(open, gates);
+    const fahrt = packs.get('fahrt');
+    expect(fahrt?.gate).toBeUndefined();
+    expect(fahrt && 'build' in fahrt).toBe(false);
+    expect(typeof fahrt?.rules?.ride).toBe('function');
   });
 
   it('scheitert ein Paket, lädt das andere trotzdem (still wie ein Netzfehler)', async () => {

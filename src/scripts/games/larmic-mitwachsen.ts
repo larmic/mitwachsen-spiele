@@ -13,7 +13,7 @@ import { LANTERN_SPARKS } from '../../data/games/mitwachsen-hoehle';
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
 import { SPARKS, fly, glints, sparks } from './mitwachsen-glyphs';
 import { Sfx } from './sfx';
-import { nightIn } from './mitwachsen-dusk';
+import { nightIn, tunnelNight } from './mitwachsen-dusk';
 import { plateToy } from './mitwachsen-plate-toy';
 import { postcard } from './mitwachsen-plate';
 import { NOTE_COLORS, StoryPlayer } from './mitwachsen-story';
@@ -123,6 +123,7 @@ class LarmicMitwachsen extends HTMLElement {
   private gl3d: World3DType | null = null; // die geladene 3D-Ansicht, auch wenn ihr Kontext gerade fehlt
   private guide?: GuideRules; // Regeln des verlaufenen Pinguins (aus dem Paket der Eis-Welt), sobald er fällig ist
   private packs = new Packs((pack) => this.arrive(pack)); // Welt-Pakete (worlds/), geladen erst bei Bedarf
+  private dimmed = 1; // Licht im Tunnel (1: wie immer), gleitet zum Ziel der Pakete (`View2D.dim`)
   // Entwickler-Schalter (`?entwickler=hoehle`, mitwachsen-dev.ts): Pakete, in die geblickt wird; dann wird nichts gespeichert
   private glimpse = glimpse(location.search, PACK_IDS);
   private dev = this.glimpse.packs.length > 0;
@@ -674,6 +675,16 @@ class LarmicMitwachsen extends HTMLElement {
     this.rides = this.renderer.all((v) => v.bodies?.(this.state, this.world, at) ?? []);
   }
 
+  /**
+   * Licht dieses Bilds: Fährt die Figur durch einen Tunnel, dimmt es (`View2D.dim` der Pakete, das kleinste zählt); es
+   * gleitet in gut einer halben Sekunde hin (bei reduzierter Bewegung sofort)
+   */
+  private dimFrame(dt: number): number {
+    const goal = Math.min(1, ...this.renderer.all((v) => (v.dim ? [v.dim(this.state, this.world)] : [])));
+    this.dimmed = this.reduced.matches ? goal : this.dimmed + (goal - this.dimmed) * Math.min(1, dt * 3);
+    return this.dimmed;
+  }
+
   /** Ins Bett gebracht: Schlaflied, Nacht; der Tag ist zu Ende, morgen ist die Figur wieder ausgeschlafen */
   private goodNight(now: number) {
     this.story.stop();
@@ -911,7 +922,8 @@ class LarmicMitwachsen extends HTMLElement {
       cam,
       bodies: this.bodies,
       gates: gates as Scene['gates'],
-      night: nightIn(realm, night), // die Grotte bleibt hell wie die Dämmerung
+      // die Grotte bleibt hell wie die Dämmerung; im Tunnel gedimmt, nie dunkler als sie
+      night: tunnelNight(nightIn(realm, night), this.dimFrame(dt)),
       evening: this.state.sleeping ? 0 : evening(this.tired),
       weather,
       aurora: aurora * night,

@@ -22,7 +22,7 @@ import { view3d } from './view-3d';
 import { PARK, REAR_ROW, frontAt, stationBodies, stationOf } from './mitwachsen-station-look';
 import { TOK, atPost, postOf, rearOf } from './mitwachsen-tok';
 import { buildScore, heraldFx } from './mitwachsen-tok-look';
-import { tokOf, withTok } from './mitwachsen-tok-save';
+import { tokOf, withTok } from '../../mitwachsen-ride-save';
 
 const BAHN = [BAHN_PACK];
 const ICE = REGIONS.find((r) => r.id === 'eis')!;
@@ -217,7 +217,7 @@ describe('Bau 1: während des Baus', () => {
     expect([board.x, board.y]).toEqual(rear); // er steigt am hinteren Wagen ein
     const st = stationOf(w)!;
     expect(rear).toEqual(st.rows[REAR_ROW]!.edge);
-    const car = stationBodies(r.s, w, at()).find((b) => b.id === 'bahn:rear')!;
+    const car = stationBodies(r.s, w, at()).find((b) => b.id === 'ride:hoehle:rear')!;
     const [lx, ly] = st.line[REAR_ROW]!;
     expect(Math.max(Math.abs(car.x - lx), Math.abs(car.y - ly))).toBeLessThan(0.5); // der Wagen hält neben ihm
     expect(r.s.work).toBeUndefined();
@@ -243,8 +243,8 @@ describe('Bau 1: während des Baus', () => {
     const again = play(initialState(built, p), built, ticks(3)).s;
     expect(again.work).toBeUndefined();
     expect(tokIn(again)).toBeUndefined();
-    const train = stationBodies(again, built, at()).filter((b) => b.id.startsWith('bahn:') && b.key.includes(':rear:'));
-    expect(train.map((b) => b.key)).toEqual(['bahn:rear:10']); // Tok sitzt im hinteren Wagen, die Tür ist zu
+    const train = stationBodies(again, built, at()).filter((b) => b.id === 'ride:hoehle:rear');
+    expect(train.map((b) => b.key)).toEqual(['ride:hoehle:rear:10000']); // Tok sitzt im hinteren Wagen, die Tür ist zu
   });
 });
 
@@ -284,16 +284,18 @@ describe('Bau 1: Bahnhof Bär und Zug', () => {
     expect(ids(0.05)).toEqual([]);
     expect(ids(BUILD.pop).filter((i) => i.startsWith('bahn:reihe')).length).toBe(LINE.bear.long);
     expect(ids(BUILD.pop)).toEqual(expect.arrayContaining(['bahn:dach', 'bahn:schild']));
-    expect(ids(BUILD.roll[0] - 0.01)).not.toContain('bahn:loco');
+    expect(ids(BUILD.roll[0] - 0.01)).not.toContain('ride:hoehle:loco');
     // zu roll steht er noch ganz im Tunnel, dann kommt Wagen für Wagen heraus, zuerst die Lok
     expect(st.portal).toBeGreaterThan(LINE.bear.long);
     expect(ids(BUILD.roll[0]).filter((i) => /^bahn:(loco|mid|rear|dampf)$/.test(i))).toEqual([]);
     const cars = (p: number) => ids(p).filter((i) => /^bahn:(loco|mid|rear)$/.test(i));
     const seen = Array.from({ length: 41 }, (_, i) => cars(BUILD.roll[0] + ((BUILD.roll[1] - BUILD.roll[0]) * i) / 40));
     expect(seen.every((c, i) => i === 0 || c.length >= seen[i - 1]!.length)).toBe(true);
-    const order = ['bahn:loco', 'bahn:mid', 'bahn:rear'];
+    const order = ['ride:hoehle:loco', 'ride:hoehle:mid', 'ride:hoehle:rear'];
     expect(seen.filter((c) => c.join() !== order.slice(0, c.length).join())).toEqual([]);
-    expect(ids(BUILD.roll[1])).toEqual(expect.arrayContaining(['bahn:loco', 'bahn:mid', 'bahn:rear', 'bahn:dampf']));
+    expect(ids(BUILD.roll[1])).toEqual(
+      expect.arrayContaining(['ride:hoehle:loco', 'ride:hoehle:mid', 'ride:hoehle:rear', 'ride:hoehle:dampf']),
+    );
     const fronts = Array.from({ length: 11 }, (_, i) =>
       frontAt(st, { x: 1e6, y: 1e6 }, BUILD.roll[0] + ((BUILD.roll[1] - BUILD.roll[0]) * i) / 10, false)!,
     );
@@ -313,16 +315,16 @@ describe('Bau 1: Bahnhof Bär und Zug', () => {
   it('die Tür des hinteren Wagens geht zu door auf, ab board sitzt Tok darin; ohne Bau sitzt er, die Tür ist zu', () => {
     const rear = (p?: number) =>
       stationBodies(p === undefined ? initialState(w, { packs: BUILT1 }) : during(p), w, at()).find(
-        (b) => b.id === 'bahn:rear',
+        (b) => b.id === 'ride:hoehle:rear',
       )!.key;
-    expect(rear(BUILD.door - 0.02)).toBe('bahn:rear:00');
-    expect(rear(BUILD.door)).toMatch(/^bahn:rear:0-?1$/);
-    expect(rear(BUILD.board)).toMatch(/^bahn:rear:1-?1$/);
-    expect(rear()).toBe('bahn:rear:10');
+    expect(rear(BUILD.door - 0.02)).toBe('ride:hoehle:rear:00000');
+    expect(rear(BUILD.door)).toMatch(/^ride:hoehle:rear:0-?1000$/);
+    expect(rear(BUILD.board)).toMatch(/^ride:hoehle:rear:1-?1000$/);
+    expect(rear()).toBe('ride:hoehle:rear:10000');
   });
 
   it('bei reduzierter Bewegung kein Dampf, der Zug rückt in Sprüngen vor; er fährt nie durch die Figur', () => {
-    expect(ids(0.6, true)).not.toContain('bahn:dampf');
+    expect(ids(0.6, true)).not.toContain('ride:hoehle:dampf');
     const p = BUILD.roll[0] + 0.1;
     const jump = frontAt(st, { x: 1e6, y: 1e6 }, p, true)! - PARK;
     expect(Math.abs(jump / 2 - Math.round(jump / 2))).toBeLessThan(1e-9);
@@ -330,11 +332,16 @@ describe('Bau 1: Bahnhof Bär und Zug', () => {
     expect(frontAt(st, { x, y }, undefined, false)).toBeGreaterThan(3);
   });
 
-  it('Farben: Lila, Silber, türkiser Leuchtstreifen, Fledermaus vorn; nirgends Gold (das Kind kann hier nichts tun)', () => {
-    const all = stationBodies(during(1 - 1e-3), w, at()).flatMap((b) => b.parts.flatMap((p) => [p[6], p[7]]));
+  it('Farben: Lila, Silber, türkiser Leuchtstreifen, Fledermaus vorn; Gold erst nach dem Bau, nur an der Tür zum Einsteigen', () => {
+    const colorsOf = (b: readonly { parts: readonly (readonly unknown[])[] }[]) =>
+      b.flatMap((x) => x.parts.flatMap((p) => [p[6], p[7]]));
+    const gold = (c: unknown) => !!c && Object.values(GOLD).includes(c as never);
+    const all = colorsOf(stationBodies(during(0.95), w, at()));
     expect(all).toEqual(expect.arrayContaining([TRAIN_COLORS.lila, TRAIN_COLORS.silver[0], TRAIN_COLORS.light]));
     expect(all).toEqual(expect.arrayContaining([TRAIN_COLORS.bat.w, TRAIN_COLORS.steam]));
-    expect(all.filter((c) => c && Object.values(GOLD).includes(c as never))).toEqual([]);
+    expect(all.filter(gold)).toEqual([]); // solange gebaut wird, kann das Kind hier nichts tun
+    const done = stationBodies(initialState(w, { packs: BUILT1 }), w, at());
+    expect(done.filter((b) => colorsOf([b]).some(gold)).map((b) => b.id)).toEqual(['ride:hoehle:mid']);
   });
 });
 

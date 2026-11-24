@@ -6,6 +6,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Der Schlitten“)
 
 import type { Dir, Part, Projection } from '../../lib/games/front';
+import type { RideId } from '../../data/games/mitwachsen-rides';
 import { dirTo } from './mitwachsen-free';
 import type { MoveCmd } from './mitwachsen-rider';
 import type { Scored } from './sfx';
@@ -74,10 +75,17 @@ export function tapRide(rides: readonly RideBody[], project: Projection, px: num
   return best;
 }
 
-/** Befehl zum angetippten Körper: ein neuer Druck in seine Richtung (`tap`: nur einsteigen, nie laufen) */
-export const tapCmd = (r: Pick<RideBody, 'x' | 'y'>, player: { x: number; y: number }): MoveCmd => ({
-  type: 'move',
-  dir: dirTo(Math.round(r.x) - player.x, Math.round(r.y) - player.y),
-  fresh: true,
-  tap: true,
-});
+/**
+ * Befehl zum angetippten Körper: ein neuer Druck in seine Richtung (`tap`: nur einsteigen, nie laufen), `ride` das
+ * Fahrzeug, dem er gehört (aus seiner Kennung `ride:<Fahrzeug>…`)
+ */
+export const tapCmd = (r: Pick<RideBody, 'id' | 'x' | 'y'>, player: { x: number; y: number }): MoveCmd => {
+  const ride = r.id.split(':')[1] as RideId | undefined;
+  return {
+    type: 'move',
+    dir: dirTo(Math.round(r.x) - player.x, Math.round(r.y) - player.y),
+    fresh: true,
+    tap: true,
+    ...(ride ? { ride } : {}),
+  };
+};

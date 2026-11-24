@@ -1,9 +1,12 @@
-// Fahrzeuge – nur Typen: was die Regeln eines Fahrzeugs vom Zustand sehen (`Rider`) und welche Haken `step` ihnen
-// gibt (`RideRules`). Die Regeln selbst bringt das Welt-Paket mit (`WorldRules.ride`, worlds/eis/mitwachsen-ride.ts).
-// Eigene Datei, weil mitwachsen-pack-types.ts von der Welt importiert wird und darum `World` nicht kennen darf.
-// Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Der Schlitten“)
+// Fahrzeuge – nur Typen: was die Regeln eines Fahrzeugs vom Zustand sehen (`Rider`), welche Haken `step` ihnen gibt
+// (`RideRules`), was ein Paket über sein Fahrzeug sagt (`Vehicle`: Strecke, wann es erscheint) und die Fahr-Engine, die
+// daraus die Regeln aller Fahrzeuge macht (`RideEngine`, aus dem Paket der Fahrzeuge worlds/fahrt/). Eigene Datei, weil
+// mitwachsen-pack-types.ts von der Welt importiert wird und darum `World` nicht kennen darf.
+// Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Der Schlitten“ und „Tok und die Bahn“, Fahren)
 
 import type { Dir } from '../../lib/games/front';
+import type { Point } from '../../data/games/mitwachsen';
+import type { RideId, RideSpec } from '../../data/games/mitwachsen-rides';
 import type { BorderEvent } from './mitwachsen-border';
 import type { Guided } from './mitwachsen-guide';
 import type { Ride, RideEvent } from './mitwachsen-pack-types';
@@ -11,17 +14,28 @@ import type { World } from './mitwachsen-world';
 
 /**
  * Ein Pfeil (Befehl `move`): `fresh` neu gedrückt oder gemerkter Tipp (nicht gehalten, `InputPace.lastFresh`), `tap`
- * das Fahrzeug angetippt
+ * ein Fahrzeug angetippt, `ride` welches (aus dem Körper, den der Finger traf)
  */
-export type MoveCmd = { type: 'move'; dir: Dir; fresh?: true; tap?: true };
+export type MoveCmd = { type: 'move'; dir: Dir; fresh?: true; tap?: true; ride?: RideId };
+
+/** Ende einer Strecke: der Halt in der Welt (`home`) oder der auf der Lichtung (`out`) */
+export type End = 'home' | 'out';
 
 /**
  * Was die Regeln eines Fahrzeugs vom Zustand sehen und ändern dürfen: wie beim Pinguin (`Guided`), dazu den
  * gespeicherten Zustand der Pakete (`packs.fahrt`), die laufende Fahrt (`ride`, nicht gespeichert) und den Takt, ab dem
  * das Fahrzeug erscheint (`rideDue`, danach der Takt, an dem es herbeitrabt bzw. zuletzt angestoßen wurde; -1: nicht
- * fällig; nicht gespeichert)
+ * fällig; nicht gespeichert). Fahrzeuge, die nicht von selbst erscheinen (der Zug: Tok baut ihn), merken sich das
+ * Anstoßen in `nudged`; liegen beide Halte in derselben Gegend (der Zug bei Ausbau 1: Bahnhof Bär und Prellbock in der
+ * Bucht), sagt `docked`, an welchem es zuletzt ankam (beides nicht gespeichert)
  */
-export type Rider = Guided & { packs: Record<string, unknown>; ride?: Ride; rideDue: number };
+export type Rider = Guided & {
+  packs: Record<string, unknown>;
+  ride?: Ride;
+  rideDue: number;
+  nudged?: { id: RideId; at: number };
+  docked?: Partial<Record<RideId, End>>;
+};
 
 /**
  * Ereignisse, die ein Fahrzeug ausgibt: seine eigenen, dazu Warten der folgenden Tiere, Wechsel der Gegend und `bump`
@@ -30,9 +44,9 @@ export type Rider = Guided & { packs: Record<string, unknown>; ride?: Ride; ride
 export type RideEvents = { push(...e: (RideEvent | BorderEvent | { type: 'bump' })[]): unknown };
 
 /**
- * Haken eines Fahrzeugs in `step` (aus dem Welt-Paket als `WorldRules.ride`). `tick`: nach dem Takt der Tiere (fällig,
+ * Haken der Fahrzeuge in `step` (aus der Fahr-Engine, `RideEngine`). `tick`: nach dem Takt der Tiere (fällig,
  * erscheinen, fahren). `move`: vor allem anderen; true, wenn der Zug damit erledigt ist (einsteigen, anstoßen, während
- * der Fahrt immer; ein Antippen immer, sobald das Fahrzeug eine Strecke hat: gelaufen wird per Antippen nie).
+ * der Fahrt immer; ein Antippen immer, sobald ein Fahrzeug eine Strecke hat: gelaufen wird per Antippen nie).
  * `blocks`: Darf das Tier `a` nicht auf (x, y) gehen (Halte, Fahrzeug, Schuppen, Strecke)?
  */
 export type RideRules = {
@@ -40,3 +54,41 @@ export type RideRules = {
   move(s: Rider, world: World, cmd: MoveCmd, events: RideEvents): boolean;
   blocks(s: Rider, world: World, a: Rider['animals'][number], x: number, y: number): boolean;
 };
+
+/**
+ * Strecke eines Fahrzeugs in einer Welt: `path` die Felder des Sitzes vom Halt in der Welt (`home`) bis zum Halt auf der
+ * Lichtung (`out`), `stops` beide Sitze, `shed` sein Schuppen (am Halt `home`), `seats` feste Warteplätze je Halt für
+ * folgende Tiere, `on` alle Felder der Strecke. Ein Fahrzeug mit Wagen (der Zug) belegt am Halt mehrere Felder (`cars`,
+ * jedes davon ist zum Einsteigen da, es gibt kein Zugtier), vor ihm müssen `ahead` Felder frei sein (sonst 2: dort geht
+ * das Zugtier); `dark`: Felder im Tunnel (Tunnelportal, Einschnitt, Gang), davor kündigt es ihn an
+ */
+export type RideRoute = {
+  path: readonly Point[];
+  stops: { home: Point; out: Point };
+  shed: readonly Point[];
+  seats: { home: readonly Point[]; out: readonly Point[] };
+  on: ReadonlySet<string>;
+  cars?: Record<End, readonly Point[]>;
+  ahead?: number;
+  dark?: ReadonlySet<string>;
+};
+
+/** Wer auf der Festfahrt außer den Tieren noch winkt (Eis-Welt: Schneemänner) */
+export type Fan = { who: string; x: number; y: number };
+
+/**
+ * Was ein Paket über sein Fahrzeug sagt (`WorldRules.vehicle`): seinen Eintrag in `RIDES`, seine Strecke in einer Welt
+ * (`route`; undefined: dort keins; sie darf vom Spielstand abhängen, der Zug fährt bei Ausbau 1 nur bis zum Prellbock),
+ * ob es jetzt erscheinen soll (`ready`; ohne: es erscheint nie von selbst, der Zug kommt mit Bau 1), wer auf der
+ * Festfahrt winkt (`fans`) und was nach dem Aussteigen geschieht (`landed`: Tok hüpft aus dem Zug an seinen Platz, die erste Fahrt ist gemacht)
+ */
+export type Vehicle = {
+  spec: RideSpec;
+  route(world: World, s: Pick<Rider, 'packs' | 'openGates'>): RideRoute | undefined;
+  ready?(s: Rider, world: World): boolean;
+  fans?(s: Rider, world: World): Fan[];
+  landed?(s: Rider, world: World, end: End, events: RideEvents): void;
+};
+
+/** Die Fahr-Engine (Paket der Fahrzeuge, `WorldRules.ride`): macht aus den Fahrzeugen der geladenen Pakete ihre Regeln */
+export type RideEngine = (vehicles: readonly Vehicle[]) => RideRules;

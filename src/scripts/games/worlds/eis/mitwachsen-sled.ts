@@ -1,16 +1,17 @@
-// Der Schlitten der Eis-Welt – rein, ohne DOM: wann er erscheint (`ready`) und seine Regeln (`sled`, `WorldRules.ride`
-// aus dem Welt-Paket). Sind alle Eis-Tiere zu Hause (Leiste der Eis-Welt voll) und steht die Figur wach am Schneebett,
-// trabt der Schlitten mit dem Schlittenrentier gut 2 s später aus den Tannen herbei. Strecke und Halte:
-// mitwachsen-sled-route.ts; Fahrregeln (allgemein, für jedes Fahrzeug): mitwachsen-ride.ts.
+// Der Schlitten der Eis-Welt – rein, ohne DOM: wann er erscheint (`ready`) und was die Fahr-Engine über ihn wissen muss
+// (`sled`, `WorldRules.vehicle` aus dem Welt-Paket). Sind alle Eis-Tiere zu Hause (Leiste der Eis-Welt voll) und steht
+// die Figur wach am Schneebett, trabt der Schlitten mit dem Schlittenrentier gut 2 s später aus den Tannen herbei.
+// Strecke und Halte: mitwachsen-sled-route.ts; Fahrregeln (allgemein, für jedes Fahrzeug): Paket der Fahrzeuge
+// (worlds/fahrt/mitwachsen-ride.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Der Schlitten“)
 
 import { REGIONS } from '../../../../data/games/mitwachsen';
 import { RIDES } from '../../../../data/games/mitwachsen-rides';
 import { full } from '../../mitwachsen-guide';
-import type { Rider } from '../../mitwachsen-rider';
+import { CHEER } from '../../mitwachsen-ride-kit';
+import { stageOf } from '../../mitwachsen-ride-save';
+import type { Fan, Rider, Vehicle } from '../../mitwachsen-rider';
 import type { World } from '../../mitwachsen-world';
-import { CHEER, rideRules, type Fan } from './mitwachsen-ride';
-import { stageOf } from './mitwachsen-ride-save';
 import { sledRoute } from './mitwachsen-sled-route';
 import { SNOWMAN, stageAt } from './mitwachsen-snowman';
 
@@ -38,5 +39,5 @@ export function snowmen(s: Rider, world: World): Fan[] {
   return out;
 }
 
-/** Regeln des Schlittens (für `pack.rules.ride`) */
-export const sled = rideRules(SLED, sledRoute, ready, snowmen);
+/** Der Schlitten für die Fahr-Engine (`pack.rules.vehicle`): Eintrag, Strecke, wann er erscheint, wer mitwinkt */
+export const sled: Vehicle = { spec: SLED, route: sledRoute, ready, fans: snowmen };

@@ -60,7 +60,8 @@ export type World = Realms & {
   /**
    * Ein Welt-Paket, das erst im Spiel ankam, einbauen: Die Welt ist danach Feld für Feld dieselbe wie gleich mit dem
    * Paket gebaut (`world`); von den schon berechneten Stücken fallen nur die weg, die sich dabei ändern (`chunks`, als
-   * "cx,cy"). Hat die Welt das Paket schon, bleibt alles, wie es ist.
+   * "cx,cy"). Hat die Welt das Paket schon oder baut und legt es nichts (die Fahrzeuge: nur Regeln), bleibt alles, wie
+   * es ist.
    */
   attach(pack: WorldPack): { world: World; chunks: readonly string[] };
   /**
@@ -738,7 +739,7 @@ function build(
       return gate ? { id: gate, strength: 1 } : climateOf(seed, places, x, y);
     },
     attach: (pack) =>
-      built.some((p) => p.id === pack.id)
+      built.some((p) => p.id === pack.id) || (!pack.build && !pack.lay) // ein Paket nur mit Regeln (Fahrzeuge): nichts zu bauen
         ? { world, chunks: [] }
         : build(seed, [...built, pack], saved, { regions, cache }),
     relay: (next) => build(seed, built, next, { regions, cache }),

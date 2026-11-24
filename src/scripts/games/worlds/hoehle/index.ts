@@ -16,7 +16,7 @@
 import type { GuideRules } from '../../mitwachsen-guide';
 import type { HeraldRules } from '../../mitwachsen-herald';
 import type { WorldPack } from '../../mitwachsen-pack-types';
-import type { RideRules } from '../../mitwachsen-rider';
+import type { RideEngine, Vehicle } from '../../mitwachsen-rider';
 import type { View2D } from '../../mitwachsen-view';
 import type { View3D } from '../../mitwachsen-view-3d';
 import { buildGrotte, placeGrotte } from './mitwachsen-grotte';
@@ -24,7 +24,7 @@ import { rules } from './mitwachsen-cave-rules';
 import { view } from './view-2d';
 import { BAT_ROOST, CAVE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
 
-export const pack: WorldPack<GuideRules, View2D, View3D, RideRules, HeraldRules> = {
+export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle> = {
   id: 'hoehle',
   gate: 'hoehle',
   build: buildGrotte,

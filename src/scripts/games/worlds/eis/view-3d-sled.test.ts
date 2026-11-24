@@ -6,7 +6,7 @@ import { initialState } from '../../mitwachsen-state';
 import type { Box } from '../../mitwachsen-view';
 import type { Layer } from '../../mitwachsen-view-3d';
 import { EIS_PACK, worldOf } from '../../test-worlds';
-import { withRide } from './mitwachsen-ride-save';
+import { withRide } from '../../mitwachsen-ride-save';
 import { sledMarks } from './mitwachsen-sled-look';
 import { joined, marksLayer } from './view-3d-sled';
 

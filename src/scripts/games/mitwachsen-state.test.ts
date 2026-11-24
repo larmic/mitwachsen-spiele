@@ -29,7 +29,8 @@ import { ICE_ANIMALS } from '../../data/games/worlds/eis/mitwachsen-kessel';
 import { HAUNTS } from './worlds/eis/mitwachsen-haunts';
 import { bergPeak } from './worlds/eis/mitwachsen-ice-sky';
 import { migrate, newWorld, progressFrom, withProgress, type SavedWorld } from './mitwachsen-save';
-import type { RideRules } from './mitwachsen-rider';
+import type { RideRules, Vehicle } from './mitwachsen-rider';
+import { RIDES } from '../../data/games/mitwachsen-rides';
 
 /** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich; Zuhause der Eis-Welt (im Kessel von Seed 1) */
 const { lichtung: LICHTUNG, eis: EIS_HOME, hoehle: HOEHLE_HOME } = worldOf(1).homes;
@@ -1473,7 +1474,12 @@ describe('Haken der Fahrzeuge (WorldRules.ride)', () => {
         return blocks;
       },
     };
-    return { calls, packs: [{ rules: { bump: () => false, ride } }] };
+    // die Fahr-Engine (Paket der Fahrzeuge) mit einem Fahrzeug (aus einem anderen Paket): ihre Regeln sind `ride`
+    const vehicle = { spec: RIDES[0], route: () => undefined } satisfies Vehicle;
+    return {
+      calls,
+      packs: [{ rules: { bump: () => false, ride: () => ride } }, { rules: { bump: () => false, vehicle } }],
+    };
   }
   const hasRide = (r: { events: GameEvent[] }) => r.events.some((e) => e.type === 'ride');
 

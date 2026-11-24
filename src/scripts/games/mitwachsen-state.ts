@@ -32,7 +32,8 @@ import { dirTo, freeNear, occupied } from './mitwachsen-free';
 import { crossBorder, type BorderEvent, type Mode } from './mitwachsen-border';
 import { lost, type GuideEvent, type GuideRules } from './mitwachsen-guide';
 import type { PackEvent, Ride, RideEvent, WorldRules } from './mitwachsen-pack-types';
-import type { MoveCmd, RideRules } from './mitwachsen-rider';
+import type { MoveCmd, RideEngine, RideRules, Vehicle } from './mitwachsen-rider';
+import type { RideId } from '../../data/games/mitwachsen-rides';
 import { hooksOf, type HeraldEvent, type HeraldRules, type Work } from './mitwachsen-herald';
 import { listen } from './mitwachsen-listen';
 import { roostAt } from './mitwachsen-roost';
@@ -56,6 +57,7 @@ export type Animal = {
   spawn: readonly [number, number];
   rest: number; // Takte bis zum nächsten Schritt beim Umherlaufen
   nap?: true; // ein Bote schläft (Tok, am Abend gekommen; mitwachsen-herald.ts)
+  bench?: true; // wartet am Halt eines Fahrzeugs, bis die Figur wieder nah ist (mitwachsen-border.ts, `BENCH`)
 };
 export type HomeAnimal = { id: string; species: SpeciesId };
 
@@ -83,6 +85,8 @@ export type State = Omit<Progress, 'position'> & {
   held?: readonly [number, number]; // gespeicherte Position, solange ein Welt-Paket fehlt: bleibt im Spielstand (Abschnitt „Welt-Pakete“)
   ride?: Ride; // laufende Fahrt mit einem Fahrzeug (nicht gespeichert; Regeln aus dem Welt-Paket, `WorldRules.ride`)
   rideDue: number; // Takt, ab dem das Fahrzeug erscheint, danach: herbeigetrabt bzw. angestoßen (-1: nie; nicht gespeichert)
+  nudged?: { id: RideId; at: number }; // zuletzt angestoßenes Fahrzeug, das nicht von selbst erscheint (Zug), und wann (nicht gespeichert)
+  docked?: Partial<Record<RideId, 'home' | 'out'>>; // an welchem Halt ein Fahrzeug zuletzt ankam (beide Halte in einer Gegend; nicht gespeichert)
   heraldDue: number; // Bote einer Welt (Tok): Takt, ab dem er auftaucht bzw. aufgetaucht ist (-1: nicht fällig; nicht gespeichert, mitwachsen-herald.ts)
   work?: Work; // Bote einer Welt baut (Tok: Bau 1), von Takt bis Takt; solange hüpft die Figur nur (nicht gespeichert, mitwachsen-herald.ts)
   late: boolean; // Abend: Die Uhr des Kinds hat `BED_AT` erreicht (die Komponente setzt es, mitwachsen-tired.ts; nicht gespeichert)
@@ -278,7 +282,7 @@ export const regionAnimals = (region: RegionId): string[] =>
  * erwacht eine Portal-Plattform. Ohne Angabe gilt alles als erkundet. `guide` sind die Regeln des verlaufenen Pinguins
  * (worlds/eis/mitwachsen-lead.ts, aus dem Welt-Paket), die die Ansicht erst hereinreicht, wenn er fällig ist; ohne sie
  * taucht er nicht auf. `rules`: Regeln der Welten aus ihren geladenen Paketen (`WorldPack.rules`, Eis-Welt: Schneemänner;
- * `ride`: ein Fahrzeug, mitwachsen-rider.ts; `herald`: der Bote einer Welt, Tok, mitwachsen-herald.ts).
+ * `ride`: die Fahr-Engine, `vehicle`: ein Fahrzeug, mitwachsen-rider.ts; `herald`: der Bote einer Welt, Tok, mitwachsen-herald.ts).
  */
 export function step(
   state: State,
@@ -286,7 +290,7 @@ export function step(
   cmd: Cmd,
   explored: Explored = EVERYWHERE,
   guide?: GuideRules,
-  rules: readonly { rules?: WorldRules<RideRules, HeraldRules> }[] = [],
+  rules: readonly { rules?: WorldRules<RideEngine, HeraldRules, Vehicle> }[] = [],
 ): Step {
   // Flache Kopie: Tiere werden beim Ändern ersetzt, nie verändert – alte Zustände bleiben gültig
   const s: State = {
@@ -445,7 +449,7 @@ function move(
   world: World,
   dir: Dir,
   events: GameEvent[],
-  packs: readonly { rules?: WorldRules<unknown, unknown> }[],
+  packs: readonly { rules?: WorldRules<unknown, unknown, unknown> }[],
 ) {
   const p = s.player;
   p.dir = dir;
@@ -560,6 +564,7 @@ function sleep(s: State, world: World, events: GameEvent[]) {
   for (const id of [...s.followers, ...waiting]) {
     const a = s.animals.find((x) => x.id === id)!;
     a.mode = 'wander';
+    delete a.bench;
     if (a.home.kind === 'wild') {
       s.animals = s.animals.filter((x) => x.id !== id);
       continue;

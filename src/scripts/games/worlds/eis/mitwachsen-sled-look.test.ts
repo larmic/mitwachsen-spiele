@@ -8,9 +8,9 @@ import type { RideAt, RideBody } from '../../mitwachsen-ride-view';
 import type { Box } from '../../mitwachsen-view';
 import { initialState, step, type GameEvent, type State } from '../../mitwachsen-state';
 import { createWorld } from '../../mitwachsen-world';
-import { EIS_PACK, worldOf } from '../../test-worlds';
-import { COME, DUE, stopsOf, trotFrom } from './mitwachsen-ride';
-import { withRide, type RideStage } from './mitwachsen-ride-save';
+import { EIS_PACK, FAHRT_PACK, worldOf } from '../../test-worlds';
+import { COME, DUE, stopsOf, trotFrom } from '../../mitwachsen-ride-kit';
+import { withRide, type RideStage } from '../../mitwachsen-ride-save';
 import { sled } from './mitwachsen-sled';
 import {
   DOOR_U,
@@ -60,9 +60,12 @@ const part = (b: readonly RideBody[], id: string) => b.find((x) => x.id === id);
 const colors = (b: RideBody | undefined) => new Set(b!.parts.flatMap((p) => [p[6], p[7]]));
 
 describe('Aussehen des Schlittens (mitwachsen-sled-look.ts)', () => {
-  it('kommt mit dem Paket: Regeln über `rules.ride`, Bild über die Haken der Ansicht', () => {
-    expect(EIS_PACK.rules!.ride).toBe(sled);
-    expect(view).toMatchObject({ bodies: sledBodies, marks: sledMarks, rideFx });
+  it('kommt mit dem Paket: Fahrzeug über `rules.vehicle` (Regeln aus der Fahr-Engine), Bild über die Haken der Ansicht', () => {
+    expect(EIS_PACK.rules!.vehicle).toBe(sled);
+    expect(view).toMatchObject({ bodies: sledBodies, marks: sledMarks });
+    const e: RideEvent = { type: 'ride', what: 'board', id: 'schlitten', x: 0, y: 0 };
+    expect(view.rideFx!(e, at())).toEqual(rideFx(e, at()));
+    expect(view.rideFx!({ ...e, id: 'hoehle' }, at())).toBeUndefined(); // der Zug antwortet selbst
   });
 
   it('Körper je Stufe: noch nichts, dann Schuppen, Schlitten mit goldenem Rahmen und Rentier; danach mit Wimpel', () => {
@@ -122,7 +125,7 @@ describe('Aussehen des Schlittens (mitwachsen-sled-look.ts)', () => {
     const ids = s.animals.map((a) => a.id).sort();
     const events: GameEvent[] = [];
     for (let i = 0; i < DUE + COME + 2; i++) {
-      const n = step(s, world, { type: 'tick' }, undefined, undefined, [EIS_PACK]);
+      const n = step(s, world, { type: 'tick' }, undefined, undefined, [EIS_PACK, FAHRT_PACK]);
       s = n.state;
       events.push(...n.events);
     }

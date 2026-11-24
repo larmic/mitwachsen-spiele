@@ -27,7 +27,7 @@ export const RULES: Rule[] = [
     name: 'Spiel lädt 3D erst bei Bedarf',
     pages: /^spielen\//,
     // Kern: Regeln, Welt, 2D-Ansicht und Daten des Spiels; 3D (Three.js) und die Welt-Pakete kommen erst per import().
-    // Gemessen 139 756 Bytes (136,5 KB)
+    // Gemessen 148 385 Bytes (144,9 KB)
     budget: 151 * 1024,
     // Probe: Der Höhlenhimmel der Grotte steht nur in ihrem Welt-Paket (GROTTE_COLORS.sky)
     forbidden: /WebGLRenderer|three\.module|#4a4370/,
@@ -61,12 +61,13 @@ export const RULES: Rule[] = [
     name: 'Welt-Paket Eis',
     pages: /^spielen\/index\.html$/, // nur die Spielseite lädt Welt-Pakete
     parts: [
-      // Gletscherkessel, Regeln des Pinguins und des Schlittens, Zeichenteile der 2D-Ansicht und Modelle der Eis-Tiere
+      // Gletscherkessel, Regeln des Pinguins, der Schlitten (Strecke, Bild; seine Fahrregeln im Paket der Fahrzeuge),
+      // Zeichenteile der 2D-Ansicht und Modelle der Eis-Tiere
       { chunks: /\/welt-eis\.[\w-]+\.js$/ },
       // 3D-Teil: kommt erst nach der 3D-Ansicht (Three.js, Baukasten der Zugänge) und dem Paket der Welt
       { chunks: /\/welt-eis-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-eis)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 68 872 Bytes (67,3 KB)
+    // Gemessen 64 963 Bytes (63,4 KB)
     budget: 74 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
@@ -92,14 +93,26 @@ export const RULES: Rule[] = [
     pages: /^spielen\/index\.html$/,
     parts: [
       // Gleis der Höhlenbahn auf Lichtung und Grotte: Trassen-Suche, Bahnhof Bär, Zeichenteile der 2D-Ansicht; Tok, der
-      // Bote der Höhlenwelt (Regeln, Modell, Bild und Ton); Bau 1 mit Bahnhof Bär und Zug (Modelle, Körper, Töne); bis zum
-      // Freischalten (BAHN_LIVE) holt es nur der Entwickler-Schalter
+      // Bote der Höhlenwelt (Regeln, Modell, Bild und Ton); Bau 1 mit Bahnhof Bär und Zug (Modelle, Körper, Töne); der Zug
+      // als Fahrzeug (Strecke, Bild beim Fahren, Ton, Licht im Tunnel); bis zum Freischalten (BAHN_LIVE) holt es nur der
+      // Entwickler-Schalter
       { chunks: /\/welt-bahn\.[\w-]+\.js$/ },
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Bahn
       { chunks: /\/welt-bahn-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-bahn)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 31 928 Bytes (31,2 KB)
-    budget: 35 * 1024,
+    // Gemessen 37 829 Bytes (36,9 KB)
+    budget: 41 * 1024,
+    forbidden: /WebGLRenderer|three\.module/,
+  },
+  {
+    name: 'Welt-Paket Fahrzeuge',
+    pages: /^spielen\/index\.html$/,
+    // Die Fahr-Engine aller Fahrzeuge (einsteigen, fahren, Hindernis, Tunnel, ankommen), samt dem, was sie mit den Paketen
+    // der Fahrzeuge teilt (Halte, Spielstand packs.fahrt); keine eigene Welt, kein 3D-Teil. Kommt, sobald es ein Fahrzeug
+    // geben kann (Eistor offen)
+    chunks: /\/welt-fahrt\.[\w-]+\.js$/,
+    // Gemessen 7791 Bytes (7,6 KB)
+    budget: 8.4 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

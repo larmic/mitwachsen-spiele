@@ -13,7 +13,7 @@
 import type { GuideRules } from '../../mitwachsen-guide';
 import type { HeraldRules } from '../../mitwachsen-herald';
 import type { WorldPack } from '../../mitwachsen-pack-types';
-import type { RideRules } from '../../mitwachsen-rider';
+import type { RideEngine, Vehicle } from '../../mitwachsen-rider';
 import type { View2D } from '../../mitwachsen-view';
 import type { View3D } from '../../mitwachsen-view-3d';
 import { buildKessel, placeKessel } from './mitwachsen-kessel';
@@ -25,15 +25,15 @@ import { rules as snowman } from './mitwachsen-snowman';
 import { rules as chime } from './mitwachsen-chime';
 import { sled } from './mitwachsen-sled';
 
-export const pack: WorldPack<GuideRules, View2D, View3D, RideRules, HeraldRules> = {
+export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle> = {
   id: 'eis',
   gate: 'eis',
   build: buildKessel,
   place: placeKessel,
   lead: { guide, meetGuide, hold }, // Regeln des Pinguins (ein schlichtes Objekt, kein Modul-Namensraum: spart Bytes)
   // Tür im Vorspiel des Eistors (die Flügel sind noch zu); Schneemänner bauen; Eiszapfen klingen (ohne Halt, darum
-  // zuletzt); der Schlitten mit dem Schlittenrentier (mitwachsen-sled.ts)
-  rules: { bump: (...a) => shut(...a) || snowman.bump(...a) || chime.bump(...a), ride: sled },
+  // zuletzt); der Schlitten mit dem Schlittenrentier (mitwachsen-sled.ts; seine Fahrregeln bringt das Paket der Fahrzeuge)
+  rules: { bump: (...a) => shut(...a) || snowman.bump(...a) || chime.bump(...a), vehicle: sled },
   view,
   view3d: () => import('./view-3d').then((m) => m.view3d),
   models: ICE_MODELS,

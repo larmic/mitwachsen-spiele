@@ -13,10 +13,12 @@ import type { Portal, PortalId } from './mitwachsen-portal';
 
 /**
  * Kennung eines Welt-Pakets: die Gegend hinter einem Tor, deren Welt es baut (Eis-Welt, Höhlenwelt), oder ein Paket, das
- * keine eigene Welt hat, sondern in die gebauten Welten etwas legt (`'bahn'`: das Gleis der Höhlenbahn auf Lichtung und
- * Grotte, `WorldPack.lay`). Unter ihr steht auch sein Zustand in `State.packs`; je Kennung ein Lader in mitwachsen-packs.ts
+ * keine eigene Welt hat: `'bahn'` legt etwas in die gebauten Welten (das Gleis der Höhlenbahn auf Lichtung und Grotte,
+ * `WorldPack.lay`), `'fahrt'` bringt nur Regeln (die Fahr-Engine aller Fahrzeuge, `WorldRules.ride`). Unter ihr steht
+ * auch sein Zustand in `State.packs` (`packs.fahrt`: der Spielstand der Fahrzeuge); je Kennung ein Lader in
+ * mitwachsen-packs.ts
  */
-export type PackId = Exclude<RegionId, 'lichtung'> | 'bahn';
+export type PackId = Exclude<RegionId, 'lichtung'> | 'bahn' | 'fahrt';
 
 /** Gang hinter einem Tor, in Koordinaten u (entlang des Tors) und t (nach außen) */
 export type Gang = {
@@ -72,7 +74,7 @@ export type Ruled = {
 };
 
 /**
- * Eine Fahrt mit einem Fahrzeug (nicht gespeichert; Regeln im Welt-Paket, worlds/eis/mitwachsen-ride.ts): `phase`
+ * Eine Fahrt mit einem Fahrzeug (nicht gespeichert; Regeln im Paket der Fahrzeuge, worlds/fahrt/mitwachsen-ride.ts): `phase`
  * eingestiegen (`seated`, gleich geht es los), unterwegs (`go`), hält vor einem Hindernis (`stop`), angekommen (`arrive`,
  * gleich steigt die Figur aus); `at` Takt, an dem die Phase begann; `pos` Fortschritt auf der Strecke in Feldern,
  * `speed` Felder je Takt; `to` Halt, zu dem es fährt: sein Zuhause am Schuppen in der Welt (`home`) oder der Halt auf der
@@ -96,8 +98,10 @@ export type Ride = {
  * (`come`), schnaubt (`snort`), stößt sanft an (`nudge`), Figur steigt ein (`board`) oder gleich wieder aus (`leave`),
  * fährt los (`go`), Figur winkt im Sitz (`wave`), hält vor einem Hindernis (`stop`), Tier hüpft beiseite (`shoo`, `who`),
  * kommt an (`arrive`), Figur steigt aus (`alight`), Fest nach der ersten Heimfahrt (`feast`, gespeichert), ein Tier
- * winkt am Weg (`cheer`, `who`), der Pinguin winkt zum Abschied (`farewell`). `from`: Feld, von dem es herbeitrabt
- * (`appear`); `ring`: das Fahrzeug bimmelt dazu (`wave`, höchstens alle 1,5 s)
+ * winkt am Weg (`cheer`, `who`), der Pinguin winkt zum Abschied (`farewell`), gleich kommt ein Tunnel (`tunnel`:
+ * „Uh-uh“), ein Gast steigt nach der Fahrt aus und geht an seinen Platz (`guest`, `who`: Tok an seinem Platz neben der
+ * Torplatte). `from`: Feld, von dem es herbeitrabt (`appear`); `ring`: das Fahrzeug bimmelt bzw. tutet dazu (`wave`,
+ * höchstens alle 1,5 s)
  */
 export type RideEvent = {
   type: 'ride';
@@ -116,7 +120,9 @@ export type RideEvent = {
     | 'alight'
     | 'feast'
     | 'cheer'
-    | 'farewell';
+    | 'farewell'
+    | 'tunnel'
+    | 'guest';
   id: RideId;
   x: number;
   y: number;
@@ -130,11 +136,12 @@ export type RideEvent = {
  * Regeln einer Welt aus ihrem Paket (Eis-Welt: Schneemänner bauen, Glockenspiel). `step` bekommt sie hereingereicht,
  * sobald das Paket da ist. `bump`: Die Figur läuft in das Feld (x, y) mit dem Inhalt `c`; `move` sagt, auf welchem
  * Feld sie steht (`here`), ob der Schritt ginge (`walks`) und was auf anderen Feldern ist (`cell`). true, wenn der Zug damit erledigt ist (sie bleibt stehen),
- * sonst geht es weiter wie immer (auch nach einem Ereignis, etwa dem Ton eines Eiszapfens). `ride`: Regeln eines
- * Fahrzeugs (`RideRules` in mitwachsen-rider.ts; hier nur als Parameter, weil die Welt diese Datei kennt). `herald`: Regeln
- * des Boten einer Welt (Paket der Bahn: Tok; `HeraldRules` in mitwachsen-herald.ts, ebenso nur als Parameter).
+ * sonst geht es weiter wie immer (auch nach einem Ereignis, etwa dem Ton eines Eiszapfens). `ride`: die Fahr-Engine
+ * aller Fahrzeuge (Paket der Fahrzeuge; `RideEngine` in mitwachsen-rider.ts, hier nur als Parameter, weil die Welt diese
+ * Datei kennt). `vehicle`: das Fahrzeug einer Welt (Eis-Welt: der Schlitten, Bahn: der Zug; `Vehicle`, ebenso). `herald`:
+ * Regeln des Boten einer Welt (Paket der Bahn: Tok; `HeraldRules` in mitwachsen-herald.ts, ebenso nur als Parameter).
  */
-export type WorldRules<Ride = never, Herald = never> = {
+export type WorldRules<Ride = never, Herald = never, Vehicle = never> = {
   bump(
     s: Ruled,
     c: Cell,
@@ -145,6 +152,7 @@ export type WorldRules<Ride = never, Herald = never> = {
   ): boolean;
   ride?: Ride;
   herald?: Herald;
+  vehicle?: Vehicle;
 };
 
 /** Liegt ein Feld ganz hinter dem Felsring der Lichtung? */
@@ -177,11 +185,19 @@ export type Laid = {
  * lädt ihren 3D-Teil nach (`View3D` aus mitwachsen-view-3d.ts; braucht Three.js, darum ein eigener `import()`, erst wenn
  * die 3D-Ansicht da ist). `models`: Modelle der Tiere dieser Welt (`addModels`), `roosts` ihre Ruhehaltungen (Höhlenwelt:
  * die Fledermaus kopfüber, `Species.roost`). `rules`: Regeln, die nur in dieser
- * Welt gelten (Eis-Welt: Schneehaufen wachsen zu Schneemännern, `ride`: Fahrzeug; Bahn: `herald`, Tok), `step` hereingereicht.
+ * Welt gelten (Eis-Welt: Schneehaufen wachsen zu Schneemännern, `vehicle`: der Schlitten; Bahn: `herald`, Tok, und
+ * `vehicle`, der Zug; Fahrzeuge: `ride`, die Fahr-Engine), `step` hereingereicht.
  * `dawn`: Ein neuer echter Spieltag beginnt (mehr als `BREAK` Pause, mitwachsen-tired.ts): neuer Zustand der Pakete (Bahn:
  * Tok, der am Abend schlafend kam, wacht auf); die Spielseite fragt es beim Start und nach langer Pause.
  */
-export type WorldPack<Rules = unknown, View = unknown, View3 = unknown, Ride = unknown, Herald = unknown> = {
+export type WorldPack<
+  Rules = unknown,
+  View = unknown,
+  View3 = unknown,
+  Ride = unknown,
+  Herald = unknown,
+  Vehicle = unknown,
+> = {
   id: PackId;
   gate?: GateId; // das Tor, hinter dem seine Welt liegt (`REGIONS`: `behind` der Gegend `id`); ohne eigene Welt keins
   build?(
@@ -194,7 +210,7 @@ export type WorldPack<Rules = unknown, View = unknown, View3 = unknown, Ride = u
   place?(seed: number, gang: Gang, beyond: Beyond): KesselPlace;
   lay?(laid: Laid): void;
   lead?: Rules;
-  rules?: WorldRules<Ride, Herald>;
+  rules?: WorldRules<Ride, Herald, Vehicle>;
   dawn?(packs: Readonly<Record<string, unknown>>): Record<string, unknown>;
   view?: View;
   view3d?: () => Promise<View3>;

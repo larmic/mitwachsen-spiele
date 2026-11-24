@@ -1,4 +1,5 @@
-// Fahrregeln des Schlittens (Engine mitwachsen-ride.ts); die Strecke prüft mitwachsen-sled-route.test.ts
+// Fahrregeln des Schlittens (Fahr-Engine im Paket der Fahrzeuge, worlds/fahrt/mitwachsen-ride.ts); die Strecke prüft
+// mitwachsen-sled-route.test.ts
 import { describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import { REGIONS, regionAnimalList, type Point } from '../../../../data/games/mitwachsen';
@@ -6,7 +7,7 @@ import { stops } from '../../input-pace';
 import type { RideEvent } from '../../mitwachsen-pack-types';
 import { initialState, progressOf, step, type Cmd, type GameEvent, type State } from '../../mitwachsen-state';
 import { canStep, createWorld, kesselPlace, standHeight, type World } from '../../mitwachsen-world';
-import { EIS_PACK, seedChunks, seedRange, seedsFor, worldOf } from '../../test-worlds';
+import { EIS_PACK, FAHRT_PACK, seedChunks, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import {
   ALIGHT,
   COME,
@@ -17,12 +18,11 @@ import {
   TAP_REACH,
   cellOf,
   parked,
-  rideRules,
   stopsOf,
-  type End,
-} from './mitwachsen-ride';
-import { stageOf, withRide, type RideStage } from './mitwachsen-ride-save';
-import { SLED, sled, snowmen } from './mitwachsen-sled';
+} from '../../mitwachsen-ride-kit';
+import type { End, RideRoute, Vehicle } from '../../mitwachsen-rider';
+import { stageOf, withRide, type RideStage } from '../../mitwachsen-ride-save';
+import { SLED, sled as SLED_VEHICLE, snowmen } from './mitwachsen-sled';
 import { SNOWMAN } from './mitwachsen-snowman';
 import { sledRoute } from './mitwachsen-sled-route';
 
@@ -31,8 +31,12 @@ const keyOf = ([x, y]: Point) => `${x},${y}`;
 
 // ---------- Fahrregeln (Engine mitwachsen-ride.ts mit dem Schlitten, über ein Test-Paket wie `pack.rules` in index.ts) ----------
 
-/** Test-Paket: die Regeln der Eis-Welt samt Schlitten */
-const RULES = [{ rules: { ...EIS_PACK.rules!, ride: sled } }];
+/** Die Fahr-Engine (Paket der Fahrzeuge) mit einem Fahrzeug */
+const engineOf = (...v: Vehicle[]) => FAHRT_PACK.rules!.ride!(v);
+/** Regeln des Schlittens: die Fahr-Engine mit dem Schlitten aus dem Paket der Eis-Welt */
+const sled = engineOf(SLED_VEHICLE);
+/** Test-Pakete: die Regeln der Eis-Welt samt Schlitten und die Fahr-Engine, wie im Spiel */
+const RULES = [EIS_PACK, FAHRT_PACK];
 const ICE_REGION = REGIONS.find((r) => r.id === 'eis')!;
 /** Je Eis-Art ein Tier auf der Schneewiese: Die Leiste der Eis-Welt ist voll */
 const FULL = regionAnimalList(ICE_REGION)
@@ -370,11 +374,7 @@ describe('Fahrregeln des Schlittens (Eis-Welt)', () => {
       cell: (x, y) =>
         r.on.has(keyOf([x, y])) ? world.cell(x, y) : { ...world.cell(x, y), portal: { gate: 'x' } as never },
     };
-    const engine = rideRules(
-      SLED,
-      () => r,
-      () => false,
-    );
+    const engine = engineOf({ spec: SLED, route: (): RideRoute => r, ready: () => false });
     const stuck = { ...wait.s, tick: wait.s.tick + 1 };
     const events: RideEvent[] = [];
     engine.tick(stuck, cramped, { push: (...e) => events.push(...(e as RideEvent[])) });

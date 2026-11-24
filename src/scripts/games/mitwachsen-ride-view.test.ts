@@ -53,7 +53,13 @@ describe('Haken der Ansicht für Fahrzeuge (mitwachsen-ride-view.ts)', () => {
   });
 
   it('angetippt ist ein neuer Druck in seine Richtung, nur zum Einsteigen', () => {
-    expect(tapCmd(SLED, { x: 10, y: 9 })).toEqual({ type: 'move', dir: 'n', fresh: true, tap: true });
+    expect(tapCmd(SLED, { x: 10, y: 9 })).toEqual({
+      type: 'move',
+      dir: 'n',
+      fresh: true,
+      tap: true,
+      ride: 'schlitten',
+    });
     expect(tapCmd(SHED, { x: 2, y: 5 })).toMatchObject({ dir: 'e', tap: true });
     expect(tapCmd(DEER, { x: 11, y: 5 }).dir).toBe('w'); // auf demselben Feld: irgendeine Richtung, das Fahrzeug entscheidet
   });

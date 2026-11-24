@@ -3,11 +3,15 @@
 // Lok und zwei Wagen, Silber mit lila Fensterband und türkisem Leuchtstreifen, vorn im Zielfenster eine Fledermaus, an den
 // Seiten der Lok eine Kristall-Raute, weiße Dampfwölkchen; im hinteren Wagen sitzt Tok, sobald er eingestiegen ist, und
 // dort geht die Tür auf. Bahnhof Bär: Bahnsteig aus Holzplanken mit heller Kante, eine Stufe über dem Gleis; Grasdach auf
-// vier Pfosten mit Bank für wartende Tiere, darauf das Schild „Bär auf Grün“ (ohne Text); Toks Häuschen am Kopf. Kein
-// Gold: Das Kind kann hier noch nichts tun (die goldene Tür kommt mit dem Fahren).
+// vier Pfosten mit Bank für wartende Tiere, darauf das Schild „Bär auf Grün“ (ohne Text); Toks Häuschen am Kopf. Fahren:
+// Die Figur sitzt im mittleren Wagen (das Dach dort ist offen, Kopf und Schultern schauen heraus), seine Tür hat bis zur
+// ersten Fahrt einen goldenen Rahmen (nur dort kann das Kind etwas tun: einsteigen), im Tunnel und am Abend leuchten die
+// Lampen. Sonst kein Gold.
 // Spec: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 1)
 
 import type { Part } from '../../../../lib/games/front';
+import { LOOK, figureParts } from '../../mitwachsen';
+import { GOLD } from '../../mitwachsen-portals';
 import { TOK_MODEL } from './mitwachsen-tok-model';
 
 /** Farben des Zugs und des Bahnhofs (Konzept „Zug und Bahnhöfe“), je Seite und Oberseite, wo es zwei gibt */
@@ -18,6 +22,8 @@ export const TRAIN_COLORS = {
   wheel: '#3c3f47',
   front: '#3a3550', // Zielfenster und offene Tür
   lamp: '#ffe08a',
+  lit: '#fffbe6', // Lampe an (Tunnel, Abend), mit Schein
+  glow: '#fff3b0',
   steam: '#ffffff',
   crystal: ['#b48cf0', '#6fd6f0', '#f08cc8'], // Raute: lila, türkis, rosa
   bat: { p: '#f2a7b8', g: '#a08c7c', k: '#1d2838', l: '#f2a7b8', w: '#b9b2dc' },
@@ -95,11 +101,19 @@ const roof = (open: boolean): Part[] =>
       ]
     : [[-L / 2 + 0.04, -HW + 0.04, 0.86, L - 0.08, 2 * HW - 0.08, 0.1, ...S]];
 
-/** Front der Lok: Zielfenster mit Fledermaus, zwei Lampen; an den Seiten die Kristall-Raute */
+/** Lampen an der Front (aus, oder an mit einem kleinen Schein davor): kein Punktlicht, nur Farbe */
+const lamps = (lit: boolean): Part[] =>
+  lit
+    ? [
+        ...both([L / 2, -HW + 0.06, 0.26, 0.03, 0.12, 0.08, TRAIN_COLORS.lit]),
+        ...both([L / 2 + 0.03, -HW + 0.04, 0.24, 0.05, 0.16, 0.12, TRAIN_COLORS.glow]),
+      ]
+    : both([L / 2, -HW + 0.06, 0.26, 0.03, 0.12, 0.08, TRAIN_COLORS.lamp]);
+
+/** Front der Lok: Zielfenster mit Fledermaus; an den Seiten die Kristall-Raute (die Lampen kommen aus `lamps`) */
 const FRONT: readonly Part[] = [
   [L / 2, -0.28, 0.6, 0.02, 0.56, 0.24, TRAIN_COLORS.front],
   ...pixels(BAT, TRAIN_COLORS.bat, L / 2 + 0.02, 0, 0.82, 0.026),
-  ...both([L / 2, -HW + 0.06, 0.26, 0.03, 0.12, 0.08, TRAIN_COLORS.lamp]),
   ...both([0.1, -HW - 0.014, 0.36, 0.08, 0.012, 0.08, TRAIN_COLORS.crystal[0]]),
   ...both([0.02, -HW - 0.016, 0.3, 0.08, 0.012, 0.06, TRAIN_COLORS.crystal[1]]),
   ...both([0.18, -HW - 0.016, 0.3, 0.08, 0.012, 0.06, TRAIN_COLORS.crystal[2]]),
@@ -108,17 +122,44 @@ const FRONT: readonly Part[] = [
 /** Tok sitzt im hinteren Wagen: sein Modell, etwas tiefer, Kopf und Helm schauen oben heraus */
 const RIDER: readonly Part[] = TOK_MODEL.map(([f, r, z, ...rest]): Part => [f, r, z + 0.32, ...rest]);
 
+/** Die Figur sitzt im mittleren Wagen: ohne Beine, Kopf und Schultern schauen oben heraus */
+const FIGURE: readonly Part[] = figureParts(LOOK)
+  .slice(4)
+  .map(([f, r, z, ...rest]): Part => [f - 0.05, r, z + 0.06, ...rest]);
+
 /** Offene Tür zur Seite des Bahnsteigs (`side` +1 rechts, −1 links) */
 const door = (side: 1 | -1): Part => [-0.26, side > 0 ? HW : -HW - 0.03, 0.18, 0.52, 0.03, 0.66, TRAIN_COLORS.front];
+/** Goldener Rahmen um die Tür zur Seite `side` bis zur ersten Fahrt: Hier steigt man ein */
+const frame = (side: 1 | -1): Part[] => {
+  const r = side > 0 ? HW + 0.004 : -HW - 0.034;
+  return [
+    [-0.32, r, 0.16, 0.06, 0.03, 0.74, GOLD.side, GOLD.top],
+    [0.26, r, 0.16, 0.06, 0.03, 0.74, GOLD.side, GOLD.top],
+    [-0.32, r, 0.86, 0.64, 0.03, 0.06, GOLD.side, GOLD.top],
+  ];
+};
 
-/** Wagen des Zugs: die Lok (`loco`), der mittlere, der hintere (mit Tok, sobald er sitzt; die Tür offen oder zu) */
-export type CarLook = { kind: 'loco' | 'mid' | 'rear'; tok: boolean; door: 0 | 1 | -1 };
+/**
+ * Wagen des Zugs: die Lok (`loco`, `lit`: die Lampen leuchten), der mittlere (`rider`: mit der Figur), der hintere (mit
+ * Tok, sobald er sitzt); `door`: die Tür zum Bahnsteig offen (+1 rechts, −1 links, 0 zu), `frame`: goldener Rahmen um
+ * die Tür auf dieser Seite (0: keiner)
+ */
+export type CarLook = {
+  kind: 'loco' | 'mid' | 'rear';
+  tok: boolean;
+  door: 0 | 1 | -1;
+  rider?: boolean;
+  frame?: 0 | 1 | -1;
+  lit?: boolean;
+};
 export const carParts = (k: CarLook): Part[] => [
   ...BODY,
-  ...roof(k.kind === 'rear' && k.tok),
-  ...(k.kind === 'loco' ? FRONT : []),
+  ...roof((k.kind === 'rear' && k.tok) || !!k.rider),
+  ...(k.kind === 'loco' ? [...FRONT, ...lamps(!!k.lit)] : []),
   ...(k.kind === 'rear' && k.tok ? RIDER : []),
+  ...(k.rider ? FIGURE : []),
   ...(k.door ? [door(k.door)] : []),
+  ...(k.frame ? frame(k.frame) : []),
 ];
 
 /** Weiße Dampfwölkchen über der Lok, je Phase (0 … 3) anders hoch (nicht bei reduzierter Bewegung) */

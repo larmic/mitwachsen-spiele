@@ -6,10 +6,12 @@
 // künftigen Bahnhof Bär am nächsten liegt, mit „Ju-hu“. Er hüpft zur Figur (Hüpfer, Herz), dann stellt er sich an den
 // künftigen Bahnsteig und ruft dort höchstens alle 4 s. Geht sie vorher weg, beginnt die Wartezeit neu. Am Abend (die
 // Uhr des Kinds hat `BED_AT` erreicht, `late`) kommt er schon schlafend und liegt neben dem Bett („Zzz“); er wacht erst
-// am nächsten echten Spieltag auf (mehr als `BREAK` Pause, `wakeTok` in mitwachsen-tok-save.ts), Schlafen im Spiel weckt
-// ihn nicht. Gespeichert wird nur `packs.fahrt.hoehle = { stage: 'faellig', schlaeft? }`, nie wo er steht. Er steht nie
+// am nächsten echten Spieltag auf (mehr als `BREAK` Pause, `wakeTok` in mitwachsen-ride-save.ts), Schlafen im Spiel
+// weckt ihn nicht. Gespeichert wird nur `packs.fahrt.hoehle = { stage: 'faellig', schlaeft? }`, nie wo er steht. Er steht nie
 // im Weg: Läuft die Figur in ihn hinein, während er an seinem Platz steht, beginnt er Bau 1 (mitwachsen-build.ts; nur
-// in einer Welt, in der Bahnhof Bär Platz hat), sonst singt und hüpft er; schläft er, schnarcht er leise.
+// in einer Welt, in der Bahnhof Bär Platz hat), sonst singt und hüpft er; schläft er, schnarcht er leise. Nach der ersten
+// Fahrt wartet er in der Bucht an seinem Platz neben der Torplatte (`BESIDE`, mitwachsen-train.ts): nachts wach neben dem
+// Bett der Lichtung, morgens ruft er und geht zurück an seinen Platz (`inBay`).
 // Bis zum Freischalten (`BAHN_LIVE`) holt das Spiel dieses Paket nie von selbst: Dann gibt es Tok nur im Blick hinein.
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Tok erscheint)
 
@@ -20,12 +22,13 @@ import { APPEAR, DUE, NEAR, PACE, PEEP_EVERY, full } from '../../mitwachsen-guid
 import type { HeraldEvents as Events, HeraldRules, Heralded } from '../../mitwachsen-herald';
 import { dirTo, freeNear, occupied } from '../../mitwachsen-free';
 import { canStep, standHeight, type World } from '../../mitwachsen-world';
+import { BESIDE, plateRow } from '../../mitwachsen-bay';
 import { bayAt, bearSpots, centreOf, hutOf, rowsOf, type Station } from './mitwachsen-bear';
 import { builtOf } from './mitwachsen-built';
 import { beatTick, buildStep, building, canBuild, startBuild } from './mitwachsen-build';
 import { futureBear } from './mitwachsen-line';
 import { REAR_ROW } from './mitwachsen-station-look';
-import { sledHome, tokOf, withTok } from './mitwachsen-tok-save';
+import { sledHome, tokOf, withTok } from '../../mitwachsen-ride-save';
 
 /** Tok unter den Wesen: ein Gast aus der Höhlenwelt (wie der Pinguin `eis:pinguin`) */
 export const TOK = animalId('hoehle', 'tok');
@@ -94,10 +97,10 @@ export function postOf(world: World): Post | null {
 
 const roundP = (p: Point): Point => [Math.round(p[0]), Math.round(p[1])];
 
-function fieldTo(world: World, goal: Point): Map<string, number> {
+function fieldTo(world: World, goal: Point, most = 6000): Map<string, number> {
   const field = new Map<string, number>([[key(...goal), 0]]);
   const queue: Point[] = [goal];
-  for (let i = 0; i < queue.length && field.size < 6000; i++) {
+  for (let i = 0; i < queue.length && field.size < most; i++) {
     const [x, y] = queue[i]!;
     const d = field.get(key(x, y))!;
     for (const [dx, dy] of STEPS) {
@@ -160,11 +163,12 @@ export function tokStep(
   explored: Explored,
 ) {
   if (s.work) return void build(s, world, cmd, events); // Bau 1 (mitwachsen-build.ts)
+  const t = s.animals.find((a) => a.id === TOK);
   if (!tokWanted(s)) {
     s.heraldDue = -1;
+    if (t?.mode === 'herald' && builtOf(s.packs) >= 1) inBay(s, world, t, cmd, events); // nach der ersten Fahrt
     return;
   }
-  const t = s.animals.find((a) => a.id === TOK);
   const woke = events.some((e) => e.type === 'wake');
   if (!t) return due(s, world, cmd, events, explored, woke);
   if (t.nap) {
@@ -383,6 +387,39 @@ export function tokMeet(s: Heralded, world: World, cmd: { dir: keyof typeof DIRS
   if (t.nap) events.push({ type: 'herald', what: 'snore', id: TOK, x: t.x, y: t.y });
   else startBuild(s, t, events);
   return true;
+}
+
+type Bay = { post: Point; field: Map<string, number> };
+const bays = new WeakMap<World, Bay | null>();
+/**
+ * Toks Platz in der Bucht: neben der Torplatte (`BESIDE`), dazu die Schritte dorthin von der Lichtung (bis zum Bett, die
+ * Bucht liegt weiter weg als sein Platz am Bahnsteig). Je Welt einmal; null ohne Höhlentor
+ */
+export function bayOf(world: World): Bay | null {
+  if (bays.has(world)) return bays.get(world)!;
+  const g = world.gates.get('hoehle');
+  const post = g && plateRow(g, BESIDE);
+  const found = post ? { post, field: fieldTo(world, post, 24000) } : null;
+  bays.set(world, found);
+  return found;
+}
+
+/**
+ * Tok wartet in der Bucht (nach der ersten Fahrt, mitwachsen-train.ts): Schläft die Figur ein, sitzt er wach neben dem
+ * Bett der Lichtung (eingeschlafen wird nie im Zug); morgens ruft er, wenn sie ihn sieht, und hüpft zurück an seinen Platz
+ * neben der Torplatte (ein Feld je `PACE.lead` Takte), dort schaut er zum Tor
+ */
+export function inBay(s: Heralded, world: World, t: Walker, cmd: 'move' | 'action' | 'tick', events: Events) {
+  if (events.some((e) => e.type === 'sleep')) return void bedside(s, world, t, false);
+  if (events.some((e) => e.type === 'wake')) return greet(s, world, t, events, 'call');
+  const at = bayOf(world);
+  const g = world.gates.get('hoehle');
+  if (cmd !== 'tick' || s.sleeping || !at || !g) return;
+  if (t.x === at.post[0] && t.y === at.post[1]) {
+    t.dir = dirTo(g.mid[0] - t.x, g.mid[1] - t.y);
+    return;
+  }
+  if (s.tick % PACE.lead === 0) stepTo(s, world, t, (x, y) => at.field.get(key(x, y)) ?? Infinity);
 }
 
 /** Toks Regeln für `step` (`WorldRules.herald`) */

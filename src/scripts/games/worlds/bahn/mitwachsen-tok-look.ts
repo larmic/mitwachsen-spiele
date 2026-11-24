@@ -15,7 +15,7 @@ import type { RideFx } from '../../mitwachsen-ride-view';
 import type { Scored } from '../../sfx';
 import { builtOf } from './mitwachsen-built';
 import { tokWanted } from './mitwachsen-tok';
-import { tokOf } from './mitwachsen-tok-save';
+import { tokOf } from '../../mitwachsen-ride-save';
 
 /** Hacke „pink“: Dreieck E6 → A5 (1319 → 880 Hz) in 50 ms, metallisch, ab `at` s */
 export const pink = (at = 0): Scored => [1318.51, 0.05, 'triangle', 0.05, 880 / 1318.51, at];

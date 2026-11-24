@@ -5,7 +5,8 @@
 // gespeichert, auch nicht über das Menü (`sandbox`; der Spielstand des Kindes bleibt, wie er war; nach dem Neuladen ohne
 // Schalter wacht die Figur wieder dort auf, wo sie war). Die Tore bleiben zu: Hinaus geht es nur durch Neuladen ohne
 // Schalter. Die Bahn (`bahn`, hinter `BAHN_LIVE`) holt die Grotte mit, damit das Gleis bis zum Bahnhof Fledermaus liegt,
-// und spielt einen Ausbau vor (`devProgress`: `&bau=1` bis zum Prellbock in der Bucht, sonst 2, die ganze Linie). Mit
+// und die Fahr-Engine mit und spielt einen Ausbau vor (`devProgress`: `&bau=1` bis zum Prellbock in der Bucht, sonst 2,
+// die ganze Linie; der Zug steht dann am Bahnhof Bär, Stufe `bereit`, die Figur kann einsteigen und fahren). Mit
 // `&bau=0` spielt sie den Stand vor, in dem Tok kommt: noch nichts gebaut, Eistor offen (dafür holt sie das Paket der
 // Eis-Welt mit), Eis-Leiste voll, erste Heimfahrt mit dem Schlitten gemacht; `&abend=1` macht es Abend (Tok kommt
 // schlafend, `devLate`).
@@ -22,8 +23,8 @@ export const DEV_PARAM = 'entwickler';
 export const DEV_BUILT = 'bau';
 /** Abend vorspielen (`&abend=1`): Die Regeln sehen die Uhr des Kinds bei `BED_AT` (Tok kommt schlafend) */
 export const DEV_EVENING = 'abend';
-/** Pakete, die ein Paket im Blick hinein mitbringt: die Bahn die Grotte (dort endet ihr Gleis) */
-const WITH: Partial<Record<PackId, readonly PackId[]>> = { bahn: ['hoehle'] };
+/** Pakete, die ein Paket im Blick hinein mitbringt: die Bahn die Grotte (dort endet ihr Gleis) und die Fahr-Engine (der Zug fährt) */
+const WITH: Partial<Record<PackId, readonly PackId[]>> = { bahn: ['hoehle', 'fahrt'] };
 
 /** Was der Entwickler-Schalter will: welche Pakete er holt (leer: kein Schalter) und in welchem Bett die Figur aufwacht */
 export type Glimpse = { packs: PackId[]; home: RegionId | null };
@@ -45,13 +46,16 @@ export function glimpse(search: string, ids: readonly PackId[]): Glimpse {
   const own = ids.filter((id) => named.includes(id)).sort((a, b) => named.indexOf(a) - named.indexOf(b));
   const tok: PackId[] = own.includes('bahn') && builtIn(search) === 0 ? ['eis'] : [];
   const packs = [...new Set([...own, ...own.flatMap((id) => WITH[id] ?? []), ...tok])].filter((id) => ids.includes(id));
-  const home = own.find((id): id is Exclude<PackId, 'bahn'> => id !== 'bahn') ?? (own.length ? 'lichtung' : null);
+  const home =
+    own.find((id): id is Exclude<PackId, 'bahn' | 'fahrt'> => id !== 'bahn' && id !== 'fahrt') ??
+    (own.length ? 'lichtung' : null);
   return { packs, home };
 }
 
 /**
  * Was der Schalter dem Spielstand vorspielt (nur im Arbeitsspeicher, `sandbox`): mit der Bahn ihren Ausbau
- * (`packs.bahn.built`, aus `&bau=`: 0, 1 oder 2, sonst 2); bei 0 dazu den Stand, in dem Tok kommt: Eistor offen, von
+ * (`packs.bahn.built`, aus `&bau=`: 0, 1 oder 2, sonst 2), ab 1 den Zug am Bahnhof (`packs.fahrt.hoehle`, Stufe
+ * `bereit`, wenn dort noch nichts steht); bei 0 dazu den Stand, in dem Tok kommt: Eistor offen, von
  * jeder Eis-Art ein Tier auf der Schneewiese (die Eis-Leiste voll) und die erste Heimfahrt mit dem Schlitten gemacht
  * (`packs.fahrt.schlitten`, Stufe `fest`). Ohne Bahn bleibt der Spielstand, wie er ist
  */
@@ -59,10 +63,13 @@ export function devProgress(dev: readonly PackId[], search: string, p: Progress)
   if (!dev.includes('bahn')) return p;
   const built = builtIn(search);
   const packs = { ...p.packs, bahn: { built } };
-  if (built) return { ...p, packs };
+  const fahrt = typeof p.packs.fahrt === 'object' && p.packs.fahrt !== null ? p.packs.fahrt : {};
+  // gebaut: Der Zug steht da (Stufe `bereit`, wie nach Bau 1), wenn der Spielstand nicht schon weiter ist
+  const was = (fahrt as { hoehle?: { stage?: unknown } }).hoehle;
+  const train = was?.stage === 'offen' || was?.stage === 'fest' ? was : { stage: 'bereit' };
+  if (built) return { ...p, packs: { ...packs, fahrt: { ...fahrt, hoehle: train } } };
   const eis = REGIONS.find((r) => r.id === 'eis')?.animals ?? [];
   const home = new Set(p.garden.map((a) => a.id));
-  const fahrt = typeof p.packs.fahrt === 'object' && p.packs.fahrt !== null ? p.packs.fahrt : {};
   return {
     ...p,
     openGates: [...new Set([...p.openGates, 'eis' as const])],

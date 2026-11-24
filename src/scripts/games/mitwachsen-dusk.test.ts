@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { DUSK_DAY, DUSK_NIGHT, dayOf, nightIn, nightMix, sunLevel, type Rgb } from './mitwachsen-dusk';
+import {
+  DUSK_DAY,
+  DUSK_NIGHT,
+  TUNNEL_LIGHT,
+  dayOf,
+  nightIn,
+  nightMix,
+  sunLevel,
+  tunnelNight,
+  type Rgb,
+} from './mitwachsen-dusk';
 import { MOOD_LIGHT, REGIONS } from '../../data/games/mitwachsen';
 
 const lum = ([r, g, b]: Rgb) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -44,5 +54,20 @@ describe('Nie dunkler als die Dämmerung (mitwachsen-dusk.ts)', () => {
     expect(nightMix('hoehle', 0.05, bright, NIGHT, DUSK)).toBe(0.05); // wenig Nacht: wie sie ist
     expect(nightMix('hoehle', 0.8, [0.05, 0.05, 0.05], NIGHT, DUSK)).toBe(0); // schon dunkler: gar nicht
     expect(nightMix('lichtung', 0.8, bright, NIGHT, DUSK)).toBe(0.8);
+  });
+});
+
+describe('Licht im Tunnel (tunnelNight, der Zug fährt durch Tunnelportal, Einschnitt und Gang)', () => {
+  it('am Tag 0,7-fach, nie dunkler als die Dämmerung; schon dunkler: nichts weiter; ohne Tunnel wie es ist', () => {
+    expect(TUNNEL_LIGHT).toBe(0.7);
+    expect(dayOf(tunnelNight(0, TUNNEL_LIGHT))).toBeCloseTo(0.7);
+    for (const night of [0, 0.2, 0.4, 0.6, DUSK_NIGHT, 0.9, 1]) {
+      const day = dayOf(night);
+      const lit = dayOf(tunnelNight(night, TUNNEL_LIGHT));
+      expect(lit, String(night)).toBeGreaterThanOrEqual(Math.min(day, DUSK_DAY) - 1e-9);
+      expect(lit, String(night)).toBeLessThanOrEqual(day + 1e-9);
+      expect(tunnelNight(night, 1)).toBe(night);
+    }
+    expect(tunnelNight(1, TUNNEL_LIGHT)).toBe(1); // nachts dimmt nichts weiter
   });
 });

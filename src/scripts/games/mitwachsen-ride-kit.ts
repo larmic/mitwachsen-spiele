@@ -1,0 +1,100 @@
+// Gemeinsames der Fahrzeuge – rein, für die Pakete (die Fahr-Engine in worlds/fahrt/ und das Bild jedes Fahrzeugs in
+// seinem Paket: Schlitten in worlds/eis/, Zug in worlds/bahn/; nur sie importieren es, Regel `ride-kit-is-for-packs`,
+// darum nicht im Kern): Zeiten der Fahrregeln, beide Halte einer Strecke (`stopsOf`), wo ein Fahrzeug steht, wenn es
+// nicht fährt (`parked`), das Feld der Fahrt bei einem Fortschritt (`cellOf`) und von wo es herbeitrabt (`trotFrom`).
+// Die Regeln selbst stehen in der Fahr-Engine (worlds/fahrt/mitwachsen-ride.ts), sie kennt kein einzelnes Fahrzeug.
+// Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Der Schlitten“ und „Tok und die Bahn“, Fahren)
+
+import type { Point } from '../../data/games/mitwachsen';
+import type { RideSpec } from '../../data/games/mitwachsen-rides';
+import type { Ride } from './mitwachsen-pack-types';
+import { rank, stageOf } from './mitwachsen-ride-save';
+import type { End, RideRoute, Rider } from './mitwachsen-rider';
+import type { World } from './mitwachsen-world';
+
+export const DUE = 20; // so viele Takte, nachdem die Welt es will (`ready`), erscheint es (wie der Pinguin)
+export const COME = 15; // so lange trabt es aus den Bäumen herbei, dann bimmelt und schnaubt es (`come`)
+export const DEPART = 20; // nach dem Einsteigen geht es so viele Takte später los (2 s; so lange steigt ein Pfeil weg aus)
+export const SHOO = 10; // so lange hält es vor einem Tier, dann hüpft das Tier beiseite
+export const ALIGHT = 10; // so lange nach der Ankunft steigt die Figur von selbst aus
+export const JINGLE_EVERY = 15; // höchstens so oft bimmelt bzw. tutet es (Anstoßen, Winken unterwegs)
+export const TAP_REACH = 4; // Antippen wirkt bis zu so vielen Feldern (Schachbrett)
+export const CHEER = 4; // auf der Festfahrt winken Tiere und Schneemänner bis so weit
+const EPS = 1e-6;
+
+export const key = (x: number, y: number) => `${x},${y}`;
+
+/**
+ * Fahrzeug am Halt: Ende der Strecke, Sitz, Zugtier (beim Zug das nächste Feld der Strecke) und alle Felder, die es
+ * belegt (samt Schuppen); `board`: die Felder, die zum Einsteigen da sind (Schlitten: der Sitz; Zug: jeder Wagen)
+ */
+export type Parked = {
+  end: End;
+  seat: Point;
+  pull: Point;
+  cells: ReadonlySet<string>;
+  board: ReadonlySet<string>;
+};
+
+const halts = new WeakMap<RideRoute, Record<End, Parked>>();
+/**
+ * Beide Halte einer Strecke: am Schuppen der Sitz auf dem ersten Feld, auf der Lichtung auf dem letzten, das Zugtier
+ * davor; ein Fahrzeug mit Wagen belegt dort die Felder seiner Wagen (`RideRoute.cars`)
+ */
+export function stopsOf(r: RideRoute): Record<End, Parked> {
+  let out = halts.get(r);
+  if (!out) {
+    const park = (end: End, seat: Point, pull: Point, more: readonly Point[] = []): Parked => {
+      const cars = r.cars?.[end];
+      const cells = new Set([seat, pull, ...(cars ?? []), ...more].map((p) => key(...p)));
+      return { end, seat, pull, cells, board: cars ? new Set(cars.map((p) => key(...p))) : new Set([key(...seat)]) };
+    };
+    const [first, second] = [r.path[0]!, r.path[1] ?? r.path[0]!];
+    out = { home: park('home', first, second, r.shed), out: park('out', r.path.at(-1)!, r.path.at(-2) ?? first) };
+    halts.set(r, out);
+  }
+  return out;
+}
+
+/**
+ * Wo das Fahrzeug steht, wenn es nicht fährt: am Halt der Gegend, in der die Figur ist, ab `bereit` (auf der Lichtung
+ * erst ab der Stufe `spec.out`: der Schlitten nach der ersten Heimfahrt); liegen beide Halte in ihrer Gegend (der Zug
+ * bei Ausbau 1), an dem, an dem es zuletzt ankam (`docked`, sonst auf der Lichtung). Undefined, solange es noch nicht da
+ * ist, unterwegs oder in einer anderen Gegend
+ */
+export function parked(
+  spec: Pick<RideSpec, 'id' | 'out'>,
+  r: RideRoute,
+  s: Pick<Rider, 'packs' | 'ride' | 'player' | 'docked'>,
+  world: World,
+): Parked | undefined {
+  const stage = rank(stageOf(s.packs, spec.id));
+  if (s.ride || stage < rank('bereit')) return undefined;
+  const at = stopsOf(r);
+  const realm = world.realm(s.player.x, s.player.y);
+  const home = realm === world.realm(...at.home.seat);
+  const out = stage >= rank(spec.out) && realm === world.realm(...at.out.seat);
+  if (home && out) return at[s.docked?.[spec.id] ?? 'out'];
+  return home ? at.home : out ? at.out : undefined;
+}
+
+/** Feld der Fahrt bei Fortschritt `pos` (zum Halt auf der Lichtung vorwärts auf `path`, heim rückwärts) */
+export const cellOf = (r: Pick<RideRoute, 'path'>, ride: Pick<Ride, 'to'>, pos: number): Point => {
+  const i = Math.floor(pos + EPS);
+  return r.path[ride.to === 'out' ? i : r.path.length - 1 - i]!;
+};
+
+const cheb = (ax: number, ay: number, bx: number, by: number) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
+
+/**
+ * Feld in den Bäumen, aus dem es herbeitrabt: ein Baum 6 bis 8 Felder vom Halt `seat`, sonst ein Stück die Strecke
+ * hinauf (auch für die Ansicht: Dort beginnt das Herbeitraben im Bild)
+ */
+export function trotFrom(r: Pick<RideRoute, 'path'>, world: World, [sx, sy]: Point): Point {
+  let best: Point | undefined;
+  for (let d = 6; d <= 8 && !best; d++)
+    for (let y = sy - d; y <= sy + d && !best; y++)
+      for (let x = sx - d; x <= sx + d && !best; x++)
+        if (cheb(x, y, sx, sy) === d && world.cell(x, y).deco === 'tree') best = [x, y];
+  return best ?? r.path[Math.min(8, r.path.length - 1)]!;
+}

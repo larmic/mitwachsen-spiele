@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { REGIONS, regionAnimalList } from '../../data/games/mitwachsen';
-import { NEAR_GATE, bahnWanted, holds, needsPack, packAt, type Need } from './mitwachsen-pack';
+import { NEAR_GATE, bahnWanted, fahrtWanted, holds, needsPack, packAt, type Need } from './mitwachsen-pack';
 import { beyondRing, createWorld, gatePlaces } from './mitwachsen-world';
 import { bareOf, worldOf } from './test-worlds';
 
@@ -110,5 +110,16 @@ describe('Welt-Pakete: wann das Paket der Bahn nötig ist (bahnWanted, Freigabe 
     expect(bahnWanted({ openGates: [] }, true)).toBe(false); // freigeschaltet: erst nach der Eis-Welt
     expect(bahnWanted({ openGates: ['eis'] }, true)).toBe(true);
     expect(at).toHaveLength(1);
+  });
+});
+
+describe('Welt-Pakete: wann das Paket der Fahrzeuge nötig ist (fahrtWanted, beide Stellungen von BAHN_LIVE)', () => {
+  it('sobald es ein Fahrzeug geben kann: Eistor offen (Schlitten); die Bahn kommt erst danach, auch freigeschaltet', () => {
+    for (const live of [false, true]) {
+      expect(fahrtWanted({ openGates: [] }, live), String(live)).toBe(false); // noch kein Fahrzeug
+      expect(fahrtWanted({ openGates: ['eis'] }, live), String(live)).toBe(true);
+      expect(fahrtWanted({ openGates: ['hoehle'] }, live), String(live)).toBe(false); // das Höhlentor allein: kein Fahrzeug
+    }
+    expect(fahrtWanted({ openGates: ['eis'] })).toBe(true); // mit der heutigen Freigabe
   });
 });

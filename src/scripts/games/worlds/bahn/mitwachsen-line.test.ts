@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fromKey } from '../../../../lib/games/chunks';
 import type { Point } from '../../../../data/games/mitwachsen';
 import { LINE } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import type { Cell, Rail } from '../../mitwachsen-cell';
@@ -11,6 +12,7 @@ import { APPROACH, PORTAL_T, clean, joined } from './mitwachsen-line';
 import { stationOf, stationBodies } from './mitwachsen-station-look';
 import type { State } from '../../mitwachsen-state';
 import { LETTERS, STEPS, gridOf } from './mitwachsen-trace';
+import { CARS, TRAIN, trainRoute } from './mitwachsen-train';
 
 /** Seeds, deren Grotte um eine Ecke liegt (wie in mitwachsen-grotte.test.ts): Dort biegt auch das Gleis im Gang ab */
 const TURNED = [26, 30];
@@ -236,11 +238,13 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
       const s = {
         packs: { bahn: { built: 1 }, fahrt: { hoehle: { stage: 'bereit' } } },
         player: { x: 1e6, y: 1e6, dir: 's' },
+        animals: [],
+        openGates: [],
         tick: 0,
       } as unknown as State;
       const lane = new Set(st.line.slice(0, LINE.bear.long).map(key));
       const cars = stationBodies(s, w, { now: 0, frac: 0, reduced: true, lit: false }).filter((b) =>
-        /^bahn:(loco|mid|rear)$/.test(b.id),
+        /^ride:hoehle:(loco|mid|rear)$/.test(b.id),
       );
       if (cars.length !== 3) bad.push(`${cars.length} Wagen`);
       for (const c of cars)
@@ -340,6 +344,45 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
       const portal = [...w.portals.values()].flatMap((p) => [p.gate, p.home]);
       if (laid.cells.some((p) => portal.some((q) => cheb(p, q) <= 2))) bad.push('an einer Plattform');
       if (laid.cells.some((p) => laid.c(p).garden)) bad.push('auf der Mooswiese');
+      expect(bad, `Seed ${seed}`).toEqual([]);
+    });
+
+    it(`Seed ${seed}: Strecke des Zugs (Fahren): bis zum Prellbock bzw. Bahnhof Fledermaus, Wagen auf dem Gleis, Bank auf dem Bahnsteig, jede Fahrt 15–20 s mit höchstens 8 Feldern je Sekunde`, () => {
+      const bad: string[] = [];
+      const ready = { bahn: { built: 2 }, fahrt: { hoehle: { stage: 'bereit' } } };
+      const shut = trainRoute(w, { packs: ready, openGates: [] });
+      const open = trainRoute(w, { packs: ready, openGates: ['hoehle'] });
+      if (!shut || !open) bad.push('keine Strecke');
+      const plate = new Set([-1, 0, 1].map((u) => key(plateRow(g, u))));
+      for (const [name, r] of [
+        ['Bucht', shut],
+        ['Grotte', open],
+      ] as const) {
+        if (!r) continue;
+        const cars = [...r.cars!.home, ...r.cars!.out];
+        if (cars.length !== 2 * CARS || cars.some((p) => !w.cell(...p).rail))
+          bad.push(`${name}: Wagen nicht auf dem Gleis`);
+        if (r.path.some((p) => plate.has(key(p)) || key(p) === key(plateRow(g, BESIDE))))
+          bad.push(`${name}: über die Platte`);
+        if (!r.seats.out.length || r.seats.out.some((p) => w.cell(...p).stop !== 'hoehle')) bad.push(`${name}: Bank`);
+        if (r.seats.home.some((p) => plate.has(key(p)) || r.on.has(key(p)))) bad.push(`${name}: Warteplatz`);
+        if (![...r.dark!].some((k) => w.cell(...fromKey(k)).rail?.part === 'portal')) bad.push(`${name}: kein Tunnel`);
+      }
+      if (shut && w.realm(...shut.stops.home) !== 'lichtung') bad.push('Ausbau 1 nicht in der Bucht');
+      if (open) {
+        if (w.realm(...open.stops.home) !== 'hoehle') bad.push('nicht bis in die Grotte');
+        if (!open.seats.home.some((p) => w.cell(...p).stop === 'hoehle')) bad.push('kein Steinbahnsteig');
+      }
+      // Dauer wie `rideTicks` in worlds/fahrt/mitwachsen-ride.ts (Pakete importieren einander nicht, auch ihre Tests
+      // nicht): in `TRAIN.ticks` gehalten (15–20 s). Gemessen (Seeds 1 bis 20): bis zum Prellbock 63 bis 91 Felder (gut 4
+      // bis 6 Felder je s), bis Bahnhof Fledermaus 105 bis 165 Felder; schneller als gut 8 Felder je s wird es nie
+      const [lo, hi] = TRAIN.ticks;
+      for (const r of [shut, open]) {
+        if (!r) continue;
+        const len = r.path.length - 1;
+        const t = Math.min(hi, Math.max(lo, Math.round(len / TRAIN.pace!)));
+        if (len / t > TRAIN.pace! * 1.05) bad.push(`${len} Felder in ${t / 10} s`);
+      }
       expect(bad, `Seed ${seed}`).toEqual([]);
     });
   }

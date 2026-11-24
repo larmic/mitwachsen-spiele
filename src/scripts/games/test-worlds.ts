@@ -10,6 +10,7 @@
 import { pack as eis } from './worlds/eis';
 import { pack as hoehle } from './worlds/hoehle';
 import { pack as bahn } from './worlds/bahn';
+import { pack as fahrt } from './worlds/fahrt';
 import { DIRS } from '../../lib/games/front';
 import type { GateId } from '../../data/games/mitwachsen';
 import { canStep, createWorld, type World } from './mitwachsen-world';
@@ -19,9 +20,15 @@ import type { WorldPack } from './mitwachsen-pack-types';
 addModels(eis.models); // wie im Spiel, wenn das Paket ankommt: Modelle der Eis-Tiere
 addModels(hoehle.models, hoehle.roosts); // und der Höhlen-Tiere samt der Fledermaus kopfüber
 addModels(bahn.models); // und Tok, der Gleisbauer
-export const PACKS = [eis, hoehle] as const;
+/** Alle Pakete, die das Spiel von selbst holt (die Bahn nicht, unten): Eis-Welt, Grotte und die Fahr-Engine */
+export const PACKS = [eis, hoehle, fahrt] as const;
 export const EIS_PACK = eis;
 export const HOEHLE_PACK = hoehle;
+/**
+ * Das Paket der Fahrzeuge (die Fahr-Engine, `rules.ride`): ohne eigene Welt, es baut nichts; Tests der Fahrzeuge reichen
+ * es mit dem Paket ihres Fahrzeugs an `step` (`[EIS_PACK, FAHRT_PACK]`), für `worldOf` brauchen sie es nicht
+ */
+export const FAHRT_PACK = fahrt;
 /**
  * Das Paket der Bahn (Gleis auf Lichtung und Grotte): nicht in `PACKS`, denn bis zum Freischalten (`BAHN_LIVE`) holt das
  * Spiel es nie von selbst; Tests der Bahn reichen es herein, mit einem Ausbau (`worldOf(seed, [HOEHLE_PACK, BAHN_PACK],

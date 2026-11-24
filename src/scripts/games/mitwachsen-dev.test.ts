@@ -19,12 +19,22 @@ describe('Entwickler-Schalter', () => {
   });
 
   it('die Bahn: holt die Grotte mit, die Figur wacht im Bett der Lichtung auf (oder der zuerst genannten Welt)', () => {
-    expect(glimpse('?entwickler=bahn', PACK_IDS)).toEqual({ packs: ['bahn', 'hoehle'], home: 'lichtung' });
-    expect(glimpse('?entwickler=hoehle,bahn', PACK_IDS)).toEqual({ packs: ['hoehle', 'bahn'], home: 'hoehle' });
-    expect(glimpse('?entwickler=bahn,eis', PACK_IDS)).toEqual({ packs: ['bahn', 'eis', 'hoehle'], home: 'eis' });
+    expect(glimpse('?entwickler=bahn', PACK_IDS)).toEqual({ packs: ['bahn', 'hoehle', 'fahrt'], home: 'lichtung' });
+    expect(glimpse('?entwickler=hoehle,bahn', PACK_IDS)).toEqual({
+      packs: ['hoehle', 'bahn', 'fahrt'],
+      home: 'hoehle',
+    });
+    expect(glimpse('?entwickler=bahn,eis', PACK_IDS)).toEqual({
+      packs: ['bahn', 'eis', 'hoehle', 'fahrt'],
+      home: 'eis',
+    });
     expect(glimpse('?entwickler=bahn', ['eis', 'bahn'])).toEqual({ packs: ['bahn'], home: 'lichtung' }); // ohne Grotte
+    expect(glimpse('?entwickler=fahrt', PACK_IDS)).toEqual({ packs: ['fahrt'], home: 'lichtung' }); // ohne eigene Welt
     // vor Tok (`&bau=0`) braucht es die Eis-Welt: ihr Tor ist dann offen
-    expect(glimpse('?entwickler=bahn&bau=0', PACK_IDS)).toEqual({ packs: ['bahn', 'hoehle', 'eis'], home: 'lichtung' });
+    expect(glimpse('?entwickler=bahn&bau=0', PACK_IDS)).toEqual({
+      packs: ['bahn', 'hoehle', 'fahrt', 'eis'],
+      home: 'lichtung',
+    });
   });
 
   const saved: Progress = {
@@ -38,7 +48,7 @@ describe('Entwickler-Schalter', () => {
     packs: { eis: { snowmen: 1 }, fahrt: { hoehle: { stage: 'faellig' } } },
   };
 
-  it('spielt der Bahn ihren Ausbau vor (nur im Arbeitsspeicher): 2, mit `&bau=1` nur bis zum Prellbock', () => {
+  it('spielt der Bahn ihren Ausbau vor (nur im Arbeitsspeicher): 2, mit `&bau=1` nur bis zum Prellbock; der Zug steht da', () => {
     expect(DEV_BUILT).toBe('bau');
     const built = (dev: PackId[], search: string) => devProgress(dev, search, saved).packs.bahn;
     expect(built(['bahn', 'hoehle'], '?entwickler=bahn')).toEqual({ built: 2 });
@@ -46,8 +56,10 @@ describe('Entwickler-Schalter', () => {
     expect(built(['bahn'], '?entwickler=bahn&bau=7')).toEqual({ built: 2 });
     expect(devProgress(['bahn'], '?entwickler=bahn&bau=1', saved)).toEqual({
       ...saved,
-      packs: { ...saved.packs, bahn: { built: 1 } },
-    }); // sonst bleibt alles
+      packs: { ...saved.packs, bahn: { built: 1 }, fahrt: { hoehle: { stage: 'bereit' } } },
+    }); // der Zug steht am Bahnhof (Stufe `bereit` wie nach Bau 1), sonst bleibt alles
+    const further = { ...saved, packs: { fahrt: { hoehle: { stage: 'fest' }, schlitten: { stage: 'fest' } } } };
+    expect(devProgress(['bahn'], '?entwickler=bahn', further).packs.fahrt).toEqual(further.packs.fahrt); // schon weiter
     expect(devProgress(['hoehle'], '?entwickler=hoehle&bau=1', saved)).toBe(saved); // ohne Bahn nichts
     expect(devProgress([], '', saved)).toBe(saved);
   });
@@ -103,7 +115,7 @@ describe('Entwickler-Schalter', () => {
   });
 
   it('Höhlenpaket und Bahn gibt es (Lader), das Höhlentor geht trotzdem nie auf', async () => {
-    expect(PACK_IDS).toEqual(['eis', 'hoehle', 'bahn']);
+    expect(PACK_IDS).toEqual(['eis', 'hoehle', 'bahn', 'fahrt']);
     const { GATES } = await import('../../data/games/mitwachsen');
     expect(GATES.find((g) => g.id === 'hoehle')?.opens).toBe('never');
   });

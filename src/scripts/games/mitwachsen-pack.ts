@@ -58,6 +58,14 @@ export const bahnWanted = (s: Pick<Need, 'openGates'>, live = BAHN_LIVE): boolea
   live && s.openGates.includes('eis');
 
 /**
+ * Braucht das Spiel das Paket der Fahrzeuge (worlds/fahrt/: die Fahr-Engine)? Sobald es ein Fahrzeug geben kann: Das
+ * Eistor ist offen (der Schlitten), oder die Bahn wird gebraucht (`bahnWanted`, mit der Freigabe `live`; vorher holt
+ * es mit ihr nur der Entwickler-Schalter). Ohne es fährt nichts, zu Fuß geht alles
+ */
+export const fahrtWanted = (s: Pick<Need, 'openGates'>, live = BAHN_LIVE): boolean =>
+  s.openGates.includes('eis') || bahnWanted(s, live);
+
+/**
  * Gehört ein Ort zur Welt hinter dem Tor `gate` oder ist ihr nah? Ja, wenn er höchstens `NEAR_GATE` Felder vom Tor
  * entfernt ist oder hinter dem Felsring liegt und dieses Tor von allen, die aufgehen können, das nächste ist (dorthin
  * führt nur der Gang dieses Tors). Eine gespeicherte Position dort hält der Spielstand, solange das Paket fehlt.

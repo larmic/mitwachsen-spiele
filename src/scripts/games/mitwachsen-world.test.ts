@@ -21,7 +21,7 @@ import { wildAnimals } from './mitwachsen-wild';
 import { homeAt } from './mitwachsen-home';
 import { PLATE_HALF, plateMid } from './mitwachsen-plate';
 import { BESIDE, bay, inBay, plateRow } from './mitwachsen-bay';
-import { EIS_PACK, PACKS, reachable, worldOf } from './test-worlds';
+import { EIS_PACK, FAHRT_PACK, PACKS, reachable, worldOf } from './test-worlds';
 
 const lichtung = REGIONS[0];
 /** Zuhause der Lichtung: Bett in ihrer Mitte, in jeder Welt gleich */
@@ -545,6 +545,7 @@ describe('Welt-Pakete', () => {
     }
     expect(world.cell(0, 0)).toBe(late.cell(0, 0)); // unveränderte Stücke werden übernommen, nicht neu gebaut
     expect(world.attach(EIS_PACK)).toEqual({ world, chunks: [] }); // zweimal einbauen ändert nichts
+    expect(world.attach(FAHRT_PACK)).toEqual({ world, chunks: [] }); // die Fahrzeuge bauen nichts: kein Neubau
   });
 
   it('attach merkt sich, womit die Welt gebaut wurde, auch wenn die Liste der Pakete danach wächst', () => {

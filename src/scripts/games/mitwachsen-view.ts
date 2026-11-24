@@ -195,13 +195,19 @@ export type View2D = {
     r3d?: { arrived(): boolean } | null,
   ): Hint;
   /**
-   * Fahrzeug dieser Welt (Eis-Welt: Schlitten, worlds/eis/mitwachsen-sled-look.ts; Haken in mitwachsen-ride-view.ts),
-   * gleich für 2D und 3D: Körper je Bild (Fahrzeug samt sitzender Figur, Zugtier, Schuppen), flache Marken am Boden
-   * (Spur, Fleck am Halt) und Ton, Hüpfer, Herz und Funken zu jedem seiner Ereignisse
+   * Fahrzeug dieser Welt (Eis-Welt: Schlitten, worlds/eis/mitwachsen-sled-look.ts; Bahn: Zug,
+   * worlds/bahn/mitwachsen-train-look.ts; Haken in mitwachsen-ride-view.ts), gleich für 2D und 3D: Körper je Bild
+   * (Fahrzeug samt sitzender Figur, Zugtier, Schuppen), flache Marken am Boden (Spur, Fleck am Halt) und Ton, Hüpfer,
+   * Herz und Funken zu jedem seiner Ereignisse (ein Ereignis eines anderen Fahrzeugs: undefined)
    */
   bodies?(state: State, world: World, at: RideAt): readonly RideBody[];
   marks?(state: State, world: World): readonly Box[];
-  rideFx?(e: RideEvent, state: State): RideFx;
+  rideFx?(e: RideEvent, state: State): RideFx | undefined;
+  /**
+   * Licht der Szene (1 wie immer): Fährt die Figur durch einen Tunnel (Bahn: Tunnelportal, Einschnitt, Gang), dimmt es
+   * auf das 0,7-Fache, nie dunkler als die Dämmerung (`tunnelNight` in mitwachsen-dusk.ts), in 2D und 3D gleich
+   */
+  dim?(state: State, world: World): number;
   /** Bote dieser Welt (Bahn: Tok, worlds/bahn/mitwachsen-tok-look.ts): Ton, Hüpfer, Herz und Funken zu seinen Ereignissen */
   heraldFx?(e: HeraldEvent, state: State): RideFx;
   /**

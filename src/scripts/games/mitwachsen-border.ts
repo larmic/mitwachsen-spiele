@@ -2,8 +2,10 @@
 // Durchgangs in eine andere Gegend (von der Lichtung aus die Torreihe eines Tors, heute des Eistors, von der Welt
 // dahinter aus die Gangmündung), lösen sich alle Tiere der Kette, die nicht in die Gegend dahinter gehören, auch die hinteren: Sie drehen
 // sich zur Figur und setzen sich auf feste Warteplätze davor. Kommt die Figur auf ihre Seite zurück, reihen sie sich
-// wieder ein; erst beim Schlafen gehen sie heim. Kein Ablauf nach Zeit, nichts davon wird gespeichert. Teil der Regeln
-// (mitwachsen-state.ts).
+// wieder ein; erst beim Schlafen gehen sie heim. Tiere, die am Halt eines Fahrzeugs warten (`bench`, die Figur fuhr
+// davon), reihen sich erst wieder ein, wenn sie höchstens `BENCH` Felder von ihnen auf ihrer Seite steht: Liegen beide
+// Halte in derselben Gegend (der Zug bei Ausbau 1), springen sie sonst quer über die Karte. Kein Ablauf nach Zeit, nichts
+// davon wird gespeichert. Teil der Regeln (mitwachsen-state.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Regel 7a „Weltgrenze“)
 
 import { fromKey } from '../../lib/games/chunks';
@@ -15,6 +17,8 @@ import { GATE_HALF, standHeight, type GatePlace, type World } from './mitwachsen
 
 export const SEATS = 16; // feste Warteplätze je Seite: genug für eine lange Kette, danach das nächste freie Feld
 const REACH = 12; // so weit liegen die Warteplätze höchstens vom ersten Feld ihrer Seite
+/** So nah (Schachbrett) muss die Figur einem Tier kommen, das am Halt eines Fahrzeugs wartet, damit es sich einreiht */
+export const BENCH = 12;
 
 /**
  * Was ein Tier tut: umherlaufen, folgen, auf der Wiese wohnen, an der Weltgrenze warten, (der verlaufene Pinguin)
@@ -49,6 +53,7 @@ export type Border = Omit<Crowd, 'player' | 'animals'> & {
     dir: Dir;
     mode: Mode;
     realm: RegionId;
+    bench?: true; // wartet am Halt eines Fahrzeugs (erst in der Nähe wieder einreihen, `BENCH`)
   }[];
   followers: string[];
 };
@@ -122,7 +127,7 @@ function crossingOf(world: World, gate: GatePlace, inner: RegionId): Crossing {
  * Die Figur ist von `from` auf ihr Feld gekommen (Schritt, Platztausch, Reise). An der Gangmitte wechselt die Gegend
  * (`realm`). Betritt sie von außen das erste Feld eines Durchgangs, setzen sich alle Tiere der Kette, die nicht in die
  * Gegend dahinter gehören, auf ihre Warteplätze (`wait`). Steht sie außerhalb der Durchgänge, reihen sich die Wartenden
- * ihrer Gegend wieder ein (`rejoin`).
+ * ihrer Gegend wieder ein (`rejoin`); die am Halt eines Fahrzeugs (`bench`) nur, wenn sie höchstens `BENCH` Felder weg sind.
  */
 export function crossBorder(s: Border, world: World, from: Point, events: { push(e: BorderEvent): unknown }) {
   const { x, y } = s.player;
@@ -131,8 +136,13 @@ export function crossBorder(s: Border, world: World, from: Point, events: { push
   const here = crossings(world).find((c) => c.cells.has(key(x, y)));
   if (!here) {
     for (const a of s.animals)
-      if (a.mode === 'wait' && a.realm === realm) {
+      if (
+        a.mode === 'wait' &&
+        a.realm === realm &&
+        (!a.bench || Math.max(Math.abs(a.x - x), Math.abs(a.y - y)) <= BENCH)
+      ) {
         a.mode = 'follow';
+        delete a.bench;
         s.followers.push(a.id);
         events.push({ type: 'rejoin', id: a.id, species: a.species });
       }

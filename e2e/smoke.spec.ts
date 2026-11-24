@@ -564,12 +564,12 @@ test(
     await render(page, 2);
     const done = await game.evaluate((node) => {
       const el = node as unknown as Game;
-      const loco = el.rides.find((r) => r.id === 'bahn:loco');
+      const loco = el.rides.find((r) => r.id === 'ride:hoehle:loco');
       return {
         work: !!el.state.work,
         tok: el.state.animals.some((a) => a.id === 'hoehle:tok'),
         fahrt: (el.state.packs.fahrt as { hoehle?: unknown }).hoehle,
-        bodies: ['bahn:loco', 'bahn:mid', 'bahn:rear', 'bahn:dach', 'bahn:schild'].filter((id) =>
+        bodies: ['ride:hoehle:loco', 'ride:hoehle:mid', 'ride:hoehle:rear', 'bahn:dach', 'bahn:schild'].filter((id) =>
           el.rides.some((r) => r.id === id),
         ),
         rail: !!loco && !!el.world.cell(Math.round(loco.x), Math.round(loco.y)).rail,
@@ -579,9 +579,91 @@ test(
       work: false,
       tok: false,
       fahrt: { stage: 'bereit' },
-      bodies: ['bahn:loco', 'bahn:mid', 'bahn:rear', 'bahn:dach', 'bahn:schild'],
+      bodies: ['ride:hoehle:loco', 'ride:hoehle:mid', 'ride:hoehle:rear', 'bahn:dach', 'bahn:schild'],
       rail: true,
     });
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
+      [],
+    );
+    expect(errors).toEqual([]);
+  },
+);
+
+// Fahren mit der Höhlenbahn per Entwickler-Schalter (`?entwickler=bahn&bau=1`, fester Seed 1; @3d, weil die Kamera dem
+// Zug folgt und 3D die Figur im Wagen zeichnet): Ein neuer Druck zum Zug steigt ein, die Figur sitzt im mittleren Wagen,
+// die erste Fahrt endet am Prellbock in der Bucht, die Figur steigt aus, Tok hüpft an seinen Platz neben der Torplatte.
+// Gespeichert wird im Blick hinein nichts; ohne Schalter gibt es den Zug nicht (Freigabe aus, „Tok erscheint …“)
+test(
+  'Spiel: Zug per Entwickler-Schalter: einsteigen, erste Fahrt bis zum Prellbock, Tok steigt aus, speichert nichts, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    type Game = {
+      world: { seed: number; cell(x: number, y: number): { stop?: string; ride?: string; plate?: string } };
+      state: {
+        player: { x: number; y: number; dir: string };
+        animals: { id: string; x: number; y: number }[];
+        ride?: { id: string; phase: string };
+        packs: Record<string, unknown>;
+      };
+      rides: { id: string; x: number; y: number; seat?: true }[];
+      apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+    };
+    await page.addInitScript(() => {
+      const real = crypto.getRandomValues.bind(crypto);
+      const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+        a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+      Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    });
+    const game = await openGame(page, { clock: true, dev: 'bahn&bau=1' });
+    await expectView(page);
+    expect(await game.evaluate((node) => (node as unknown as Game).world.seed)).toBe(1);
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    await render(page);
+    // auf den Bahnsteig neben den mittleren Wagen, ein neuer Druck zu ihm hin
+    const boarded = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const mid = el.rides.find((r) => r.id === 'ride:hoehle:mid')!;
+      const [mx, my] = [Math.round(mid.x), Math.round(mid.y)];
+      const dirs: [string, number, number][] = [
+        ['e', 1, 0],
+        ['w', -1, 0],
+        ['s', 0, 1],
+        ['n', 0, -1],
+      ];
+      const [dir, dx, dy] = dirs.find(([, dx, dy]) => el.world.cell(mx - dx, my - dy).stop === 'hoehle')!;
+      el.state = { ...el.state, animals: [], player: { x: mx - dx, y: my - dy, dir: 's' } };
+      el.apply({ type: 'move', dir, fresh: true });
+      return el.state.ride?.id;
+    });
+    expect(boarded).toBe('hoehle');
+    await ticks(page, 30);
+    await render(page, 2);
+    const riding = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      return { phase: el.state.ride?.phase, seat: el.rides.find((r) => r.seat)?.id };
+    });
+    expect(riding).toEqual({ phase: 'go', seat: 'ride:hoehle:mid' });
+    // 15 bis 20 s Fahrt (bis zum Prellbock 15 s), dann steigt die Figur nach 1 s aus
+    for (let i = 0; i < 25; i++) {
+      if (!(await game.evaluate((node) => !!(node as unknown as Game).state.ride))) break;
+      await ticks(page, 10);
+    }
+    await render(page, 2);
+    const done = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const { x, y } = el.state.player;
+      const tok = el.state.animals.find((a) => a.id === 'hoehle:tok');
+      return {
+        ride: !!el.state.ride,
+        onTrack: !!el.world.cell(x, y).ride,
+        onPlate: !!el.world.cell(x, y).plate,
+        tok: !!tok,
+        seat: el.rides.some((r) => r.seat),
+      };
+    });
+    expect(done).toEqual({ ride: false, onTrack: false, onPlate: false, tok: true, seat: false });
     await page.evaluate(() => dispatchEvent(new Event('pagehide')));
     expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
       [],

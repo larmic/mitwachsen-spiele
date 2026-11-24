@@ -15,7 +15,7 @@ import { BUILD } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import type { HeraldEvents as Events, Heralded } from '../../mitwachsen-herald';
 import { dirTo } from '../../mitwachsen-free';
 import { builtOf, withBuilt } from './mitwachsen-built';
-import { tokOf, withTok } from './mitwachsen-tok-save';
+import { tokOf, withTok } from '../../mitwachsen-ride-save';
 
 /** Takt eines Augenblicks im Bau, der um `from` begann */
 export const beatTick = (from: number, beat: number) => from + Math.round(beat * BUILD.ticks);

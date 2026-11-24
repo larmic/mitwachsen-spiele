@@ -52,3 +52,16 @@ export function nightMix(realm: RegionId, night: number, color: Rgb, nightSky: R
   if (c <= d || c <= n) return 0;
   return Math.max(0, Math.min(night, (c - d) / (c - n)));
 }
+
+/** So viel Licht bleibt im Tunnel (Tunnelportal, Einschnitt, Gang), wenn der Zug hindurchfährt */
+export const TUNNEL_LIGHT = 0.7;
+
+/**
+ * Nacht der Szene, wenn das Licht auf `dim` gedimmt ist (der Zug im Tunnel, `View2D.dim`): Tageslicht mal `dim`, aber
+ * nie dunkler als die Dämmerung (`DUSK_DAY`); ist es schon dunkler (Abend, Nacht), dimmt nichts weiter. `dim` 1: wie sie ist
+ */
+export function tunnelNight(night: number, dim: number): number {
+  const day = dayOf(night);
+  if (dim >= 1 || day <= DUSK_DAY) return night;
+  return (1 - Math.max(DUSK_DAY, day * dim)) / 0.75;
+}

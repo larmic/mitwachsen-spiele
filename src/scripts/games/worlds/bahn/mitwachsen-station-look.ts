@@ -6,8 +6,13 @@
 // zu `door` auf, und Tok sitzt ab `board` darin. Der Zug rollt aus dem Tunnelportal heran: Was von ihm noch im Tunnel
 // ist, ist nicht zu sehen. Bei reduzierter Bewegung kein Aufploppen, kein Dampf, der Zug rückt in
 // ruhigen Sprüngen vor. Der Zug fährt nie durch die Figur: Steht sie auf dem Gleis, hält er davor. Wo alles steht,
-// rechnet `stationOf` je Welt einmal aus den Feldern (Gleis vom Prellbock an Bahnhof Bär, Bahnsteig, Häuschen). Kein
-// Gold: Das Kind kann hier noch nichts tun. Teil des Pakets der Bahn (view-2d.ts).
+// rechnet `stationOf` je Welt einmal aus den Feldern (Gleis vom Prellbock an Bahnhof Bär, Bahnsteig, Häuschen).
+// Fahren: Der Zug steht, wo die Regeln ihn parken (`parked`: an Bahnhof Bär, am Prellbock in der Bucht, an Bahnhof
+// Fledermaus), und fährt mit der Figur im mittleren Wagen das Gleis entlang (zwischen den Takten gleitend, bei
+// reduzierter Bewegung springt er ans Ziel); die Tür des mittleren Wagens hat bis zur ersten Fahrt (`gefahren`) einen
+// goldenen Rahmen, solange er dort steht, wo die Figur einsteigen kann, angestoßen geht sie kurz auf; im Tunnel und am
+// Abend leuchten die Lampen; Tok sitzt im hinteren Wagen, solange er nicht in der Bucht wartet. Teil des Pakets der
+// Bahn (view-2d.ts).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 1)
 
 import type { Dir, Part } from '../../../../lib/games/front';
@@ -23,15 +28,17 @@ import {
   type CarLook,
 } from '../../../../data/games/worlds/bahn/mitwachsen-train-model';
 import { dirTo } from '../../mitwachsen-free';
-import { workOf } from '../../mitwachsen-herald';
+import { heraldOf, workOf } from '../../mitwachsen-herald';
 import type { RideAt, RideBody } from '../../mitwachsen-ride-view';
 import type { State } from '../../mitwachsen-state';
 import type { World } from '../../mitwachsen-world';
 import { hutOf, rowsOf } from './mitwachsen-bear';
 import { builtOf } from './mitwachsen-built';
 import { key } from './mitwachsen-ground';
-import { tokOf } from './mitwachsen-tok-save';
+import { parked } from '../../mitwachsen-ride-kit';
+import { ridden, tokOf } from '../../mitwachsen-ride-save';
 import { LETTERS, STEPS } from './mitwachsen-trace';
+import { SEAT, TRAIN, bearEnd, farOf, inTunnel, lineOf, trainRoute } from './mitwachsen-train';
 
 /** Bahnhof Bär in einer Welt: das Gleis vom Prellbock an (Ausbau 1, bis an den Prellbock vor der Tür), Reihen, Häuschen */
 export type BearStation = {
@@ -44,19 +51,7 @@ export type BearStation = {
   portal?: number;
 };
 
-/** So weit ums Bett der Lichtung wird nach dem Prellbock von Bahnhof Bär gesucht (er liegt 13 bis 16 Felder weg) */
-const SEARCH = 24;
 const stations = new WeakMap<World, BearStation | null>();
-
-/** Der Prellbock am Anfang der Linie auf der Lichtung (Ausbau 1), gesucht ums Bett */
-function bearEnd(world: World, [bx, by]: Point): Point | undefined {
-  for (let y = by - SEARCH; y <= by + SEARCH; y++)
-    for (let x = bx - SEARCH; x <= bx + SEARCH; x++) {
-      const c = world.cell(x, y);
-      if (c.rail?.part === 'end' && c.rail.stage === 1 && c.region === 'lichtung') return [x, y];
-    }
-  return undefined;
-}
 
 /** Das Gleis des Ausbaus 1 vom Feld `start` an in Reihe (den Richtungen der Stücke nach) */
 function railFrom(world: World, start: Point | undefined): Point[] {
@@ -91,7 +86,7 @@ function platformBy(world: World, lane: readonly Point[]): Point[] {
 export function stationOf(world: World): BearStation | null {
   if (stations.has(world)) return stations.get(world)!;
   const bed = world.homes.lichtung.bed;
-  const line = railFrom(world, bearEnd(world, bed));
+  const line = railFrom(world, bearEnd(world));
   const lane = line.slice(0, LINE.bear.long);
   const platform = platformBy(world, lane);
   const rows = rowsOf({ lane, platform });
@@ -122,8 +117,10 @@ const GAP = CAR + 0.1;
 export const REAR_ROW = Math.round(PARK + 2 * GAP + CAR / 2);
 /** So viele Felder rollt der Zug beim Bau heran, wenn es kein Tunnelportal gibt (sonst aus dem Portal) */
 export const ROLL_IN = 16;
-/** Bei reduzierter Bewegung rückt er in Sprüngen so vieler Felder vor */
+/** Bei reduzierter Bewegung rückt er beim Bau in Sprüngen so vieler Felder heran */
 const JUMP = 2;
+/** Kennung der Körper des Zugs (`ride:` trifft das Antippen, wie beim Schlitten) */
+export const TRAIN_ID = 'ride:hoehle';
 /** So lange ploppt der Bahnhof auf (Bruchteil des Baus) */
 const POP_FOR = 0.06;
 
@@ -214,35 +211,82 @@ function stationParts(st: BearStation, world: World, work: number | undefined, r
   return out;
 }
 
+/** So viele Takte nach dem Anstoßen steht die Tür des mittleren Wagens einladend offen (1 s) */
+export const OPEN_TICKS = 10;
+
+/** Wo der Zug steht: das Gleis von Bahnhof Bär an und die Stelle der Front der Lok darauf */
+type Place = { line: readonly Point[]; front: number };
+
+/**
+ * Wo der Zug gerade ist: unterwegs mit der Figur (der Sitz zwischen den Takten gleitend; bei reduzierter Bewegung steht
+ * er bis zur Ankunft am Halt, von dem er abfuhr, und springt dann ans Ziel; die Kamera folgt dem Sitz, bleibt also still), am Halt in der Welt (Prellbock in der Bucht, Bahnhof Fledermaus) oder an Bahnhof Bär
+ * (dort rollt er beim Bau heran und hält vor der Figur, `frontAt`); undefined, solange er noch nicht da ist
+ */
+function placeOf(st: BearStation, world: World, state: State, work: number | undefined, at: RideAt): Place | undefined {
+  const r = work === undefined ? trainRoute(world, state) : undefined;
+  const ride = state.ride?.id === TRAIN.id ? state.ride : undefined;
+  if (r && ride) {
+    const line = lineOf(world, farOf(state));
+    const len = r.path.length - 1;
+    let p = ride.phase === 'go' ? Math.max(0, ride.pos - ride.speed * (1 - at.frac)) : ride.pos;
+    if (at.reduced && p < len) p = 0; // bei reduzierter Bewegung springt er ans Ziel: bis zur Ankunft steht er am Halt
+    const q = ride.to === 'out' ? line.length - 1 - SEAT - p : SEAT + p;
+    return { line, front: q - SEAT + PARK };
+  }
+  const end = r && (parked(TRAIN, r, state, world)?.end ?? state.docked?.[TRAIN.id]);
+  if (r && end === 'home') {
+    const line = lineOf(world, farOf(state));
+    return { line, front: line.length - 1 - 2 * SEAT + PARK };
+  }
+  const front = frontAt(st, state.player, work, at.reduced);
+  return front === undefined ? undefined : { line: st.line, front };
+}
+
 /**
  * Lok und zwei Wagen am Gleis (beim Bau rollen sie aus dem Tunnelportal heran; ein Wagen, dessen Mitte noch hinter dem
- * Portal ist, ist nicht zu sehen), Dampf über der Lok (nicht bei reduzierter Bewegung)
+ * Portal ist, ist nicht zu sehen; unterwegs sitzt die Figur im mittleren Wagen, `seat`), Dampf über der Lok (nicht bei
+ * reduzierter Bewegung)
  */
 function trainParts(st: BearStation, world: World, state: State, work: number | undefined, at: RideAt): RideBody[] {
-  const front = frontAt(st, state.player, work, at.reduced);
-  if (front === undefined) return [];
-  const tok = work === undefined ? tokOf(state.packs) !== undefined : work >= BUILD.board;
+  const place = placeOf(st, world, state, work, at);
+  if (!place) return [];
+  const riding = state.ride?.id === TRAIN.id;
+  const tok = work === undefined ? tokOf(state.packs) !== undefined && !heraldOf(state) : work >= BUILD.board;
   const open = work !== undefined && work >= BUILD.door;
+  const r = work === undefined && !riding ? trainRoute(world, state) : undefined;
+  // bis zur ersten Fahrt (`gefahren`, gespeichert) ein goldener Rahmen um die Tür, wo die Figur einsteigen kann
+  const gold = !!r && !ridden(state.packs, TRAIN.id) && !!parked(TRAIN, r, state, world);
+  const nudged = state.nudged?.id === TRAIN.id && state.tick - state.nudged.at < OPEN_TICKS && !riding;
+  const lit = at.lit || inTunnel(state, world);
   const kinds: CarLook['kind'][] = ['loco', 'mid', 'rear'];
   const hidden = (a: number) => work !== undefined && st.portal !== undefined && a + CAR / 2 > st.portal;
   const out = kinds.flatMap((kind, i): RideBody[] => {
-    const a = front + i * GAP; // Front dieses Wagens
+    const a = place.front + i * GAP; // Front dieses Wagens
     if (hidden(a)) return [];
-    const [x, y, z] = along(world, st.line, a + CAR / 2);
-    const [fx, fy] = along(world, st.line, a);
-    const [bx, by] = along(world, st.line, a + CAR);
+    const [x, y, z] = along(world, place.line, a + CAR / 2);
+    const [fx, fy] = along(world, place.line, a);
+    const [bx, by] = along(world, place.line, a + CAR);
     const dir = dirTo(fx - bx, fy - by);
     const [rx, ry] = RIGHT[dir];
     const side = rx * st.side[0] + ry * st.side[1] > 0 ? 1 : -1;
-    const look: CarLook = { kind, tok: kind === 'rear' && tok, door: kind === 'rear' && open ? side : 0 };
-    const k = `bahn:${kind}:${+look.tok}${look.door}`;
-    return [{ id: `bahn:${kind}`, key: k, x, y, z, dir, parts: model(k, () => carParts(look)) }];
+    const mid = kind === 'mid';
+    const look: CarLook = {
+      kind,
+      tok: kind === 'rear' && tok,
+      door: (kind === 'rear' && open) || (mid && nudged) ? side : 0,
+      rider: mid && riding,
+      frame: mid && gold ? side : 0,
+      lit: kind === 'loco' && lit,
+    };
+    const k = `${TRAIN_ID}:${kind}:${+look.tok}${look.door}${+!!look.rider}${look.frame}${+!!look.lit}`;
+    const seat = mid && riding ? { seat: true as const } : {};
+    return [{ id: `${TRAIN_ID}:${kind}`, key: k, x, y, z, dir, parts: model(k, () => carParts(look)), ...seat }];
   });
-  const loco = out.find((b) => b.id === 'bahn:loco');
+  const loco = out.find((b) => b.id === `${TRAIN_ID}:loco`);
   if (loco && !at.reduced) {
     const phase = Math.floor(at.now / 400) % 4;
-    const k = `bahn:dampf:${phase}`;
-    out.push({ ...loco, id: 'bahn:dampf', key: k, parts: model(k, () => steamParts(phase)) });
+    const k = `${TRAIN_ID}:dampf:${phase}`;
+    out.push({ ...loco, id: `${TRAIN_ID}:dampf`, key: k, parts: model(k, () => steamParts(phase)) });
   }
   return out;
 }

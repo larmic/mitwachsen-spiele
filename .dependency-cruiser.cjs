@@ -109,15 +109,14 @@ module.exports = {
       to: { path: '^src/scripts/games/mitwachsen-bay\\.ts$' },
     },
     {
-      name: 'ride-engine-is-generic',
+      name: 'ride-kit-is-for-packs',
       severity: 'error',
       comment:
-        'Die Fahrzeug-Engine (worlds/eis/mitwachsen-ride*.ts: Spielstand, Regeln) kennt keinen Schlitten und nichts aus der Eis-Welt außer den Wegen (mitwachsen-flood.ts): So zieht sie später mit allen Fahrzeugen in ein eigenes Paket (worlds/fahrt/). Was nur der Schlitten braucht, steckt in mitwachsen-sled*.ts.',
-      from: { path: '^src/scripts/games/worlds/eis/mitwachsen-ride[^/]*\\.ts$', pathNot: '\\.test\\.ts$' },
-      to: {
-        path: '^src/(scripts|data)/games/worlds/eis/',
-        pathNot: '^src/scripts/games/worlds/eis/mitwachsen-(flood|ride[^/]*)\\.ts$',
+        'Was alle Fahrzeuge teilen (mitwachsen-ride-kit.ts: Zeiten, Halte, wo ein Fahrzeug steht; mitwachsen-ride-save.ts: Spielstand packs.fahrt) brauchen nur Pakete: die Fahr-Engine (worlds/fahrt/) und das Bild jedes Fahrzeugs (Schlitten in worlds/eis/, Zug in worlds/bahn/). Nur Pakete und Tests importieren es, so landet es nie im Kern der Spielseite; die Fahr-Engine selbst kennt kein Fahrzeug (world-packs-stay-apart).',
+      from: {
+        pathNot: ['^src/scripts/games/worlds/', '\\.test\\.ts$', '^src/scripts/games/mitwachsen-ride-kit\\.ts$'],
       },
+      to: { path: '^src/scripts/games/mitwachsen-ride-(kit|save)\\.ts$' },
     },
     {
       name: 'turn-lives-in-3d',

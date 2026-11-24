@@ -18,8 +18,8 @@ import type { State } from '../../mitwachsen-state';
 import type { Box } from '../../mitwachsen-view';
 import { standHeight, type GatePlace, type World } from '../../mitwachsen-world';
 import type { Scored } from '../../sfx';
-import { COME, cellOf, parked, trotFrom } from './mitwachsen-ride';
-import { stageOf } from './mitwachsen-ride-save';
+import { COME, cellOf, parked, trotFrom } from '../../mitwachsen-ride-kit';
+import { stageOf } from '../../mitwachsen-ride-save';
 import { SLED } from './mitwachsen-sled';
 import { sledRoute, type Route } from './mitwachsen-sled-route';
 

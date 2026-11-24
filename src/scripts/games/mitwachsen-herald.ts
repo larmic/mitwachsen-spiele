@@ -7,7 +7,7 @@
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Tok erscheint)
 
 import type { Guided } from './mitwachsen-guide';
-import type { MoveCmd, RideEvents, RideRules, Rider } from './mitwachsen-rider';
+import type { MoveCmd, RideEngine, RideEvents, RideRules, Rider, Vehicle } from './mitwachsen-rider';
 import type { World } from './mitwachsen-world';
 
 /**
@@ -81,13 +81,31 @@ export const heraldOf = <A extends { mode: string }>(s: { animals: readonly A[] 
 /** Ohne Boten (sein Paket fehlt): Er tut nichts */
 const NONE: HeraldRules = { step: () => {}, meet: () => false };
 
+type Hooks = { rules?: { ride?: RideEngine; vehicle?: Vehicle; herald?: HeraldRules } };
+// je Fahr-Engine die zuletzt gebauten Regeln: `step` fragt in jedem Befehl, die Fahrzeuge ändern sich nur, wenn ein Paket kommt
+const built = new WeakMap<RideEngine, { vehicles: readonly Vehicle[]; rules: RideRules }>();
+
+/** Regeln aller Fahrzeuge: die Fahr-Engine (Paket der Fahrzeuge) mit den Fahrzeugen der geladenen Pakete */
+function ridesOf(rules: readonly Hooks[]): RideRules | undefined {
+  const engine = rules.find((r) => r.rules?.ride)?.rules?.ride;
+  const vehicles = rules.flatMap((r) => (r.rules?.vehicle ? [r.rules.vehicle] : []));
+  if (!engine || !vehicles.length) return undefined;
+  const last = built.get(engine);
+  if (last && last.vehicles.length === vehicles.length && last.vehicles.every((v, i) => v === vehicles[i]))
+    return last.rules;
+  const made = engine(vehicles);
+  built.set(engine, { vehicles, rules: made });
+  return made;
+}
+
 /**
- * Die Haken aus den geladenen Paketen für `step`: Fahrzeug (`ride`, Schlitten), Bote (`herald`, Tok; ohne Paket einer,
+ * Die Haken aus den geladenen Paketen für `step`: Fahrzeuge (`ride`: die Fahr-Engine aus dem Paket der Fahrzeuge mit den
+ * Fahrzeugen der Pakete, Schlitten und Zug; ohne Engine oder ohne Fahrzeug keine), Bote (`herald`, Tok; ohne Paket einer,
  * der nichts tut) und was vor dem Schritt der Figur kommt (`meet`: am Fahrzeug einsteigen, anstoßen, winken; in den
  * schlafenden Boten laufen); true, wenn der Zug damit erledigt ist
  */
-export function hooksOf(rules: readonly { rules?: { ride?: RideRules; herald?: HeraldRules } }[]) {
-  const ride = rules.find((r) => r.rules?.ride)?.rules?.ride;
+export function hooksOf(rules: readonly Hooks[]) {
+  const ride = ridesOf(rules);
   const herald = rules.find((r) => r.rules?.herald)?.rules?.herald ?? NONE;
   const meet = (s: Rider & Heralded, world: World, cmd: MoveCmd, events: RideEvents & HeraldEvents) =>
     !!ride?.move(s, world, cmd, events) || herald.meet(s, world, cmd, events);
