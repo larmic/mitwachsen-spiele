@@ -922,13 +922,13 @@ describe('Wiese ums Bett', () => {
 });
 
 describe('Große Tore', () => {
-  // das Höhlentor auch, bis zum Freischalten der Bahn-Phase (`keyOf`: Schlüssel Tok erst mit `bahnOn`)
   const never = GATES.filter((g) => !keyOf(g.id)).map((g) => g.id);
 
-  it('die anderen sieben Tore öffnen nie (`never`, das Höhlentor bis zur Bahn-Phase); das Eistor öffnet nur der Pinguin, kein anderes Tier', () => {
-    expect(never).toHaveLength(7);
-    expect(never).toContain('hoehle');
+  it('sechs Tore öffnen nie (`never`); das Eistor öffnet nur der Pinguin, das Höhlentor nur Tok, kein anderes Tier', () => {
+    expect(never).toHaveLength(6);
+    expect(never).not.toContain('hoehle');
     expect(never).not.toContain('eis');
+    expect(GATES.find((g) => g.id === 'hoehle')!.opens).toEqual({ key: 'tok', after: 'eis' });
     expect(GATES.find((g) => g.id === 'eis')!.opens).toEqual({ key: 'pinguin' });
     // alle Tiere der Lichtung und alle Eis-Tiere außer dem Pinguin zu Hause: Er ist nicht dabei, also bleibt alles zu
     const world = worldOf(1);

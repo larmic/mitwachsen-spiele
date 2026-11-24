@@ -1,7 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import type { Point } from '../../../../data/games/mitwachsen';
-import { BAHN_LIVE, tryBahn } from '../../../../data/games/mitwachsen-live';
 import { bahnWanted } from '../../mitwachsen-pack';
 import { initialState, step, type GameEvent, type State } from '../../mitwachsen-state';
 import type { Cell } from '../../mitwachsen-cell';
@@ -34,17 +33,12 @@ function walkInto(w: World, stone: Point, packs: Record<string, unknown>): GameE
 }
 
 describe('Klangsteine der Bahn (mitwachsen-stones.ts)', () => {
-  afterEach(() => tryBahn(false));
-
-  it('Freigabe (beide Stellungen): bis zum Freischalten holt das Spiel das Paket nie, also gibt es keinen Stein der Bahn', () => {
-    expect(BAHN_LIVE).toBe(false);
-    expect(bahnWanted({ openGates: ['eis'] })).toBe(false);
-    const cave = worldOf(SEED, [HOEHLE_PACK]); // wie für das Kind (die Grotte nur im Blick hinein)
+  it('ohne das Paket der Bahn gibt es keinen Stein der Bahn; mit ihm (ab offenem Eistor) kommen sie mit dem Ausbau', () => {
+    expect(bahnWanted({ openGates: [] })).toBe(false);
+    const cave = worldOf(SEED, [HOEHLE_PACK]); // ohne Bahn (etwa im Blick hinein nur in die Grotte)
     expect(trainStones(cave)).toEqual([]);
     expect(cave.stones.has('hoehle-offen')).toBe(true); // der Stein am Höhlenbett gehört der Grotte, nicht der Bahn
-    // angeschaltet (Entwickler-Schalter `tryBahn`, oder später `BAHN_LIVE`): mit dem Paket kommen sie mit dem Ausbau
-    tryBahn();
-    expect(bahnWanted({ openGates: ['eis'] }, true)).toBe(true);
+    expect(bahnWanted({ openGates: ['eis'] })).toBe(true);
     expect(trainStones(W1)).toEqual(['bahnhof']);
   });
 

@@ -129,9 +129,10 @@ module.exports = {
     {
       name: 'no-test-in-production',
       severity: 'error',
-      comment: 'Tests und ihre Helfer (test-worlds.ts, test-plates.ts) werden nur von Tests importiert.',
-      from: { pathNot: '\\.test\\.ts$' },
-      to: { path: '(\\.test\\.ts|/test-(worlds|plates)\\.ts)$' },
+      comment:
+        'Tests und ihre Helfer (test-worlds.ts, test-plates.ts) werden nur von Tests importiert (und vom Setup des tiefen Laufs, test-deep-setup.ts).',
+      from: { pathNot: '(\\.test\\.ts|/test-deep-setup\\.ts)$' },
+      to: { path: '(\\.test\\.ts|/test-(worlds|plates|deep-setup)\\.ts)$' },
     },
     {
       name: 'not-to-unresolvable',

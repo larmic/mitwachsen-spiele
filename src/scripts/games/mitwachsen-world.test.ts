@@ -156,8 +156,8 @@ describe('Start auf der Lichtung', () => {
           expect(w.cell(x, y).gate).toBe(g.id);
           expect(standHeight(w, [], x, y)).toBeNull();
         }
-        // das Eistor öffnet der Pinguin, das Höhlentor Tok (erst mit der Bahn-Phase)
-        const opens = { eis: { key: 'pinguin' }, hoehle: { key: 'tok', live: 'bahn' } } as Record<string, unknown>;
+        // das Eistor öffnet der Pinguin, das Höhlentor Tok
+        const opens = { eis: { key: 'pinguin' }, hoehle: { key: 'tok', after: 'eis' } } as Record<string, unknown>;
         expect(g.opens).toEqual(opens[g.id] ?? 'never');
       }
     });
@@ -415,7 +415,7 @@ describe('Klangsteine', () => {
   for (const seed of [1, 42, 2026]) {
     const w = worldOf(seed);
     it(`Seed ${seed}: einer am Bett, einer vor jedem Tor, einer am Schneebett, einer am Höhlenbett; fest, erreichbar, der Weg zum Tor bleibt frei`, () => {
-      // ohne das Paket der Bahn (bis zum Freischalten) keine Steine der Bahn
+      // ohne das Paket der Bahn (Tests ohne Bahn) keine Steine der Bahn
       expect([...w.stones.keys()].sort()).toEqual(
         ['bett', ...GATES.map((g) => g.id), 'eis-offen', 'hoehle-offen'].sort(),
       );
@@ -466,7 +466,7 @@ describe('Welt-Pakete', () => {
       expect([...bare.gates.keys()]).toEqual([...full.gates.keys()]);
     });
 
-    it(`Seed ${seed}: Hinter dem Höhlentor (geht nie auf) steht ohne Paket eine Felswand, mit Paket die Grotte`, () => {
+    it(`Seed ${seed}: Hinter dem Höhlentor steht ohne Paket eine Felswand, mit Paket die Grotte`, () => {
       expect(bare.worlds).toEqual(['eis', 'hoehle']); // gebaut hinter beiden Toren: Eisklippe und Felswand
       expect(bare.spotsOf('hoehle')).toEqual([]);
       expect(crossings(bare).map((c) => c.gate.id)).toEqual(['eis', 'hoehle']);

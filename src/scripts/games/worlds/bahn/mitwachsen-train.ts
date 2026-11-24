@@ -11,8 +11,6 @@
 // neben der Torplatte (`BESIDE`, `landed`).
 // Steht die Figur 6 Felder vor einem Halt (`RIDE_PRELOAD`), holt das Spiel die Grotte (`needs`) und die Fahr-Engine;
 // solange die Engine fehlt oder (ab Ausbau 2) die Grotte, schläft der Zug am Halt (mitwachsen-preload.ts).
-// Bis zum Freischalten (`BAHN_LIVE`) holt das Spiel das Paket der Bahn nie von selbst: Dann gibt es den Zug nur im
-// Blick hinein (Entwickler-Schalter).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Fahren)
 
 import { REGIONS, animalId, type Point } from '../../../../data/games/mitwachsen';

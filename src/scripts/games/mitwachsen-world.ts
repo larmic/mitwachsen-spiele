@@ -21,7 +21,7 @@ import { BED_STONE, type StoryId } from '../../data/games/mitwachsen-stories';
 import type { Cell, Ground, TreeKind } from './mitwachsen-cell';
 import { LICHTUNG_HOME, bedsOf, realmsOf, type Realms } from './mitwachsen-home';
 import type { Beyond, Gang, WorldPack } from './mitwachsen-pack-types';
-import { behind, hullOf, roomBehind, straightCentre, type Behind } from './mitwachsen-behind';
+import { behind, hullOf, landOf, roomBehind, straightCentre, type Behind } from './mitwachsen-behind';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal, type PortalId } from './mitwachsen-portal';
 import { findSpawns } from './mitwachsen-spawns';
 import { GATE_FLOOR, forecourt } from './mitwachsen-apron';
@@ -36,6 +36,7 @@ export type GatePlace = {
   out: Point; // nach außen (weg von der Lichtung)
   angle: number; // Winkel von der Mitte aus: In dieser Richtung liegt die Welt des Tors
   deep: number; // so viele Felder hinter der Tür liegt die Mündung des Gangs (seine letzte Reihe, `end`)
+  land?: Beyond; // Land seiner Welt hinter dem Felsring, auch ohne ihr Paket (`landOf` in mitwachsen-behind.ts)
 };
 
 /** Eine Welt: Felder, Gegenden mit ihrem Zuhause (`Realms`), Wohnorte, Tore, Portale und Klangsteine */
@@ -702,7 +703,10 @@ export const portalPlaces = (seed: number) => portalsOf(layouts(seed));
 export const gatePlaces = (seed: number) => gatesOf(layouts(seed));
 const gatesOf = (places: readonly Layout[]) =>
   new Map<GateId, GatePlace>(
-    places.map(({ id, cells, mid, out, angle, deep }) => [id, { id, cells, mid, out, angle, deep }]),
+    places.map(({ id, cells, mid, out, angle, deep }) => {
+      const land = landOf(gangOf(places, id), id, () => roomOf(places, id));
+      return [id, { id, cells, mid, out, angle, deep, land }];
+    }),
   );
 
 /**

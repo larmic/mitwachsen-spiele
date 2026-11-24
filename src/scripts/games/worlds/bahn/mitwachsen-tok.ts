@@ -14,7 +14,6 @@
 // Bett der Lichtung, morgens ruft er und geht zurück an seinen Platz (`inBay`); nach dem Laden ebenso (`backToBay`: die
 // erste Fahrt ist gemacht, `gefahren`, und der Zug fährt noch nicht in die Grotte). So geht es auch zu Fuß: Tok hüpft
 // der Figur voraus in die Bucht, und das Hau-ruck am Höhlentor (Paket der Höhlenwelt) beginnt mit ihm dort.
-// Bis zum Freischalten (`BAHN_LIVE`) holt das Spiel dieses Paket nie von selbst: Dann gibt es Tok nur im Blick hinein.
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Tok erscheint)
 
 import { DIRS } from '../../../../lib/games/front';

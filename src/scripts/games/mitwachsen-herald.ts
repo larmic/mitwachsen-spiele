@@ -2,8 +2,8 @@
 // und was der Kern über ihn wissen muss: Er ist ein Wesen unter den Tieren (`mode: 'herald'`, mit dem Modell seiner Art),
 // singt und hüpft, wenn die Figur in ihn hineinläuft, hat einen Gast-Platz in der Leiste, der Pfeil der Karte zeigt auf
 // ihn, und schläft er (`nap`), schwebt „Zzz“ über ihm. Wann er kommt, wo er wartet und was gespeichert wird, regelt sein
-// Paket (`WorldRules.herald`, worlds/bahn/mitwachsen-tok.ts); `step` reicht ihm den Zustand herein. Fehlt das Paket (bis
-// zum Freischalten der Bahn-Phase, `BAHN_LIVE`), gibt es ihn nicht. Teil der Regeln (mitwachsen-state.ts) und der Ansicht.
+// Paket (`WorldRules.herald`, worlds/bahn/mitwachsen-tok.ts); `step` reicht ihm den Zustand herein. Fehlt das Paket (vor der
+// Eis-Welt oder wenn es nicht lädt), gibt es ihn nicht. Teil der Regeln (mitwachsen-state.ts) und der Ansicht.
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Tok erscheint)
 
 import type { GateId } from '../../data/games/mitwachsen';

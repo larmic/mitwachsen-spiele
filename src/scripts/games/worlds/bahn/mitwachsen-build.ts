@@ -8,7 +8,7 @@
 // (`packs.bahn.built`, steigt nur) und Toks Stufe auf `bereit` (Tok getroffen, der Zug steht da), gespeichert wird
 // sofort; zum Augenblick `pop` wird die Welt mit Bahnhof und Gleis neu gebaut (`relay`, `World.relay`). Wie weit der
 // Bau ist, steht nur im Zustand (`State.work`, nicht gespeichert): Wer mitten im Bau neu lädt, findet ihn fertig.
-// Teil des Pakets der Bahn (Regeln von Tok, mitwachsen-tok.ts); bis zum Freischalten (`BAHN_LIVE`) nur im Blick hinein.
+// Teil des Pakets der Bahn (Regeln von Tok, mitwachsen-tok.ts).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 1)
 
 import { BUILD } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';

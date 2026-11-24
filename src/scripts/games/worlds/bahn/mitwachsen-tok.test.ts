@@ -1,9 +1,8 @@
 // Tok erscheint (mitwachsen-tok.ts, Spielstand mitwachsen-ride-save.ts, Bild und Ton mitwachsen-tok-look.ts): Boten-Muster
-// am Bett der Lichtung, hinter der Freigabe der Bahn-Phase (`BAHN_LIVE`)
+// am Bett der Lichtung, sobald das Eistor offen, die Eis-Leiste voll und die erste Heimfahrt mit dem Schlitten gemacht ist
 import { describe, expect, it } from 'vitest';
 import { DIRS, type Dir, type Part } from '../../../../lib/games/front';
 import { REGIONS, SPECIES, figureParts, LOOK, regionAnimalList, type Point } from '../../../../data/games/mitwachsen';
-import { BAHN_LIVE } from '../../../../data/games/mitwachsen-live';
 import { TOK_COLORS, TOK_MODEL } from '../../../../data/games/worlds/bahn/mitwachsen-tok-model';
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
 import { slots } from '../../mitwachsen-album';
@@ -24,6 +23,7 @@ import { CALL_EVERY, COME, SIGHT, TOK, TOK_NEAR, postOf, tokWanted } from './mit
 import { heraldFx, juhu, lacks, pink } from './mitwachsen-tok-look';
 import { sledHome, tokOf, wakeRides, withTok } from '../../mitwachsen-ride-save';
 import { TAP_REACH } from '../../mitwachsen-ride-kit';
+import { migrate, newWorld, progressFrom } from '../../mitwachsen-save';
 
 const BAHN = [BAHN_PACK];
 const ICE = REGIONS.find((r) => r.id === 'eis')!;
@@ -80,20 +80,46 @@ function fieldAt(world: World, d: number): Point {
   throw new Error(`kein Feld ${d} vom Bett`);
 }
 
-describe('Tok erscheint: Freigabe der Bahn-Phase', () => {
-  it('bis zum Freischalten holt das Spiel das Paket der Bahn nie: Ohne es kommt Tok nicht, auch wenn alles gilt', () => {
-    expect(BAHN_LIVE).toBe(false); // Freigabe aus: Erst der Schritt „Freischalten“ setzt sie
-    const world = worldOf(1, BAHN);
-    const s = ready(world);
-    expect(bahnWanted(s)).toBe(false); // Freigabe aus (Voreinstellung)
-    expect(bahnWanted(s, true)).toBe(true); // freigeschaltet: mit offenem Eistor
-    expect(bahnWanted({ openGates: [] }, true)).toBe(false);
-    const without = play(s, world, [WAKE, ...ticks(40)], false);
-    expect(tokIn(without.s)).toBeUndefined();
-    expect(heralds(without.events)).toEqual([]);
-    expect(without.s.packs).toEqual(SLED_HOME); // nichts gespeichert
-    const withPack = play(s, world, [WAKE, ...ticks(5)]); // mit dem Paket (freigeschaltet oder Blick hinein)
-    expect(tokIn(withPack.s)).toBeDefined();
+describe('Tok erscheint: alte Spielstände (Freischalten)', () => {
+  const world = worldOf(1, BAHN);
+  /** Ein Spielstand, wie ihn das Spiel vor dem Freischalten schrieb (Version 5), schlafend im Bett der Lichtung */
+  const saved = (packs: Record<string, unknown>, openGates = ['eis']) => {
+    const raw = {
+      ...newWorld('alt', 1, 'Alte Welt'),
+      openGates,
+      homeAnimals: FULL,
+      position: world.homes.lichtung.bed,
+      packs,
+    };
+    return progressFrom(migrate(JSON.parse(JSON.stringify(raw)))!);
+  };
+  /** Was das Spiel damit beim nächsten Start tut: das Paket der Bahn holen, wenn nötig, und aufwachen */
+  const wake = (p: ReturnType<typeof saved>) => {
+    const s = initialState(world, p);
+    return { wanted: bahnWanted(p), sleeping: s.sleeping, ...play(s, world, [WAKE, ...ticks(5)], bahnWanted(p)) };
+  };
+
+  it('volle Eis-Leiste und erste Heimfahrt mit dem Schlitten: beim nächsten Aufwachen im Lichtungsbett kommt Tok', () => {
+    const r = wake(saved(SLED_HOME));
+    expect(r.wanted).toBe(true);
+    expect(r.sleeping).toBe(true);
+    expect(tokIn(r.s)).toMatchObject({ mode: 'herald' });
+    expect(heralds(r.events, 'appear')).toHaveLength(1);
+    expect(tokOf(r.s.packs)).toEqual({ stage: 'faellig' }); // gespeichert wird nur, dass er kam
+  });
+
+  it('ohne die Heimfahrt mit dem Schlitten oder ohne Eis-Welt bleibt alles wie vorher: kein Tok, nichts gespeichert', () => {
+    for (const [name, p] of [
+      ['Schlitten nur bereit', saved({ fahrt: { schlitten: { stage: 'bereit' } } })],
+      ['ohne Schlitten', saved({})],
+      ['Eistor zu', saved({}, [])],
+    ] as const) {
+      const r = wake(p);
+      expect(tokIn(r.s), name).toBeUndefined();
+      expect(heralds(r.events), name).toEqual([]);
+      expect(r.s.packs, name).toEqual(p.packs);
+    }
+    expect(wake(saved({}, [])).wanted).toBe(false); // vor der Eis-Welt holt das Spiel das Paket der Bahn gar nicht
   });
 });
 
@@ -374,8 +400,7 @@ describe('Tok antippen (Schritt 14)', () => {
     expect(tapped.s.player).toMatchObject({ x: near[0], y: near[1] });
   });
 
-  it('ohne das Paket der Bahn (Freigabe aus, BAHN_LIVE) gibt es keinen Tok: Antippen tut nichts und läuft nie', () => {
-    expect(BAHN_LIVE).toBe(false);
+  it('ohne das Paket der Bahn (vor der Eis-Welt oder wenn es nicht lädt) gibt es keinen Tok: Antippen tut nichts und läuft nie', () => {
     const plain = worldOf(7, [EIS_PACK]);
     const s = awake(plain, ready(plain));
     const r = play(s, plain, [TAP_TOK], false);

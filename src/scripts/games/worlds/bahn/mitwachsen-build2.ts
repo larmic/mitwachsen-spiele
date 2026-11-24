@@ -10,8 +10,7 @@
 // Tier, das einzieht; erst danach erwacht das Portal am stillen See, `Portal.later`), und Tok hüpft an seinen Platz im
 // Lokschuppen: Dort wohnt er von nun an (`inShed`/`backToShed` in mitwachsen-tok.ts), ohne den Maulwurf (`solo`).
 // Wer mitten in der Fahrt neu lädt, findet Ausbau 2 fertig vor; der Maulwurf läuft dann frei gegenüber dem Bahnhof, bis
-// das Kind ihn heimbringt oder wieder mit dem Zug am Bahnhof Fledermaus ankommt (dann zieht er ein). Teil des Pakets der Bahn (Zug: mitwachsen-train.ts; Tok: mitwachsen-tok.ts); bis zum
-// Freischalten (`BAHN_LIVE`) nur im Blick hinein.
+// das Kind ihn heimbringt oder wieder mit dem Zug am Bahnhof Fledermaus ankommt (dann zieht er ein). Teil des Pakets der Bahn (Zug: mitwachsen-train.ts; Tok: mitwachsen-tok.ts).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 2)
 
 import { DIRS } from '../../../../lib/games/front';

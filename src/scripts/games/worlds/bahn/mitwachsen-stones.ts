@@ -1,6 +1,6 @@
 // Klangsteine der Bahn – rein und deterministisch: Das Paket der Bahn setzt sie beim Legen (`WorldPack.lay`), so wie es
-// das Gleis legt, und nur mit dem Ausbau, zu dem sie gehören; vorher und ohne Paket (bis zum Freischalten, `BAHN_LIVE`)
-// gibt es sie nicht. Am Bahnhof Bär ab Ausbau 1 (`bahnhof`, neben Toks Häuschen, zwei Felder vom Bahnhof und vom Gleis,
+// das Gleis legt, und nur mit dem Ausbau, zu dem sie gehören; vorher und ohne Paket (vor der Eis-Welt) gibt
+// es sie nicht. Am Bahnhof Bär ab Ausbau 1 (`bahnhof`, neben Toks Häuschen, zwei Felder vom Bahnhof und vom Gleis,
 // notfalls drei oder vier),
 // am Lokschuppen ab Ausbau 2 (`lokschuppen`, Toks Geschichte, auf dem Platz, den die Grotte neben dem Schuppen frei hält,
 // `Cell.stone`). Teil des Pakets der Bahn (index.ts).

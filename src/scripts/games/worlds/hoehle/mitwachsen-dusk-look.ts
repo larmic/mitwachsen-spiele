@@ -5,7 +5,7 @@
 // zwei), wachen auf und fliegen Runden um den Lichtschacht über dem Höhlenbett (Schacht 0), zu sehen vom Bett und vom
 // Bahnhof Fledermaus; solange hängen sie nicht an ihrem Platz (`away`). Sie fliegen auch, solange die Figur im
 // Höhlenbett schläft („Gute Nacht, Fledermaus“). Bei reduzierter Bewegung fliegt keine (sie hängen weiter), das
-// Abendlicht bleibt. Nur Bild, kein Spielstand; erreichbar erst mit offenem Höhlentor, also hinter der Freigabe der Bahn.
+// Abendlicht bleibt. Nur Bild, kein Spielstand; erreichbar erst mit offenem Höhlentor (nach dem Hau-ruck).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Schmuck mit Zug)
 
 import type { Dir, Projection } from '../../../../lib/games/front';

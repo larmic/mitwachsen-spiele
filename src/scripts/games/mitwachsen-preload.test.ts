@@ -2,7 +2,6 @@
 // werden und wann es schläft. Die Regeln des schlafenden Zugs prüft worlds/bahn/mitwachsen-train.test.ts
 import { describe, expect, it } from 'vitest';
 import type { Point } from '../../data/games/mitwachsen';
-import { BAHN_LIVE } from '../../data/games/mitwachsen-live';
 import { RIDE_PRELOAD } from '../../data/games/mitwachsen-rides';
 import { bahnWanted } from './mitwachsen-pack';
 import { dozingOf, preloadOf } from './mitwachsen-preload';
@@ -69,12 +68,10 @@ describe('Vorladen am Halt (preloadOf, RIDE_PRELOAD)', () => {
     ]);
   });
 
-  it('Freigabe (beide Stellungen): aus holt das Kind das Paket der Bahn nie, also holt kein Halt die Grotte; an holt Bahnhof Bär sie', () => {
-    expect(BAHN_LIVE).toBe(false);
-    const child = (live: boolean) => [EIS_PACK, ...(bahnWanted(S, live) ? [BAHN_PACK] : []), FAHRT_PACK];
-    const near = [at(ALONE, r, 2)];
-    expect(preloadOf(child(BAHN_LIVE), ALONE, S, near)).not.toContain('hoehle');
-    expect(preloadOf(child(true), ALONE, S, near)).toContain('hoehle');
+  it('für das Kind: mit offenem Eistor kommt das Paket der Bahn, also holt Bahnhof Bär die Grotte vor', () => {
+    expect(bahnWanted(S)).toBe(true);
+    const child = [EIS_PACK, BAHN_PACK, FAHRT_PACK];
+    expect(preloadOf(child, ALONE, S, [at(ALONE, r, 2)])).toContain('hoehle');
   });
 });
 

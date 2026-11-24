@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { fromKey } from '../../../../lib/games/chunks';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import { animalId, type Point } from '../../../../data/games/mitwachsen';
-import { BAHN_LIVE } from '../../../../data/games/mitwachsen-live';
 import { RIDES, RIDE_PRELOAD } from '../../../../data/games/mitwachsen-rides';
 import { BESIDE, plateRow } from '../../mitwachsen-bay';
 import { TUNNEL_LIGHT } from '../../mitwachsen-dusk';
@@ -92,10 +91,9 @@ describe('Fahren mit der Höhlenbahn: Strecke und Paket (mitwachsen-train.ts)', 
     expect(view).toMatchObject({ bodies: stationBodies, rideFx: trainFx, dim });
   });
 
-  it('Freigabe (beide Stellungen): ohne das Paket der Bahn gibt es keinen Zug, freigeschaltet kommt es mit dem Eistor', () => {
-    expect(BAHN_LIVE).toBe(false);
-    expect(bahnWanted({ openGates: ['eis'] })).toBe(false); // bis zum Freischalten holt das Spiel es nie
-    expect(bahnWanted({ openGates: ['eis'] }, true)).toBe(true);
+  it('ohne das Paket der Bahn gibt es keinen Zug; das Spiel holt es mit offenem Eistor', () => {
+    expect(bahnWanted({ openGates: [] })).toBe(false);
+    expect(bahnWanted({ openGates: ['eis'] })).toBe(true);
     const { at, dir } = onPlatform(W1);
     const s = awake(W1, at);
     const without = play(s, W1, [{ type: 'move', dir, fresh: true }], [EIS_PACK, FAHRT_PACK]);

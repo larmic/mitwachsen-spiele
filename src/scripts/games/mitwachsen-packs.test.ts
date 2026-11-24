@@ -4,7 +4,6 @@ import { ICE_MODELS } from '../../data/games/worlds/eis/mitwachsen-ice-models';
 import { BAT_ROOST, CAVE_MODELS } from '../../data/games/worlds/hoehle/mitwachsen-cave-models';
 import { PACK_IDS, PACK_WAIT_MS, Packs, RETRY_MS, type LoadedPack } from './mitwachsen-packs';
 import type { Need } from './mitwachsen-pack';
-import { BAHN_LIVE } from '../../data/games/mitwachsen-live';
 import { HINT_AFTER } from './mitwachsen-guide';
 import { plateMid } from './mitwachsen-plate';
 import { initialState, type State } from './mitwachsen-state';
@@ -136,16 +135,17 @@ describe('Welt-Pakete laden (Packs)', () => {
     expect(packs.at('eis')).toBe(pack);
     expect(packs.at('hoehle')).toBeUndefined();
     const door = gates.get('hoehle')!;
-    await packs.want({ ...bed, at: [door.mid] }, gates); // nah am Höhlentor: nichts, es geht bis zur Bahn-Phase nie auf
+    await packs.want({ ...bed, at: [door.mid] }, gates); // nah am Höhlentor vor der Eis-Welt: Tok kommt erst danach
     expect(asked).toEqual(['eis']);
-    await packs.want({ ...bed, openGates: ['hoehle'] }, gates); // das Höhlentor ist offen: jetzt auch die Höhlenwelt
+    await packs.want({ ...open, at: [door.mid] }, gates); // nah am Höhlentor nach der Eis-Welt: jetzt auch die Höhlenwelt
+    expect(asked).toEqual(['eis', 'hoehle']);
+    await packs.want({ ...bed, openGates: ['hoehle'] }, gates); // das Höhlentor ist offen: sie ist schon da
     expect(asked).toEqual(['eis', 'hoehle']);
     expect(packs.at('hoehle')).toBe(hoehle);
     expect(packs.get('hoehle')).toBe(hoehle);
   });
 
-  it('Freigabe der Bahn (BAHN_LIVE aus): das Paket der Bahn kommt nie von selbst, auch nicht bei offenem Eistor', async () => {
-    expect(BAHN_LIVE).toBe(false);
+  it('das Paket der Bahn kommt, sobald das Eistor offen ist, vorher nur mit dem Entwickler-Schalter', async () => {
     const asked: string[] = [];
     const bahn = { id: 'bahn' } as LoadedPack;
     const hoehle = { ...pack, id: 'hoehle', gate: 'hoehle' } as LoadedPack;
@@ -153,14 +153,21 @@ describe('Welt-Pakete laden (Packs)', () => {
       () => {},
       (id) => (asked.push(id), Promise.resolve({ eis: pack, hoehle, bahn, fahrt: { id: 'fahrt' } as LoadedPack }[id])),
     );
-    await packs.want({ ...open, openGates: ['eis', 'hoehle'] }, gates);
+    await packs.want(bed, gates); // Eistor zu: keine Bahn
     expect(asked).not.toContain('bahn');
-    expect(packs.at(undefined)).toBeUndefined(); // ein Paket ohne Tor ist nie „das Paket hinter einem Tor“
-    packs.extra = ['bahn']; // nur der Entwickler-Schalter holt es
-    await packs.want(bed, gates);
+    await packs.want({ ...open, openGates: ['eis', 'hoehle'] }, gates);
     expect(asked).toContain('bahn');
     expect(packs.get('bahn')).toBe(bahn);
+    expect(packs.at(undefined)).toBeUndefined(); // ein Paket ohne Tor ist nie „das Paket hinter einem Tor“
     expect(packs.at('hoehle')).toBe(hoehle); // das Paket hinter dem Höhlentor bleibt die Höhlenwelt
+    asked.length = 0;
+    const dev = new Packs(
+      () => {},
+      (id) => (asked.push(id), Promise.resolve({ eis: pack, hoehle, bahn, fahrt: { id: 'fahrt' } as LoadedPack }[id])),
+    );
+    dev.extra = ['bahn']; // der Entwickler-Schalter holt es auch ohne Bedarf
+    await dev.want(bed, gates);
+    expect(asked).toEqual(['bahn']);
   });
 
   it('das Paket der Fahrzeuge kommt, sobald es ein Fahrzeug geben kann (Eistor offen), mit dem Schalter der Bahn auch so', async () => {

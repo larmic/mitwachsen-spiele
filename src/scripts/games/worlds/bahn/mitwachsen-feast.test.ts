@@ -1,11 +1,10 @@
 // Schmuck mit Zug (Schritt 13): Pfeif-Gruß, Laternenfahrt mit Kristall-Wimpel, warmes Licht ab 20 min, „Gute Nacht,
 // Bahn“ samt Nachtlicht (mitwachsen-feast-look.ts, mitwachsen-train.ts `feast`, mitwachsen-station-look.ts), dazu die
-// Gute Nacht des Schlittens (mit der Freigabe der Bahn). Reine Regeln über `step` mit den Paketen wie im Spiel
-import { afterEach, describe, expect, it } from 'vitest';
+// Gute Nacht des Schlittens. Reine Regeln über `step` mit den Paketen wie im Spiel
+import { describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import { REGIONS, animalId, type Point } from '../../../../data/games/mitwachsen';
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
-import { BAHN_LIVE, bahnOn, tryBahn } from '../../../../data/games/mitwachsen-live';
 import { TRAIN_COLORS } from '../../../../data/games/worlds/bahn/mitwachsen-train-model';
 import { bahnWanted } from '../../mitwachsen-pack';
 import type { RideEvent } from '../../mitwachsen-pack-types';
@@ -97,16 +96,11 @@ const ev = (what: RideEvent['what'], more: Partial<RideEvent> = {}): RideEvent =
 const marmotAt = (id: string, x: number, y: number) =>
   ({ id, species: 'murmeltier', x, y, dir: 's', mode: 'wander' }) as State['animals'][number];
 
-describe('Schmuck mit Zug: Freigabe', () => {
-  afterEach(() => tryBahn(false));
-
-  it('alles kommt mit dem Paket der Bahn, das bis zum Freischalten nie von selbst lädt', () => {
-    expect(BAHN_LIVE).toBe(false);
-    expect(bahnWanted({ openGates: ['eis', 'hoehle'] })).toBe(false);
+describe('Schmuck mit Zug: mit dem Paket der Bahn', () => {
+  it('alles kommt mit dem Paket der Bahn, das das Spiel mit offenem Eistor holt', () => {
+    expect(bahnWanted({ openGates: ['eis', 'hoehle'] })).toBe(true);
     expect(view).toHaveProperty('goodNight', trainGoodNight);
     expect(train).toHaveProperty('feast', feast);
-    tryBahn(false);
-    expect(bahnOn()).toBe(false);
   });
 });
 

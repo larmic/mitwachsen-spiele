@@ -135,9 +135,9 @@ function fromV3(raw: Record<string, unknown>): Record<string, unknown> {
  */
 function fromV4(raw: Record<string, unknown>): Record<string, unknown> {
   if (typeof raw.seed !== 'number' || !Number.isFinite(raw.seed)) return { ...raw, v: 5 };
-  // derselbe Seed wie die Welt: `migrate` speichert ihn unten als `seed >>> 0`, daraus baut das Spiel die Welt. Heute geht
-  // hinter dem Felsring nur das Eistor auf, `packAt` grenzt trotzdem auf sein Land ein: Kommt ein Tal hinter einem
-  // anderen Tor hinzu, bleibt dessen Nebel bei diesem Umzug unberührt
+  // derselbe Seed wie die Welt: `migrate` speichert ihn unten als `seed >>> 0`, daraus baut das Spiel die Welt. `packAt`
+  // grenzt auf das Land der Eis-Welt ein (ihre Hülle, sonst das nächste Tor, das aufgehen kann): Der alte Kessel liegt
+  // darin, der Nebel hinter anderen Toren (die Grotte hinter dem Höhlentor) bleibt bei diesem Umzug unberührt
   const gates = gatePlaces(raw.seed >>> 0);
   const fog = Fog.from(raw.explored);
   fog.forget((x, y) => beyondRing(x, y) && packAt([x, y], gates, beyondRing));

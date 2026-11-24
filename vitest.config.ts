@@ -11,6 +11,7 @@ import { budgetMs, calibrate } from './scripts/test-budget.ts';
 // Pipeline und gates:ci).
 // Welten kommen über `worldOf`/`bareOf` (test-worlds.ts), kein `expect` in Schleifen je Takt oder Feld.
 const CI = !!process.env.CI;
+const DEEP = process.env.MITWACHSEN_DEEP === '1';
 const coverage = process.argv.includes('--coverage');
 const calib = calibrate();
 const budget = budgetMs(calib, coverage);
@@ -27,6 +28,12 @@ export default defineConfig({
     slowTestThreshold: budget,
     // Lokal die Hälfte der Kerne: weniger Rauschen durch viele Worker (und Effizienzkerne)
     maxWorkers: CI ? undefined : '50%',
+    // Tiefer Lauf ohne Isolation je Datei: Jeder Worker lädt die Module (Pakete, Modelle) einmal für alle seine Dateien
+    // statt je Datei neu; gebaute Welten vergisst er nach jeder Datei (test-deep-setup.ts, sonst reicht der Speicher
+    // nicht). test:deep lag in gates:ci am 24.11.2026 bei 139 bis 154 s von 150 s. `npm test` bleibt isoliert und
+    // findet so Tests, die von einer anderen Datei abhängen
+    isolate: !DEEP,
+    setupFiles: DEEP ? ['src/scripts/games/test-deep-setup.ts'] : [],
     // Abdeckung nur für die reinen Module – Web Components, Canvas und Three.js prüft der Browser-Test (e2e/)
     coverage: {
       provider: 'v8',

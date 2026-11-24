@@ -94,6 +94,6 @@ export const view: View2D = {
   // Schlitten mit Schlittenrentier und Schuppen, Schneespur und Fleck am Halt, Ton und Freude (mitwachsen-sled-look.ts)
   bodies: sledBodies,
   marks: sledMarks,
-  goodNight: sledGoodNight, // „Gute Nacht, Fahrzeuge“ (mit der Freigabe der Bahn)
+  goodNight: sledGoodNight, // „Gute Nacht, Fahrzeuge“
   rideFx: (e, state) => (e.id === SLED_ID.slice(5) ? rideFx(e, state) : undefined), // nur seine Ereignisse
 };

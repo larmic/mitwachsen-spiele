@@ -3,7 +3,6 @@ import { fromKey } from '../../../../lib/games/chunks';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import { animalId, type Point } from '../../../../data/games/mitwachsen';
 import { FIRST_MOLE } from '../../../../data/games/mitwachsen-hoehle';
-import { tryBahn } from '../../../../data/games/mitwachsen-live';
 import { atHome } from '../../mitwachsen-meadow';
 import { SIGHT, stopsOf } from '../../mitwachsen-ride-kit';
 import { withTok } from '../../mitwachsen-ride-save';
@@ -537,12 +536,7 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
     });
 
     it(`Seed ${seed}: Bau 2 als ganze Fahrt: Tok klopft am Prellbock, der Zug fährt bis Bahnhof Fledermaus, der Maulwurf zieht ein und läuft heim, Tok im Lokschuppen`, () => {
-      tryBahn(); // die Bahn-Phase an wie im Blick hinein, sonst gilt das Höhlentor als zu
-      try {
-        expect(build2Ride(w), `Seed ${seed}`).toEqual([]);
-      } finally {
-        tryBahn(false);
-      }
+      expect(build2Ride(w), `Seed ${seed}`).toEqual([]);
     });
 
     it(`Seed ${seed}: Gute Nacht, Bahn: Bahnhof Bär liegt in Sichtweite des Lichtungsbetts`, () => {

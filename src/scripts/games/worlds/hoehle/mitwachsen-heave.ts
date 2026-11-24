@@ -2,8 +2,7 @@
 // (Konzept „Gleisbauer und Höhlen-Welt“, Tor-Ritual). Teil des Welt-Pakets der Höhlenwelt (`rules.ritual`, Form der
 // Regeln eines Boten, mitwachsen-herald.ts); Tok selbst kommt aus dem Paket der Bahn, hier zählt nur, dass er als Bote
 // (`mode: 'herald'`, wach) in der Bucht vor dem Höhlentor steht. Auslöser wie am Eistor: Die wache Figur steht seit 0,4 s
-// still auf der Torplatte (`still`, nur Stehen zählt), das Tor ist zu und hat seinen Schlüssel (`keyOf`: erst mit der
-// Bahn-Phase, `bahnOn`). Dann das Vorspiel, in dem die Kamera zur Front dreht (`leadTicks` je Torlage; in 2D und bei
+// still auf der Torplatte (`still`, nur Stehen zählt), das Tor ist zu und hat seinen Schlüssel (`keyOf`: Tok). Dann das Vorspiel, in dem die Kamera zur Front dreht (`leadTicks` je Torlage; in 2D und bei
 // reduzierter Bewegung kommt die Postkarte), danach gibt jeder Pfeil einen Stoß (mindestens `PUSH_GAP` Takte
 // dazwischen); ohne Druck stößt Tok nach je `TOK_ALONE` Takten allein, niemand bleibt hängen, es gibt keine Zeitgrenze
 // und keinen Fehlerton. Drei Stöße: Der Stein rollt in Dritteln, beim dritten kommt das Tor zu den offenen (Ereignis

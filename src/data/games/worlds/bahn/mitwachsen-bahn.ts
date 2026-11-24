@@ -1,5 +1,5 @@
 // Höhlenbahn: Maße der Linie und Farben des Gleises. Nur das Paket der Bahn (src/scripts/games/worlds/bahn/) liest diese
-// Daten; es wird nachgeladen, und bis zum Freischalten (`BAHN_LIVE`) holt es nur der Entwickler-Schalter.
+// Daten; es wird nachgeladen, sobald das Eistor offen ist.
 // Konzept: docs/games/mitwachsen.md (Höhlenwelt, Tok und die Bahn) · Spec: docs/specs/mitwachsen.md („Tok und die Bahn“)
 
 /**

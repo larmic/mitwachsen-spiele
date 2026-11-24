@@ -1,10 +1,8 @@
 // Hau-ruck am Höhlentor (Konzept-Schritt 11): Tok und die Figur schieben den Rollstein in drei Stößen in seine Nische
 // (Regeln mitwachsen-heave.ts, Bild und Ton mitwachsen-heave-look.ts, beide im Paket der Höhlenwelt). Reine Regeln über
-// `step` mit den Paketen wie im Spiel (Höhlenwelt, Bahn mit Tok, Fahr-Engine); hinter der Freigabe der Bahn-Phase, darum
-// beide Stellungen (`tryBahn` wie der Entwickler-Schalter, aus wie für das Kind bis zum Freischalten)
-import { afterEach, describe, expect, it } from 'vitest';
+// `step` mit den Paketen wie im Spiel (Höhlenwelt, Bahn mit Tok, Fahr-Engine)
+import { describe, expect, it } from 'vitest';
 import { animalId, keyOf, type Point } from '../../../../data/games/mitwachsen';
-import { BAHN_LIVE, tryBahn } from '../../../../data/games/mitwachsen-live';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import { BESIDE, plateRow } from '../../mitwachsen-bay';
 import { HEAVE_END, heaveLeft, nope } from '../../mitwachsen-guide';
@@ -55,8 +53,6 @@ const AT: RideAt = { now: 0, frac: 0, reduced: false, lit: false };
 const ticks = (n: number): Cmd[] => Array.from({ length: n }, () => TICK);
 const PENTA = new Set([0, 2, 4, 7, 9]); // C-Dur-Pentatonik in Halbtönen über C
 const semis = (f: number) => ((Math.round(12 * Math.log2(f / 261.63)) % 12) + 12) % 12;
-
-afterEach(() => tryBahn(false));
 
 type Run = { s: State; events: GameEvent[]; at: Map<string, number[]> };
 function play(s: State, world: World, cmds: readonly Cmd[]): Run {
@@ -130,32 +126,19 @@ function pathTo(world: World, s: State, goal: Point, limit = 40000): Dir[] | nul
   return null;
 }
 
-describe('Hau-ruck am Höhlentor: Freigabe (beide Stellungen)', () => {
-  it('bis zum Freischalten hat das Höhlentor keinen Schlüssel: Auch mit Tok neben der Platte beginnt nichts', () => {
-    expect(BAHN_LIVE).toBe(false);
-    expect(keyOf(GATE)).toBeUndefined();
-    const r = play(onPlate(W), W, ticks(200));
-    expect(r.s.heave).toBeUndefined();
-    expect(r.s.openGates).not.toContain(GATE);
-    expect(r.events.filter((e) => e.type === 'heave' || e.type === 'gate')).toEqual([]);
-    // ein Spielstand mit offenem Höhlentor (gibt es für das Kind nicht) bleibt beim Laden zu
-    expect(initialState(W, { openGates: [GATE] }).openGates).toEqual([]);
-  });
-
-  it('mit der Bahn-Phase (Entwickler-Schalter, später `BAHN_LIVE`): Schlüssel Tok, das Hau-ruck beginnt, ein offenes Tor bleibt offen', () => {
-    tryBahn();
+describe('Hau-ruck am Höhlentor: Schlüssel und Pakete', () => {
+  it('Schlüssel Tok: das Hau-ruck beginnt, ein offenes Tor bleibt beim Laden offen', () => {
     expect(keyOf(GATE)).toBe('tok');
     expect(HOEHLE_PACK.rules?.ritual).toBe(HEAVE);
     expect(begun(W).s.heave).toEqual({ gate: GATE, n: 0, at: OPEN_TICKS + lead(W) });
     expect(initialState(W, { openGates: [GATE] }).openGates).toEqual([GATE]);
   });
 
-  it('Pakete: mit der Bahn-Phase braucht das Spiel die Grotte nah am Höhlentor und mit offenem Tor; aus nie von selbst', () => {
+  it('Pakete: das Spiel braucht die Grotte nah am Höhlentor nach der Eis-Welt und mit offenem Tor, sonst nicht', () => {
     const g = W.gates.get(GATE)!;
     const near = { openGates: ['eis' as const], garden: [], at: [plateRow(g, 0)] };
-    expect(needsPack(near, W.gates, beyondRing, GATE)).toBe(false);
-    tryBahn();
     expect(needsPack(near, W.gates, beyondRing, GATE)).toBe(true);
+    expect(needsPack({ ...near, openGates: [] }, W.gates, beyondRing, GATE)).toBe(false); // vor der Eis-Welt: Tok kommt erst danach
     expect(needsPack({ ...near, at: [W.homes.lichtung.bed] }, W.gates, beyondRing, GATE)).toBe(false); // fern vom Tor
     expect(needsPack({ ...near, at: [], openGates: ['eis', GATE] }, W.gates, beyondRing, GATE)).toBe(true);
   });
@@ -163,7 +146,6 @@ describe('Hau-ruck am Höhlentor: Freigabe (beide Stellungen)', () => {
 
 describe('Hau-ruck am Höhlentor: Regeln (mitwachsen-heave.ts)', () => {
   it('beginnt erst, wenn die Figur 0,4 s still auf der Platte steht und Tok in der Bucht wartet; Drüberlaufen nie', () => {
-    tryBahn();
     const g = W.gates.get(GATE)!;
     const s = onPlate(W);
     expect(play(s, W, ticks(OPEN_TICKS - 1)).s.heave).toBeUndefined();
@@ -189,7 +171,6 @@ describe('Hau-ruck am Höhlentor: Regeln (mitwachsen-heave.ts)', () => {
   });
 
   it('Vorspiel, solange die Kamera zur Front dreht: Pfeile lassen nur hüpfen, die Figur bleibt auf der Platte', () => {
-    tryBahn();
     const b = begun(W);
     if (lead(W) === 0) return;
     const r = play(b.s, W, [push('n'), push('e'), push('s')]);
@@ -199,7 +180,6 @@ describe('Hau-ruck am Höhlentor: Regeln (mitwachsen-heave.ts)', () => {
   });
 
   it('jeder Pfeil ist ein Stoß, mindestens 6 Takte dazwischen; drei Stöße: das Tor ist offen und sofort gespeichert, Stufe `offen`', () => {
-    tryBahn();
     let s = play(begun(W).s, W, ticks(lead(W))).s;
     const first = play(s, W, [push()]);
     expect(first.s.heave).toMatchObject({ n: 1, at: s.tick });
@@ -225,7 +205,6 @@ describe('Hau-ruck am Höhlentor: Regeln (mitwachsen-heave.ts)', () => {
   });
 
   it('ohne Druck stößt Tok allein, je 1,5 s: niemand bleibt hängen, kein Fehlerton', () => {
-    tryBahn();
     const b = begun(W);
     const go = b.s.heave!.at;
     const r = play(b.s, W, ticks(lead(W) + PUSHES * TOK_ALONE + 1));
@@ -239,7 +218,6 @@ describe('Hau-ruck am Höhlentor: Regeln (mitwachsen-heave.ts)', () => {
   });
 
   it('danach 3 s: Pfeile hüpfen nur, dann hüpft Tok mit Herz („Ju-hu“) und das Hau-ruck ist vorbei', () => {
-    tryBahn();
     const b = begun(W);
     let r = play(b.s, W, ticks(lead(W) + PUSHES * TOK_ALONE));
     const opened = r.s.heave!.at;
@@ -254,7 +232,6 @@ describe('Hau-ruck am Höhlentor: Regeln (mitwachsen-heave.ts)', () => {
   });
 
   it('ein halb geschobener Stein wird nicht gespeichert: nach dem Laden ist das Tor zu, kein Hau-ruck', () => {
-    tryBahn();
     const b = begun(W);
     const half = play(b.s, W, ticks(lead(W) + 2 * TOK_ALONE)).s;
     expect(half.heave?.n).toBe(2);
@@ -267,7 +244,6 @@ describe('Hau-ruck am Höhlentor: Regeln (mitwachsen-heave.ts)', () => {
   });
 
   it('Stufe `fest` bleibt `fest`; während des Hau-rucks zeigt das Tor kein „noch nicht“', () => {
-    tryBahn();
     const packs = withBuilt(withTok({}, { stage: 'fest' }), 1);
     const s = play(onPlate(W, { packs }), W, ticks(OPEN_TICKS + lead(W))).s;
     expect(nope({ ...s, still: 100 }, W, -1e9)).toBeUndefined();
@@ -276,7 +252,6 @@ describe('Hau-ruck am Höhlentor: Regeln (mitwachsen-heave.ts)', () => {
   });
 
   it('zu Fuß: nach dem Laden wartet Tok wieder in der Bucht (am Morgen hüpft er vom Bett hin), dann geht es genauso', () => {
-    tryBahn();
     let s = initialState(W, { packs: RIDDEN });
     s = play(s, W, [TICK]).s;
     const tok = () => s.animals.find((a) => a.id === TOK);
@@ -301,7 +276,6 @@ describe('Hau-ruck am Höhlentor: über viele Welten', () => {
   it.each(seedsFor(seedRange(1, 20)))(
     'Seed %i: Tok allein öffnet das Tor in drei Stößen; danach geht es zu Fuß durch den Gang ins Höhlenbett, vorher nicht',
     (seed) => {
-      tryBahn();
       const w = worldFor(seed);
       const before = onPlate(w);
       const wake = w.homes.hoehle.wake[0]!;

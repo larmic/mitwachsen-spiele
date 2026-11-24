@@ -1,4 +1,4 @@
-// Schlitten und Höhlenbahn in einer Welt (nach dem Freischalten hat das Kind beide): Die Strecke des Schlittens, seine
+// Schlitten und Höhlenbahn in einer Welt (das Kind hat beide): Die Strecke des Schlittens, seine
 // Halte, sein Schuppen und die Warteplätze liegen nie auf Gleis oder Bahnsteig der Bahn; wo sie sich nicht in die Quere
 // kommen, fährt der Schlitten wie ohne Bahn. Eigene Datei, damit die Welten mit beiden Paketen im tiefen Lauf in einem
 // eigenen Worker entstehen

@@ -2,10 +2,9 @@
 // fährt bis Bahnhof Fledermaus, der Maulwurf zieht als erstes Höhlen-Tier ein, Tok wohnt im Lokschuppen
 // (mitwachsen-build2.ts, Bild in mitwachsen-bat-look.ts, mitwachsen-rail-look.ts, mitwachsen-station-look.ts). Reine
 // Regeln über `step` mit den Paketen wie im Spiel; die Welt wird beim Ereignis `relay` neu gebaut wie in der Spielseite
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import { animalId, type Point } from '../../../../data/games/mitwachsen';
-import { BAHN_LIVE, tryBahn } from '../../../../data/games/mitwachsen-live';
 import { FIRST_MOLE } from '../../../../data/games/mitwachsen-hoehle';
 import { BUILD2 } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import { TOK_MODEL, TOK_SOLO } from '../../../../data/games/worlds/bahn/mitwachsen-tok-model';
@@ -97,16 +96,11 @@ function rideIn(s: State, w: World, watch: (r: Run) => void = () => {}, limit = 
 }
 
 describe('Bau 2: bei der nächsten Fahrt nach dem Hau-ruck (mitwachsen-build2.ts)', () => {
-  // die Bahn-Phase an wie im Blick hinein (`tryBahn`), sonst gilt das Höhlentor als eines, das nie aufgeht
-  beforeEach(() => tryBahn());
-  afterEach(() => tryBahn(false));
   let ready: State | undefined;
   const begin = () => (ready ??= awake(W1, onPlatform(W1).at));
 
-  it('Freigabe (beide Stellungen): ohne das Paket der Bahn kein Bau 2 und der erste Maulwurf wohnt in der Grotte', () => {
-    expect(BAHN_LIVE).toBe(false);
-    expect(bahnWanted({ openGates: ['eis', 'hoehle'] })).toBe(false); // bis zum Freischalten holt das Spiel es nie
-    expect(bahnWanted({ openGates: ['eis', 'hoehle'] }, true)).toBe(true);
+  it('ohne das Paket der Bahn wohnt der erste Maulwurf in der Grotte, mit ihm sitzt er bis Bau 2 auf Toks Helm', () => {
+    expect(bahnWanted({ openGates: ['eis', 'hoehle'] })).toBe(true); // für das Kind kommt es mit offenem Eistor
     // ohne Bahn (Blick hinein nur in die Grotte): Der erste Maulwurf läuft frei an seinem Fundort
     const cave = worldOf(SEED, [HOEHLE_PACK]);
     expect(cave.away?.size ?? 0).toBe(0);
@@ -117,11 +111,10 @@ describe('Bau 2: bei der nächsten Fahrt nach dem Hau-ruck (mitwachsen-build2.ts
     expect(attachPack(initialState(cave, { packs: OPENED }), W1).animals.some((a) => a.id === FIRST_MOLE)).toBe(false);
     expect(W2.away?.size).toBe(0);
     expect(BAHN_PACK.away!({ bahn: { built: 2 } })).toEqual([]);
-    // aus (wie für das Kind bis zum Freischalten): Das Höhlentor gilt als zu, also beginnt auch kein Bau 2
-    tryBahn(false);
-    const off = initialState(W1, { packs: OPENED, openGates: [...OPEN_GATES] });
-    expect(off.openGates).not.toContain('hoehle');
-    expect(canBuild2(off, W1, 'home')).toBe(false);
+    // ohne Hau-ruck (Höhlentor zu) beginnt kein Bau 2
+    const shut = initialState(W1, { packs: OPENED, openGates: ['eis'] });
+    expect(shut.openGates).not.toContain('hoehle');
+    expect(canBuild2(shut, W1, 'home')).toBe(false);
   });
 
   it('beginnt nur zur Grotte hin, nach dem Hau-ruck, mit der Grotte; vorher und am Prellbock nicht', () => {

@@ -20,7 +20,7 @@ import type { WorldPack } from './mitwachsen-pack-types';
 addModels(eis.models); // wie im Spiel, wenn das Paket ankommt: Modelle der Eis-Tiere
 addModels(hoehle.models, hoehle.roosts); // und der Höhlen-Tiere samt der Fledermaus kopfüber
 addModels(bahn.models, {}, bahn.solos); // und Tok, der Gleisbauer (nach Bau 2 ohne den Maulwurf)
-/** Alle Pakete, die das Spiel von selbst holt (die Bahn nicht, unten): Eis-Welt, Grotte und die Fahr-Engine */
+/** Die Pakete mit eigener Welt und die Fahr-Engine (die Bahn nicht, unten): Eis-Welt, Grotte und die Fahr-Engine */
 export const PACKS = [eis, hoehle, fahrt] as const;
 export const EIS_PACK = eis;
 export const HOEHLE_PACK = hoehle;
@@ -30,9 +30,9 @@ export const HOEHLE_PACK = hoehle;
  */
 export const FAHRT_PACK = fahrt;
 /**
- * Das Paket der Bahn (Gleis auf Lichtung und Grotte): nicht in `PACKS`, denn bis zum Freischalten (`BAHN_LIVE`) holt das
- * Spiel es nie von selbst; Tests der Bahn reichen es herein, mit einem Ausbau (`worldOf(seed, [HOEHLE_PACK, BAHN_PACK],
- * BUILT)`; ohne Ausbau legt es nichts)
+ * Das Paket der Bahn (Tok, Gleis auf Lichtung und Grotte, Zug): nicht in `PACKS`, damit Tests ohne Bahn ihre Welten und
+ * Regeln ohne Tok bauen (im Spiel kommt es, sobald das Eistor offen ist); Tests der Bahn reichen es herein, mit einem
+ * Ausbau (`worldOf(seed, [HOEHLE_PACK, BAHN_PACK], BUILT)`; ohne Ausbau legt es nichts)
  */
 export const BAHN_PACK = bahn;
 /** Spielstand der Pakete mit ganz gebautem Gleis (`packs.bahn.built` 2), für `worldOf` */
@@ -113,4 +113,13 @@ export function bareOf(seed: number): World {
   let w = bare.get(seed);
   if (!w) bare.set(seed, (w = createWorld(seed, [])));
   return w;
+}
+
+/**
+ * Gebaute Welten vergessen (`worldOf`, `bareOf`): Der tiefe Lauf teilt die Module eines Workers über alle seine Dateien
+ * (`isolate` in vitest.config.ts) und ruft dies nach jeder Datei (test-deep-setup.ts), sonst wüchse der Speicher
+ */
+export function forgetWorlds(): void {
+  worlds.clear();
+  bare.clear();
 }

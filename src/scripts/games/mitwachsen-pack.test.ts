@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { REGIONS, regionAnimalList } from '../../data/games/mitwachsen';
 import { NEAR_GATE, bahnWanted, fahrtWanted, holds, needsPack, packAt, type Need } from './mitwachsen-pack';
-import { beyondRing, createWorld, gatePlaces } from './mitwachsen-world';
-import { bareOf, worldOf } from './test-worlds';
+import { beyondRing, createWorld, gatePlaces, kesselPlace } from './mitwachsen-world';
+import { EIS_PACK, HOEHLE_PACK, SAMPLE_SEEDS, bareOf, seedRange, seedsFor, worldOf } from './test-worlds';
 
 const SEED = 1;
 const gates = gatePlaces(SEED);
@@ -73,7 +73,7 @@ describe('Welt-Pakete: wann das Paket der Eis-Welt nötig ist (needsPack)', () =
   });
 });
 
-describe('Welt-Pakete je Tor: das Höhlentor (noch ohne Schlüssel und ohne Paket)', () => {
+describe('Welt-Pakete je Tor: das Höhlentor (Schlüssel Tok)', () => {
   const hoehle = gates.get('hoehle')!;
   const nearHoehle: [number, number] = [hoehle.mid[0] - hoehle.out[0] * 3, hoehle.mid[1] - hoehle.out[1] * 3];
 
@@ -83,43 +83,62 @@ describe('Welt-Pakete je Tor: das Höhlentor (noch ohne Schlüssel und ohne Pake
       expect(needsPack(n, gates, beyondRing, 'hoehle')).toBe(false);
     }
     expect(needsPack(need({ openGates: ['hoehle'] }), gates, beyondRing, 'hoehle')).toBe(true); // Tor offen
-    // nah an seinem Tor: nichts, es geht bis zur Bahn-Phase nie auf (die Höhlenwelt ist noch nicht für das Kind)
+    // nah an seinem Tor, aber vor der Eis-Welt: Tok kommt erst danach (`keyInPlay`), das Paket der Grotte noch nicht
     expect(needsPack(need({ at: [nearHoehle] }), gates, beyondRing, 'hoehle')).toBe(false);
     expect(needsPack(need({ at: [hoehle.mid] }), gates, beyondRing, 'hoehle')).toBe(false);
+    // mit offenem Eistor kann Tok kommen: Nah am Höhlentor kommt das Paket der Grotte schon einmal
+    const afterIce = { openGates: ['eis' as const] };
+    expect(needsPack(need({ ...afterIce, at: [nearHoehle] }), gates, beyondRing, 'hoehle')).toBe(true);
+    expect(needsPack(need({ ...afterIce, at: [hoehle.mid] }), gates, beyondRing, 'hoehle')).toBe(true);
+    expect(needsPack(need({ ...afterIce, at: [[0, 0]] }), gates, beyondRing, 'hoehle')).toBe(false); // fern vom Tor
     expect(needsPack(need({ at: [nearHoehle] }), gates, beyondRing, 'eis')).toBe(false);
   });
+
+  // Hinter dem Felsring gehört jedes Feld einer Welt nur zu ihr (`land`), auch wenn das andere Tor näher liegt: Früher
+  // gab das nächste Tor den Ausschlag, und mit dem Höhlentor als zweitem Tor mit Schlüssel fiel bis zu einem Drittel der
+  // Eis-Welt an die Grotte (Seeds 2, 9, 15, 18, 19). Lage der Welten ohne sie zu bauen (`kesselPlace`)
+  it.each(seedsFor(seedRange(1, 40), [...SAMPLE_SEEDS, 2, 9, 15, 18, 19]))(
+    'Seed %i: jedes Feld der Eis-Welt gehört zum Eistor, jedes der Grotte zum Höhlentor, keines zum anderen',
+    (seed) => {
+      const g = gatePlaces(seed);
+      const bad: string[] = [];
+      for (const [pack, own, other] of [
+        [EIS_PACK, 'eis', 'hoehle'],
+        [HOEHLE_PACK, 'hoehle', 'eis'],
+      ] as const)
+        for (const p of kesselPlace(seed, pack).cells)
+          if (!packAt(p, g, beyondRing, own) || packAt(p, g, beyondRing, other)) bad.push(`${own} ${p[0]},${p[1]}`);
+      expect(bad.slice(0, 5)).toEqual([]);
+    },
+  );
 
   it('holds: Eine Position hält der Spielstand nur für eine Welt hinter einem Tor, das aufgehen kann, ohne ihr Paket', () => {
     const [eisRegion, hoehleRegion] = [REGIONS[1]!, REGIONS[2]!];
     expect([eisRegion.id, hoehleRegion.id]).toEqual(['eis', 'hoehle']);
     const nearEis: [number, number] = [eis.mid[0] - eis.out[0] * 3, eis.mid[1] - eis.out[1] * 3];
-    expect(holds(bareOf(SEED), eisRegion, nearEis, beyondRing)).toBe(true); // Paket fehlt: festhalten
-    expect(holds(worldOf(SEED), eisRegion, nearEis, beyondRing)).toBe(false); // Paket da
-    expect(holds(bareOf(SEED), hoehleRegion, nearHoehle, beyondRing)).toBe(false); // das Höhlentor geht bis zur Bahn-Phase nie auf
-    expect(holds(bareOf(SEED), REGIONS[0], [0, 0], beyondRing)).toBe(false); // die Lichtung liegt hinter keinem Tor
-    expect(holds(createWorld(SEED, []), eisRegion, [0, 0], beyondRing)).toBe(false); // am Bett: nicht ihre Welt
+    expect(holds(bareOf(SEED), eisRegion, nearEis, beyondRing, [])).toBe(true); // Paket fehlt: festhalten
+    expect(holds(worldOf(SEED), eisRegion, nearEis, beyondRing, [])).toBe(false); // Paket da
+    // das Höhlentor kann aufgehen (Tok), aber erst nach der Eis-Welt: vorher kommt sein Paket nicht, nichts festhalten
+    expect(holds(bareOf(SEED), hoehleRegion, nearHoehle, beyondRing, [])).toBe(false);
+    expect(holds(bareOf(SEED), hoehleRegion, nearHoehle, beyondRing, ['eis'])).toBe(true); // Paket fehlt
+    expect(holds(bareOf(SEED), REGIONS[0], [0, 0], beyondRing, ['eis'])).toBe(false); // die Lichtung liegt hinter keinem Tor
+    expect(holds(createWorld(SEED, []), eisRegion, [0, 0], beyondRing, [])).toBe(false); // am Bett: nicht ihre Welt
   });
 });
 
-describe('Welt-Pakete: wann das Paket der Bahn nötig ist (bahnWanted, Freigabe BAHN_LIVE)', () => {
-  it('vor dem Freischalten nie, wie weit das Kind auch ist; danach, sobald das Eistor offen ist', () => {
-    const at: Need['at'] = [[0, 0]];
+describe('Welt-Pakete: wann das Paket der Bahn nötig ist (bahnWanted)', () => {
+  it('sobald das Eistor offen ist (Tok kommt erst nach der Eis-Welt), vorher nie', () => {
     expect(bahnWanted({ openGates: [] })).toBe(false);
-    expect(bahnWanted({ openGates: ['eis'] })).toBe(false); // BAHN_LIVE ist aus
-    expect(bahnWanted({ openGates: ['eis', 'hoehle'] }, false)).toBe(false);
-    expect(bahnWanted({ openGates: [] }, true)).toBe(false); // freigeschaltet: erst nach der Eis-Welt
-    expect(bahnWanted({ openGates: ['eis'] }, true)).toBe(true);
-    expect(at).toHaveLength(1);
+    expect(bahnWanted({ openGates: ['hoehle'] })).toBe(false); // ohne Eis-Welt gibt es keine Bahn
+    expect(bahnWanted({ openGates: ['eis'] })).toBe(true);
+    expect(bahnWanted({ openGates: ['eis', 'hoehle'] })).toBe(true);
   });
 });
 
-describe('Welt-Pakete: wann das Paket der Fahrzeuge nötig ist (fahrtWanted, beide Stellungen von BAHN_LIVE)', () => {
-  it('sobald es ein Fahrzeug geben kann: Eistor offen (Schlitten); die Bahn kommt erst danach, auch freigeschaltet', () => {
-    for (const live of [false, true]) {
-      expect(fahrtWanted({ openGates: [] }, live), String(live)).toBe(false); // noch kein Fahrzeug
-      expect(fahrtWanted({ openGates: ['eis'] }, live), String(live)).toBe(true);
-      expect(fahrtWanted({ openGates: ['hoehle'] }, live), String(live)).toBe(false); // das Höhlentor allein: kein Fahrzeug
-    }
-    expect(fahrtWanted({ openGates: ['eis'] })).toBe(true); // mit der heutigen Freigabe
+describe('Welt-Pakete: wann das Paket der Fahrzeuge nötig ist (fahrtWanted)', () => {
+  it('sobald es ein Fahrzeug geben kann: Eistor offen (Schlitten); die Bahn kommt erst danach', () => {
+    expect(fahrtWanted({ openGates: [] })).toBe(false); // noch kein Fahrzeug
+    expect(fahrtWanted({ openGates: ['eis'] })).toBe(true);
+    expect(fahrtWanted({ openGates: ['hoehle'] })).toBe(false); // das Höhlentor allein: kein Fahrzeug
   });
 });

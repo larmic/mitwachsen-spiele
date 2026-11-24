@@ -5,7 +5,7 @@
 // kleines Fest mit Kristall-Funken, danach trägt der Zug den Kristall-Wimpel) und „Gute Nacht, Bahn“ (schläft die Figur im
 // Lichtungsbett und steht der Zug an Bahnhof Bär in Sichtweite, pfeift er leise gute Nacht und macht sein Licht aus,
 // danach brennt nur ein kleines Nachtlicht). Bei reduzierter Bewegung keine Glühwürmchen; die Töne bleiben. Alles
-// Zierde, nie Bedingung, und hinter der Freigabe der Bahn (ohne ihr Paket gibt es keinen Zug).
+// Zierde, nie Bedingung (ohne das Paket der Bahn gibt es keinen Zug).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Schmuck mit Zug)
 
 import type { Part } from '../../../../lib/games/front';

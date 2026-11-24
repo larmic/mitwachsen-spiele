@@ -3,8 +3,8 @@
 // `RIDES` dazu. Die Fahrregeln aller Fahrzeuge bringt das Paket der Fahrzeuge mit (worlds/fahrt/), Strecke und Bild das
 // Paket des Fahrzeugs (Schlitten: worlds/eis/mitwachsen-sled*.ts; Zug: worlds/bahn/mitwachsen-train*.ts). Die Liste steht
 // hier, weil die Pakete einander nicht importieren und jedes seinen Eintrag braucht; der Kern kennt nur die Typen
-// (`RideId`). Die Höhlenbahn (`'hoehle'`, Paket worlds/bahn/) gibt es nur hinter dem Schalter `BAHN_LIVE`
-// (mitwachsen-live.ts): Bis zum Freischalten sieht das Kind nichts von ihr, nur der Entwickler-Schalter zeigt sie.
+// (`RideId`). Die Höhlenbahn (`'hoehle'`, Paket worlds/bahn/) kommt mit Tok nach der ersten Heimfahrt mit dem
+// Schlitten (Bau 1).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Der Schlitten“ und „Tok und die Bahn“)
 
 import type { GateId } from './mitwachsen';

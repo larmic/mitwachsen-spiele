@@ -236,10 +236,10 @@ test(
   },
 );
 
-// Das Gleis der Höhlenbahn sieht bis zum Freischalten (`BAHN_LIVE`) nur der Entwickler-Schalter: Die Figur wacht im Bett
-// der Lichtung auf, das Höhlentor bleibt zu, der Schalter spielt den Ausbau 2 vor, das Gleis liegt von Bahnhof Bär bis vor
-// das Tor und wird gezeichnet (2D: Schienen und Schwellen im Bild, 3D: aus dem 3D-Teil der Bahn); gespeichert wird
-// nichts. Ohne Schalter kommt das Paket der Bahn nicht
+// Das Gleis der Höhlenbahn per Entwickler-Schalter: Die Figur wacht im Bett der Lichtung auf, der Schalter spielt den
+// Ausbau 2 vor, das Gleis liegt von Bahnhof Bär bis vor das Tor und wird gezeichnet (2D: Schienen und Schwellen im Bild,
+// 3D: aus dem 3D-Teil der Bahn); gespeichert wird nichts. Ohne Schalter in einer neuen Welt (Eistor zu) kommt das Paket
+// der Bahn nicht
 test(
   'Spiel: Gleis der Höhlenbahn per Entwickler-Schalter, nur dort, speichert nichts, ohne Fehler',
   { tag: '@3d' },
@@ -329,7 +329,7 @@ test(
     await page.evaluate(() => dispatchEvent(new Event('pagehide')));
     const saved = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')));
     expect(saved).toEqual([]);
-    // ohne Schalter: kein Paket der Bahn, kein Gleis
+    // ohne Schalter, eine neue Welt (vor der Eis-Welt): kein Paket der Bahn, kein Gleis
     const plain = await openGame(page, { clock: true, info: false });
     const child = await plain.evaluate((node, [x, y]) => {
       const el = node as unknown as Game;
@@ -399,8 +399,7 @@ test('Spiel: Kristall-Laterne in der Grotte per Entwickler-Schalter, Lichtkreis 
 // Tok erscheint per Entwickler-Schalter (`?entwickler=bahn&bau=0`, 2D): Der Schalter spielt den Stand vor, in dem er
 // kommt (Eistor offen, Eis-Leiste voll, erste Heimfahrt mit dem Schlitten); beim Aufwachen im Bett der Lichtung hüpft
 // er neben der Figur heraus, wird gezeichnet und hat einen Gast-Platz; am Abend (`&abend=1`) liegt er schlafend neben
-// dem Bett. Gespeichert wird nichts; ohne Schalter gibt es ihn nicht (Freigabe `BAHN_LIVE` aus), auch nicht in einem
-// Spielstand, in dem alles für ihn gilt: Das Paket der Bahn wird nie geholt
+// dem Bett. Gespeichert wird nichts. Für das Kind ohne Schalter: „Bahn und Höhle für das Kind …“
 test('Spiel: Tok erscheint per Entwickler-Schalter, am Abend schlafend, speichert nichts, ohne Fehler', async ({
   page,
 }) => {
@@ -451,40 +450,13 @@ test('Spiel: Tok erscheint per Entwickler-Schalter, am Abend schlafend, speicher
   await ticks(page, 5);
   await render(page, 2);
   expect(await tok(evening)).toMatchObject({ mode: 'herald', nap: true, near: true, drawn: true });
-  // ohne Schalter, im Spielstand des Kindes alles, was Tok braucht (Eistor offen, Eis-Leiste voll, erste Heimfahrt mit
-  // dem Schlitten): Freigabe aus, also kein Paket der Bahn und kein Tok
-  const ice = (REGIONS.find((r) => r.id === 'eis')?.animals ?? []).map(({ species }) => ({
-    id: animalId('eis', species),
-    species,
-  }));
-  const plain = await openGame(page, { clock: true, info: false });
-  await plain.evaluate((node, garden) => {
-    const el = node as unknown as Game & { state: { garden: unknown[] }; save(): void };
-    const packs = { ...el.state.packs, fahrt: { schlitten: { stage: 'fest' } } };
-    el.state = { ...el.state, openGates: ['eis'], garden: [...el.state.garden, ...garden], packs };
-    el.save();
-  }, ice);
-  const fetched: string[] = [];
-  page.on('request', (r) => {
-    if (/\/welt-bahn/.test(new URL(r.url()).pathname)) fetched.push(r.url());
-  });
-  await reloadGame(page);
-  await wake(plain);
-  await ticks(page, 30);
-  expect(await tok(plain)).toMatchObject({ mode: null, open: ['eis'], fahrt: { schlitten: { stage: 'fest' } } });
-  const loaded = await plain.evaluate((node) =>
-    (node as unknown as { packs: { loaded: { id: string }[] } }).packs.loaded.map((p) => p.id),
-  );
-  expect(loaded).toContain('eis');
-  expect(loaded).not.toContain('bahn');
-  expect(fetched).toEqual([]);
   expect(errors).toEqual([]);
 });
 
 // Hau-ruck am Höhlentor per Entwickler-Schalter (`?entwickler=bahn&bau=1&bucht=1`, 2D): Die erste Fahrt ist gemacht,
 // Tok wartet neben der Torplatte; steht die Figur still auf der Platte, beginnen die Hände auf dem Stein zu leuchten,
 // ohne Druck stößt Tok allein, nach drei Stößen ist das Höhlentor offen (Stufe `offen`). Gespeichert wird im Blick
-// hinein nichts; ohne Schalter hat das Höhlentor keinen Schlüssel (Freigabe `BAHN_LIVE` aus)
+// hinein nichts; für das Kind: „Bahn und Höhle für das Kind …“
 test('Spiel: Hau-ruck am Höhlentor per Entwickler-Schalter, Tok stößt allein, das Tor geht auf, ohne Fehler', async ({
   page,
 }) => {
@@ -593,7 +565,7 @@ test('Spiel: Gute Nacht, Bahn per Entwickler-Schalter, Licht aus nach dem Pfiff,
 // Bau 1 per Entwickler-Schalter (`?entwickler=bahn&bau=0`; @3d, weil die Welt dabei neu gebaut wird und 3D ihre Stücke
 // austauscht): Läuft die Figur in den wachen Tok, baut er 8 s lang (Pfeile lassen sie nur hüpfen), die Welt wird mit dem
 // Gleis neu gebaut, danach stehen Bahnhof Bär und der Zug da, Tok sitzt im hinteren Wagen. Gespeichert wird im Blick
-// hinein nichts; ohne Schalter gibt es den Bau nicht (Freigabe aus, geprüft in „Tok erscheint per Entwickler-Schalter …“)
+// hinein nichts; für das Kind: „Bahn und Höhle für das Kind …“
 test(
   'Spiel: Bau 1 per Entwickler-Schalter: in Tok gelaufen, Bahnhof, Gleis und Zug, speichert nichts, ohne Fehler',
   {
@@ -702,8 +674,7 @@ test(
 // Antippen von Tok und Zug per Entwickler-Schalter (`?entwickler=bahn&bau=0`, fester Seed 1; @3d, weil der Finger über
 // die Projektion der 3D-Kamera trifft, im Projekt `game` dieselbe Prüfung in 2D): Ein Klick auf Tok an seinem Platz, drei
 // Felder von der Figur, beginnt Bau 1 wie Hineinlaufen, die Figur geht keinen Schritt; nach dem Bau steigt ein Klick auf
-// den mittleren Wagen ein. Gespeichert wird im Blick hinein nichts; ohne Schalter gibt es Tok und Zug nicht (Freigabe
-// aus, „Tok erscheint …“), also auch nichts anzutippen
+// den mittleren Wagen ein. Gespeichert wird im Blick hinein nichts
 test(
   'Spiel: Antippen per Entwickler-Schalter: Tok beginnt Bau 1, der Zug steigt ein, ohne Schritt, speichert nichts, ohne Fehler',
   { tag: '@3d' },
@@ -816,7 +787,7 @@ test(
 // Fahren mit der Höhlenbahn per Entwickler-Schalter (`?entwickler=bahn&bau=1`, fester Seed 1; @3d, weil die Kamera dem
 // Zug folgt und 3D die Figur im Wagen zeichnet): Ein neuer Druck zum Zug steigt ein, die Figur sitzt im mittleren Wagen,
 // die erste Fahrt endet am Prellbock in der Bucht, die Figur steigt aus, Tok hüpft an seinen Platz neben der Torplatte.
-// Gespeichert wird im Blick hinein nichts; ohne Schalter gibt es den Zug nicht (Freigabe aus, „Tok erscheint …“)
+// Gespeichert wird im Blick hinein nichts; für das Kind: „Bahn und Höhle für das Kind …“
 test(
   'Spiel: Zug per Entwickler-Schalter: einsteigen, erste Fahrt bis zum Prellbock, Tok steigt aus, speichert nichts, ohne Fehler',
   { tag: '@3d' },
@@ -899,7 +870,7 @@ test(
 // gebaut wird und 3D ihre Stücke tauscht): Das Hau-ruck ist gemacht, Tok wartet in der Bucht. Ein neuer Druck zum Zug an
 // Bahnhof Bär steigt ein; beim Abfahren steht Ausbau 2 im Spielstand, am Prellbock klopft Tok, der Prellbock versinkt,
 // der Zug fährt bis Bahnhof Fledermaus in der Grotte; dort zieht der Maulwurf ins Gehege, Tok wohnt im Lokschuppen.
-// Gespeichert wird im Blick hinein nichts; ohne Schalter gibt es die Bahn nicht (Freigabe aus)
+// Gespeichert wird im Blick hinein nichts; für das Kind: „Bahn und Höhle für das Kind …“
 test(
   'Spiel: Bau 2 per Entwickler-Schalter: Prellbock versinkt, Fahrt bis Bahnhof Fledermaus, Maulwurf zieht ein, speichert nichts, ohne Fehler',
   { tag: '@3d' },
@@ -973,6 +944,226 @@ test(
     expect(errors).toEqual([]);
   },
 );
+
+// Bahn und Höhle für das Kind, der ganze Weg ohne Entwickler-Schalter, mit echtem Spielstand (fester Seed 1, 2D, Test-Uhr):
+// Ein Spielstand nach der Eis-Welt (Eistor offen, Eis-Leiste voll, erste Heimfahrt mit dem Schlitten), wie ihn das Spiel
+// vor dem Freischalten schrieb. Beim Aufwachen im Bett der Lichtung kommt Tok (gespeichert: `faellig`); in ihn
+// hineingelaufen baut er Bahnhof Bär, Gleis und Zug (Bau 1); die erste Fahrt endet am Prellbock in der Bucht, Tok wartet
+// neben der Torplatte; still auf der Platte öffnet das Hau-ruck das Höhlentor. Nach dem Neuladen steht alles im
+// Spielstand, der Zug an Bahnhof Bär; die nächste Fahrt spielt Bau 2 und endet am Bahnhof Fledermaus in der Grotte, der
+// Maulwurf zieht ein. Die Figur wird nur an den Ort jedes Schritts gestellt (der Weg zu Fuß ist anderswo geprüft);
+// gewartet wird nur auf Zustände
+test('Spiel: Bahn und Höhle für das Kind – Tok, Bau 1, erste Fahrt, Hau-ruck, Bau 2 bis in die Grotte, gespeichert, ohne Fehler', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  type Animal = { id: string; mode: string; x: number; y: number; solo?: true };
+  type Game = {
+    world: {
+      seed: number;
+      homes: Record<string, { bed: [number, number] }>;
+      gates: Map<string, { mid: [number, number]; out: [number, number] }>;
+      cell(x: number, y: number): { solid: boolean; ground: string; stop?: string; plate?: string };
+      realm(x: number, y: number): string;
+    };
+    state: {
+      player: { x: number; y: number; dir: string };
+      sleeping: boolean;
+      openGates: string[];
+      animals: Animal[];
+      garden: { id: string }[];
+      packs: { bahn?: { built?: number }; fahrt?: Record<string, unknown> };
+      work?: unknown;
+      ride?: { id: string };
+      heave?: unknown;
+      heraldDue: number;
+    };
+    packs: { loaded: { id: string }[] };
+    rides: { id: string; x: number; y: number }[];
+    fog: { reveal(x: number, y: number, r: number): void };
+    apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+    save(): void;
+  };
+  await page.addInitScript(() => {
+    const real = crypto.getRandomValues.bind(crypto);
+    const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+      a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+    Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+  });
+  const game = await openGame(page, { clock: true });
+  const ice = (REGIONS.find((r) => r.id === 'eis')?.animals ?? []).map(({ species }) => ({
+    id: animalId('eis', species),
+    species,
+  }));
+  await game.evaluate((node, garden) => {
+    const el = node as unknown as Game & { state: { garden: unknown[] } };
+    const packs = { ...el.state.packs, fahrt: { schlitten: { stage: 'fest' } } };
+    el.state = { ...el.state, openGates: ['eis'], garden: [...el.state.garden, ...garden], packs };
+    el.save();
+  }, ice);
+  await reloadGame(page);
+  const loaded = () => game.evaluate((node) => (node as unknown as Game).packs.loaded.map((p) => p.id).sort());
+  expect(await game.evaluate((node) => (node as unknown as Game).world.seed)).toBe(1);
+  expect(await loaded()).toEqual(['bahn', 'eis', 'fahrt']);
+  const look = () =>
+    game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const tok = el.state.animals.find((a) => a.id === 'hoehle:tok');
+      const { x, y } = el.state.player;
+      return {
+        tok: tok ? tok.mode + (tok.solo ? ':solo' : '') : null,
+        fahrt: el.state.packs.fahrt?.hoehle ?? null,
+        built: el.state.packs.bahn?.built ?? 0,
+        open: el.state.openGates,
+        realm: el.world.realm(x, y),
+        ride: !!el.state.ride,
+      };
+    });
+  /** Auf ein freies Feld neben dem mittleren Wagen auf dem Bahnsteig stellen, ein neuer Druck zu ihm hin: einsteigen */
+  const board = () =>
+    game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const mid = el.rides.find((r) => r.id === 'ride:hoehle:mid')!;
+      const [mx, my] = [Math.round(mid.x), Math.round(mid.y)];
+      const dirs: [string, number, number][] = [
+        ['e', 1, 0],
+        ['w', -1, 0],
+        ['s', 0, 1],
+        ['n', 0, -1],
+      ];
+      const free = (x: number, y: number) => !el.state.animals.some((a) => a.x === x && a.y === y);
+      const [dir, dx, dy] = dirs.find(
+        ([, dx, dy]) => el.world.cell(mx - dx, my - dy).stop === 'hoehle' && free(mx - dx, my - dy),
+      )!;
+      el.state = { ...el.state, player: { x: mx - dx, y: my - dy, dir: 's' } };
+      el.apply({ type: 'move', dir, fresh: true });
+      return el.state.ride?.id;
+    });
+  /** Fahren, bis die Figur ausgestiegen ist (jede Fahrt 15 bis 20 s, Bau 2 dazu 3 s am Prellbock) */
+  const rideOut = async () => {
+    for (let i = 0; i < 40 && (await look()).ride; i++) {
+      await ticks(page, 10);
+      await render(page);
+    }
+    await render(page, 2);
+  };
+  const wake = () => game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' }));
+
+  // 1. Aufwachen im Bett der Lichtung: Tok kommt
+  expect(await game.evaluate((node) => (node as unknown as Game).state.sleeping)).toBe(true);
+  await wake();
+  await ticks(page, 5);
+  expect(await look()).toMatchObject({ tok: 'herald', fahrt: { stage: 'faellig' }, built: 0, open: ['eis'] });
+
+  // 2. Bau 1: Tok hüpft an seinen Platz am künftigen Bahnsteig; dort in ihn hineingelaufen
+  const tokAt = () =>
+    game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const t = el.state.animals.find((a) => a.id === 'hoehle:tok');
+      return t && el.state.heraldDue < 0 ? `${t.x},${t.y}` : '';
+    });
+  let [last, posted] = ['', false];
+  for (let i = 0; i < 30 && !posted; i++) {
+    await ticks(page, 10);
+    const now = await tokAt();
+    [posted, last] = [now !== '' && now === last, now];
+  }
+  expect(posted).toBe(true);
+  const building = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const t = el.state.animals.find((a) => a.id === 'hoehle:tok')!;
+    const dirs: [string, number, number][] = [
+      ['e', 1, 0],
+      ['w', -1, 0],
+      ['s', 0, 1],
+      ['n', 0, -1],
+    ];
+    const [dir, dx, dy] = dirs.find(([, dx, dy]) => {
+      const c = el.world.cell(t.x - dx, t.y - dy);
+      return !c.solid && c.ground !== 'water' && !el.state.animals.some((a) => a.x === t.x - dx && a.y === t.y - dy);
+    })!;
+    el.state = { ...el.state, player: { x: t.x - dx, y: t.y - dy, dir: 's' } };
+    el.apply({ type: 'move', dir, fresh: true });
+    return !!el.state.work;
+  });
+  expect(building).toBe(true);
+  await ticks(page, 85);
+  await render(page, 2);
+  expect(await look()).toMatchObject({ tok: null, fahrt: { stage: 'bereit' }, built: 1 }); // Tok sitzt im Zug
+
+  // 3. Die erste Fahrt bis zum Prellbock in der Bucht; Tok hüpft an seinen Platz neben der Torplatte
+  expect(await board()).toBe('hoehle');
+  await rideOut();
+  expect(await look()).toMatchObject({ ride: false, tok: 'herald', fahrt: { stage: 'bereit', gefahren: true } });
+  // die Grotte kommt vor dem Hau-ruck (Vorladen am Halt, nah am Höhlentor)
+  await expect
+    .poll(async () => {
+      await ticks(page, 1);
+      return (await loaded()).includes('hoehle');
+    })
+    .toBe(true);
+
+  // 4. Hau-ruck: still auf der Torplatte, Tok stößt allein, nach drei Stößen ist das Höhlentor offen
+  await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const { mid, out } = el.world.gates.get('hoehle')!;
+    const [px, py] = [mid[0] - out[0] * 2, mid[1] - out[1] * 2];
+    el.state = { ...el.state, player: { x: px, y: py, dir: 'n' } };
+    el.fog.reveal(px, py, 10);
+  });
+  const plate = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    return el.world.cell(el.state.player.x, el.state.player.y).plate;
+  });
+  expect(plate).toBe('hoehle');
+  for (let i = 0; i < 40 && !(await look()).open.includes('hoehle'); i++) await ticks(page, 10);
+  await ticks(page, 31); // 3 s Nische, Lampen, „Ju-hu“
+  await render(page, 2);
+  expect(await look()).toMatchObject({ open: ['eis', 'hoehle'], fahrt: { stage: 'offen', gefahren: true } });
+
+  // 5. Neu laden: alles steht im Spielstand, die Figur wacht im Bett der Lichtung auf, der Zug steht an Bahnhof Bär
+  await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+  await reloadGame(page);
+  expect(await loaded()).toEqual(['bahn', 'eis', 'fahrt', 'hoehle']);
+  expect(await look()).toMatchObject({ open: ['eis', 'hoehle'], built: 1, realm: 'lichtung', ride: false });
+  await wake();
+  await render(page);
+
+  // 6. Bau 2: die nächste Fahrt von Bahnhof Bär, der Prellbock versinkt, bis Bahnhof Fledermaus in der Grotte
+  expect(await board()).toBe('hoehle');
+  await ticks(page, 30);
+  expect((await look()).built).toBe(2);
+  await rideOut();
+  const end = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    return {
+      mole: el.state.garden.some((a) => a.id === 'hoehle:maulwurf'),
+      shed: el.rides.some((r) => r.id === 'bahn:schuppen'),
+      station: el.rides.some((r) => r.id === 'bahn:felsdach'),
+    };
+  });
+  expect(await look()).toMatchObject({ ride: false, realm: 'hoehle', tok: 'herald:solo', built: 2 });
+  expect(end).toEqual({ mole: true, shed: true, station: true });
+
+  // 7. Gespeichert: Höhlentor offen, Ausbau 2, Stufe `offen`, der Maulwurf zu Hause
+  await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+  const saved = await page.evaluate(() => {
+    const index = JSON.parse(localStorage.getItem('larmic.games.index') ?? '{}') as { current?: string };
+    const w = JSON.parse(localStorage.getItem(`larmic.games.world.${index.current}`) ?? '{}') as {
+      openGates?: string[];
+      homeAnimals?: { id: string }[];
+      packs?: { bahn?: unknown; fahrt?: { hoehle?: { stage?: string } } };
+    };
+    return {
+      open: w.openGates,
+      bahn: w.packs?.bahn,
+      stage: w.packs?.fahrt?.hoehle?.stage,
+      mole: !!w.homeAnimals?.some((a) => a.id === 'hoehle:maulwurf'),
+    };
+  });
+  expect(saved).toEqual({ open: ['eis', 'hoehle'], bahn: { built: 2 }, stage: 'offen', mole: true });
+  expect(errors).toEqual([]);
+});
 
 // Ohne Service Worker: Er holte die Pakete sonst aus seinem Speicher, am Netz vorbei, das der Test hier anhält
 test.describe('Vorladen am Halt', () => {

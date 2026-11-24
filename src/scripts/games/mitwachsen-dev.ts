@@ -4,9 +4,9 @@
 // Figur wacht im Bett der ersten genannten Welt auf (die Bahn hat keine: dann im Bett der Lichtung), und es wird nichts
 // gespeichert, auch nicht über das Menü (`sandbox`; der Spielstand des Kindes bleibt, wie er war; nach dem Neuladen ohne
 // Schalter wacht die Figur wieder dort auf, wo sie war). Die Tore bleiben zu, bis auf das Höhlentor mit der Bahn (unten):
-// Hinaus geht es sonst nur durch Neuladen ohne Schalter. Die Bahn (`bahn`, hinter `BAHN_LIVE`) schaltet die Bahn-Phase für
-// diese Seite an (`tryBahn` in der Spielseite: Das Höhlentor hat dann seinen Schlüssel Tok und geht mit dem Hau-ruck auf),
-// holt die Grotte mit, damit das Gleis bis zum Bahnhof Fledermaus liegt, und die Fahr-Engine mit und spielt einen
+// Hinaus geht es sonst nur durch Neuladen ohne Schalter. Er bleibt für den Blick in künftige Welten und um Stände der
+// Bahn vorzuspielen, die das Kind erst nach langem Spielen erreicht. Die Bahn (`bahn`; für das Kind kommt sie nach der
+// Eis-Welt und der ersten Heimfahrt mit dem Schlitten) holt die Grotte mit, damit das Gleis bis zum Bahnhof Fledermaus liegt, und die Fahr-Engine mit und spielt einen
 // Ausbau vor (`devProgress`: `&bau=1` bis zum Prellbock in der Bucht, sonst 2, die ganze Linie; der Zug steht dann am
 // Bahnhof Bär, Stufe `bereit`, die Figur kann einsteigen und fahren; bei 2 ist das Höhlentor schon offen, Stufe
 // `offen`, der Maulwurf wohnt im Gehege am Höhlenbett und Tok im Lokschuppen, denn Bau 2 kommt erst nach dem Hau-ruck,

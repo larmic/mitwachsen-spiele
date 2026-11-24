@@ -16,7 +16,6 @@ import type { Progress } from './mitwachsen-state';
 import { PACK_IDS } from './mitwachsen-packs';
 import type { PackId } from './mitwachsen-pack-types';
 import { GATES, REGIONS, keyOf } from '../../data/games/mitwachsen';
-import { BAHN_LIVE, tryBahn } from '../../data/games/mitwachsen-live';
 import { full } from './mitwachsen-guide';
 import { FIRST_MOLE } from '../../data/games/mitwachsen-hoehle';
 
@@ -187,19 +186,11 @@ describe('Entwickler-Schalter', () => {
     expect(glimpse('?entwickler=bahn&vorladen=1&fest=1', PACK_IDS).home).toBe('lichtung');
   });
 
-  it('Höhlenpaket und Bahn gibt es (Lader); das Höhlentor hat seinen Schlüssel nur mit der Bahn-Phase (beide Stellungen)', () => {
+  it('Höhlenpaket und Bahn gibt es (Lader); das Höhlentor hat seinen Schlüssel Tok, mit und ohne Schalter', () => {
     expect(PACK_IDS).toEqual(['eis', 'hoehle', 'bahn', 'fahrt']);
-    expect(GATES.find((g) => g.id === 'hoehle')?.opens).toEqual({ key: 'tok', live: 'bahn' });
-    expect(BAHN_LIVE).toBe(false);
-    expect(keyOf('hoehle')).toBeUndefined(); // für das Kind geht es nie auf
-    tryBahn(); // wie die Spielseite mit `?entwickler=bahn`
-    try {
-      expect(keyOf('hoehle')).toBe('tok');
-      expect(keyOf('eis')).toBe('pinguin');
-      expect(keyOf('sand')).toBeUndefined();
-    } finally {
-      tryBahn(false);
-    }
-    expect(keyOf('hoehle')).toBeUndefined();
+    expect(GATES.find((g) => g.id === 'hoehle')?.opens).toEqual({ key: 'tok', after: 'eis' });
+    expect(keyOf('hoehle')).toBe('tok');
+    expect(keyOf('eis')).toBe('pinguin');
+    expect(keyOf('sand')).toBeUndefined();
   });
 });

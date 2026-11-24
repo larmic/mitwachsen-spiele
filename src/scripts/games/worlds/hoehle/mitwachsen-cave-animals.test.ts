@@ -68,7 +68,7 @@ describe('Höhlen-Tiere: Wohnorte in der Grotte', () => {
     expect(bad).toEqual([]);
   });
 
-  it('ohne das Paket der Höhlenwelt fehlen ihre Tiere ganz (das Höhlentor geht bis zur Bahn-Phase nie auf), bleiben aber im Spielstand', () => {
+  it('ohne das Paket der Höhlenwelt fehlen ihre Tiere ganz (etwa solange es nicht geladen ist), bleiben aber im Spielstand', () => {
     const bare = bareOf(1);
     const garden = [{ id: 'hoehle:dachs:2', species: 'dachs' as const }];
     const s = initialState(bare, { garden });

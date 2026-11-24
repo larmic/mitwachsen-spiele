@@ -1,7 +1,16 @@
 // Der verlaufene Pinguin holt die Figur ab und öffnet das Eistor (`opens: { key: 'pinguin' }`), gegen die echten Daten.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../lib/games/front';
-import { GATES, REGIONS, animalId, gateOfKey, keyOf, regionAnimalList, type Point } from '../../data/games/mitwachsen';
+import {
+  GATES,
+  REGIONS,
+  animalId,
+  gateOfKey,
+  keyInPlay,
+  keyOf,
+  regionAnimalList,
+  type Point,
+} from '../../data/games/mitwachsen';
 import {
   initialState,
   progressOf,
@@ -1073,7 +1082,8 @@ describe('„Noch nicht“ am Eistor', () => {
 
 describe('„Noch nicht“ an den Toren, die nie aufgehen', () => {
   const world = worldOf(1);
-  const never = GATES.filter((g) => !keyOf(g.id)); // das Höhlentor auch, bis zum Freischalten der Bahn-Phase
+  // alle außer dem Eistor: das Höhlentor auch, solange es zu ist und kein Hau-ruck läuft (ohne Paket der Bahn nie)
+  const never = GATES.filter((g) => g.id !== GUIDE_GATE);
   /** Wache Figur auf `at`, alle Tiere der Lichtung zu Hause, keine Tiere unterwegs */
   const alone = (at: Point): State => ({
     ...initialState(world, { garden: everyone() }),
@@ -1239,32 +1249,45 @@ describe('Invarianten bei wildem Drücken bis durchs offene Eistor', () => {
 describe('Boten je Tor: Schlüssel, Verlaufen, fällig, was fehlt', () => {
   const lichtung = () => regionAnimalList(REGIONS[0]).map(({ id, species }) => ({ id, species }));
 
-  it('der Schlüssel eines Tors steht in GATES (`opens`): heute nur das Eistor mit dem Pinguin', () => {
-    expect(GATES.filter((g) => keyOf(g.id)).map((g) => [g.id, keyOf(g.id)])).toEqual([['eis', 'pinguin']]);
+  it('der Schlüssel eines Tors steht in GATES (`opens`): das Eistor mit dem Pinguin, das Höhlentor mit Tok', () => {
+    expect(GATES.filter((g) => keyOf(g.id)).map((g) => [g.id, keyOf(g.id)])).toEqual([
+      ['eis', 'pinguin'],
+      ['hoehle', 'tok'],
+    ]);
     expect(GUIDE_GATE).toBe(gateOfKey('pinguin'));
     expect(keyAnimal('eis')).toBe(GUIDE); // der Bote als Tier: das erste Tier seiner Art hinter dem Tor
-    expect(keyAnimal('hoehle')).toBeUndefined(); // das Höhlentor hat keinen Schlüssel (noch nicht)
+    expect(keyAnimal('hoehle')).toBe(animalId('hoehle', 'tok'));
     expect(keyAnimal('sand')).toBeUndefined(); // ohne Schlüssel und ohne Gegend dahinter
+  });
+
+  it('der Bote des Höhlentors kommt erst nach der Eis-Welt (`after`, `keyInPlay`), der des Eistors immer', () => {
+    expect(keyInPlay('eis', [])).toBe(true);
+    expect(keyInPlay('hoehle', [])).toBe(false);
+    expect(keyInPlay('hoehle', ['eis'])).toBe(true);
+    expect(keyInPlay('wald', ['eis', 'hoehle'])).toBe(false); // geht nie auf
   });
 
   it('keyed und lost je Tor: nur ein Tor mit Schlüssel, das zu ist, hat einen verlaufenen Boten', () => {
     expect([keyed([], 'eis'), keyed(['eis'], 'eis'), keyed([], 'hoehle'), keyed(['hoehle'], 'hoehle')]).toEqual([
       true,
       false,
-      false,
+      true,
       false,
     ]);
+    expect(keyed([], 'sand')).toBe(false); // ein Tor ohne Schlüssel
     expect(keyed([])).toBe(true); // ohne Angabe das Tor des Pinguins
     expect(lost(GUIDE, ['hoehle'])).toBe(true); // ein anderes offenes Tor ändert nichts
     expect(lost(animalId('hoehle', 'pinguin'), [])).toBe(false);
   });
 
-  it('wanted, pending und missing je Tor: ein Tor ohne Schlüssel ruft keinen Boten und braucht keine Regeln', () => {
+  it('wanted, pending und missing je Tor: ein Tor ohne Schlüssel ruft keinen Boten; Tok bringt sein Paket, nicht `pending`', () => {
     const s = { openGates: [], garden: lichtung() };
     expect([wanted(s), wanted(s, 'eis'), wanted(s, 'eis', REGIONS[0])]).toEqual([true, true, true]);
-    expect(wanted(s, 'hoehle')).toBe(false);
+    expect(wanted(s, 'sand')).toBe(false);
     expect(wanted(s, 'eis', REGIONS[1])).toBe(false); // die Leiste der Eis-Welt ist leer
-    expect([pending(s, 'hoehle'), pending({ ...s, openGates: ['hoehle'] }, 'hoehle')]).toEqual([false, false]);
+    // das Höhlentor zu: kein verlaufener Bote (Tok kommt aus dem Paket der Bahn); offen: Tok wohnt nie auf einer Wiese,
+    // die Grotte bleibt also nötig (wie ohnehin mit offenem Tor)
+    expect([pending(s, 'hoehle'), pending({ ...s, openGates: ['hoehle'] }, 'hoehle')]).toEqual([false, true]);
     expect(pending(s, 'eis')).toBe(true);
     expect(missing(s, 'eis')).toBe('pinguin');
     expect(missing({ garden: [] }, 'eis')).toBe(REGIONS[0].animals[0]!.species); // vor dem Boten die Leiste seiner Gegend

@@ -111,6 +111,19 @@ export function hullOf(gang: Gang, centre: number, { rx, ry, gap }: Room): Beyon
 }
 
 /**
+ * Land der Welt hinter dem Tor `gate` (ihr Platz `Region.room`), wenn sie gerade hinter ihrem Gang liegt, wie es auch
+ * ohne ihr Paket feststeht: ihre Hülle (`hullOf` um `straightCentre` in `beyond`, wie spätere Welten sie freihalten;
+ * darin liegen alle ihre Felder, Test). Erst beim ersten Fragen berechnet. Keines ohne Welt und bei einer, deren Gang
+ * biegen darf (`bend`: Sie steht zuletzt, ihr Land ist, was die anderen freilassen)
+ */
+export function landOf(gang: Gang, gate: GateId, beyond: () => Beyond): Beyond | undefined {
+  const room = regionBehind(gate)?.room;
+  if (!room || room.bend) return undefined;
+  let hull: Beyond | undefined;
+  return (x, y) => (hull ??= hullOf(gang, straightCentre(gang, beyond(), room), room))(x, y);
+}
+
+/**
  * Wo die Welt hinter dem Tor `own` liegen darf (`Beyond` für ihr Paket): ganz hinter dem Felsring (`beyond`) und
  * mindestens `EXIT_GAP` Felder von jedem Ausgang der anderen Gänge (`gangs` ohne `own`: ihre erste Reihe ganz hinter
  * dem Felsring, `end`, in der Breite von Tor und Türmen, `span` Felder zu jeder Seite)

@@ -10,7 +10,6 @@ import { projection } from '../../lib/games/front';
 import type { World3D as World3DType } from './mitwachsen-3d';
 import { GAME_COLORS, LOOK, SPECIES, TIRED_TALK, realmOfAnimal, type GateId } from '../../data/games/mitwachsen';
 import { LANTERN_SPARKS } from '../../data/games/mitwachsen-hoehle';
-import { tryBahn } from '../../data/games/mitwachsen-live';
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
 import { SPARKS, fly, glints, sparks } from './mitwachsen-glyphs';
 import { Sfx } from './sfx';
@@ -168,7 +167,6 @@ class LarmicMitwachsen extends HTMLElement {
     this.sfx.muted = this.store.getItem('larmic.games.muted') === '1';
     this.tired = loadTired(this.store, Date.now());
     this.packs.extra = this.glimpse.packs; // seine Pakete holen, auch ohne Bedarf
-    if (this.glimpse.packs.includes('bahn')) tryBahn(); // Blick hinein: Bahn-Phase an, das Höhlentor hat seinen Schlüssel
     void this.openWorld(loadIndex(this.store).current).then(() => this.begin());
   }
 
@@ -673,7 +671,7 @@ class LarmicMitwachsen extends HTMLElement {
 
   /**
    * Was das Antippen sieht: die Körper der Fahrzeuge, den Boten (Tok, wo er gerade gezeichnet ist; es gibt ihn nur mit
-   * dem Paket der Bahn, also hinter `BAHN_LIVE`), die Projektion der Ansicht und die Figur (nicht, solange es ruht)
+   * dem Paket der Bahn), die Projektion der Ansicht und die Figur (nicht, solange es ruht)
    */
   private tapScene() {
     const t = heraldOf(this.state);

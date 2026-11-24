@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GATES, REGIONS, REGION_IDS, gateOfKey, keyOf, realmOfAnimal, regionBehind, speciesOf } from './mitwachsen';
 import { HOMES } from './mitwachsen-homes';
-import { BAHN_LIVE, tryBahn } from './mitwachsen-live';
 import { STORIES, openStory, told } from './mitwachsen-stories';
 
 describe('Gegenden und Tore', () => {
@@ -26,11 +25,13 @@ describe('Gegenden und Tore', () => {
     expect(realmOfAnimal('hoehle:hase')).toBe('hoehle');
   });
 
-  it('Schlüssel je Tor (`opens`): das Eistor öffnet der Pinguin, alle anderen gehen nie auf, auch das Höhlentor', () => {
+  it('Schlüssel je Tor (`opens`): das Eistor öffnet der Pinguin, das Höhlentor Tok, alle anderen gehen nie auf', () => {
     expect(keyOf('eis')).toBe('pinguin');
     expect(gateOfKey('pinguin')).toBe('eis');
+    expect(keyOf('hoehle')).toBe('tok');
+    expect(gateOfKey('tok')).toBe('hoehle');
     expect(gateOfKey('hase')).toBeUndefined();
-    for (const g of GATES.filter((t) => t.id !== 'eis')) expect(keyOf(g.id), g.id).toBeUndefined();
+    for (const g of GATES.filter((t) => t.id !== 'eis' && t.id !== 'hoehle')) expect(keyOf(g.id), g.id).toBeUndefined();
   });
 });
 
@@ -50,16 +51,9 @@ describe('Was ein Klangstein erzählt (told)', () => {
     expect(Object.hasOwn(STORIES, 'hoehle')).toBe(true);
   });
 
-  it('solange die Bahn-Phase aus ist (BAHN_LIVE), geht das Höhlentor nicht auf: sein Stein erzählt die erste Fassung', () => {
-    expect(BAHN_LIVE).toBe(false);
-    expect(keyOf('hoehle')).toBeUndefined(); // ohne Schlüssel kommt das Höhlentor nie in die offenen Tore
+  it('das Höhlentor hat seinen Schlüssel Tok: zu erzählt sein Stein die erste Fassung, offen die zweite', () => {
+    expect(keyOf('hoehle')).toBe('tok'); // Tok öffnet es mit dem Hau-ruck (nach Bau 1 und der ersten Fahrt)
     expect(told('hoehle', ['eis'])).toBe('hoehle');
-    tryBahn();
-    try {
-      expect(keyOf('hoehle')).toBe('tok'); // im Blick hinein (Entwickler-Schalter): Tok öffnet es, dann die zweite
-      expect(told('hoehle', ['eis', 'hoehle'])).toBe('hoehle-offen');
-    } finally {
-      tryBahn(false);
-    }
+    expect(told('hoehle', ['eis', 'hoehle'])).toBe('hoehle-offen');
   });
 });

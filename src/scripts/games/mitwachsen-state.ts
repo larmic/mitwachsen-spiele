@@ -178,7 +178,7 @@ const settle = (id: string, species: SpeciesId, [x, y]: Point, mode: Mode, home:
 
 export function initialState(world: World, saved: Partial<Progress> = {}, rngSeed = 1): State {
   const garden = saved.garden ?? [];
-  // Nur Tore, die überhaupt aufgehen können, bleiben aus dem Spielstand offen (das Höhlentor erst mit der Bahn-Phase)
+  // Nur Tore, die überhaupt aufgehen können, bleiben aus dem Spielstand offen
   const open = (saved.openGates ?? []).filter((id) => !!keyOf(id));
   const animals = placeAnimals(world, open, garden, new Set());
   const [bx, by] = world.homes[wakeRealm(world, open, saved.position, beyondRing)].bed;
@@ -217,7 +217,7 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
   // Fehlt das Paket der Welt, zu der die Position gehört (hinter einem Tor, das aufgehen kann), wüsste die Welt nicht,
   // ob die Figur dort war: Position behalten
   const pos = saved.position;
-  if (pos && REGIONS.some((r) => holds(world, r, pos, beyondRing))) s.held = [...pos];
+  if (pos && REGIONS.some((r) => holds(world, r, pos, beyondRing, open))) s.held = [...pos];
   scatter(s, world, () => random(s)); // jeder Besuch: Die Tiere wohnen woanders
   syncWild(s, world);
   return s;

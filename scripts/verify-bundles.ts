@@ -27,7 +27,7 @@ export const RULES: Rule[] = [
     name: 'Spiel lädt 3D erst bei Bedarf',
     pages: /^spielen\//,
     // Kern: Regeln, Welt, 2D-Ansicht und Daten des Spiels; 3D (Three.js) und die Welt-Pakete kommen erst per import().
-    // Gemessen 146,9 KB (mit dem Hau-ruck am Höhlentor: Schlüssel hinter der Freigabe, Haken `ajar` und `ritual`)
+    // Gemessen 149,7 KB (Bahn und Höhle freigeschaltet: Höhlentor mit Schlüssel Tok, Haken `ajar` und `ritual`)
     budget: 162 * 1024,
     // Probe: Der Höhlenhimmel der Grotte steht nur in ihrem Welt-Paket (GROTTE_COLORS.sky)
     forbidden: /WebGLRenderer|three\.module|#4a4370/,
@@ -78,8 +78,8 @@ export const RULES: Rule[] = [
       // Kristallgrotte (Lage, Gelände, Zuhause, Licht, Portal am See, Fundorte der Höhlen-Tiere, Pilzbeete, Tropfquelle,
       // Tropfmoos), ihr Schmuck (Säulen-Glockenspiel mit Fledermaus-Runde, Grottenolm am Steg, Tropfsteine), ihre Füllung
       // (Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken, Felsinseln, Pfützen, Moos und Farn, Lehmhang), ihr Licht
-      // (Ränder im Dunkel, Lichtkreis, Kristall-Laterne), Zeichenteile der 2D-Ansicht und Modelle der Höhlen-Tiere; nur
-      // der Entwickler-Schalter holt sie (bis zum Freischalten der Bahn geht das Höhlentor nie auf); dazu das Hau-ruck am
+      // (Ränder im Dunkel, Lichtkreis, Kristall-Laterne), Zeichenteile der 2D-Ansicht und Modelle der Höhlen-Tiere; geholt
+      // nah am Höhlentor, mit offenem Tor oder vor einem Halt des Zugs; dazu das Hau-ruck am
       // Höhlentor (Regeln, Hände auf dem Stein, Fledermaus, Glühwürmchen, Töne)
       { chunks: /\/welt-hoehle\.[\w-]+\.js$/ },
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Welt
@@ -97,7 +97,7 @@ export const RULES: Rule[] = [
       // Bote der Höhlenwelt (Regeln, Modell, Bild und Ton); Bau 1 mit Bahnhof Bär und Zug (Modelle, Körper, Töne); der Zug
       // als Fahrzeug (Strecke, Bild beim Fahren, Ton, Licht im Tunnel); Bau 2 mit Bahnhof Fledermaus und Lokschuppen;
       // Schmuck mit Zug (Pfeif-Gruß, Laternenfahrt mit Glühwürmchen und Kristall-Wimpel, warmes Licht, Gute Nacht);
-      // bis zum Freischalten (BAHN_LIVE) holt es nur der Entwickler-Schalter
+      // geholt, sobald das Eistor offen ist
       { chunks: /\/welt-bahn\.[\w-]+\.js$/ },
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Bahn
       { chunks: /\/welt-bahn-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-bahn)\.[\w-]+\.js$/ },

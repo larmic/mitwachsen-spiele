@@ -1,13 +1,12 @@
 // Bau 1 (mitwachsen-build.ts; Bild in mitwachsen-station-look.ts und mitwachsen-rail-look.ts, Töne in
 // mitwachsen-tok-look.ts): Läuft die Figur in den wachen Tok, baut er Bahnhof Bär, das Gleis bis vor das Höhlentor und
-// den Zug; hinter der Freigabe der Bahn-Phase (`BAHN_LIVE`)
+// den Zug
 import { describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import { REGIONS, regionAnimalList, type Point } from '../../../../data/games/mitwachsen';
 import { BUILD, LINE } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import { TRAIN_COLORS } from '../../../../data/games/worlds/bahn/mitwachsen-train-model';
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
-import { BAHN_LIVE } from '../../../../data/games/mitwachsen-live';
 import { unstick } from '../../mitwachsen-free';
 import type { HeraldEvent } from '../../mitwachsen-herald';
 import { bahnWanted } from '../../mitwachsen-pack';
@@ -78,14 +77,13 @@ function besideTok(world: World): { s: State; into: Cmd } {
 /** Bild zu einem Zeitpunkt (`now` ms), ohne Bruchteil eines Takts */
 const at = (reduced = false, now = 0): RideAt => ({ now, frac: 0, reduced, lit: false });
 
-describe('Bau 1: Freigabe der Bahn-Phase', () => {
-  it('bis zum Freischalten kommt das Paket der Bahn nie von selbst: kein Tok, kein Bau, nichts gespeichert', () => {
+describe('Bau 1: ohne das Paket der Bahn', () => {
+  it('kommt das Paket (vor der Eis-Welt oder wenn es nicht lädt) nicht, baut niemand: kein Tok, kein Bau, nichts gespeichert', () => {
     const world = worldOf(1, BAHN);
     const { s, into } = besideTok(world);
-    expect(BAHN_LIVE).toBe(false);
-    expect(bahnWanted(s)).toBe(false); // Freigabe aus: Das Spiel holt das Paket nie
-    expect(bahnWanted(s, true)).toBe(true); // freigeschaltet
-    // ohne die Regeln des Pakets (so läuft das Spiel, solange die Freigabe aus ist) baut niemand
+    expect(bahnWanted(s)).toBe(true); // für das Kind kommt es mit offenem Eistor
+    expect(bahnWanted({ openGates: [] })).toBe(false);
+    // ohne die Regeln des Pakets baut niemand
     const bare = { ...s, animals: s.animals.filter((a) => a.id !== TOK) };
     const r = step(bare, world, into, undefined, undefined, []);
     expect(builtOf(r.state.packs)).toBe(0);

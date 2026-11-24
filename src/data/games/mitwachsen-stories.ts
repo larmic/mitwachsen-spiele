@@ -1,6 +1,6 @@
 // Geschichten von Mitwachsen: Klangsteine am Bett, vor jedem großen Tor, am Schneebett im Gletscherkessel (die zweite
 // Fassung der Eis-Geschichte, „Wenn das Tor offen ist“) und am Höhlenbett (die zweite Fassung der Höhlen-Geschichte);
-// dazu die Steine der Bahn, die erst mit ihr kommen (Paket der Bahn, hinter `BAHN_LIVE`): am Bahnhof Bär ab Bau 1 und am
+// dazu die Steine der Bahn, die erst mit ihr kommen (Paket der Bahn): am Bahnhof Bär ab Bau 1 und am
 // Lokschuppen ab Bau 2 (worlds/bahn/mitwachsen-stones.ts). Läuft die Figur hinein, erklingt die
 // Melodie des Ortes, später danach die eingesprochene Geschichte. Titel und Texte stehen in mitwachsen-story-texts.ts
 // (nicht im Spiel, das nur Melodie und Aufnahme spielt).
