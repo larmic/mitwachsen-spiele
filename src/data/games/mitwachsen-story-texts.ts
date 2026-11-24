@@ -31,7 +31,7 @@ export const STORY_TEXTS: Record<StoryId, { title: string; text: string }> = {
   },
   hoehle: {
     title: 'Tor zur Höhlenwelt',
-    text: 'Hinter diesem Tor geht es unter die Erde, in eine große Höhle. Dunkel ist es dort aber nicht, denn an den Wänden wachsen Kristalle, die in allen Farben glitzern. Eine Fledermaus wohnt da. Sie schläft am Tag mit dem Kopf nach unten und wacht erst auf, wenn du ins Bett gehst. Vielleicht weckst du sie später einmal.',
+    text: 'Hinter diesem Tor geht es unter die Erde, in eine große Höhle. Dunkel ist es dort nur ein bisschen, und die Laterne macht es hell. An den Wänden wachsen Kristalle, die in allen Farben glitzern. Eine Fledermaus wohnt da. Sie schläft am Tag mit dem Kopf nach unten und wacht erst auf, wenn du ins Bett gehst. Vielleicht weckst du sie später einmal.',
   },
   'hoehle-offen': {
     title: 'Am Höhlenbett',

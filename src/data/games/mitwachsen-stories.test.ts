@@ -19,11 +19,12 @@ describe('Geschichten der Klangsteine', () => {
     expect(STORIES['eis-offen'].melody).toEqual(STORIES.eis.melody);
   });
 
-  it('die Höhlen-Geschichte hat zwei Fassungen: gleicher erster Satz, gleiche Melodie; die erste bleibt wortgleich', () => {
+  it('die Höhlen-Geschichte hat zwei Fassungen: gleicher erster Satz, gleiche Melodie; die erste wortgleich', () => {
     const [first, open] = [STORY_TEXTS.hoehle, STORY_TEXTS['hoehle-offen']];
-    // die Geschichte am geschlossenen Höhlentor bleibt, wie sie war (Konzept „Gleisbauer und Höhlen-Welt“)
+    // die Geschichte am geschlossenen Höhlentor (Konzept „Gleisbauer und Höhlen-Welt“), seit der Dunkelmaske mit dem
+    // Satz zum Dunkel, den der Vater am 24.11.2026 freigegeben hat (Konzeptseite „Höhle nach dem ersten Spielen“)
     expect(first.text).toBe(
-      'Hinter diesem Tor geht es unter die Erde, in eine große Höhle. Dunkel ist es dort aber nicht, denn an den Wänden wachsen Kristalle, die in allen Farben glitzern. Eine Fledermaus wohnt da. Sie schläft am Tag mit dem Kopf nach unten und wacht erst auf, wenn du ins Bett gehst. Vielleicht weckst du sie später einmal.',
+      'Hinter diesem Tor geht es unter die Erde, in eine große Höhle. Dunkel ist es dort nur ein bisschen, und die Laterne macht es hell. An den Wänden wachsen Kristalle, die in allen Farben glitzern. Eine Fledermaus wohnt da. Sie schläft am Tag mit dem Kopf nach unten und wacht erst auf, wenn du ins Bett gehst. Vielleicht weckst du sie später einmal.',
     );
     expect(first.text.split('. ')[0]).toBe(open.text.split('. ')[0]);
     expect(open.text.split('. ')[1]).toMatch(/^Und jetzt ist sie offen, weil du mit Tok zusammen/);

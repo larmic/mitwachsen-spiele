@@ -42,7 +42,7 @@ describe('Was ein Klangstein erzählt (told)', () => {
     expect(GATES.filter((g) => openStory(g.id)).map((g) => g.id)).toEqual(['eis', 'hoehle']);
     expect(told('eis', [])).toBe('eis');
     expect(told('eis', ['eis'])).toBe('eis-offen');
-    expect(told('hoehle', ['eis'])).toBe('hoehle'); // Höhlentor zu: die erste Fassung, wortgleich wie bisher
+    expect(told('hoehle', ['eis'])).toBe('hoehle'); // Höhlentor zu: die erste Fassung
     expect(told('hoehle', ['hoehle', 'eis'])).toBe('hoehle-offen');
     expect(told('bett', ['eis', 'hoehle'])).toBe('bett');
     // die Steine der Bahn erzählen immer ihre eigene Geschichte
