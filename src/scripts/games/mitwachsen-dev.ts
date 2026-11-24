@@ -157,7 +157,7 @@ export const devLate = (dev: readonly PackId[], search: string): boolean =>
 
 /**
  * Speicher für den Entwickler-Schalter: liest den Spielstand des Kindes, schreibt aber nur in den Arbeitsspeicher. So
- * ändert nichts, was im Blick hinein geschieht (Speichern, Menü: neue Welt, Welt löschen, Ton, „Kamera bewegen“), den
+ * ändert nichts, was im Blick hinein geschieht (Speichern, Menü: neue Welt, Welt löschen, Ton, Elternschalter), den
  * Spielstand im `localStorage`; nach dem Neuladen ist alles vergessen
  */
 export function sandbox(store: Store): Store {

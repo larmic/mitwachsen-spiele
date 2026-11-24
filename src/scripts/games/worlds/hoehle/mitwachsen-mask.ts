@@ -15,7 +15,9 @@
 // blendet sie mit dem Weg aus (`gang` Felder hinter der Mündung ist sie weg, vor der Grenze der Höhlenwelt) und dazu
 // höchstens so schnell wie in `fade` ms, beim Einschlafen mit der Nacht (Maske × (1 − Nacht / `night`)). Gezeichnet in einem Viertel der Auflösung
 // und mit einem einzigen drawImage über das Bild, nach dem, was zur Welt gehört (Fledermäuse, Grottenolm, Tropfen), vor
-// dem Leuchten und vor Zeichen, Herzen, Sprechblasen und Leiste (mitwachsen-cave-sky.ts).
+// dem Leuchten und vor Zeichen, Herzen, Sprechblasen und Leiste (mitwachsen-cave-sky.ts). Elternschalter „Höhle dunkel“
+// aus („Höhle hell“, Schritt 6): Stärke `bright` statt `mask` (`brightOf`, gelesen wie „Kamera bewegen“ in 3D); nach
+// dem Umlegen gleitet die Stärke in `fade` ms hinüber (`levelOf`, bei reduzierter Bewegung sofort).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Höhle nach dem ersten Spielen“, Dunkelmaske)
 
 import { DIRS, type Dir, type Projection } from '../../../../lib/games/front';
@@ -64,6 +66,37 @@ export const FLOOR = rgbOf(flatColors({ ground: 'grotto' } as Cell)?.[1] ?? GROT
 
 /** Stärke abseits der Figur („Höhle hell“: `bright`) */
 export const strengthOf = (bright: boolean) => (bright ? D.bright : D.mask);
+/**
+ * Elternschalter „Höhle dunkel“ im Speicher: wie `CAVE_KEY` im Menü, das das Paket nicht mitladen soll (Test in
+ * mitwachsen-mask.test.ts); '1' heißt aus („Höhle hell“)
+ */
+export const CAVE_STORE = 'larmic.games.cave';
+
+/** Spielfläche, wie der Schalter sie liest: `data-cave` setzt das Menü bei jedem Füllen */
+type Host = { dataset: { cave?: string } };
+
+/**
+ * „Höhle hell“ in diesem Bild? An der Spielfläche (`data-cave`, vom Menü gesetzt, auch wenn der Speicher gesperrt ist),
+ * sonst aus dem Speicher, einmal gelesen und gemerkt (`m.brightAt`); geht das nicht: dunkel, wie ohne Eintrag
+ */
+export function brightOf(m: MaskFx, host: Host | null | undefined, stored: () => string | null): boolean {
+  const cave = host?.dataset.cave;
+  if (cave !== undefined) return cave === '1';
+  if (m.brightAt === undefined)
+    try {
+      m.brightAt = stored() === '1';
+    } catch {
+      m.brightAt = false; // gesperrt: dunkel
+    }
+  return m.brightAt;
+}
+
+/** Spielfläche zur Zeichenfläche der Ansicht (im Browser die `.mw` um das Canvas; in Tests ohne DOM keine) */
+const hostOf = (ctx: CanvasRenderingContext2D): Host | null =>
+  (ctx.canvas as Partial<HTMLCanvasElement> | undefined)?.closest?.<HTMLElement>('.mw') ?? null;
+/** Der Schalter im Speicher (ohne DOM, in Tests: keiner, also dunkel) */
+const storedCave = () => (typeof document === 'undefined' ? null : localStorage.getItem(CAVE_STORE));
+
 /** Stärke, bei der der Grottenboden gerade die Dämmerung von heute hat (`dusk`) */
 export const DUSK_MASK = maskFor(FLOOR, D.dusk);
 /** So viel nimmt ein Weg-Band der Maske `strength` weg: dort bleibt die Dämmerung (ist die Maske schwächer: nichts) */
@@ -89,6 +122,22 @@ export function fadeOf(f: Partial<Fade>, inside: boolean, now: number): number {
     return f.to > f.from ? Math.min(f.to, f.from + step) : Math.max(f.to, f.from - step);
   };
   if (f.to !== to) Object.assign(f, { from: value(), to, at: now });
+  return value();
+}
+
+/**
+ * Grundstärke mit der Zeit (`m.level`): Legen Eltern den Schalter um, gleitet sie von der Stärke, die sie gerade hat,
+ * zur neuen (`target`), über die ganze Spanne in `GROTTE.dark.fade` ms, nie ein Sprung; bei reduzierter Bewegung und
+ * beim ersten Bild gleich, wie es ist
+ */
+export function levelOf(l: Partial<Fade>, target: number, now: number, reduced: boolean): number {
+  const value = () => {
+    if (reduced || l.to === undefined || l.from === undefined || l.at === undefined) return target;
+    const span = Math.abs(l.to - l.from);
+    const p = span > 0 ? Math.max(0, Math.min(1, (now - l.at) / (D.fade * (span / (D.mask - D.bright))))) : 1;
+    return p >= 1 ? l.to : l.from + (l.to - l.from) * p;
+  };
+  if (l.to !== target || reduced) Object.assign(l, { from: value(), to: target, at: now });
   return value();
 }
 
@@ -338,8 +387,10 @@ export type MaskCanvas = HTMLCanvasElement;
 
 /**
  * Was die Maske sich fürs Bild merkt: Zeichenfläche (`canvas`, gebaut von `make`), Ein- und Ausblenden (`fade`), die
- * Reihen der Grotte im Ausschnitt (`cover`, je Ausschnitt), „Höhle hell“ (`bright`, Schalter für Eltern), was zuletzt
- * gezeichnet wurde (`drawn`: Stärke und Löcher in Pixeln, für Tests und Messung) und was es kostet (`cost`: Bilder und ms)
+ * Reihen der Grotte im Ausschnitt (`cover`, je Ausschnitt), „Höhle hell“ (`bright`: im letzten Bild, aus dem Schalter
+ * für Eltern, `brightOf`; `brightAt`: der Schalter im Speicher, beim ersten Bild gelesen; `level`: Gleiten der
+ * Grundstärke nach dem Umlegen, `levelOf`), was zuletzt gezeichnet wurde
+ * (`drawn`: Stärke und Löcher in Pixeln, für Tests und Messung) und was es kostet (`cost`: Bilder und ms)
  */
 export type MaskFx = {
   canvas?: MaskCanvas | null;
@@ -347,6 +398,8 @@ export type MaskFx = {
   fade: Partial<Fade>;
   cover?: { key: string; world: object; runs: Run[] };
   bright?: boolean;
+  brightAt?: boolean;
+  level?: Partial<Fade>;
   drawn?: { strength: number; spots: { cx: number; cy: number; r: number }[] } | null;
   cost?: { n: number; ms: number };
 };
@@ -466,7 +519,9 @@ export function caveMask(
   const me = sc.bodies?.get('player') ?? state.player;
   const near = gangFade(frame, me.x, me.y);
   const fade = Math.min(near, fadeOf(m.fade, near > 0, sc.now));
-  const strength = maskNow(strengthOf(!!m.bright), fade, sc.night ?? 0);
+  m.bright = brightOf(m, hostOf(ctx), storedCave);
+  const base = levelOf((m.level ??= {}), strengthOf(m.bright), sc.now, sc.reduced);
+  const strength = maskNow(base, fade, sc.night ?? 0);
   if (strength < 0.005) return;
   if (m.canvas === undefined) m.canvas = (m.make ?? browserCanvas)();
   if (!m.canvas) return;

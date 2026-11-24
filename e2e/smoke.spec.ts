@@ -413,6 +413,8 @@ test(
         a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
       Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
     });
+    // gespeichert „Höhle hell“ (Elternschalter aus, wie nach einem früheren Spielen), das Menü bleibt zu
+    await page.addInitScript(() => localStorage.setItem('larmic.games.cave', '1'));
     const game = await openGame(page, { clock: true, dev: 'hoehle' });
     const webgl = await expectView(page);
     await view3d(page, 'hoehle');
@@ -428,7 +430,11 @@ test(
       renderer: {
         views: Map<
           string,
-          { fx?: { mask?: { bright?: boolean; drawn?: { strength: number; spots: Spot[] } | null } } }
+          {
+            fx?: {
+              mask?: { bright?: boolean; brightAt?: boolean; drawn?: { strength: number; spots: Spot[] } | null };
+            };
+          }
         >;
       };
       seen(x: number, y: number): boolean;
@@ -448,6 +454,13 @@ test(
     });
     await arrive(page);
     await render(page, 60); // die Luft der Grotte in 3D ist ganz da (blendet je Bild weich ein)
+    // ohne Menü: Die Maske liest den Schalter beim ersten Bild aus dem Speicher, die Spielfläche weiß noch nichts
+    await expect(game).not.toHaveAttribute('data-cave');
+    const saved = await game.evaluate((node) => {
+      const mask = (node as unknown as Game).renderer.views.get('hoehle')!.fx!.mask!;
+      return { brightAt: mask.brightAt, strength: mask.drawn?.strength };
+    });
+    expect(saved).toEqual({ brightAt: true, strength: GROTTE.dark.bright });
     const canvas = await page.locator('canvas.mw-canvas').boundingBox();
     /** Helligkeit (relative Luminanz) des fertigen Bilds an Punkten der Ansicht (Pixel der Ansicht) */
     const lums = async (points: [number, number][]) => {
@@ -481,10 +494,10 @@ test(
     });
     /** Stärke, Loch und Helligkeit: Mitte links neben der Figur, ein Ring außerhalb des Lochs, das Feld im Nebel */
     const probe = async (bright: boolean) => {
-      await game.evaluate((node, pale) => {
-        (node as unknown as Game).renderer.views.get('hoehle')!.fx!.mask!.bright = pale;
-      }, bright);
-      await render(page, 1); // ein Bild mit dieser Stärke
+      // wie das Menü den Elternschalter „Höhle dunkel“ an der Spielfläche setzt
+      await game.evaluate((node, pale) => ((node as HTMLElement).dataset.cave = pale ? '1' : '0'), bright);
+      // die Stärke gleitet in `fade` ms hinüber: so viele Bilder der Test-Uhr, dann eins mit dieser Stärke
+      await render(page, Math.ceil(GROTTE.dark.fade / FRAME_MS) + 1);
       const { strength, spots } = await game.evaluate(
         (node) => (node as unknown as Game).renderer.views.get('hoehle')!.fx!.mask!.drawn!,
       );
@@ -507,6 +520,9 @@ test(
     const pale = await probe(true);
     expect(dark.strength).toBeCloseTo(GROTTE.dark.mask);
     expect(pale.strength).toBe(GROTTE.dark.bright);
+    expect(
+      await game.evaluate((node) => (node as unknown as Game).renderer.views.get('hoehle')!.fx!.mask!.bright),
+    ).toBe(true);
     expect(dark.r).toBeGreaterThan(40); // 3 Felder
     // im Loch: fast so hell wie mit „Höhle hell“, nie dunkler als die Dämmerung
     expect(dark.near).toBeGreaterThan(0.75 * pale.near);
@@ -2613,6 +2629,55 @@ test('Menü für Eltern: Schalter „Kamera bewegen“ bleibt nach dem Neuladen 
   await motion.click(); // wieder an
   await expect(motion).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => localStorage.getItem('larmic.games.calm'))).toBe('0');
+  expect(errors).toEqual([]);
+});
+
+test('Menü für Eltern: Schalter „Höhle dunkel“ ist an und lässt sich umlegen, ohne neues Format des Spielstands', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  await openGame(page, { clock: true });
+  const menu = await openMenu(page);
+  const cave = menu.getByRole('button', { name: /^Höhle dunkel/ });
+  const motion = menu.getByRole('button', { name: /^Kamera bewegen/ });
+  // Ohne Eintrag im Speicher ist die Höhle dunkel, neben „Kamera bewegen“; die Spielfläche weiß es für die Maske
+  await expect(cave).toHaveText('Höhle dunkel: an');
+  await expect(cave).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('larmic-mitwachsen')).toHaveAttribute('data-cave', '0');
+  await cave.click();
+  await expect(cave).toHaveText('Höhle dunkel: aus');
+  await expect(cave).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('larmic-mitwachsen')).toHaveAttribute('data-cave', '1');
+  await expect(motion).toHaveAttribute('aria-pressed', 'true'); // die Kamera bleibt, wie sie war
+  // Gespeichert unter eigenem Schlüssel, kein neues Format des Spielstands: Die Welt speichert ihn nicht
+  const stored = await page.evaluate(() => ({
+    cave: localStorage.getItem('larmic.games.cave'),
+    calm: localStorage.getItem('larmic.games.calm'),
+    worlds: Object.keys(localStorage)
+      .filter((k) => k.startsWith('larmic.games.world.'))
+      .map((k) => localStorage.getItem(k) ?? ''),
+  }));
+  expect(stored.cave).toBe('1');
+  expect(stored.calm).toBeNull();
+  expect(stored.worlds.some((w) => w.includes('cave'))).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('Menü für Eltern: Schalter „Höhle dunkel“ bleibt nach dem Neuladen aus und lässt sich wieder anlegen', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  // Wie nach dem Umlegen im Test davor und neu geladen: Der Speicher sagt „Höhle hell“
+  await page.addInitScript(() => localStorage.setItem('larmic.games.cave', '1'));
+  await openGame(page, { clock: true });
+  const menu = await openMenu(page);
+  const cave = menu.getByRole('button', { name: /^Höhle dunkel/ });
+  await expect(cave).toHaveText('Höhle dunkel: aus');
+  await expect(cave).toHaveAttribute('aria-pressed', 'false');
+  await cave.click(); // wieder dunkel
+  await expect(cave).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('larmic-mitwachsen')).toHaveAttribute('data-cave', '0');
+  expect(await page.evaluate(() => localStorage.getItem('larmic.games.cave'))).toBe('0');
   expect(errors).toEqual([]);
 });
 

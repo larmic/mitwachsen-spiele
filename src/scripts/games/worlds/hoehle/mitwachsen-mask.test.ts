@@ -14,6 +14,9 @@ import {
   FLOOR,
   MASK,
   MASK_SCALE,
+  CAVE_STORE,
+  brightOf,
+  levelOf,
   brightness,
   caveFrame,
   caveMask,
@@ -38,6 +41,7 @@ import {
 } from './mitwachsen-mask';
 import { Olm } from './mitwachsen-olm-look';
 import { flatColors } from '../../mitwachsen-ground-2d';
+import { CAVE_KEY, caveBright, toggleCave } from '../../mitwachsen-menu';
 import type { Cell } from '../../mitwachsen-cell';
 
 const D = GROTTE.dark;
@@ -468,10 +472,40 @@ describe('Dunkelmaske: zeichnen', () => {
     expect(m.drawn?.strength).toBeCloseTo(D.mask / 2);
     caveMask(recorder().ctx, w, scene({ now: 20_000 + D.fade }), P, lit(bed), m);
     expect(m.drawn?.strength).toBeCloseTo(D.mask);
-    // „Höhle hell“
-    const pale: MaskFx = { fade: {}, make: () => fakeCanvas().canvas, bright: true };
+    // „Höhle hell“ (Schalter im Speicher aus, beim ersten Bild gelesen)
+    const pale: MaskFx = { fade: {}, make: () => fakeCanvas().canvas, brightAt: true };
     caveMask(recorder().ctx, w, scene(), P, lit(bed), pale);
     expect(pale.drawn?.strength).toBe(D.bright);
+    expect(pale.bright).toBe(true);
+    // die Spielfläche um das Canvas sagt es, sobald das Menü sie gesetzt hat (hier: wieder dunkel); die Stärke gleitet
+    // in `fade` ms hinüber, nie ein Sprung
+    const host = { dataset: { cave: '0' } };
+    const onHost = recorder().ctx as unknown as { canvas: { closest: (s: string) => unknown } };
+    onHost.canvas = { closest: (sel) => (sel === '.mw' ? host : null) };
+    const onHostCtx = onHost as unknown as CanvasRenderingContext2D;
+    caveMask(onHostCtx, w, scene({ now: 1 }), P, lit(bed), pale);
+    expect(pale.bright).toBe(false);
+    expect(pale.drawn?.strength).toBeCloseTo(D.bright);
+    caveMask(onHostCtx, w, scene({ now: 1 + D.fade / 2 }), P, lit(bed), pale);
+    expect(pale.drawn!.strength).toBeGreaterThan(D.bright);
+    expect(pale.drawn!.strength).toBeLessThan(D.mask);
+    expect(pale.drawn?.strength).toBeCloseTo((D.bright + D.mask) / 2);
+    // halb hinüber wieder umgelegt: zurück von dort, wo sie ist, in der halben Zeit
+    host.dataset.cave = '1';
+    caveMask(onHostCtx, w, scene({ now: 1 + D.fade / 2 }), P, lit(bed), pale);
+    expect(pale.drawn?.strength).toBeCloseTo((D.bright + D.mask) / 2);
+    caveMask(onHostCtx, w, scene({ now: 1 + D.fade / 2 + D.fade / 4 }), P, lit(bed), pale);
+    expect(pale.drawn?.strength).toBeCloseTo(D.bright + (D.mask - D.bright) / 4);
+    caveMask(onHostCtx, w, scene({ now: 1 + D.fade }), P, lit(bed), pale);
+    expect(pale.drawn?.strength).toBeCloseTo(D.bright);
+    host.dataset.cave = '0';
+    caveMask(onHostCtx, w, scene({ now: 2 + D.fade }), P, lit(bed), pale);
+    caveMask(onHostCtx, w, scene({ now: 2 + 2 * D.fade }), P, lit(bed), pale);
+    expect(pale.drawn?.strength).toBeCloseTo(D.mask);
+    // bei reduzierter Bewegung sofort
+    host.dataset.cave = '1';
+    caveMask(onHostCtx, w, scene({ now: 3 + 2 * D.fade, reduced: true }), P, lit(bed), pale);
+    expect(pale.drawn?.strength).toBeCloseTo(D.bright);
     // ohne Zeichenfläche, ohne Zustand, ohne Grotte: nichts
     const none: MaskFx = { fade: {}, make: () => null };
     caveMask(recorder().ctx, w, scene(), P, lit(bed), none);
@@ -505,5 +539,78 @@ describe('Dunkelmaske: zeichnen', () => {
     expect(image).toBeGreaterThanOrEqual(0);
     expect(circle).toBeGreaterThan(image);
     expect(fx.light.drawn).not.toBeNull();
+  });
+});
+
+describe('Elternschalter „Höhle dunkel“ (Schritt 6)', () => {
+  /** Speicher wie localStorage, in einer Map */
+  const memory = (init: Record<string, string> = {}) => {
+    const m = new Map(Object.entries(init));
+    return {
+      getItem: (k: string) => m.get(k) ?? null,
+      setItem: (k: string, v: string) => void m.set(k, v),
+      removeItem: (k: string) => void m.delete(k),
+    };
+  };
+
+  it('ohne Eintrag dunkel; „1“ heißt hell (Maske 0,3); die Spielfläche (`data-cave`) gilt vor dem Speicher', () => {
+    expect(D.bright).toBe(0.3);
+    expect(strengthOf(true)).toBe(0.3);
+    expect(brightOf({ fade: {} }, null, () => null)).toBe(false);
+    expect(brightOf({ fade: {} }, null, () => '0')).toBe(false);
+    expect(brightOf({ fade: {} }, null, () => '1')).toBe(true);
+    expect(brightOf({ fade: {} }, { dataset: { cave: '1' } }, () => '0')).toBe(true);
+    expect(brightOf({ fade: {} }, { dataset: { cave: '0' } }, () => '1')).toBe(false);
+    expect(brightOf({ fade: {} }, { dataset: {} }, () => '1')).toBe(true); // Menü noch nie gefüllt
+  });
+
+  it('Umlegen: die Grundstärke gleitet in `fade` ms, beim ersten Bild und bei reduzierter Bewegung gleich (`levelOf`)', () => {
+    const l = {};
+    expect(levelOf(l, D.bright, 0, false)).toBe(D.bright);
+    expect(levelOf(l, D.mask, 100, false)).toBe(D.bright);
+    expect(levelOf(l, D.mask, 100 + D.fade / 2, false)).toBeCloseTo((D.bright + D.mask) / 2);
+    expect(levelOf(l, D.mask, 100 + D.fade, false)).toBe(D.mask);
+    expect(levelOf(l, D.mask, 100 + 9 * D.fade, false)).toBe(D.mask);
+    expect(levelOf(l, D.bright, 5000, true)).toBe(D.bright);
+    expect(levelOf(l, D.mask, 5001, true)).toBe(D.mask);
+  });
+
+  it('liest den Speicher einmal (beim ersten Bild) und merkt ihn; gesperrt heißt dunkel', () => {
+    let reads = 0;
+    const m: MaskFx = { fade: {} };
+    const stored = () => (reads++, '1');
+    expect(brightOf(m, null, stored)).toBe(true);
+    expect(brightOf(m, null, stored)).toBe(true);
+    expect(reads).toBe(1);
+    expect(m.brightAt).toBe(true);
+    const locked: MaskFx = { fade: {} };
+    expect(
+      brightOf(locked, null, () => {
+        throw new Error('gesperrt');
+      }),
+    ).toBe(false);
+    expect(locked.brightAt).toBe(false);
+  });
+
+  it('Schlüssel wie im Menü, das das Paket nicht mitlädt; Umlegen merkt ihn für alle Welten, nicht im Spielstand', () => {
+    expect(CAVE_STORE).toBe(CAVE_KEY);
+    const store = memory();
+    expect(caveBright(store)).toBe(false);
+    toggleCave(store);
+    expect(store.getItem(CAVE_KEY)).toBe('1');
+    expect(caveBright(store)).toBe(true);
+    expect(brightOf({ fade: {} }, null, () => store.getItem(CAVE_STORE))).toBe(true);
+    toggleCave(store);
+    expect(store.getItem(CAVE_KEY)).toBe('0');
+    expect(caveBright(store)).toBe(false);
+    // geht das Speichern nicht, bleibt er, wie er war
+    const full = {
+      ...memory({ [CAVE_KEY]: '1' }),
+      setItem: () => {
+        throw new Error('voll');
+      },
+    };
+    toggleCave(full);
+    expect(caveBright(full)).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 // Menü für Eltern, nachgeladen: Inhalt (Liste der Welten mit je einem Knopf zum Wechseln mit Welt- und Figurname und
-// einem zum Löschen, Namen, Welt-Code, Ton, Kamera bewegen) und die seltenen Handgriffe: Welt löschen mit Rückfrage im Menü selbst (kein
+// einem zum Löschen, Namen, Welt-Code, Ton, Kamera bewegen, Höhle dunkel) und die seltenen Handgriffe: Welt löschen mit Rückfrage im Menü selbst (kein
 // Dialog des Browsers) und Welt-Code kopieren. Die Klicks fängt die Web Component (larmic-mitwachsen.ts) über
 // `data-world` und `data-delete`; sie lädt dieses Modul erst, wenn sie das Menü füllt oder ein Handgriff kommt.
 // Spezifikation: docs/specs/mitwachsen.md („Was angezeigt wird“: Menü)
@@ -24,6 +24,27 @@ export function toggleCalm(store: Store) {
     /* Speicher voll oder gesperrt */
   }
 }
+
+/** Elternschalter „Höhle dunkel“: '1' heißt aus („Höhle hell“, Maske 0,3); fehlt der Eintrag, ist er an (dunkel) */
+export const CAVE_KEY = 'larmic.games.cave';
+
+/** Ist der Elternschalter „Höhle dunkel“ aus, die Grotte also hell? */
+export const caveBright = (store: Store) => store.getItem(CAVE_KEY) === '1';
+
+/**
+ * Elternschalter „Höhle dunkel“ umlegen und merken (geht das nicht, bleibt er, wie er war). Aus („Höhle hell“): Die
+ * Dunkelmaske der Grotte deckt abseits der Figur nur mit 0,3 statt mit voller Stärke (worlds/hoehle/mitwachsen-mask.ts)
+ */
+export function toggleCave(store: Store) {
+  try {
+    store.setItem(CAVE_KEY, caveBright(store) ? '0' : '1');
+  } catch {
+    /* Speicher voll oder gesperrt */
+  }
+}
+
+/** Welchen Elternschalter ein Klick vor dem Füllen umlegt */
+export type Flip = 'motion' | 'cave';
 
 /**
  * Löschen-Knopf geklickt: Der erste Klick fragt („Wirklich löschen?“, auch im Etikett für Screenreader), der zweite
@@ -68,11 +89,12 @@ export async function copyCode(button: HTMLElement, written: Promise<void>, menu
 }
 
 /**
- * Menü füllen: Liste der Welten aus `store` (die gespielte markiert), Namen, Welt-Code und die Schalter für den Ton und
- * „Kamera bewegen“; `flip`: den Schalter „Kamera bewegen“ vorher umlegen (geklickt)
+ * Menü füllen: Liste der Welten aus `store` (die gespielte markiert), Namen, Welt-Code und die Schalter für den Ton,
+ * „Kamera bewegen“ und „Höhle dunkel“; `flip`: diesen Elternschalter vorher umlegen (geklickt)
  */
-export function renderMenu(menu: HTMLElement, store: Store, saved: SavedWorld, muted: boolean, flip = false) {
-  if (flip) toggleCalm(store);
+export function renderMenu(menu: HTMLElement, store: Store, saved: SavedWorld, muted: boolean, flip?: Flip) {
+  if (flip === 'motion') toggleCalm(store);
+  if (flip === 'cave') toggleCave(store);
   const index = loadIndex(store);
   menu.querySelector('.mw-worlds')!.replaceChildren(...index.worlds.map((w) => worldItem(w, w.id === saved.id)));
   (menu.querySelector('#mw-world-name') as HTMLInputElement).value = saved.worldName;
@@ -81,8 +103,13 @@ export function renderMenu(menu: HTMLElement, store: Store, saved: SavedWorld, m
   toggle(menu, 'sound', !muted, muted ? 'Ton ist aus' : 'Ton ist an');
   const off = calm(store);
   toggle(menu, 'motion', !off, `Kamera bewegen: ${off ? 'aus' : 'an'}`);
-  // an der Spielfläche für die 3D-Ansicht (mitwachsen-turn-3d.ts), auch wenn der Speicher gesperrt ist
-  menu.closest<HTMLElement>('.mw')?.setAttribute('data-calm', off ? '1' : '0');
+  const bright = caveBright(store);
+  toggle(menu, 'cave', !bright, `Höhle dunkel: ${bright ? 'aus' : 'an'}`);
+  // an der Spielfläche für die 3D-Ansicht (mitwachsen-turn-3d.ts) und die Dunkelmaske der Grotte (mitwachsen-mask.ts),
+  // auch wenn der Speicher gesperrt ist
+  const host = menu.closest<HTMLElement>('.mw');
+  host?.setAttribute('data-calm', off ? '1' : '0');
+  host?.setAttribute('data-cave', bright ? '1' : '0');
 }
 
 /** Schalter im Menü (`data-act`): gedrückt heißt an, das Etikett sagt es auch */

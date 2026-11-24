@@ -17,18 +17,21 @@ test('Barrierefrei: Spiel mit Hinweis für Eltern und danach', async ({ page }) 
 });
 
 // Je Zustand des Schalters ein Test: Laden, Menü und zwei Prüfungen mit axe sprengten auf dem Runner die 30 s eines Tests
-test('Barrierefrei: Menü für Eltern mit den Schaltern für Ton und Kamera', async ({ page }) => {
+test('Barrierefrei: Menü für Eltern mit den Schaltern für Ton, Kamera und Höhle', async ({ page }) => {
   await openGame(page, { clock: true });
   const menu = await openMenu(page);
   await expect(menu.getByRole('button', { name: 'Kamera bewegen: an' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(menu.getByRole('button', { name: 'Höhle dunkel: an' })).toHaveAttribute('aria-pressed', 'true');
   expect(await violations(page)).toEqual([]);
 });
 
-test('Barrierefrei: Menü für Eltern, Schalter „Kamera bewegen“ umgelegt', async ({ page }) => {
+test('Barrierefrei: Menü für Eltern, Schalter „Kamera bewegen“ und „Höhle dunkel“ umgelegt', async ({ page }) => {
   await openGame(page, { clock: true });
   const menu = await openMenu(page);
   await menu.getByRole('button', { name: 'Kamera bewegen: an' }).click();
   await expect(menu.getByRole('button', { name: 'Kamera bewegen: aus' })).toHaveAttribute('aria-pressed', 'false');
+  await menu.getByRole('button', { name: 'Höhle dunkel: an' }).click();
+  await expect(menu.getByRole('button', { name: 'Höhle dunkel: aus' })).toHaveAttribute('aria-pressed', 'false');
   expect(await violations(page)).toEqual([]);
 });
 

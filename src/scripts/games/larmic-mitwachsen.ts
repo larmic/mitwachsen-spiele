@@ -1038,8 +1038,11 @@ class LarmicMitwachsen extends HTMLElement {
     this.menu.showModal();
   }
 
-  /** Menü füllen, nachgeladen mit seinen seltenen Handgriffen (mitwachsen-menu.ts); `flip`: Schalter „Kamera bewegen“ */
-  private async renderMenu(flip?: boolean) {
+  /**
+   * Menü füllen, nachgeladen mit seinen seltenen Handgriffen (mitwachsen-menu.ts); `flip`: Elternschalter „Kamera
+   * bewegen“ oder „Höhle dunkel“ vorher umlegen
+   */
+  private async renderMenu(flip?: 'motion' | 'cave') {
     (await import('./mitwachsen-menu').catch(noop))?.renderMenu(
       this.menu,
       this.store,
@@ -1101,7 +1104,10 @@ class LarmicMitwachsen extends HTMLElement {
         void this.renderMenu();
         break;
       case 'motion': // Elternschalter „Kamera bewegen“ (im Menü-Modul, an der Spielfläche für die 3D-Ansicht)
-        void this.renderMenu(true);
+        void this.renderMenu('motion');
+        break;
+      case 'cave': // Elternschalter „Höhle dunkel“ (im Menü-Modul, an der Spielfläche für die Dunkelmaske der Grotte)
+        void this.renderMenu('cave');
         break;
       case 'fullscreen':
         this.menu.close();
