@@ -423,6 +423,7 @@ export function rideRules(v: Vehicle): One {
     move(s, world, cmd, events) {
       if (s.ride && s.ride.id !== id) return false;
       if (!s.ride && cmd.tap && cmd.ride && cmd.ride !== id) return false; // ein anderes Fahrzeug angetippt
+      if (!s.ride && cmd.tap && cmd.who) return false; // ein Bote angetippt (Tok): kein Fahrzeug
       const c = ctx(world, s);
       if (!c) return false;
       if (s.ride) {

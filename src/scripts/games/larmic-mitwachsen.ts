@@ -57,6 +57,7 @@ import { CHORUS_MS, seatOf, withHop, type RideBody } from './mitwachsen-ride-vie
 import { GoodNights, endsBedtime, rideLight } from './mitwachsen-bedtime';
 import { awayIn, packScore } from './mitwachsen-view';
 import { listenTap } from './mitwachsen-tap';
+import { heraldOf } from './mitwachsen-herald';
 import { SLEEP_EVENT, type GameMoment } from './pwa-update';
 import { browserStore } from './browser-store';
 
@@ -481,7 +482,7 @@ class LarmicMitwachsen extends HTMLElement {
 
     this.querySelector('.mw-gear')!.addEventListener('click', () => void this.openMenu(), { signal });
     listenTouch(this, signal, this.pace, this.sfx, (dir) => this.apply({ type: 'move', dir }));
-    // Antippen eines Fahrzeugs (mitwachsen-tap.ts): in 2D und 3D über die Projektion der Ansicht
+    // Antippen eines Fahrzeugs oder von Tok (mitwachsen-tap.ts): in 2D und 3D über die Projektion der Ansicht
     listenTap(this.canvas, signal, () => this.tapScene(), this.apply.bind(this));
     // Beim Schließen gibt der Dialog den Fokus ans Zahnrad zurück; die Leertaste öffnete dann sofort wieder das Menü
     this.menu.addEventListener(
@@ -670,11 +671,17 @@ class LarmicMitwachsen extends HTMLElement {
     this.gl3d?.adopt(world, chunks);
   }
 
-  /** Was das Antippen sieht: die Körper des Fahrzeugs, die Projektion der Ansicht und die Figur (nicht, solange es ruht) */
+  /**
+   * Was das Antippen sieht: die Körper der Fahrzeuge, den Boten (Tok, wo er gerade gezeichnet ist; es gibt ihn nur mit
+   * dem Paket der Bahn, also hinter `BAHN_LIVE`), die Projektion der Ansicht und die Figur (nicht, solange es ruht)
+   */
   private tapScene() {
-    if (this.paused() || !this.rides.length) return null;
+    const t = heraldOf(this.state);
+    const b = t && this.bodies.get(t.id);
+    const rides = b ? [...this.rides, { id: t.id, x: b.x, y: b.y, z: b.z, being: true as const }] : this.rides;
+    if (this.paused() || !rides.length) return null;
     return {
-      rides: this.rides,
+      rides,
       project: (x: number, y: number, z: number) => this.project(x, y, z),
       player: this.state.player,
     };

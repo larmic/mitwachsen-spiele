@@ -325,9 +325,15 @@ export function step(
     ride?.tick(s, world, events);
   } else if (s.sleeping) {
     if (cmd.type !== 'move' || !cmd.tap) wake(s, world, events); // Antippen des Fahrzeugs weckt nicht, es steigt nur ein
-  } else if (cmd.type === 'move' && !meet(s, world, cmd, events) && !guide?.hold(s, events)) {
-    // Ein Schritt (am Fahrzeug: einsteigen, anstoßen, unterwegs winken; in den schlafenden Boten: Er schnarcht; während
-    // das Eistor aufgeht, hüpft die Figur stattdessen nur: `hold` in worlds/eis/mitwachsen-ritual.ts)
+  } else if (
+    cmd.type === 'move' &&
+    !meet(s, world, cmd, events) &&
+    !tapped(s, cmd, events) &&
+    !guide?.hold(s, events)
+  ) {
+    // Ein Schritt (am Fahrzeug: einsteigen, anstoßen, unterwegs winken; in den schlafenden Boten: Er schnarcht; ein
+    // Antippen läuft nie, `tapped`; während das Eistor aufgeht, hüpft die Figur stattdessen nur: `hold` in
+    // worlds/eis/mitwachsen-ritual.ts)
     const from: Point = [s.player.x, s.player.y];
     move(s, world, cmd.dir, events, rules);
     guide?.meetGuide(s, world, events); // in den führenden Pinguin gelaufen: Er hüpft voraus oder tauscht den Platz
@@ -408,6 +414,17 @@ function tick(s: State, world: World, events: GameEvent[], ride?: RideRules) {
       }
     }
   }
+}
+
+/**
+ * Ein Antippen, das kein Haken der Pakete erledigt hat (wirkt wie Hineinlaufen: einsteigen, Tok baut oder schnarcht):
+ * Ist es der Bote (`MoveCmd.who`; sein Paket hat schon geprüft, dass er nah genug ist), singt und hüpft er wie beim
+ * Hineinlaufen; sonst nichts. true für jedes Antippen: Die Figur geht nie einen Schritt
+ */
+function tapped(s: State, cmd: MoveCmd, events: GameEvent[]): boolean {
+  const a = cmd.tap && s.animals.find((b) => b.id === cmd.who && b.mode === 'herald');
+  if (a) sing(s, a, false, events);
+  return !!cmd.tap;
 }
 
 /**

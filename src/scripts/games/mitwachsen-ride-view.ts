@@ -86,35 +86,53 @@ export function byRow<B extends readonly [number, number, number, number, number
 
 /** So weit um seine Mitte (in Feldbreiten auf dem Bildschirm) trifft ein Finger einen Körper */
 export const TAP_RADIUS = 0.8;
+/** Ein Zentimeter in CSS-Pixeln (96 px je Zoll) */
+export const CM = 96 / 2.54;
+/** So weit trifft ein Finger höchstens, wie groß die Ansicht auch ist (Konzept: Treffer ≤ max(38 px, 1 cm)) */
+export const TAP_MAX = Math.max(38, CM);
 
 /**
- * Antippen: der Körper eines Fahrzeugs unter dem Bildschirmpunkt (px, py), der nächste zuerst; `project` ist die
- * Projektion der Ansicht (2D von vorn oder die 3D-Kamera), so trifft es in beiden gleich
+ * Was sich antippen lässt: ein Körper eines Fahrzeugs (Kennung `ride:<Fahrzeug>…`) oder ein Bote unter den Wesen
+ * (`being`, Tok; Kennung wie in `State.animals`), Lage in Feldern wie bei `RideBody`
  */
-export function tapRide(rides: readonly RideBody[], project: Projection, px: number, py: number): RideBody | undefined {
-  let best: RideBody | undefined;
+export type Tap = Pick<RideBody, 'id' | 'x' | 'y' | 'z'> & { being?: true };
+
+/**
+ * Antippen: das Antippbare unter dem Bildschirmpunkt (px, py), das nächste zuerst; `project` ist die Projektion der
+ * Ansicht (2D von vorn oder die 3D-Kamera), so trifft es in beiden gleich. Getroffen ist, was höchstens `TAP_RADIUS`
+ * Feldbreiten um seine Mitte liegt, höchstens aber `TAP_MAX` Pixel (nah oder groß gezoomt); andere Körper (Laterne,
+ * Bahnhof, Figur) trifft es nie
+ */
+export function tapRide<T extends Tap>(
+  rides: readonly T[],
+  project: Projection,
+  px: number,
+  py: number,
+): T | undefined {
+  let best: T | undefined;
   let near = Infinity;
   for (const r of rides) {
-    if (!r.id.startsWith('ride:')) continue;
+    if (!r.being && !r.id.startsWith('ride:')) continue;
     const [cx, cy] = project(r.x + 0.5, r.y + 0.5, r.z + 0.4);
     const [ex, ey] = project(r.x + 1.5, r.y + 0.5, r.z + 0.4);
     const d = Math.hypot(px - cx, py - cy);
-    if (d <= Math.hypot(ex - cx, ey - cy) * TAP_RADIUS && d < near) [best, near] = [r, d];
+    if (d <= Math.min(Math.hypot(ex - cx, ey - cy) * TAP_RADIUS, TAP_MAX) && d < near) [best, near] = [r, d];
   }
   return best;
 }
 
 /**
- * Befehl zum angetippten Körper: ein neuer Druck in seine Richtung (`tap`: nur einsteigen, nie laufen), `ride` das
- * Fahrzeug, dem er gehört (aus seiner Kennung `ride:<Fahrzeug>…`)
+ * Befehl zum Angetippten: ein neuer Druck in seine Richtung (`tap`: wirkt wie Hineinlaufen, nie laufen); `ride` das
+ * Fahrzeug, dem der Körper gehört (aus seiner Kennung `ride:<Fahrzeug>…`), `who` der angetippte Bote
  */
-export const tapCmd = (r: Pick<RideBody, 'id' | 'x' | 'y'>, player: { x: number; y: number }): MoveCmd => {
-  const ride = r.id.split(':')[1] as RideId | undefined;
+export const tapCmd = (r: Pick<Tap, 'id' | 'x' | 'y' | 'being'>, player: { x: number; y: number }): MoveCmd => {
+  const ride = r.being ? undefined : (r.id.split(':')[1] as RideId | undefined);
   return {
     type: 'move',
     dir: dirTo(Math.round(r.x) - player.x, Math.round(r.y) - player.y),
     fresh: true,
     tap: true,
     ...(ride ? { ride } : {}),
+    ...(r.being ? { who: r.id } : {}),
   };
 };

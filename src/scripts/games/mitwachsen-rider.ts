@@ -14,9 +14,10 @@ import type { World } from './mitwachsen-world';
 
 /**
  * Ein Pfeil (Befehl `move`): `fresh` neu gedrückt oder gemerkter Tipp (nicht gehalten, `InputPace.lastFresh`), `tap`
- * ein Fahrzeug angetippt, `ride` welches (aus dem Körper, den der Finger traf)
+ * angetippt (mitwachsen-tap.ts): ein Fahrzeug, `ride` welches (aus dem Körper, den der Finger traf), oder ein Bote
+ * (Tok), `who` seine Kennung unter den Wesen. Gelaufen wird per Antippen nie
  */
-export type MoveCmd = { type: 'move'; dir: Dir; fresh?: true; tap?: true; ride?: RideId };
+export type MoveCmd = { type: 'move'; dir: Dir; fresh?: true; tap?: true; ride?: RideId; who?: string };
 
 /** Ende einer Strecke: der Halt in der Welt (`home`) oder der auf der Lichtung (`out`) */
 export type End = 'home' | 'out';
@@ -64,7 +65,8 @@ export type RideEvents = {
 /**
  * Haken der Fahrzeuge in `step` (aus der Fahr-Engine, `RideEngine`). `tick`: nach dem Takt der Tiere (fällig,
  * erscheinen, fahren). `move`: vor allem anderen; true, wenn der Zug damit erledigt ist (einsteigen, anstoßen, während
- * der Fahrt immer; ein Antippen immer, sobald ein Fahrzeug eine Strecke hat: gelaufen wird per Antippen nie).
+ * der Fahrt immer; ein Antippen eines Fahrzeugs immer, sobald es eine Strecke hat: gelaufen wird per Antippen nie;
+ * ein angetippter Bote, `MoveCmd.who`, gehört nicht den Fahrzeugen).
  * `blocks`: Darf das Tier `a` nicht auf (x, y) gehen (Halte, Fahrzeug, Schuppen, Strecke)?
  */
 export type RideRules = {

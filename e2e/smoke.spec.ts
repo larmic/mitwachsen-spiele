@@ -699,6 +699,120 @@ test(
   },
 );
 
+// Antippen von Tok und Zug per Entwickler-Schalter (`?entwickler=bahn&bau=0`, fester Seed 1; @3d, weil der Finger über
+// die Projektion der 3D-Kamera trifft, im Projekt `game` dieselbe Prüfung in 2D): Ein Klick auf Tok an seinem Platz, drei
+// Felder von der Figur, beginnt Bau 1 wie Hineinlaufen, die Figur geht keinen Schritt; nach dem Bau steigt ein Klick auf
+// den mittleren Wagen ein. Gespeichert wird im Blick hinein nichts; ohne Schalter gibt es Tok und Zug nicht (Freigabe
+// aus, „Tok erscheint …“), also auch nichts anzutippen
+test(
+  'Spiel: Antippen per Entwickler-Schalter: Tok beginnt Bau 1, der Zug steigt ein, ohne Schritt, speichert nichts, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    type Game = {
+      world: {
+        seed: number;
+        cell(x: number, y: number): { solid: boolean; ground: string; stop?: string };
+        realm(x: number, y: number): string;
+      };
+      state: {
+        player: { x: number; y: number; dir: string };
+        animals: { id: string; x: number; y: number }[];
+        packs: Record<string, unknown>;
+        work?: { from: number; to: number };
+        ride?: { id: string };
+        heraldDue: number;
+      };
+      bodies: Map<string, { x: number; y: number; z: number }>;
+      rides: { id: string; x: number; y: number; z: number }[];
+      project(x: number, y: number, z: number): [number, number];
+      apply(cmd: { type: 'move'; dir: string }): void;
+    };
+    await page.addInitScript(() => {
+      const real = crypto.getRandomValues.bind(crypto);
+      const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+        a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+      Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    });
+    const game = await openGame(page, { clock: true, dev: 'bahn&bau=0' });
+    await expectView(page);
+    expect(await game.evaluate((node) => (node as unknown as Game).world.seed)).toBe(1);
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    // Tok hüpft zur Figur und an seinen Platz; dort steht er still (nur dort beginnt er zu bauen)
+    const tokAt = () =>
+      game.evaluate((node) => {
+        const el = node as unknown as Game;
+        const t = el.state.animals.find((a) => a.id === 'hoehle:tok');
+        return t && el.state.heraldDue < 0 ? `${t.x},${t.y}` : '';
+      });
+    let [last, posted] = ['', false];
+    for (let i = 0; i < 30 && !posted; i++) {
+      await ticks(page, 10);
+      const now = await tokAt();
+      [posted, last] = [now !== '' && now === last, now];
+    }
+    expect(posted).toBe(true);
+    // die Figur drei Felder von ihm (frei, auf der Lichtung), dann wird gezeichnet: Tok hat seinen Körper
+    const from = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const t = el.state.animals.find((a) => a.id === 'hoehle:tok')!;
+      const spots: [number, number][] = [];
+      for (let dx = -3; dx <= 3; dx++)
+        for (let dy = -3; dy <= 3; dy++)
+          if (Math.max(Math.abs(dx), Math.abs(dy)) === 3) spots.push([t.x + dx, t.y + dy]);
+      const [x, y] = spots.find(([x, y]) => {
+        const c = el.world.cell(x, y);
+        const free = !el.state.animals.some((a) => a.x === x && a.y === y);
+        return free && !c.solid && c.ground !== 'water' && el.world.realm(x, y) === 'lichtung';
+      })!;
+      el.state = { ...el.state, player: { x, y, dir: 's' } };
+      return [x, y];
+    });
+    await render(page, 4);
+    const at = (id: string) =>
+      game.evaluate((node, id) => {
+        const el = node as unknown as Game;
+        const b = el.bodies.get(id) ?? el.rides.find((r) => r.id === id);
+        return b ? el.project(b.x + 0.5, b.y + 0.5, b.z + 0.4) : null;
+      }, id);
+    const canvas = page.locator('canvas.mw-canvas');
+    const tok = await at('hoehle:tok');
+    expect(tok).not.toBeNull();
+    await canvas.click({ position: { x: tok![0], y: tok![1] } });
+    const started = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      return { work: !!el.state.work, bahn: el.state.packs.bahn, at: [el.state.player.x, el.state.player.y] };
+    });
+    expect(started).toEqual({ work: true, bahn: { built: 1 }, at: from });
+    // nach dem Bau: auf den Bahnsteig neben den mittleren Wagen, ein Klick auf ihn steigt ein
+    await ticks(page, 85);
+    await render(page, 2);
+    await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const mid = el.rides.find((r) => r.id === 'ride:hoehle:mid')!;
+      const [mx, my] = [Math.round(mid.x), Math.round(mid.y)];
+      const near: [number, number][] = [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ];
+      const [dx, dy] = near.find(([dx, dy]) => el.world.cell(mx - dx, my - dy).stop === 'hoehle')!;
+      el.state = { ...el.state, animals: [], player: { x: mx - dx, y: my - dy, dir: 's' } };
+    });
+    await render(page, 4);
+    const mid = await at('ride:hoehle:mid');
+    expect(mid).not.toBeNull();
+    await canvas.click({ position: { x: mid![0], y: mid![1] } });
+    expect(await game.evaluate((node) => (node as unknown as Game).state.ride?.id)).toBe('hoehle');
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
+      [],
+    );
+    expect(errors).toEqual([]);
+  },
+);
+
 // Fahren mit der Höhlenbahn per Entwickler-Schalter (`?entwickler=bahn&bau=1`, fester Seed 1; @3d, weil die Kamera dem
 // Zug folgt und 3D die Figur im Wagen zeichnet): Ein neuer Druck zum Zug steigt ein, die Figur sitzt im mittleren Wagen,
 // die erste Fahrt endet am Prellbock in der Bucht, die Figur steigt aus, Tok hüpft an seinen Platz neben der Torplatte.

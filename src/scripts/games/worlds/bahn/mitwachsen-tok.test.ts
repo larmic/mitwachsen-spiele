@@ -8,7 +8,7 @@ import { TOK_COLORS, TOK_MODEL } from '../../../../data/games/worlds/bahn/mitwac
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
 import { slots } from '../../mitwachsen-album';
 import { APPEAR, DUE, NEAR } from '../../mitwachsen-guide';
-import { unstick } from '../../mitwachsen-free';
+import { dirTo, unstick } from '../../mitwachsen-free';
 import type { HeraldEvent } from '../../mitwachsen-herald';
 import { silhouette } from '../../mitwachsen-hint-look';
 import { bahnWanted } from '../../mitwachsen-pack';
@@ -23,6 +23,7 @@ import { BAHN_PACK, EIS_PACK, REGRESSION_SEEDS, SAMPLE_SEEDS, seedRange, seedsFo
 import { CALL_EVERY, COME, SIGHT, TOK, TOK_NEAR, postOf, tokWanted } from './mitwachsen-tok';
 import { heraldFx, juhu, lacks, pink } from './mitwachsen-tok-look';
 import { sledHome, tokOf, wakeRides, withTok } from '../../mitwachsen-ride-save';
+import { TAP_REACH } from '../../mitwachsen-ride-kit';
 
 const BAHN = [BAHN_PACK];
 const ICE = REGIONS.find((r) => r.id === 'eis')!;
@@ -304,6 +305,83 @@ describe('Tok erscheint: am Abend schlafend', () => {
     ]);
     expect(r.s.player).toMatchObject({ x: t.x - dx, y: t.y - dy, dir }); // die Figur bleibt stehen
     expect(tokIn(r.s)).toMatchObject({ x: t.x, y: t.y }); // er bleibt an seinem Platz
+  });
+});
+
+/** Ein freies Feld der Lichtung, auf dem man stehen kann, genau `d` Felder (Schachbrett) von `t` */
+function freeAt(world: World, s: State, t: Point, d: number): Point {
+  for (let dx = -d; dx <= d; dx++)
+    for (let dy = -d; dy <= d; dy++) {
+      const p: Point = [t[0] + dx, t[1] + dy];
+      if (cheb(p, t) !== d || world.realm(...p) !== 'lichtung' || standHeight(world, [], ...p) === null) continue;
+      if (!s.animals.some((a) => a.x === p[0] && a.y === p[1])) return p;
+    }
+  throw new Error(`kein freies Feld ${d} von Tok`);
+}
+/** Tok angetippt (mitwachsen-tap.ts: ein neuer Druck zu ihm hin, `who`; die Richtung rechnet sein Paket) */
+const TAP_TOK: Cmd = { type: 'move', dir: 'n', fresh: true, tap: true, who: TOK };
+
+describe('Tok antippen (Schritt 14)', () => {
+  const world = worldOf(7, BAHN);
+
+  it(`wach an seinem Platz: Antippen bis ${TAP_REACH} Felder beginnt Bau 1 wie Hineinlaufen, weiter weg nichts`, () => {
+    const r = play(ready(world), world, [WAKE, ...ticks(200)]);
+    const t = tokIn(r.s)!;
+    const near = freeAt(world, r.s, [t.x, t.y], TAP_REACH);
+    const before = { ...r.s, player: { x: near[0], y: near[1], dir: 's' as Dir } };
+    const tapped = play(before, world, [TAP_TOK]);
+    expect(heralds(tapped.events, 'build')).toEqual([
+      { type: 'herald', what: 'build', id: TOK, x: t.x, y: t.y, persist: true },
+    ]);
+    expect(tapped.events.filter((e) => e.type === 'sing' || e.type === 'step')).toEqual([]);
+    expect(tapped.s.packs.bahn).toEqual({ built: 1 }); // wie Hineinlaufen: Ausbau 1, sofort gespeichert
+    expect(tapped.s.player).toMatchObject({ x: near[0], y: near[1] }); // die Figur bleibt stehen
+    expect(tapped.s.player.dir).toBe(dirTo(t.x - near[0], t.y - near[1])); // schaut zu ihm
+    // weiter weg: nichts, und gelaufen wird nie
+    const far = freeAt(world, r.s, [t.x, t.y], TAP_REACH + 1);
+    const away = { ...r.s, player: { x: far[0], y: far[1], dir: 's' as Dir } };
+    const none = play(away, world, [TAP_TOK]);
+    expect(none.events).toEqual([]);
+    expect(none.s.player).toEqual(away.player);
+    expect(none.s.packs).toEqual(away.packs);
+  });
+
+  it('schlafend: Antippen lässt ihn leise schnarchen, nichts singt, die Figur bleibt stehen; Antippen weckt die Figur nie', () => {
+    const r = play(evening(ready(world)), world, [WAKE]);
+    const t = tokIn(r.s)!;
+    expect(t.nap).toBe(true);
+    const near = freeAt(world, r.s, [t.x, t.y], 2);
+    const before = { ...r.s, player: { x: near[0], y: near[1], dir: 's' as Dir }, wokeAt: -100 };
+    const tapped = play(before, world, [TAP_TOK]);
+    expect(heralds(tapped.events, 'snore')).toHaveLength(1);
+    expect(tapped.events.some((e) => e.type === 'sing' || e.type === 'step')).toBe(false);
+    expect(tapped.s.player).toMatchObject({ x: near[0], y: near[1] });
+    // die Figur schläft: Antippen weckt sie nicht
+    const asleep = play({ ...before, sleeping: true }, world, [TAP_TOK]);
+    expect(asleep.s.sleeping).toBe(true);
+    expect(asleep.events.some((e) => e.type === 'wake')).toBe(false);
+  });
+
+  it('unterwegs zu seinem Platz: angetippt singt und hüpft er wie beim Hineinlaufen, gelaufen wird nicht', () => {
+    const r = play(ready(world), world, [WAKE]); // gerade aufgetaucht, noch nicht an seinem Platz
+    const t = tokIn(r.s)!;
+    expect(key([t.x, t.y])).not.toBe(key(postOf(world)!.post));
+    const near = freeAt(world, r.s, [t.x, t.y], 3);
+    const before = { ...r.s, player: { x: near[0], y: near[1], dir: 's' as Dir } };
+    const tapped = play(before, world, [TAP_TOK]);
+    expect(tapped.events.filter((e) => e.type === 'sing').map((e) => (e as { id?: string }).id)).toEqual([TOK]);
+    expect(heralds(tapped.events, 'build')).toEqual([]);
+    expect(tapped.s.player).toMatchObject({ x: near[0], y: near[1] });
+  });
+
+  it('ohne das Paket der Bahn (Freigabe aus, BAHN_LIVE) gibt es keinen Tok: Antippen tut nichts und läuft nie', () => {
+    expect(BAHN_LIVE).toBe(false);
+    const plain = worldOf(7, [EIS_PACK]);
+    const s = awake(plain, ready(plain));
+    const r = play(s, plain, [TAP_TOK], false);
+    expect(tokIn(r.s)).toBeUndefined();
+    expect(r.events).toEqual([]);
+    expect(r.s.player).toEqual(s.player);
   });
 });
 

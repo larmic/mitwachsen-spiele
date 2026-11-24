@@ -1518,9 +1518,15 @@ describe('Haken der Fahrzeuge (WorldRules.ride)', () => {
     const cmd: Cmd = { type: 'move', dir: 'e', fresh: true, tap: true };
     const r = step(t.state, world, cmd, undefined, undefined, packs);
     expect(calls.at(-1)).toEqual({ hook: 'move', tick: s.tick + 1, cmd });
-    // false: Der Zug geht weiter wie immer
-    expect(types(r.events)).toEqual(['step']);
-    expect([r.state.player.x, r.state.player.y]).toEqual([1, 0]);
+    // false: Ein Antippen läuft trotzdem nie
+    expect(types(r.events)).toEqual([]);
+    expect([r.state.player.x, r.state.player.y]).toEqual([0, 0]);
+    // false bei einem Pfeil: Der Zug geht weiter wie immer
+    const arrow: Cmd = { type: 'move', dir: 'e', fresh: true };
+    const w = step(t.state, world, arrow, undefined, undefined, packs);
+    expect(calls.at(-1)).toEqual({ hook: 'move', tick: s.tick + 1, cmd: arrow });
+    expect(types(w.events)).toEqual(['step']);
+    expect([w.state.player.x, w.state.player.y]).toEqual([1, 0]);
   });
 
   it('move === true verbraucht den Zug: kein Schritt, kein Hüpfen am Eistor, keine Weltgrenze', () => {

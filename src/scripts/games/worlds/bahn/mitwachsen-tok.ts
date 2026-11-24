@@ -33,7 +33,8 @@ import { REAR_ROW } from './mitwachsen-station-look';
 import { ridden, sledHome, tokOf, withTok } from '../../mitwachsen-ride-save';
 import { farOf } from './mitwachsen-train';
 import { build2Step, shedIn, tokInShed } from './mitwachsen-build2';
-import type { Rider } from '../../mitwachsen-rider';
+import type { MoveCmd, Rider } from '../../mitwachsen-rider';
+import { TAP_REACH } from '../../mitwachsen-ride-kit';
 
 /** Tok unter den Wesen: ein Gast aus der Höhlenwelt (wie der Pinguin `eis:pinguin`) */
 export const TOK = animalId('hoehle', 'tok');
@@ -380,19 +381,23 @@ function build(s: Heralded, world: World, cmd: string, events: Events) {
 /**
  * Vor dem Schritt der Figur (`HeraldRules.meet`): Solange Tok baut, hüpft sie auf jeden Pfeil nur. In den schlafenden Tok
  * gelaufen, schnarcht er leise, sie bleibt stehen; in den wachen an seinem Platz (`atPost`), beginnt er den nächsten Bau
- * (Bau 1, solange noch nichts gebaut ist, `canBuild`); sonst singt und hüpft er (Regeln des Kerns)
+ * (Bau 1, solange noch nichts gebaut ist, `canBuild`); sonst singt und hüpft er (Regeln des Kerns). **Antippen** (`tap`
+ * mit `who` = Tok) wirkt genauso, wenn die Figur höchstens `TAP_REACH` Felder (Schachbrett) von ihm steht, wie beim
+ * Einsteigen in ein Fahrzeug; weiter weg passiert nichts (true: erledigt, gelaufen wird per Antippen nie)
  */
-export function tokMeet(s: Heralded, world: World, cmd: { dir: keyof typeof DIRS }, events: Events): boolean {
+export function tokMeet(s: Heralded, world: World, cmd: Pick<MoveCmd, 'dir' | 'tap' | 'who'>, events: Events): boolean {
   const [dx, dy] = DIRS[cmd.dir];
   if (building(s)) {
     s.player.dir = cmd.dir;
     events.push({ type: 'hop' });
     return true;
   }
+  if (cmd.tap && cmd.who !== TOK) return false;
   const t = s.animals.find((a) => a.id === TOK);
-  if (!t || t.x !== s.player.x + dx || t.y !== s.player.y + dy) return false;
+  if (cmd.tap && (!t || cheb(t, s.player) > TAP_REACH)) return true; // zu weit weg: nichts
+  if (!t || (!cmd.tap && (t.x !== s.player.x + dx || t.y !== s.player.y + dy))) return false;
   if (!t.nap && !(canBuild(s) && atPost(world, t))) return false;
-  s.player.dir = cmd.dir;
+  s.player.dir = cmd.tap ? dirTo(t.x - s.player.x, t.y - s.player.y) : cmd.dir;
   if (t.nap) events.push({ type: 'herald', what: 'snore', id: TOK, x: t.x, y: t.y });
   else startBuild(s, t, events);
   return true;

@@ -545,6 +545,10 @@ describe('Fahr-Engine mit zwei Fahrzeugen (Schlitten und Zug)', () => {
       tap: true,
       ride: 'hoehle',
     };
+    // Antippen von Tok (ein Bote, `who`) gehört keinem Fahrzeug, auch nicht neben dem Zug
+    const tok: Cmd & { type: 'move' } = { type: 'move', dir: tap.dir, fresh: true, tap: true, who: 'hoehle:tok' };
+    expect(both.move(s, W1, tok, { push })).toBe(false);
+    expect(s.ride).toBeUndefined();
     expect(both.move(s, W1, tap, { push })).toBe(true);
     expect(s.ride?.id).toBe('hoehle');
   });
