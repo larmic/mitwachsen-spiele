@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Point } from '../../../../data/games/mitwachsen';
 import { LANTERN_PARTS } from '../../../../data/games/mitwachsen-hoehle';
-import { GOLD } from '../../../../data/games/mitwachsen-portals';
+import { CAVE_PORTAL, GOLD } from '../../../../data/games/mitwachsen-portals';
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import { DIRS, TILE_W, projection, type Dir, type Projection } from '../../../../lib/games/front';
 import { stops } from '../../input-pace';
@@ -19,6 +19,7 @@ import { Chime } from './mitwachsen-chime-look';
 import { Drips } from './mitwachsen-drips';
 import { fromMouth } from './mitwachsen-grotte';
 import { circleOf, circleOnScreen, darken, drawCircle, edgeDim, isWall, shadowOver } from './mitwachsen-glow';
+import { caveFrame } from './mitwachsen-mask';
 import { LANTERN_READY, POST_H, lanternBodies, lanternScore, lanternSpot, takeLantern } from './mitwachsen-lantern';
 import { Olm } from './mitwachsen-olm-look';
 import type { Site } from './mitwachsen-site';
@@ -379,5 +380,58 @@ describe('Licht der Grotte: Lichtkreis um die Figur', () => {
   it('Farbe: kühles, helles Licht, kein Gold, kein Feuer', () => {
     expect(GROTTE_COLORS.circle.every((v) => v >= 230)).toBe(true);
     expect(fromMouth([0, 0])[1]).toBe(-GROTTE.shape.ry); // Lagen wie im Generator
+  });
+});
+
+/** Abstand (Luftlinie) von der Mündung zum ersten Feld außerhalb der Höhlenwelt: Breitensuche über begehbare Felder vor der Mündung */
+function gangBorder(world: World, f: NonNullable<ReturnType<typeof caveFrame>>): number {
+  const m = f.at(0, 0);
+  const seen = new Set([m.join()]);
+  let front: Point[] = [m];
+  let border = Infinity;
+  const visit = (p: Point, next: Point[]) => {
+    if (seen.has(p.join()) || world.cell(...p).solid || f.out(...p) >= 0.5) return;
+    seen.add(p.join());
+    if (world.realm(...p) !== 'hoehle') border = Math.min(border, Math.hypot(p[0] - m[0], p[1] - m[1]));
+    else next.push(p);
+  };
+  while (front.length && border === Infinity) {
+    const next: Point[] = [];
+    for (const [x, y] of front) for (const [dx, dy] of Object.values(DIRS)) visit([x + dx, y + dy], next);
+    front = next;
+  }
+  return border;
+}
+
+// Hier statt in mitwachsen-mask.test.ts: Die Welten dieser Seeds baut diese Datei ohnehin (test:deep vergisst sie je Datei)
+describe('Licht der Grotte: Raster der Dunkelmaske', () => {
+  it('Seed …: Raster der Grotte aus Bett und Portal: Mündung, Bett, Portal am See und Bahnhof liegen, wo der Generator sie hat; die Grenze im Gang liegt hinter dem Ende der Maske', () => {
+    const bad: string[] = [];
+    for (const seed of SEEDS) {
+      const world = worldOf(seed, [HOEHLE_PACK]);
+      const f = caveFrame(world);
+      if (!f) {
+        bad.push(`${seed}: kein Raster`);
+        continue;
+      }
+      const b = world.homes.hoehle.bed;
+      const gate = world.portals.get(CAVE_PORTAL)!.gate;
+      if (f.at(0, GROTTE.bed).join() !== b.join()) bad.push(`${seed}: Bett`);
+      if (f.at(0, GROTTE.portal[1]).join() !== gate.join()) bad.push(`${seed}: Portal`);
+      if (Math.abs(f.out(...b) - GROTTE.bed) > 1e-9) bad.push(`${seed}: vom Tor weg`);
+      const { side, out, long } = GROTTE.station;
+      for (let o = out; o < out + long; o++)
+        if (world.cell(...f.at(side, o)).stop !== 'hoehle') bad.push(`${seed}: Bahnhof ${o}`);
+      GROTTE.shafts.forEach(([u, o], i) => {
+        if (world.cell(...f.at(u, o)).shaft !== i) bad.push(`${seed}: Schacht ${i}`);
+      });
+      if (world.realm(...f.at(0, 1)) !== 'hoehle' || world.cell(...f.at(0, 1)).solid) bad.push(`${seed}: Mündung`);
+      if (f.out(...f.at(0, -3)) >= 0) bad.push(`${seed}: Gang`);
+      // durch den Gang hinaus: die Grenze der Höhlenwelt liegt weiter als `GROTTE.dark.gang` von der Mündung, dort ist
+      // die Maske schon weg (gangFade)
+      const border = gangBorder(world, f);
+      if (!(border > GROTTE.dark.gang)) bad.push(`${seed}: Grenze im Gang bei ${border}`);
+    }
+    expect(bad, bad.join('; ')).toEqual([]);
   });
 });

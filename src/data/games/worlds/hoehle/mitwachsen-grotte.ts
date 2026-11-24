@@ -51,6 +51,37 @@ export const GROTTE = {
    * Kristall-Laterne größer und etwas heller; wächst in `grow` ms (bei reduzierter Bewegung sofort)
    */
   circle: { r: 2.5, lantern: 4.5, alpha: 0.16, lanternAlpha: 0.22, grow: 600 },
+  /**
+   * Dunkelmaske über dem Bild (mitwachsen-mask.ts, Entscheidung des Vaters vom 24.11.2026): Stärke `mask` abseits der
+   * Figur, „Höhle hell“ `bright`; die Grenzen stehen als Helligkeit (relative Luminanz): nichts unter der Maske unter
+   * `floor` (so hell ist ihre Farbe `GROTTE_COLORS.dark`; der Grottenboden liegt dann bei etwa 0,12), um die Figur, auf
+   * dem Weg zum Bett und an allem, was leuchtet, nie unter `dusk` (die Dämmerung von heute). Die 0,62 des Vaters galten
+   * für ein tiefes Nachtlila, unter dem Fels und Nebel unter 0,08 fielen; die hellere Farbe braucht 0,87 für denselben
+   * Boden. Lichtloch um die Figur `hole` Felder, mit Laterne `lantern` (wächst in `circle.grow` ms), im Fahrzeug um den
+   * Sitz `seat`, an den Lampen vorn `lamp`. Feste Löcher (`fixed`, Radius in Feldern): Lichtschächte, Wiese am Bett,
+   * Bahnhof Fledermaus, Mündung des Gangs. Kleine Löcher (`small`) nur bis `near` Felder um die Figur (die letzten zwei
+   * weich); Wege als Bänder, `band` Felder breit. Höchstens `most` Löcher je Bild. Im Gang blendet sie mit dem Weg aus,
+   * `gang` Felder von der Mündung ist sie weg, und nie schneller als in `fade` ms; ist die Nacht bei `night`, ist sie ganz
+   * weg (Maske × (1 − Nacht / `night`))
+   */
+  dark: {
+    mask: 0.87,
+    bright: 0.3,
+    floor: 0.08,
+    dusk: 0.16,
+    hole: 3,
+    lantern: 6.5,
+    seat: 3.5,
+    lamp: 1.2,
+    fixed: { shaft: 3.5, meadow: 6, station: 4, mouth: 3 },
+    small: { crystal: 0.8, column: 1, lamp: 1, bed: 1.2, spring: 1.2, animal: 1 },
+    near: 9,
+    band: 2.5,
+    most: 48,
+    fade: 1000,
+    gang: 12,
+    night: 0.496,
+  },
   /** Sockel der Kristall-Laterne, relativ zum Höhlenbett: rechts vorn, gespiegelt zum Platz des Klangsteins (−3, 1) */
   lantern: [3, 1],
   /**
@@ -131,6 +162,8 @@ export const GROTTE_COLORS = {
   clay: ['#a8794c', '#c39462'],
   /** Schatten an den Rändern (2D halb durchsichtig über dem Boden; 3D dunkelt die Farbe ab) */
   shadow: '#2e2848',
+  /** Dunkelmaske: Nachtlila, so hell wie ihre Untergrenze `GROTTE.dark.floor` (0,084): darunter wird nichts dunkler als sie */
+  dark: '#534b7e',
   /** Lichtkreis um die Figur: kühles, helles Licht */
   circle: [240, 238, 255],
   /** Abendlicht in den Lichtschächten (ab 20 min Spielzeit): golden-orange, halb durchsichtig über dem Lichtfleck */

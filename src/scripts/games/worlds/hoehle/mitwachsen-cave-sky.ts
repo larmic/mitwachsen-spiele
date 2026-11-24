@@ -5,6 +5,9 @@
 // Lichtkreis um die Figur (mitwachsen-glow.ts; auch im Nebel, er gehört zur Figur), am Abend in 3D das golden-orange
 // Licht der Schächte und die Fledermaus-Runden um den Schacht über dem Bett (mitwachsen-dusk-look.ts). Im Nebel zeigt
 // sich sonst nichts. Bei reduzierter Bewegung kein Tropfen und keine Flugrunde. Wetter gibt es in der Grotte keins.
+// Reihenfolge: erst was zur Welt gehört (Abend, Tropfen, Grottenolm, Fledermaus), dann die Dunkelmaske
+// (mitwachsen-mask.ts), dann das Leuchten obendrauf (Lichtkreis, in 3D die klingende Säule); Zeichen, Herzen,
+// Sprechblasen und Leiste zeichnet der Kern danach.
 // Teil des Welt-Pakets der Höhlenwelt.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Schmuck der Grotte“)
 
@@ -22,11 +25,13 @@ import type { Drips } from './mitwachsen-drips';
 import { OLM_MS, type Olm } from './mitwachsen-olm-look';
 import { circleOf, drawCircle, type Circle } from './mitwachsen-glow';
 import { drawDusk, type Dusk } from './mitwachsen-dusk-look';
+import { caveMask, type MaskFx } from './mitwachsen-mask';
 
 /**
  * Was die Grotte sich fürs Bild merkt: Glockenspiel, Tropfen, Grottenolm; Licht: seit wann die Figur die Laterne trägt
  * (`since`, ms; für das Wachsen des Lichtkreises) und der zuletzt gezeichnete Lichtkreis (`drawn`, für die Tests); am
- * Abend, welche Fledermäuse gerade Runden fliegen (`dusk`, mitwachsen-dusk-look.ts)
+ * Abend, welche Fledermäuse gerade Runden fliegen (`dusk`, mitwachsen-dusk-look.ts); die Dunkelmaske (`mask`,
+ * mitwachsen-mask.ts, beim ersten Bild angelegt)
  */
 export type CaveFx = {
   chime: Chime;
@@ -34,6 +39,7 @@ export type CaveFx = {
   olm: Olm;
   light: { since?: number; drawn?: Circle | null };
   dusk?: Dusk;
+  mask?: MaskFx;
 };
 
 const [WATER, WATER_TOP] = GROTTE_COLORS.water;
@@ -45,7 +51,9 @@ const [WATER, WATER_TOP] = GROTTE_COLORS.water;
 type CaveScene = SkyScene & {
   lit3d?: boolean;
   evening?: number;
+  night?: number;
   bodies?: ReadonlyMap<string, { x: number; y: number; z: number; hop: number }>;
+  rides?: Parameters<typeof caveMask>[2]['rides'];
 };
 
 /** Zustand, wie der Lichtkreis ihn liest */
@@ -66,38 +74,54 @@ export function circleNow(
   return circleOf(!!state.lamp, fx.light.since, now, reduced);
 }
 
-/** `Sky.weather` der Grotte: alles, was sich in ihrer Luft bewegt, und der Lichtkreis um die Figur */
+/**
+ * `Sky.weather` der Grotte: alles, was sich in ihrer Luft bewegt, darüber die Dunkelmaske, darüber das Leuchten
+ * (Lichtkreis um die Figur, in 3D die klingende Säule)
+ */
 export function caveWeather(fx: CaveFx): Sky['weather'] {
   return (ctx, world, sc: CaveScene, P, state) => {
     // Abend (und Schlaf im Höhlenbett): Fledermäuse fliegen Runden um den Schacht über dem Bett; in 3D Abendlicht
     const fly = (x: number, y: number, z: number, dir: Dir) =>
       drawModel(ctx, P, CAVE_MODELS.fledermaus, x, y, z, dir, CAVE_SPECIES.fledermaus.scale);
     fx.dusk = drawDusk(ctx, world, P, sc, state, fly);
+    const seen = (x: number, y: number) => sc.explored(Math.round(x), Math.round(y));
+    air(ctx, world, fx, sc, P, seen);
+    caveMask(ctx, world, sc, P, state, (fx.mask ??= { fade: {} }), fx.light.since);
     const me = sc.bodies?.get('player');
     const circle = me ? circleNow(world, state, fx, sc.now, sc.reduced) : null;
     fx.light.drawn = circle;
     if (me && circle) drawCircle(ctx, P, { x: me.x, y: me.y, z: me.z + me.hop }, circle);
-    const seen = (x: number, y: number) => sc.explored(Math.round(x), Math.round(y));
     if (sc.lit3d) glows(ctx, world, fx, sc, P, seen);
-    const drop = sc.reduced ? null : fx.drips.falling(sc.now);
-    if (drop && seen(drop.x, drop.y))
-      drawBox(ctx, P, [drop.x + 0.46, drop.y + 0.1, drop.z, 0.08, 0.08, 0.14, WATER, WATER_TOP]);
-    const olm = fx.olm.now(world, sc.now, sc.reduced);
-    if (olm && seen(olm.x, olm.y)) {
-      const { x, y, z } = olm;
-      drawModel(ctx, P, CAVE_MODELS.grottenolm, x + 0.5, y + 0.5, z, 's', CAVE_SPECIES.grottenolm.scale);
-      // die Oberfläche des Wassers über seinem Bauch, dazu ein Ring, der sich weitet (nicht bei reduzierter Bewegung)
-      ctx.globalAlpha = 0.6;
-      drawBox(ctx, P, [x + 0.1, y + 0.55, -0.01, 0.8, 0.4, 0.02, WATER, WATER_TOP]);
-      const r = sc.reduced ? 0 : 0.3 + 0.4 * (olm.ms / OLM_MS);
-      ctx.globalAlpha = sc.reduced ? 0 : 0.5 * (1 - olm.ms / OLM_MS);
-      if (r) drawBox(ctx, P, [x + 0.5 - r, y + 0.5 - r * 0.5, 0.005, 2 * r, r, 0.01, '#ffffff', '#ffffff']);
-      ctx.globalAlpha = 1;
-    }
-    const bat = sc.reduced ? null : fx.chime.bat(world, sc.now);
-    if (bat && seen(bat.x, bat.y))
-      drawModel(ctx, P, CAVE_MODELS.fledermaus, bat.x, bat.y, bat.z, bat.dir, CAVE_SPECIES.fledermaus.scale);
   };
+}
+
+/** Was zur Welt gehört und unter der Maske liegt: der fallende Tropfen, der Grottenolm, die Fledermaus auf ihrer Runde */
+function air(
+  ctx: CanvasRenderingContext2D,
+  world: World,
+  fx: CaveFx,
+  sc: CaveScene,
+  P: Projection,
+  seen: (x: number, y: number) => boolean,
+) {
+  const drop = sc.reduced ? null : fx.drips.falling(sc.now);
+  if (drop && seen(drop.x, drop.y))
+    drawBox(ctx, P, [drop.x + 0.46, drop.y + 0.1, drop.z, 0.08, 0.08, 0.14, WATER, WATER_TOP]);
+  const olm = fx.olm.now(world, sc.now, sc.reduced);
+  if (olm && seen(olm.x, olm.y)) {
+    const { x, y, z } = olm;
+    drawModel(ctx, P, CAVE_MODELS.grottenolm, x + 0.5, y + 0.5, z, 's', CAVE_SPECIES.grottenolm.scale);
+    // die Oberfläche des Wassers über seinem Bauch, dazu ein Ring, der sich weitet (nicht bei reduzierter Bewegung)
+    ctx.globalAlpha = 0.6;
+    drawBox(ctx, P, [x + 0.1, y + 0.55, -0.01, 0.8, 0.4, 0.02, WATER, WATER_TOP]);
+    const r = sc.reduced ? 0 : 0.3 + 0.4 * (olm.ms / OLM_MS);
+    ctx.globalAlpha = sc.reduced ? 0 : 0.5 * (1 - olm.ms / OLM_MS);
+    if (r) drawBox(ctx, P, [x + 0.5 - r, y + 0.5 - r * 0.5, 0.005, 2 * r, r, 0.01, '#ffffff', '#ffffff']);
+    ctx.globalAlpha = 1;
+  }
+  const bat = sc.reduced ? null : fx.chime.bat(world, sc.now);
+  if (bat && seen(bat.x, bat.y))
+    drawModel(ctx, P, CAVE_MODELS.fledermaus, bat.x, bat.y, bat.z, bat.dir, CAVE_SPECIES.fledermaus.scale);
 }
 
 /** In 3D: Säulen, die gerade klingen, leuchten auf der Ebene darüber heller (halb durchsichtig, verblasst in 0,5 s) */

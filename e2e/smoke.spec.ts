@@ -396,6 +396,136 @@ test('Spiel: Kristall-Laterne in der Grotte per Entwickler-Schalter, Lichtkreis 
   expect(errors).toEqual([]);
 });
 
+// Dunkelmaske der Grotte (Pixelprobe am fertigen Bild, als Bildschirmfoto: in 2D und in 3D mit der Ebene über WebGL;
+// @3d, damit der beleuchtete Boden in 3D mitgeprüft wird): mitten in der Grotte, fern von Bett und Schächten, liegt um
+// die Figur ein Lichtloch (nie dunkler als die Dämmerung, fast so hell wie mit „Höhle hell“), außerhalb ist es
+// deutlich dunkler als mit „Höhle hell“, aber nie unter Helligkeit 0,08; der Nebel daneben ist unter der Maske nie
+// heller als der Boden und nie unter 0,08
+test(
+  'Spiel: Dunkelmaske in der Grotte per Entwickler-Schalter, Lichtloch um die Figur, nie schwarz, Nebel nicht heller, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    // eine feste Welt (Seed 1, der schlimmste Fall beim ersten Spielen), sonst zöge jeder Lauf einen neuen Seed
+    await page.addInitScript(() => {
+      const real = crypto.getRandomValues.bind(crypto);
+      const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+        a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+      Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    });
+    const game = await openGame(page, { clock: true, dev: 'hoehle' });
+    const webgl = await expectView(page);
+    await view3d(page, 'hoehle');
+    type Spot = { cx: number; cy: number; r: number };
+    type Game = {
+      world: {
+        homes: Record<string, { bed: [number, number] }>;
+        portals: Map<string, { gate: [number, number] }>;
+        realm(x: number, y: number): string;
+        cell(x: number, y: number): { h: number; solid?: boolean };
+      };
+      state: { player: { x: number; y: number; dir: string }; wokeAt: number; animals: unknown[] };
+      renderer: {
+        views: Map<
+          string,
+          { fx?: { mask?: { bright?: boolean; drawn?: { strength: number; spots: Spot[] } | null } } }
+        >;
+      };
+      seen(x: number, y: number): boolean;
+      apply(cmd: { type: 'move'; dir: string }): void;
+    };
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    await ticks(page, 10);
+    // auf den Weg durch die Mitte, 42 Felder hinter dem Bett (fern von Bett, Schächten und Bahnhof), ohne Tiere
+    await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const [bx, by] = el.world.homes.hoehle!.bed;
+      const [gx, gy] = el.world.portals.get('hoehlensee')!.gate;
+      const k = 42 / 106;
+      const player = { x: Math.round(bx + (gx - bx) * k), y: Math.round(by + (gy - by) * k), dir: 's' };
+      el.state = { ...el.state, wokeAt: -1e6, animals: [], player };
+      el.apply({ type: 'move', dir: 's' }); // ein Schritt: der Nebel lichtet sich
+    });
+    await arrive(page);
+    await render(page, 60); // die Luft der Grotte in 3D ist ganz da (blendet je Bild weich ein)
+    const canvas = await page.locator('canvas.mw-canvas').boundingBox();
+    /** Helligkeit (relative Luminanz) des fertigen Bilds an Punkten der Ansicht (Pixel der Ansicht) */
+    const lums = async (points: [number, number][]) => {
+      const shot = await page.screenshot({ scale: 'css', clip: canvas! });
+      return page.evaluate(
+        async ([b64, pts]) => {
+          const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+          const img = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+          const cv = new OffscreenCanvas(img.width, img.height);
+          const ctx = cv.getContext('2d')!;
+          ctx.drawImage(img, 0, 0);
+          const lin = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+          return pts.map(([x, y]) => {
+            const d = ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data;
+            return 0.2126 * lin(d[0]! / 255) + 0.7152 * lin(d[1]! / 255) + 0.0722 * lin(d[2]! / 255);
+          });
+        },
+        [shot.toString('base64'), points] as const,
+      );
+    };
+    // Felder im Nebel in der Reihe der Figur (Grottenboden auf ihrer Höhe, nichts Hohes davor): so viele Felder seitlich
+    const fogs = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const { x, y } = el.state.player;
+      const h = el.world.cell(x, y).h;
+      const free = (fx: number) =>
+        el.world.realm(fx, y) === 'hoehle' &&
+        [0, Math.sign(fx - x)].every((d) => !el.seen(fx + d, y)) &&
+        [0, 1, 2].every((d) => el.world.cell(fx, y + d).h <= h && !el.world.cell(fx, y + d).solid);
+      return [8, 9, 10, 11, 12].flatMap((k) => [-k, k].filter((d) => free(x + d)));
+    });
+    /** Stärke, Loch und Helligkeit: Mitte links neben der Figur, ein Ring außerhalb des Lochs, das Feld im Nebel */
+    const probe = async (bright: boolean) => {
+      await game.evaluate((node, pale) => {
+        (node as unknown as Game).renderer.views.get('hoehle')!.fx!.mask!.bright = pale;
+      }, bright);
+      await render(page, 1); // ein Bild mit dieser Stärke
+      const { strength, spots } = await game.evaluate(
+        (node) => (node as unknown as Game).renderer.views.get('hoehle')!.fx!.mask!.drawn!,
+      );
+      const { cx, cy, r } = spots[0]!;
+      // das am weitesten draußen, das noch im Bild liegt (in 3D verläuft der Nebel über 2 bis 3 Felder)
+      const fogAt = fogs.filter((k) => (Math.abs(k) * r) / GROTTE.dark.hole < cx - 10).sort((a, b) => b * b - a * a)[0];
+      expect(fogAt).toBeDefined();
+      const ring = [0, 1, 2, 3, 4, 5].map((i): [number, number] => [
+        cx + 1.5 * r * Math.cos(i),
+        cy + 1.5 * r * Math.sin(i),
+      ]);
+      const [near, fog, ...around] = await lums([
+        [cx - 0.35 * r, cy],
+        [cx + (fogAt! * r) / GROTTE.dark.hole, cy],
+        ...ring,
+      ]);
+      return { strength, r, near: near!, fog: fog!, ring: around };
+    };
+    const dark = await probe(false);
+    const pale = await probe(true);
+    expect(dark.strength).toBeCloseTo(GROTTE.dark.mask);
+    expect(pale.strength).toBe(GROTTE.dark.bright);
+    expect(dark.r).toBeGreaterThan(40); // 3 Felder
+    // im Loch: fast so hell wie mit „Höhle hell“, nie dunkler als die Dämmerung
+    expect(dark.near).toBeGreaterThan(0.75 * pale.near);
+    expect(dark.near).toBeGreaterThanOrEqual(GROTTE.dark.dusk);
+    // außerhalb: deutlich dunkler als „Höhle hell“, aber nirgends schwarz
+    const mean = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
+    expect(mean(dark.ring)).toBeLessThan(0.6 * mean(pale.ring));
+    expect(Math.min(...dark.ring)).toBeGreaterThanOrEqual(GROTTE.dark.floor);
+    expect(mean(dark.ring)).toBeLessThan(dark.near / 2);
+    // der Nebel: nie unter 0,08; in 2D nie heller als der Boden unter der Maske. In 3D ist der beleuchtete Boden dunkler
+    // als in 2D und der Nebel schon ohne Maske etwas heller als er (siehe „Höhle hell“): dort höchstens ein Viertel heller
+    // (ohne Maske über dem Nebel war er fast viermal so hell; nachzusehen am Gerät, Schritt 18)
+    expect(dark.fog).toBeGreaterThanOrEqual(GROTTE.dark.floor);
+    const median = (v: number[]) => [...v].sort((a, b) => a - b)[v.length >> 1]!;
+    expect(dark.fog).toBeLessThanOrEqual((webgl ? 1.25 : 1) * median(dark.ring));
+    expect(errors).toEqual([]);
+  },
+);
+
 // Tok erscheint per Entwickler-Schalter (`?entwickler=bahn&bau=0`, 2D): Der Schalter spielt den Stand vor, in dem er
 // kommt (Eistor offen, Eis-Leiste voll, erste Heimfahrt mit dem Schlitten); beim Aufwachen im Bett der Lichtung hüpft
 // er neben der Figur heraus, wird gezeichnet und hat einen Gast-Platz; am Abend (`&abend=1`) liegt er schlafend neben
