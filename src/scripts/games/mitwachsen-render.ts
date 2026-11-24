@@ -63,6 +63,7 @@ import { Album } from './mitwachsen-album';
 import { ASK, HEART, NOTE, ZZZ, sprite, type Particle } from './mitwachsen-glyphs';
 import { byRow, type RideBody } from './mitwachsen-ride-view';
 import { hangAt, labelHeight } from './mitwachsen-roost';
+import { workOf } from './mitwachsen-herald';
 
 /** Gleitende Position eines Wesens auf dem Bildschirm (in Feldern), dazu Hüpfer und Blickrichtung */
 export type Body = { x: number; y: number; z: number; hop: number; puff?: number }; // puff: Haltung im Iglu (Größe)
@@ -169,7 +170,7 @@ export class Renderer {
     const marks = byRow(this.all((v) => v.marks?.(state, world) ?? [])); // Schneespur des Fahrzeugs
 
     this.later = [];
-    this.at = { now: sc.now, reduced: sc.reduced, picked: state.picked, packs: state.packs };
+    this.at = { now: sc.now, reduced: sc.reduced, picked: state.picked, packs: state.packs, work: workOf(state) };
     this.guest = this.guestAt(world, state);
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) this.ground(P, world, x, y, sc);

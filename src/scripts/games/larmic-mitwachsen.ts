@@ -37,6 +37,7 @@ import { Fog, START_REVEAL, lookAround } from './mitwachsen-fog';
 import { attachPack, initialState, progressOf, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
 import { reshapes, type ChoreEvent } from './mitwachsen-chores';
 import { createWorld, gatePlaces, standHeight, type World } from './mitwachsen-world';
+import { unstick } from './mitwachsen-free';
 import { GUIDE_GATE, pending, type GuideRules } from './mitwachsen-guide';
 import { PACK_IDS, Packs, dawnOf, type LoadedPack } from './mitwachsen-packs';
 import { devLate, devProgress, glimpse, sandbox } from './mitwachsen-dev';
@@ -637,7 +638,20 @@ class LarmicMitwachsen extends HTMLElement {
     if (fx?.who) this.hops.set(fx.who, now);
     if (fx?.who && fx.heart) this.float('heart', fx.who, GAME_COLORS.heart, now + 150);
     if (fx?.burst) this.burst('', fx.burst, 24, { x: e.x, y: e.y, z: this.world.cell(e.x, e.y).h + 0.4 });
+    if (e.type === 'herald' && e.relay) this.relay();
     if (e.persist) this.save();
+  }
+
+  /**
+   * Der Spielstand der Pakete, nach dem ein Paket ohne eigene Welt legt, hat sich geändert (Tok baut: Bau 1): die Welt
+   * neu bauen (`World.relay`); wie beim Ankommen eines Pakets entstehen nur die betroffenen Stücke neu, ohne zu flackern.
+   * Wer nun auf einem festen Feld stünde, rückt zur Seite (`unstick`)
+   */
+  private relay() {
+    const { world, chunks } = this.world.relay(this.state.packs);
+    this.world = world;
+    this.state = unstick(this.state, world);
+    this.gl3d?.adopt(world, chunks);
   }
 
   /** Was das Antippen sieht: die Körper des Fahrzeugs, die Projektion der Ansicht und die Figur (nicht, solange es ruht) */

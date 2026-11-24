@@ -8,19 +8,23 @@
 // Uhr des Kinds hat `BED_AT` erreicht, `late`) kommt er schon schlafend und liegt neben dem Bett („Zzz“); er wacht erst
 // am nächsten echten Spieltag auf (mehr als `BREAK` Pause, `wakeTok` in mitwachsen-tok-save.ts), Schlafen im Spiel weckt
 // ihn nicht. Gespeichert wird nur `packs.fahrt.hoehle = { stage: 'faellig', schlaeft? }`, nie wo er steht. Er steht nie
-// im Weg: Läuft die Figur in ihn hinein, singt und hüpft er (Regeln des Kerns); schläft er, schnarcht er leise.
+// im Weg: Läuft die Figur in ihn hinein, während er an seinem Platz steht, beginnt er Bau 1 (mitwachsen-build.ts; nur
+// in einer Welt, in der Bahnhof Bär Platz hat), sonst singt und hüpft er; schläft er, schnarcht er leise.
 // Bis zum Freischalten (`BAHN_LIVE`) holt das Spiel dieses Paket nie von selbst: Dann gibt es Tok nur im Blick hinein.
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Tok erscheint)
 
 import { DIRS } from '../../../../lib/games/front';
+import { BUILD } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import { REGIONS, animalId, type Point } from '../../../../data/games/mitwachsen';
 import { APPEAR, DUE, NEAR, PACE, PEEP_EVERY, full } from '../../mitwachsen-guide';
 import type { HeraldEvents as Events, HeraldRules, Heralded } from '../../mitwachsen-herald';
 import { dirTo, freeNear, occupied } from '../../mitwachsen-free';
 import { canStep, standHeight, type World } from '../../mitwachsen-world';
-import { bayAt, bearSpots, centreOf } from './mitwachsen-bear';
+import { bayAt, bearSpots, centreOf, hutOf, rowsOf, type Station } from './mitwachsen-bear';
 import { builtOf } from './mitwachsen-built';
+import { beatTick, buildStep, building, canBuild, startBuild } from './mitwachsen-build';
 import { futureBear } from './mitwachsen-line';
+import { REAR_ROW } from './mitwachsen-station-look';
 import { sledHome, tokOf, withTok } from './mitwachsen-tok-save';
 
 /** Tok unter den Wesen: ein Gast aus der Höhlenwelt (wie der Pinguin `eis:pinguin`) */
@@ -55,23 +59,26 @@ export function nearBed(s: Pick<Heralded, 'sleeping' | 'player'>, world: World):
   return !s.sleeping && world.realm(x, y) === 'lichtung' && cheb(s.player, { x: bed[0], y: bed[1] }) <= TOK_NEAR;
 }
 
-const posts = new WeakMap<World, { post: Point; field: Map<string, number> } | null>();
+type Post = { post: Point; field: Map<string, number>; station: Station | null };
+const posts = new WeakMap<World, Post | null>();
 /**
  * Toks Platz am künftigen Bahnsteig: das Feld des künftigen Bahnhofs Bär, das dem Bett am nächsten liegt (`futureBear`;
  * passt dort keine Linie, das nächste freie Feld an der Mitte des besten Platzes im Bereich des Konzepts), dazu die
- * Schritte bis dorthin von jedem Feld der Lichtung in der Nähe (Breitensuche rückwärts, höchstens 6000 Felder). Je Welt
- * einmal; null ohne Höhlentor
+ * Schritte bis dorthin von jedem Feld der Lichtung in der Nähe (Breitensuche rückwärts, höchstens 6000 Felder) und der
+ * künftige Bahnhof (`station`, null ohne Platz für eine Linie: dann baut er nicht). Je Welt einmal; null ohne Höhlentor
  */
-export function postOf(world: World): { post: Point; field: Map<string, number> } | null {
+export function postOf(world: World): Post | null {
   if (posts.has(world)) return posts.get(world)!;
   const bed = world.homes.lichtung.bed;
   const g = world.gates.get('hoehle');
-  let found: { post: Point; field: Map<string, number> } | null = null;
+  let found: Post | null = null;
   if (g) {
     const far = (p: Point) => Math.hypot(p[0] - bed[0], p[1] - bed[1]);
     const stands = (p: Point) => standHeight(world, [], ...p) !== null && world.cell(...p).region === 'lichtung';
-    const station = futureBear(world.seed);
-    const platform = station?.platform.filter(stands).sort((a, b) => far(a) - far(b))[0];
+    const station = futureBear(world.seed) ?? null;
+    const hut = station && hutOf(station, bed)?.at;
+    const off = (p: Point) => !hut || p[0] !== hut[0] || p[1] !== hut[1]; // nicht auf dem Platz von Toks Häuschen
+    const platform = station?.platform.filter((p) => stands(p) && off(p)).sort((a, b) => far(a) - far(b))[0];
     const ideal = bearSpots(g, bed)[0];
     const guess = ideal ? centreOf(ideal) : bayAt(g)(0, -6);
     const post =
@@ -79,7 +86,7 @@ export function postOf(world: World): { post: Point; field: Map<string, number> 
       freeNear({ sleeping: true, player: { x: 0, y: 0 }, animals: [], openGates: [] }, world, roundP(guess), (x, y) =>
         stands([x, y]),
       );
-    if (post) found = { post, field: fieldTo(world, post) };
+    if (post) found = { post, field: fieldTo(world, post), station };
   }
   posts.set(world, found);
   return found;
@@ -152,6 +159,7 @@ export function tokStep(
   events: Events,
   explored: Explored,
 ) {
+  if (s.work) return void build(s, world, cmd, events); // Bau 1 (mitwachsen-build.ts)
   if (!tokWanted(s)) {
     s.heraldDue = -1;
     return;
@@ -323,13 +331,57 @@ function stepTo(s: Heralded, world: World, t: Walker, cost: (x: number, y: numbe
   [t.x, t.y] = next;
 }
 
-/** Vor dem Schritt der Figur (`HeraldRules.meet`): In den schlafenden Tok gelaufen, schnarcht er leise, sie bleibt stehen */
-export function tokMeet(s: Heralded, _world: World, cmd: { dir: keyof typeof DIRS }, events: Events): boolean {
+/**
+ * Steht Tok an seinem Platz (auf dem künftigen Bahnsteig oder höchstens ein Feld neben seinem Platz) in einer Welt, in
+ * der Bahnhof Bär Platz hat? Nur dann beginnt er zu bauen; unterwegs dorthin singt und hüpft er nur
+ */
+export function atPost(world: World, t: { x: number; y: number }): boolean {
+  const at = postOf(world);
+  if (!at?.station || !rowsOf(at.station).length) return false;
+  const near = Math.max(Math.abs(t.x - at.post[0]), Math.abs(t.y - at.post[1])) <= 1;
+  return near || at.station.platform.some(([x, y]) => x === t.x && y === t.y);
+}
+
+/** Das Feld des Bahnsteigs neben dem hinteren Wagen des haltenden Zugs: Dorthin hüpft Tok, bevor er einsteigt */
+export function rearOf(world: World): Point | undefined {
+  const station = postOf(world)?.station;
+  const rows = station ? rowsOf(station) : [];
+  return rows[Math.min(REAR_ROW, rows.length - 1)]?.edge;
+}
+
+/**
+ * Solange er baut: Sobald der Zug heranrollt (`roll`), hüpft Tok über den Bahnsteig an den hinteren Wagen (ein Feld je
+ * `PACE.lead` Takte, lieber auf dem Bahnsteig als daneben), dann steigt er ein (`buildStep`)
+ */
+function build(s: Heralded, world: World, cmd: string, events: Events) {
+  const t = s.animals.find((a) => a.id === TOK);
+  const rear = rearOf(world);
+  if (t && rear && s.work && cmd === 'tick' && s.tick >= beatTick(s.work.from, BUILD.roll[0])) {
+    const on = new Set(postOf(world)?.station?.platform.map(([x, y]) => key(x, y)));
+    const cost = (x: number, y: number) => Math.hypot(x - rear[0], y - rear[1]) + (on.has(key(x, y)) ? 0 : 2);
+    if ((t.x !== rear[0] || t.y !== rear[1]) && s.tick % PACE.lead === 0) stepTo(s, world, t, cost);
+  }
+  buildStep(s, TOK, events);
+}
+
+/**
+ * Vor dem Schritt der Figur (`HeraldRules.meet`): Solange Tok baut, hüpft sie auf jeden Pfeil nur. In den schlafenden Tok
+ * gelaufen, schnarcht er leise, sie bleibt stehen; in den wachen an seinem Platz (`atPost`), beginnt er den nächsten Bau
+ * (Bau 1, solange noch nichts gebaut ist, `canBuild`); sonst singt und hüpft er (Regeln des Kerns)
+ */
+export function tokMeet(s: Heralded, world: World, cmd: { dir: keyof typeof DIRS }, events: Events): boolean {
   const [dx, dy] = DIRS[cmd.dir];
-  const t = s.animals.find((a) => a.id === TOK && a.nap);
+  if (building(s)) {
+    s.player.dir = cmd.dir;
+    events.push({ type: 'hop' });
+    return true;
+  }
+  const t = s.animals.find((a) => a.id === TOK);
   if (!t || t.x !== s.player.x + dx || t.y !== s.player.y + dy) return false;
+  if (!t.nap && !(canBuild(s) && atPost(world, t))) return false;
   s.player.dir = cmd.dir;
-  events.push({ type: 'herald', what: 'snore', id: TOK, x: t.x, y: t.y });
+  if (t.nap) events.push({ type: 'herald', what: 'snore', id: TOK, x: t.x, y: t.y });
+  else startBuild(s, t, events);
   return true;
 }
 

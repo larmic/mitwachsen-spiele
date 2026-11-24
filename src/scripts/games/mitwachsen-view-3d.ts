@@ -61,10 +61,10 @@ export type View3D = {
   /** Gleis auf Feldern mit Strecke (wie in 2D, `DrawRails`) */
   rails?: DrawRails;
   /**
-   * Was am Zustand der Pakete die Stücke dieses Pakets ändert (die Bahn: ihr Ausbau); ändert es sich, baut die 3D-Ansicht
-   * alle Stücke neu
+   * Was am Zustand der Pakete die Stücke dieses Pakets ändert (die Bahn: ihr Ausbau und, solange gebaut wird, die Stufe
+   * der Gleiswelle aus `work`, wie weit der Bote mit seiner Arbeit ist); ändert es sich, baut die 3D-Ansicht alle Stücke neu
    */
-  stamp?(packs: Readonly<Record<string, unknown>>): string;
+  stamp?(packs: Readonly<Record<string, unknown>>, work?: number): string;
   /**
    * Farbe, mit der die Quader `'glow'` dieser Welt leuchten (multipliziert, 1 = wie gebaut), je nach Polarlicht (0 … 1),
    * reduzierter Bewegung und Zeit; fehlt sie, leuchten sie wie gebaut. Es gibt ein Leuchtmaterial für alle Welten, darum
@@ -168,7 +168,7 @@ export class Views3D {
   }
 
   /** Gleis auf einem Feld mit Strecke aus dem 3D-Teil eines Pakets (der Bahn), sonst null: wie sonst bauen */
-  rails(c: Cell, x: number, y: number, at: Pick<DecoAt, 'packs'>): readonly Box[] | null {
+  rails(c: Cell, x: number, y: number, at: Pick<DecoAt, 'packs' | 'reduced' | 'work'>): readonly Box[] | null {
     for (const v of this.views) {
       const own = v.rails?.(c, x, y, at);
       if (own) return own;
@@ -177,7 +177,7 @@ export class Views3D {
   }
 
   /** Was am Zustand der Pakete die Stücke ändert (`View3D.stamp` aller 3D-Teile, hintereinander) */
-  stamp(packs: Readonly<Record<string, unknown>>): string {
-    return this.views.map((v) => v.stamp?.(packs) ?? '').join('|');
+  stamp(packs: Readonly<Record<string, unknown>>, work?: number): string {
+    return this.views.map((v) => v.stamp?.(packs, work) ?? '').join('|');
   }
 }

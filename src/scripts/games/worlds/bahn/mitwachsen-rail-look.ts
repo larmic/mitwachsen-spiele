@@ -2,13 +2,14 @@
 // graue Schienen, gerade oder in einer rechtwinkligen Kurve, roter Prellbock an den Enden der Linie und, solange der
 // Ausbau 1 ist, vor der Tür des Höhlentors; das Tunnelportal aus Stein mit Grasdach und die niedrigen Wände des oben
 // offenen Einschnitts. Was liegt, sagt der Ausbau im Spielstand (`packs.bahn.built`): 0 nichts, 1 die Lichtung bis zum
-// Prellbock, 2 die ganze Linie. Liegt nichts, zeigt sich das Feld wie sonst (Gras, Büschel, Blumen). Teil des Pakets der
-// Bahn (view-2d.ts, view-3d.ts).
+// Prellbock, 2 die ganze Linie; solange Tok baut, läuft die Gleiswelle (`railShown`, bei reduzierter Bewegung und in 3D in
+// drei Stufen). Liegt nichts, zeigt sich das Feld wie sonst (Gras, Büschel, Blumen). Teil des Pakets der Bahn
+// (view-2d.ts, view-3d.ts).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Gleis als Boden)
 
-import { RAIL_COLORS } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
-import type { Cell } from '../../mitwachsen-cell';
-import type { Box, DrawRails } from '../../mitwachsen-view';
+import { BUILD, RAIL_COLORS } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
+import type { Cell, Rail } from '../../mitwachsen-cell';
+import type { Box, DecoAt, DrawRails } from '../../mitwachsen-view';
 import { builtOf } from './mitwachsen-built';
 
 /** Quader in einem Feld, ohne Lage: x, y (nach vorn), z über dem Boden, Breite, Tiefe, Höhe, Seite, oben */
@@ -74,12 +75,40 @@ function shape(to: string): [readonly Local[], number] {
 }
 
 /**
- * Quader des Gleises auf dem Feld (x, y) nach dem Ausbau in `at.packs` (`DrawRails`); null, wenn dort (noch) keins
- * liegt
+ * Ab welchem Augenblick des Baus (0 … 1, `BUILD.wave`) liegt ein Stück, das so weit (`along`) in seinem Ausbau liegt: Die
+ * Gleiswelle läuft gleichmäßig vom Anfang bis zum Ende; bei reduzierter Bewegung kommt das Gleis in drei Stufen
+ */
+export function waveAt(along: number, reduced: boolean): number {
+  const [from, to] = BUILD.wave;
+  const k = reduced ? Math.min(STAGES - 1, Math.floor(along * STAGES)) / STAGES : along;
+  return from * (1 - k) + to * k; // am Ende genau `to`
+}
+/** Stufen der Gleiswelle bei reduzierter Bewegung (und in 3D, dort zuckt nichts) */
+export const STAGES = 3;
+
+/** Wie viele der drei Stufen der Gleiswelle liegen, solange gebaut wird (`work`), sonst undefined (alles liegt) */
+export const waveStage = (work: number | undefined): number | undefined =>
+  work === undefined
+    ? undefined
+    : Array.from({ length: STAGES }, (_, k) => k / STAGES).filter((a) => work >= waveAt(a, true)).length;
+
+/**
+ * Liegt das Stück schon? Nach dem Ausbau in `at.packs`; das Stück des Ausbaus, der gerade gebaut wird (`at.work`), erst,
+ * wenn die Gleiswelle es erreicht hat
+ */
+export function railShown(r: Rail, at: Pick<DecoAt, 'packs' | 'reduced' | 'work'>): boolean {
+  const built = builtOf(at.packs);
+  if (r.stage > built) return false;
+  return at.work === undefined || r.stage < built || at.work >= waveAt(r.along ?? 0, at.reduced);
+}
+
+/**
+ * Quader des Gleises auf dem Feld (x, y) nach dem Ausbau in `at.packs` und, solange gebaut wird, der Gleiswelle
+ * (`DrawRails`); null, wenn dort (noch) keins liegt
  */
 export const railBoxes: DrawRails = (c: Cell, x: number, y: number, at) => {
   const r = c.rail;
-  if (!r || r.stage > builtOf(at.packs)) return null;
+  if (!r || !railShown(r, at)) return null;
   // Prellbock vor der Tür nur, solange der Ausbau 1 ist (danach geht es weiter durch die Tür): Ende zur Strecke hin
   const end = r.part === 'end' || (r.part === 'buffer' && builtOf(at.packs) < 2);
   const to = end ? r.to.slice(0, 1) : r.to;

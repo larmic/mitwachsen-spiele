@@ -44,13 +44,15 @@ export function drawBox(ctx: CanvasRenderingContext2D, P: Projection, b: Box | n
 
 /**
  * Was eine Zeichnung vom Bild weiß: Zeit, reduzierte Bewegung, geleerte Büsche und Fischkisten ("x,y"), Zustand der
- * Welt-Pakete (`State.packs`, Eis-Welt: wie weit jeder Schneemann gewachsen ist)
+ * Welt-Pakete (`State.packs`, Eis-Welt: wie weit jeder Schneemann gewachsen ist), wie weit ein Bote mit seiner Arbeit ist
+ * (`work`, 0 … 1, `workOf` in mitwachsen-herald.ts; Tok baut: Die Gleiswelle läuft; ohne: er baut nichts)
  */
 export type DecoAt = {
   now: number;
   reduced: boolean;
   picked: Readonly<Record<string, number>>;
   packs: Readonly<Record<string, unknown>>;
+  work?: number;
 };
 
 /** Zeichnung einer Deko-Art: Quader, die in der Reihe ihrer Vorderkante drankommen; null: wie sonst zeichnen */
@@ -102,10 +104,16 @@ export type Trail = {
 
 /**
  * Gleis auf einem Feld mit Strecke (`Cell.ride`, Paket der Bahn): seine Quader (Schwellen, Schienen, Prellbock,
- * Tunnelportal, Einschnitt), je nach Ausbau im Zustand der Pakete (`at.packs`); null: dort liegt (noch) nichts, das Feld
+ * Tunnelportal, Einschnitt), je nach Ausbau im Zustand der Pakete (`at.packs`) und, solange gebaut wird, wie weit die
+ * Gleiswelle ist (`at.work`; bei reduzierter Bewegung in Stufen, `at.reduced`); null: dort liegt (noch) nichts, das Feld
  * zeigt sich wie sonst. Gleich für 2D und 3D. Liegt Gleis, zeigt das Feld weder Grasbüschel noch Blumen
  */
-export type DrawRails = (c: Cell, x: number, y: number, at: Pick<DecoAt, 'packs'>) => readonly Box[] | null;
+export type DrawRails = (
+  c: Cell,
+  x: number,
+  y: number,
+  at: Pick<DecoAt, 'packs' | 'reduced' | 'work'>,
+) => readonly Box[] | null;
 
 /**
  * Wann die 2D-Ansicht das Gleis eines Felds zeichnet: sonst in der Reihe seiner Vorderkante (`later`, wie die Dinge der

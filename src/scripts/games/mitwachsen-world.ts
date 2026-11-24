@@ -63,6 +63,12 @@ export type World = Realms & {
    * "cx,cy"). Hat die Welt das Paket schon, bleibt alles, wie es ist.
    */
   attach(pack: WorldPack): { world: World; chunks: readonly string[] };
+  /**
+   * Der Spielstand der Pakete, nach dem ein Paket ohne eigene Welt legt, hat sich im Spiel geändert (die Bahn: Bau 1):
+   * Die Welt ist danach Feld für Feld dieselbe wie gleich mit `saved` gebaut; wie bei `attach` fallen von den schon
+   * berechneten Stücken nur die weg, die sich dabei ändern (`chunks`)
+   */
+  relay(saved: Readonly<Record<string, unknown>>): { world: World; chunks: readonly string[] };
 };
 
 export type Climate = { id: GateId; strength: number };
@@ -677,7 +683,7 @@ const gatesOf = (places: readonly Layout[]) =>
 /**
  * Die Welt eines Seeds mit den geladenen Welt-Paketen (worlds/); die Lichtung ist mit und ohne sie dieselbe. Nur ein
  * Paket ohne eigene Welt (`lay`, die Bahn) ändert sie, und nur nach seinem Spielstand `saved` (`State.packs`: das Gleis
- * erst ab Ausbau 1); ändert der sich, wird die Welt neu gebaut
+ * erst ab Ausbau 1); ändert der sich im Spiel, baut `World.relay` die Welt neu
  */
 export const createWorld = (
   seed: number,
@@ -685,7 +691,10 @@ export const createWorld = (
   saved: Readonly<Record<string, unknown>> = {},
 ): World => build(seed, packs, saved).world;
 
-/** Welt bauen; `from`: die Welt vor dem Einbau eines Pakets, ihre unveränderten Stücke werden übernommen (`attach`) */
+/**
+ * Welt bauen; `from`: die Welt vor dem Einbau eines Pakets oder einem neuen Spielstand der Pakete, ihre unveränderten
+ * Stücke werden übernommen (`attach`, `relay`)
+ */
 function build(
   seed: number,
   packs: readonly WorldPack[],
@@ -732,6 +741,7 @@ function build(
       built.some((p) => p.id === pack.id)
         ? { world, chunks: [] }
         : build(seed, [...built, pack], saved, { regions, cache }),
+    relay: (next) => build(seed, built, next, { regions, cache }),
   };
   return { world, chunks: [...chunks] };
 }

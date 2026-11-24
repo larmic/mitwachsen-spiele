@@ -70,6 +70,7 @@ import { tree, tufts } from './mitwachsen-trees-3d';
 import type { PlateTurn } from './mitwachsen-turn-3d';
 import { CAM_REST, camPose } from './mitwachsen-camera';
 import { hangAt } from './mitwachsen-roost';
+import { workOf } from './mitwachsen-herald';
 
 /** Beeren am Busch: [x, Höhe, z] im Feld; oben auf der Kuppe und an der Vorderseite (zur Kamera) */
 const BERRIES = [
@@ -335,8 +336,9 @@ export class World3D {
   render(world: World, state: State, sc: Scene) {
     if (this.world !== world) this.reset(world);
     this.explored = sc.explored;
-    this.at = { ...this.at, picked: state.picked, packs: state.packs }; // in 3D zuckt nichts
-    const stamp = this.views.stamp(state.packs); // Zustand der Pakete, der ihre Stücke ändert (Ausbau der Bahn)
+    const work = workOf(state); // ein Bote baut (Tok): Die Gleiswelle kommt in 3D in Stufen (`reduced`, in 3D zuckt nichts)
+    this.at = { ...this.at, picked: state.picked, packs: state.packs, work };
+    const stamp = this.views.stamp(state.packs, work); // Zustand der Pakete, der ihre Stücke ändert (Ausbau der Bahn)
     if (state.day !== this.day || state.openGates.join() !== this.opened.join() || stamp !== this.stamp) {
       this.stamp = stamp;
       // ein neuer Tag: Stücke neu bauen, denn es sind Blumen und Pilze nachgewachsen (oder ein Tor ging auf, dann

@@ -4,8 +4,10 @@
 // Gang weiter bis zum Bahnhof Fledermaus (mitwachsen-line.ts, Trassen-Suche in mitwachsen-trace.ts), und zeichnet es
 // je nach Ausbau in 2D und 3D (mitwachsen-rail-look.ts). Dazu Tok, der Bote der Höhlenwelt: Er erscheint am Bett der
 // Lichtung und wartet am künftigen Bahnhof Bär (`rules.herald`, mitwachsen-tok.ts; Modell `TOK_MODEL`, Bild und Ton in
-// mitwachsen-tok-look.ts, Spielstand in mitwachsen-tok-save.ts, `dawn`: am nächsten echten Spieltag wacht er auf). Zug,
-// Bahnhöfe und das Hau-ruck am Höhlentor kommen in den nächsten Schritten.
+// mitwachsen-tok-look.ts, Spielstand in mitwachsen-tok-save.ts, `dawn`: am nächsten echten Spieltag wacht er auf). Läuft
+// die Figur in ihn hinein, baut er Bahnhof Bär, das Gleis bis vor das Höhlentor und den Zug (Bau 1, mitwachsen-build.ts;
+// Bahnhof und Zug als Körper in mitwachsen-station-look.ts, Modelle in mitwachsen-train-model.ts). Fahren und das Hau-ruck
+// am Höhlentor kommen in den nächsten Schritten.
 // Bis zum Freischalten (`BAHN_LIVE`) holt das Spiel es nie von selbst, nur der Entwickler-Schalter
 // (`/spielen/?entwickler=bahn`, mitwachsen-dev.ts). Nichts außerhalb dieses Ordners importiert statisch von hier
 // (geprüft durch `npm run arch`): im Build `_astro/welt-bahn.<hash>.js`, sein 3D-Teil `_astro/welt-bahn-3d.<hash>.js`,

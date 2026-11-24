@@ -55,3 +55,21 @@ export const RAIL_COLORS = {
   stone: ['#6e6688', '#7b7396'],
   grass: ['#5c9e34', '#6dbd47'],
 } as const;
+
+/**
+ * Bau 1 (Tok baut Bahnhof Bär und das Gleis bis vor das Höhlentor): so viele Takte zu 0,1 s (`ticks`, 8 s) und was wann
+ * geschieht, als Bruchteil des Baus (0 … 1): die Hacke klopft dreimal (`pink`), Bahnhof Bär ploppt auf (`pop`), die
+ * Gleiswelle läuft vom Bahnhof bis an den Prellbock in der Bucht (`wave`, bei reduzierter Bewegung in drei Stufen), der Zug
+ * rollt ein (`roll`, mit Pfiff), „Ding-Dong“ (`ding`), die Tür geht auf (`door`, „pff“), Tok steigt in den hinteren Wagen
+ * (`board`, „Ju-hu“)
+ */
+export const BUILD = {
+  ticks: 80,
+  pink: 0,
+  pop: 0.1,
+  wave: [0.15, 0.45],
+  roll: [0.45, 0.8],
+  ding: 0.82,
+  door: 0.87,
+  board: 0.92,
+} as const;

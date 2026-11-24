@@ -481,6 +481,115 @@ test('Spiel: Tok erscheint per Entwickler-Schalter, am Abend schlafend, speicher
   expect(errors).toEqual([]);
 });
 
+// Bau 1 per Entwickler-Schalter (`?entwickler=bahn&bau=0`; @3d, weil die Welt dabei neu gebaut wird und 3D ihre Stücke
+// austauscht): Läuft die Figur in den wachen Tok, baut er 8 s lang (Pfeile lassen sie nur hüpfen), die Welt wird mit dem
+// Gleis neu gebaut, danach stehen Bahnhof Bär und der Zug da, Tok sitzt im hinteren Wagen. Gespeichert wird im Blick
+// hinein nichts; ohne Schalter gibt es den Bau nicht (Freigabe aus, geprüft in „Tok erscheint per Entwickler-Schalter …“)
+test(
+  'Spiel: Bau 1 per Entwickler-Schalter: in Tok gelaufen, Bahnhof, Gleis und Zug, speichert nichts, ohne Fehler',
+  {
+    tag: '@3d',
+  },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    type Game = {
+      world: {
+        seed: number;
+        cell(x: number, y: number): { solid: boolean; ground: string; rail?: unknown; stop?: string };
+      };
+      state: {
+        tick: number;
+        player: { x: number; y: number; dir: string };
+        animals: { id: string; x: number; y: number }[];
+        packs: Record<string, unknown>;
+        work?: { from: number; to: number };
+        heraldDue: number;
+      };
+      rides: { id: string; x: number; y: number }[];
+      apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+    };
+    // eine feste Welt (Seed 1, wie in mitwachsen-build.test.ts): Bahnhof Bär hat Platz, Tok kommt an seinen Platz; sonst
+    // zöge jeder Lauf einen neuen Seed (`randomSeed`), und in den elf Welten ohne Platz für Bahnhof Bär baut Tok nicht
+    await page.addInitScript(() => {
+      const real = crypto.getRandomValues.bind(crypto);
+      const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+        a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+      Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    });
+    const game = await openGame(page, { clock: true, dev: 'bahn&bau=0' });
+    await expectView(page);
+    expect(await game.evaluate((node) => (node as unknown as Game).world.seed)).toBe(1);
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    // Tok hüpft zur Figur und an seinen Platz; dort steht er still (nur dort beginnt er zu bauen)
+    const tokAt = () =>
+      game.evaluate((node) => {
+        const el = node as unknown as Game;
+        const t = el.state.animals.find((a) => a.id === 'hoehle:tok');
+        return t && el.state.heraldDue < 0 ? `${t.x},${t.y}` : '';
+      });
+    let [last, posted] = ['', false];
+    for (let i = 0; i < 30 && !posted; i++) {
+      await ticks(page, 10);
+      const now = await tokAt();
+      [posted, last] = [now !== '' && now === last, now];
+    }
+    expect(posted).toBe(true);
+    const started = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const t = el.state.animals.find((a) => a.id === 'hoehle:tok')!;
+      const dirs: [string, number, number][] = [
+        ['e', 1, 0],
+        ['w', -1, 0],
+        ['s', 0, 1],
+        ['n', 0, -1],
+      ];
+      const [dir, dx, dy] = dirs.find(([, dx, dy]) => {
+        const c = el.world.cell(t.x - dx, t.y - dy);
+        return !c.solid && c.ground !== 'water' && !el.state.animals.some((a) => a.x === t.x - dx && a.y === t.y - dy);
+      })!;
+      el.state = { ...el.state, player: { x: t.x - dx, y: t.y - dy, dir: 's' } };
+      el.apply({ type: 'move', dir, fresh: true });
+      return { work: !!el.state.work, bahn: el.state.packs.bahn, at: [el.state.player.x, el.state.player.y] };
+    });
+    expect(started).toMatchObject({ work: true, bahn: { built: 1 } });
+    await ticks(page, 40);
+    // mitten im Bau: Ein Pfeil lässt die Figur nur hüpfen
+    const still = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      el.apply({ type: 'move', dir: 'n', fresh: true });
+      return [el.state.player.x, el.state.player.y];
+    });
+    expect(still).toEqual(started.at);
+    await ticks(page, 45);
+    await render(page, 2);
+    const done = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const loco = el.rides.find((r) => r.id === 'bahn:loco');
+      return {
+        work: !!el.state.work,
+        tok: el.state.animals.some((a) => a.id === 'hoehle:tok'),
+        fahrt: (el.state.packs.fahrt as { hoehle?: unknown }).hoehle,
+        bodies: ['bahn:loco', 'bahn:mid', 'bahn:rear', 'bahn:dach', 'bahn:schild'].filter((id) =>
+          el.rides.some((r) => r.id === id),
+        ),
+        rail: !!loco && !!el.world.cell(Math.round(loco.x), Math.round(loco.y)).rail,
+      };
+    });
+    expect(done).toEqual({
+      work: false,
+      tok: false,
+      fahrt: { stage: 'bereit' },
+      bodies: ['bahn:loco', 'bahn:mid', 'bahn:rear', 'bahn:dach', 'bahn:schild'],
+      rail: true,
+    });
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
+      [],
+    );
+    expect(errors).toEqual([]);
+  },
+);
+
 // Je Welt ein Test, dass sie gezeichnet wird: im Projekt `game` in 2D, im Projekt `3d` mit WebGL samt dem 3D-Teil ihres
 // Welt-Pakets (Schmuck ihres Tors). Neue Welten kommen in die Liste
 for (const realm of ['lichtung', 'eis'] as const)

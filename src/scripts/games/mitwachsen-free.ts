@@ -43,3 +43,35 @@ export function freeNear(
   }
   return null;
 }
+
+type Placed = { id: string; x: number; y: number; spawn: readonly [number, number] };
+
+/**
+ * Nach einem Neubau der Welt im Spiel (`World.relay`, etwa Bau 1 der Bahn: Häuschen und Tunnelportal sind fest): Wer auf
+ * einem Feld steht, auf dem man nicht mehr stehen kann, kommt auf das nächste freie Feld derselben Gegend; ein Wohnort
+ * dort wird zu dem, den die neue Welt kennt (`World.spawns`), sonst zum neuen Feld. Die Figur genauso. Gibt `s` selbst
+ * zurück, wenn niemand im Weg stand
+ */
+export function unstick<A extends Placed, S extends Omit<Crowd, 'animals'> & { animals: readonly A[] }>(
+  s: S,
+  world: World,
+): S {
+  const stands = (x: number, y: number) => standHeight(world, s.openGates, x, y) !== null;
+  const inRealm = (x: number, y: number) => (u: number, v: number) => world.realm(u, v) === world.realm(x, y);
+  let next = s;
+  const { x: px, y: py } = s.player;
+  if (!stands(px, py)) {
+    const to = freeNear({ ...s, sleeping: true }, world, [px, py], inRealm(px, py));
+    if (to) next = { ...next, player: { ...next.player, x: to[0], y: to[1] } };
+  }
+  const animals = next.animals.map((a): A => {
+    let b = a;
+    if (!stands(a.x, a.y)) {
+      const to = freeNear(next, world, [a.x, a.y], inRealm(a.x, a.y), a.id);
+      if (to) b = { ...b, x: to[0], y: to[1] };
+    }
+    if (!stands(...b.spawn)) b = { ...b, spawn: world.spawns.get(b.id) ?? [b.x, b.y] };
+    return b;
+  });
+  return animals.some((a, i) => a !== next.animals[i]) ? { ...next, animals } : next;
+}

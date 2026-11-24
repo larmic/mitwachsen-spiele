@@ -6,8 +6,10 @@ import { LICHTUNG_HOME } from '../../mitwachsen-home';
 import { BESIDE, plateRow } from '../../mitwachsen-bay';
 import { canStep, createWorld, type World } from '../../mitwachsen-world';
 import { BAHN_PACK, BUILT, HOEHLE_PACK, SAMPLE_SEEDS, seedRange, seedsFor, worldOf } from '../../test-worlds';
-import { bayAt, besideRay, centreOf } from './mitwachsen-bear';
+import { bayAt, besideRay, centreOf, hutOf } from './mitwachsen-bear';
 import { APPROACH, PORTAL_T, clean, joined } from './mitwachsen-line';
+import { stationOf, stationBodies } from './mitwachsen-station-look';
+import type { State } from '../../mitwachsen-state';
 import { LETTERS, STEPS, gridOf } from './mitwachsen-trace';
 
 /** Seeds, deren Grotte um eine Ecke liegt (wie in mitwachsen-grotte.test.ts): Dort biegt auch das Gleis im Gang ab */
@@ -96,10 +98,11 @@ function platformOf(laid: Laid, realm: Cell['region']): Point[] {
 }
 
 /** Was an einem Feld von Bahnhof Bär nicht stimmt: Lichtung, trocken, frei, außerhalb des Portalrings, nichts Gemiedenes nah */
-function siteFaults(laid: Laid, p: Point, bed: Point): string[] {
+function siteFaults(laid: Laid, p: Point, bed: Point, hut?: Point): string[] {
   const bad: string[] = [];
   const cell = laid.c(p);
-  if (cell.ground === 'water' || cell.solid || cell.region !== 'lichtung') bad.push(`Feld ${key(p)}`);
+  const solid = cell.solid && (!hut || key(p) !== key(hut)); // Toks Häuschen ist fest
+  if (cell.ground === 'water' || solid || cell.region !== 'lichtung') bad.push(`Feld ${key(p)}`);
   if (Math.hypot(p[0] - bed[0], p[1] - bed[1]) < LINE.bear.ring) bad.push(`${key(p)} im Portalring`);
   const near = [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => laid.c([p[0] + dx, p[1] + dy])));
   if (near.some((n) => n.portal || n.garden || n.plate || n.deco === 'klangstein' || n.ground === 'water'))
@@ -200,7 +203,15 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
       if (!lane.every((p) => platform.some((q) => cheb(p, q) === 1 && (p[0] === q[0] || p[1] === q[1]))))
         bad.push('Gleis nicht am Bahnsteig');
       const station = [...lane, ...platform];
-      if (new Set(station.map((p) => laid.c(p).h)).size !== 1) bad.push('Bahnhof nicht eben');
+      // das Gleis eben, der Bahnsteig eine Stufe darüber, Toks Häuschen am Kopf fest (hinten, am Ende fern vom Bett)
+      const h = laid.c(lane[0]!).h;
+      if (!lane.every((p) => laid.c(p).h === h)) bad.push('Gleis am Bahnhof nicht eben');
+      if (!platform.every((p) => laid.c(p).h === h + 1)) bad.push('Bahnsteig nicht eine Stufe über dem Gleis');
+      const hut = hutOf({ lane, platform }, bed);
+      const solid = platform.filter((p) => laid.c(p).solid).map(key);
+      if (!hut || solid.join() !== key(hut.at))
+        bad.push(`fest: ${solid.join(' ')} statt Häuschen ${hut && key(hut.at)}`);
+      if (hut && ![0, LINE.bear.long - 1].includes(hut.row)) bad.push('Häuschen nicht am Kopf');
       const c = centreOf({ lane, platform });
       const r = Math.hypot(c[0] - bed[0], c[1] - bed[1]);
       const deg = besideRay(c, g, bed);
@@ -209,8 +220,32 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
         bad.push(`Mitte ${r.toFixed(1)} Felder, ${deg.toFixed(0)}°`);
       const steps = stepsTo(w, LICHTUNG_HOME.wake, new Set(platform.map(key)));
       if (steps < bear.steps[0] || steps > bear.steps[1]) bad.push(`${steps} Schritte vom Bett`);
-      bad.push(...station.flatMap((p) => siteFaults(laid, p, bed)));
+      bad.push(...station.flatMap((p) => siteFaults(laid, p, bed, hut?.at)));
       expect(bad.slice(0, 5), `Seed ${seed}`).toEqual([]);
+    });
+
+    it(`Seed ${seed}: Bahnhof Bär im Bild: 7 Reihen, Häuschen am Kopf, der Zug hält am Bahnsteig, das Tunnelportal liegt dahinter`, () => {
+      const st = stationOf(w);
+      if (!st) return expect(st, `Seed ${seed}`).not.toBeNull();
+      const bad: string[] = [];
+      if (st.rows.length !== LINE.bear.long) bad.push(`${st.rows.length} Reihen`);
+      if (!st.hut || !w.cell(...st.hut.at).solid) bad.push('Häuschen nicht fest');
+      if (!(st.portal! > LINE.bear.long)) bad.push(`Tunnelportal bei ${st.portal}`);
+      // der Zug am Bahnsteig (Ausbau 1, Tok im Wagen): alle Wagen über dem Gleis neben dem Bahnsteig
+      // was das Bild vom Zustand liest (ohne `initialState`, das alle Tiere der Welt aufstellt)
+      const s = {
+        packs: { bahn: { built: 1 }, fahrt: { hoehle: { stage: 'bereit' } } },
+        player: { x: 1e6, y: 1e6, dir: 's' },
+        tick: 0,
+      } as unknown as State;
+      const lane = new Set(st.line.slice(0, LINE.bear.long).map(key));
+      const cars = stationBodies(s, w, { now: 0, frac: 0, reduced: true, lit: false }).filter((b) =>
+        /^bahn:(loco|mid|rear)$/.test(b.id),
+      );
+      if (cars.length !== 3) bad.push(`${cars.length} Wagen`);
+      for (const c of cars)
+        if (!lane.has(key([Math.round(c.x), Math.round(c.y)]))) bad.push(`${c.id} nicht am Bahnsteig`);
+      expect(bad, `Seed ${seed}`).toEqual([]);
     });
 
     it(`Seed ${seed}: freier Weg vom Bett zum Bahnsteig, Fußweg zur Torplatte frei, keine Plattform berührt`, () => {

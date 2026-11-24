@@ -114,6 +114,7 @@ export type Cell = {
  * Ein Stück Gleis (Paket der Bahn): `to` die Richtungen, in die es weiterführt (`n` oben, `e` rechts, `s` unten, `w`
  * links; zwei, an den Enden eine), `stage` ab welchem Ausbau es liegt (1: Lichtung bis zum Prellbock in der Bucht, 2:
  * durch Tor und Gang in die Grotte), `part` was dort steht: Prellbock am Ende einer Linie (`end`), Prellbock in der Bucht,
- * solange der Ausbau 1 ist (`buffer`), Tunnelportal (`portal`), oben offener Einschnitt (`cut`)
+ * solange der Ausbau 1 ist (`buffer`), Tunnelportal (`portal`), oben offener Einschnitt (`cut`); `along` wie weit es in
+ * seinem Ausbau liegt (0 am Anfang, bei Ausbau 1 an Bahnhof Bär, … 1 am Ende): Beim Bau läuft die Gleiswelle so entlang
  */
-export type Rail = { to: string; stage: 1 | 2; part?: 'end' | 'buffer' | 'portal' | 'cut' };
+export type Rail = { to: string; stage: 1 | 2; along?: number; part?: 'end' | 'buffer' | 'portal' | 'cut' };

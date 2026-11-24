@@ -15,30 +15,53 @@ import type { World } from './mitwachsen-world';
  * (`packs`), ob es Abend ist (`late`: die Uhr des Kinds hat `BED_AT` erreicht; die Komponente setzt es, nicht
  * gespeichert) und den Takt, ab dem er auftaucht (`heraldDue`, -1: nicht fällig; nicht gespeichert)
  */
-export type Heralded = Guided & { packs: Record<string, unknown>; late: boolean; heraldDue: number };
+export type Heralded = Guided & {
+  packs: Record<string, unknown>;
+  late: boolean;
+  heraldDue: number;
+  work?: Work;
+};
+
+/**
+ * Arbeit eines Boten (Tok baut: Bau 1), von Takt `from` bis vor Takt `to`; solange hüpft die Figur auf jeden Pfeil nur
+ * (nicht gespeichert: Wer mitten im Bau neu lädt, findet ihn fertig, denn sein Ergebnis ist schon gespeichert).
+ * `laid`: Was er baut, steht schon in der Welt (sie wurde neu gebaut, `relay`)
+ */
+export type Work = { from: number; to: number; laid?: true };
+
+/** Wie weit die Arbeit eines Boten ist (0 … 1), undefined, wenn er gerade nichts baut */
+export const workOf = (s: { tick: number; work?: Work }): number | undefined =>
+  s.work && s.tick < s.work.to ? Math.max(0, (s.tick - s.work.from) / (s.work.to - s.work.from)) : undefined;
 
 /**
  * Ereignis eines Boten: Es klopft, und er hüpft aus einem Hügel Steinkrümel neben der Figur (`appear`, gespeichert), ist
  * bei ihr angekommen (`arrive`: Hüpfer, Herz), ruft an seinem Platz (`call`: Ruf und Hüpfer), kommt am Abend schon
  * schlafend (`nap`, gespeichert), schnarcht leise, wenn man in ihn hineinläuft, während er schläft (`snore`), wacht am
- * nächsten echten Spieltag auf (`wake`, Ruf und Hüpfer). `persist`: gleich speichern
+ * nächsten echten Spieltag auf (`wake`, Ruf und Hüpfer), beginnt zu bauen (`build`: Läuft die Figur in den wachen Boten
+ * und gibt es einen nächsten Bau, Tok: Bau 1), was er baut, ploppt auf (`pop`, die Welt wird neu gebaut) und er steigt
+ * am Ende des Baus in den Zug (`board`). `persist`: gleich speichern; `relay`: Der Spielstand der Pakete, nach dem ein
+ * Paket ohne eigene Welt legt, hat sich geändert, die Welt wird neu gebaut (`World.relay`)
  */
 export type HeraldEvent = {
   type: 'herald';
-  what: 'appear' | 'arrive' | 'call' | 'nap' | 'snore' | 'wake';
+  what: 'appear' | 'arrive' | 'call' | 'nap' | 'snore' | 'wake' | 'build' | 'pop' | 'board';
   id: string;
   x: number;
   y: number;
   persist?: true;
+  relay?: true;
 };
 
-/** Ereignisse, die ein Bote ausgibt (und die er liest: `wake`, `sleep`) */
-export type HeraldEvents = { readonly type: string }[] & { push(...e: (HeraldEvent | { type: 'bump' })[]): unknown };
+/** Ereignisse, die ein Bote ausgibt (und die er liest: `wake`, `sleep`); `hop`: Die Figur hüpft nur (er baut) */
+export type HeraldEvents = { readonly type: string }[] & {
+  push(...e: (HeraldEvent | { type: 'bump' } | { type: 'hop' })[]): unknown;
+};
 
 /**
  * Haken eines Boten in `step` (aus dem Welt-Paket als `WorldRules.herald`). `step`: nach jedem Befehl (fällig,
  * auftauchen, ankommen, warten, rufen, schlafen). `meet`: vor dem Schritt der Figur; true, wenn der Zug damit erledigt
- * ist (in den schlafenden Boten gelaufen: Er schnarcht, die Figur bleibt stehen)
+ * ist (in den schlafenden Boten gelaufen: Er schnarcht, die Figur bleibt stehen; in den wachen: Er beginnt den nächsten
+ * Bau; solange er baut, hüpft die Figur nur)
  */
 export type HeraldRules = {
   step(

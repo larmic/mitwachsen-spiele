@@ -1,0 +1,166 @@
+// Modelle der Höhlenbahn und von Bahnhof Bär, nur im Paket der Bahn (Teile wie in `front.ts`: vorn, rechts, unten, Länge,
+// Breite, Höhe, Farbe, oben; eigene Voxel-Grafik nach der Skizze im Konzept, keine Lore, kein Gesicht): der kleine Zug aus
+// Lok und zwei Wagen, Silber mit lila Fensterband und türkisem Leuchtstreifen, vorn im Zielfenster eine Fledermaus, an den
+// Seiten der Lok eine Kristall-Raute, weiße Dampfwölkchen; im hinteren Wagen sitzt Tok, sobald er eingestiegen ist, und
+// dort geht die Tür auf. Bahnhof Bär: Bahnsteig aus Holzplanken mit heller Kante, eine Stufe über dem Gleis; Grasdach auf
+// vier Pfosten mit Bank für wartende Tiere, darauf das Schild „Bär auf Grün“ (ohne Text); Toks Häuschen am Kopf. Kein
+// Gold: Das Kind kann hier noch nichts tun (die goldene Tür kommt mit dem Fahren).
+// Spec: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 1)
+
+import type { Part } from '../../../../lib/games/front';
+import { TOK_MODEL } from './mitwachsen-tok-model';
+
+/** Farben des Zugs und des Bahnhofs (Konzept „Zug und Bahnhöfe“), je Seite und Oberseite, wo es zwei gibt */
+export const TRAIN_COLORS = {
+  silver: ['#c9c6d6', '#dcd9e6'],
+  lila: '#a07cff',
+  light: '#6fd6f0', // türkiser Leuchtstreifen
+  wheel: '#3c3f47',
+  front: '#3a3550', // Zielfenster und offene Tür
+  lamp: '#ffe08a',
+  steam: '#ffffff',
+  crystal: ['#b48cf0', '#6fd6f0', '#f08cc8'], // Raute: lila, türkis, rosa
+  bat: { p: '#f2a7b8', g: '#a08c7c', k: '#1d2838', l: '#f2a7b8', w: '#b9b2dc' },
+} as const;
+
+export const STATION_COLORS = {
+  plank: ['#c08a55', '#b37c49'],
+  edge: '#f4e6c0',
+  wood: '#8a5a34',
+  bench: '#b07a48',
+  roof: ['#5c9e34', '#73b746'],
+  hut: '#d9b48a',
+  hutRoof: ['#b5523f', '#c4634f'],
+  door: '#6e4a30',
+  glass: '#bfe3f5',
+  sign: '#7cbf4a',
+  bear: { b: '#8a5a34', k: '#2e2b33', l: '#e8c9a0' },
+} as const;
+
+/** Bär für das Schild auf Grün, 8 × 8 Pixel (b braun, k dunkel, l hell; Punkt: frei) */
+const BEAR = ['bb....bb', 'bbbbbbbb', '.bbbbbb.', '.bkbbkb.', '.bbllbb.', '.blkklb.', '..bllb..', '...bb...'];
+/** Fledermaus im Zielfenster der Lok, 9 × 7 Pixel (aus der Skizze, ohne Zähne) */
+const BAT = ['..p...p..', '..pgggp..', 'w.gkgkg.w', 'ww.glg.ww', 'wwwgggwww', '.ww.g.ww.', '..w...w..'];
+
+/**
+ * Pixelbild als Teile auf einer Fläche, die nach vorn (+vorn) schaut: bei vorn `f`, Mitte quer bei `r`, Oberkante bei
+ * `top`, je Pixel `px` groß
+ */
+function pixels(
+  rows: readonly string[],
+  pal: Readonly<Record<string, string>>,
+  f: number,
+  r: number,
+  top: number,
+  px: number,
+): Part[] {
+  const out: Part[] = [];
+  const w = Math.max(...rows.map((l) => l.length));
+  rows.forEach((line, row) =>
+    [...line].forEach((ch, col) => {
+      const c = pal[ch];
+      if (c) out.push([f, r + (w / 2 - col - 1) * px, top - (row + 1) * px, 0.012, px, px, c]);
+    }),
+  );
+  return out;
+}
+
+/** Länge eines Wagens (die Lok gleich lang): Lok und zwei Wagen mit Lücken sind gut 5 Felder lang */
+export const CAR = 1.6;
+const L = CAR;
+const HW = 0.46; // halbe Breite
+const S = TRAIN_COLORS.silver;
+
+/** Teil auf beiden Seiten: wie angegeben und quer gespiegelt */
+const both = ([f, r, ...rest]: Part): Part[] => [
+  [f, r, ...rest],
+  [f, -r - rest[2], ...rest],
+];
+
+/** Kasten eines Wagens (Mitte in der Mitte, vorn in Fahrtrichtung zum Prellbock von Bahnhof Bär) ohne Dach */
+const BODY: readonly Part[] = [
+  ...both([-0.62, -HW + 0.04, 0.02, 0.3, 0.1, 0.18, TRAIN_COLORS.wheel]), // Räder
+  ...both([0.32, -HW + 0.04, 0.02, 0.3, 0.1, 0.18, TRAIN_COLORS.wheel]),
+  [-L / 2, -HW, 0.16, L, 2 * HW, 0.4, ...S],
+  [-L / 2, -HW, 0.56, L, 2 * HW, 0.3, TRAIN_COLORS.lila, TRAIN_COLORS.lila], // Fensterband
+  ...[-0.42, 0, 0.42].map((f): Part => [f - 0.03, -HW - 0.006, 0.56, 0.06, 2 * HW + 0.012, 0.3, ...S]), // Fensterstege
+  ...both([-L / 2, -HW - 0.012, 0.83, L, 0.04, 0.04, TRAIN_COLORS.light]), // Leuchtstreifen
+];
+/** Dach, ganz oder (`open`) in der Mitte offen: Dort schaut Tok heraus */
+const roof = (open: boolean): Part[] =>
+  open
+    ? [
+        [-L / 2 + 0.04, -HW + 0.04, 0.86, 0.42, 2 * HW - 0.08, 0.1, ...S],
+        [L / 2 - 0.46, -HW + 0.04, 0.86, 0.42, 2 * HW - 0.08, 0.1, ...S],
+      ]
+    : [[-L / 2 + 0.04, -HW + 0.04, 0.86, L - 0.08, 2 * HW - 0.08, 0.1, ...S]];
+
+/** Front der Lok: Zielfenster mit Fledermaus, zwei Lampen; an den Seiten die Kristall-Raute */
+const FRONT: readonly Part[] = [
+  [L / 2, -0.28, 0.6, 0.02, 0.56, 0.24, TRAIN_COLORS.front],
+  ...pixels(BAT, TRAIN_COLORS.bat, L / 2 + 0.02, 0, 0.82, 0.026),
+  ...both([L / 2, -HW + 0.06, 0.26, 0.03, 0.12, 0.08, TRAIN_COLORS.lamp]),
+  ...both([0.1, -HW - 0.014, 0.36, 0.08, 0.012, 0.08, TRAIN_COLORS.crystal[0]]),
+  ...both([0.02, -HW - 0.016, 0.3, 0.08, 0.012, 0.06, TRAIN_COLORS.crystal[1]]),
+  ...both([0.18, -HW - 0.016, 0.3, 0.08, 0.012, 0.06, TRAIN_COLORS.crystal[2]]),
+];
+
+/** Tok sitzt im hinteren Wagen: sein Modell, etwas tiefer, Kopf und Helm schauen oben heraus */
+const RIDER: readonly Part[] = TOK_MODEL.map(([f, r, z, ...rest]): Part => [f, r, z + 0.32, ...rest]);
+
+/** Offene Tür zur Seite des Bahnsteigs (`side` +1 rechts, −1 links) */
+const door = (side: 1 | -1): Part => [-0.26, side > 0 ? HW : -HW - 0.03, 0.18, 0.52, 0.03, 0.66, TRAIN_COLORS.front];
+
+/** Wagen des Zugs: die Lok (`loco`), der mittlere, der hintere (mit Tok, sobald er sitzt; die Tür offen oder zu) */
+export type CarLook = { kind: 'loco' | 'mid' | 'rear'; tok: boolean; door: 0 | 1 | -1 };
+export const carParts = (k: CarLook): Part[] => [
+  ...BODY,
+  ...roof(k.kind === 'rear' && k.tok),
+  ...(k.kind === 'loco' ? FRONT : []),
+  ...(k.kind === 'rear' && k.tok ? RIDER : []),
+  ...(k.door ? [door(k.door)] : []),
+];
+
+/** Weiße Dampfwölkchen über der Lok, je Phase (0 … 3) anders hoch (nicht bei reduzierter Bewegung) */
+export const steamParts = (phase: number): Part[] =>
+  [0, 1, 2].map((i): Part => {
+    const k = (phase + i) % 4;
+    const s = 0.1 + k * 0.03;
+    return [0.4 - k * 0.12, -s / 2 + (i - 1) * 0.08, 1.0 + k * 0.2, s, s, s, TRAIN_COLORS.steam];
+  });
+
+// ---------- Bahnhof Bär ----------
+// Eine Reihe des Bahnsteigs schaut vom Gleis weg (vorn): von −1 (Kante am Gleis) bis +1 (hinten), quer −0,5 … 0,5.
+
+const SC = STATION_COLORS;
+/** Planken einer Reihe mit heller Kante und der Stirnseite aus Holz zum Gleis hin (die Stufe) */
+const row = (odd: boolean): Part[] => [
+  [-1, -0.5, 0, 2, 1, 0.04, SC.plank[+odd]!, SC.plank[+odd]!],
+  [-1, -0.5, 0.04, 0.1, 1, 0.015, SC.edge, SC.edge],
+  [-1.03, -0.5, -1, 0.04, 1, 1.02, SC.wood],
+];
+/** Toks Häuschen auf dem hinteren Feld der Reihe, die Tür zum Gleis */
+const HUT: readonly Part[] = [
+  [0.08, -0.42, 0.04, 0.84, 0.84, 0.95, SC.hut],
+  [0.02, -0.48, 0.99, 0.96, 0.96, 0.18, ...SC.hutRoof],
+  [0.06, -0.16, 0.04, 0.03, 0.32, 0.6, SC.door],
+  [0.06, 0.2, 0.46, 0.03, 0.16, 0.18, SC.glass],
+];
+/** Reihe des Bahnsteigs (`hut`: mit Toks Häuschen hinten) */
+export const rowParts = (odd: boolean, hut: boolean): Part[] => [...row(odd), ...(hut ? HUT : [])];
+
+/** Grasdach über zwei Reihen (Mitte in der Mitte der vier Felder) auf vier Pfosten, hinten die Bank */
+export const ROOF: readonly Part[] = [
+  ...[-0.92, 0.8].flatMap((f) => [-0.92, 0.8].map((r): Part => [f, r, 0.04, 0.12, 0.12, 1.5, SC.wood])),
+  [-1.08, -1.08, 1.54, 2.16, 2.16, 0.2, ...SC.roof],
+  [0.36, -0.6, 0.3, 0.4, 1.2, 0.08, SC.bench, SC.bench],
+  [0.7, -0.6, 0.38, 0.06, 1.2, 0.3, SC.bench],
+  ...[-0.5, 0.42].flatMap((r) => [0.4, 0.66].map((f): Part => [f, r, 0.04, 0.07, 0.07, 0.26, SC.wood])),
+];
+
+/** Schild auf dem Dach, zur Kamera (Körper schaut nach Süden): Bär auf Grün, 2 × 2 Schildbreite, ohne Text */
+export const SIGN: readonly Part[] = [
+  [-0.05, -0.05, 0, 0.1, 0.1, 0.16, SC.wood],
+  [-0.03, -0.44, 0.16, 0.06, 0.88, 0.88, SC.sign, SC.sign],
+  ...pixels(BEAR, SC.bear, 0.03, 0, 0.96, 0.09),
+];

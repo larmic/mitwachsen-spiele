@@ -190,3 +190,38 @@ export function snapshot(map: Map<string, Cell>, cells: readonly Point[], r = 8)
     for (const [k, c] of saved) if (c) map.set(k, c);
   };
 }
+
+const STEPS4: readonly Point[] = [
+  [1, 0],
+  [0, 1],
+  [-1, 0],
+  [0, -1],
+];
+
+/**
+ * Reihen eines Bahnhofs quer zum Gleis, vom Prellbock an (`lane` in Reihe): je das Feld am Gleis und das dahinter. Liegt
+ * der Bahnsteig nicht in zwei Reihen neben dem Gleis, leer
+ */
+export function rowsOf(s: Pick<Station, 'lane' | 'platform'>): { edge: Point; back: Point }[] {
+  const on = new Set(s.platform.map((p) => key(...p)));
+  const first = s.lane[0];
+  const side = first && STEPS4.find(([dx, dy]) => on.has(key(first[0] + dx, first[1] + dy)));
+  if (!side) return [];
+  const rows = s.lane.map(([x, y]) => ({
+    edge: [x + side[0], y + side[1]] as Point,
+    back: [x + 2 * side[0], y + 2 * side[1]] as Point,
+  }));
+  return rows.every((r) => on.has(key(...r.edge)) && on.has(key(...r.back))) ? rows : [];
+}
+
+/**
+ * Toks Häuschen am Kopf des Bahnhofs Bär: auf dem Feld hinten (fern vom Gleis) in der ersten oder letzten Reihe, auf der,
+ * die weiter vom Bett liegt, damit das Feld des Bahnsteigs nächst dem Bett frei bleibt (dort wartet Tok, und dorthin
+ * zählen die Schritte vom Bett). Das Feld ist fest; undefined ohne Reihen
+ */
+export function hutOf(s: Pick<Station, 'lane' | 'platform'>, bed: Point): { at: Point; row: number } | undefined {
+  const rows = rowsOf(s);
+  const ends = [0, rows.length - 1].flatMap((row) => (rows[row] ? [{ at: rows[row].back, row }] : []));
+  const far = (p: Point) => Math.hypot(p[0] - bed[0], p[1] - bed[1]);
+  return ends.sort((a, b) => far(b.at) - far(a.at))[0];
+}

@@ -8,6 +8,7 @@ import { TOK_COLORS, TOK_MODEL } from '../../../../data/games/worlds/bahn/mitwac
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
 import { slots } from '../../mitwachsen-album';
 import { APPEAR, DUE, NEAR } from '../../mitwachsen-guide';
+import { unstick } from '../../mitwachsen-free';
 import type { HeraldEvent } from '../../mitwachsen-herald';
 import { silhouette } from '../../mitwachsen-hint-look';
 import { bahnWanted } from '../../mitwachsen-pack';
@@ -15,7 +16,9 @@ import { dawnOf } from '../../mitwachsen-packs';
 import { initialState, progressOf, step, type Cmd, type GameEvent, type State } from '../../mitwachsen-state';
 import { createWorld, standHeight, type World } from '../../mitwachsen-world';
 import { arrowTo } from '../../mitwachsen-map';
+import { hutOf } from './mitwachsen-bear';
 import { futureBear } from './mitwachsen-line';
+import { stationOf } from './mitwachsen-station-look';
 import { BAHN_PACK, EIS_PACK, REGRESSION_SEEDS, SAMPLE_SEEDS, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import { CALL_EVERY, COME, SIGHT, TOK, TOK_NEAR, postOf, tokWanted } from './mitwachsen-tok';
 import { heraldFx, juhu, lacks, pink } from './mitwachsen-tok-look';
@@ -179,6 +182,8 @@ describe('Tok erscheint: ankommen und warten', () => {
       const { post } = postOf(world)!;
       // sein Platz liegt am künftigen Bahnsteig (gerechnet auf der Kopie der Karte, frisch gebaut über `worldOf`)
       expect(futureBear(seed)?.platform.map(key), `Seed ${seed}`).toContain(key(post));
+      // nie auf dem Platz von Toks Häuschen (Bau 1 macht ihn fest)
+      expect(key(hutOf(futureBear(seed)!, world.homes.lichtung.bed)!.at), `Seed ${seed}`).not.toBe(key(post));
       // ein Feld je `PACE.lead` Takte: höchstens 120 Takte, bis er dort steht
       for (let i = 0; i < 12 && key([tokIn(r.s)!.x, tokIn(r.s)!.y]) !== key(post); i++) r = play(r.s, world, ticks(10));
       const t = tokIn(r.s)!;
@@ -206,7 +211,7 @@ describe('Tok erscheint: ankommen und warten', () => {
     (seed) => {
       const before = createWorld(seed, BAHN); // frisch gebaut: Das Paket merkt sich die Karte vor Ausbau 1
       const station = futureBear(seed)?.platform ?? [];
-      const built = createWorld(seed, BAHN, { bahn: { built: 1 } }); // nicht über worldOf: bleibt nicht im Speicher
+      const built = worldOf(seed, BAHN, { bahn: { built: 1 } }); // auch für „Bau 1: wer im Weg stünde …“
       const faults = station.filter((p) => built.cell(...p).stop !== 'hoehle' || before.cell(...p).stop).map(key);
       const post = postOf(before)?.post;
       if (!station.length || !post || !station.some((p) => key(p) === key(post))) faults.push('Platz');
@@ -285,7 +290,7 @@ describe('Tok erscheint: am Abend schlafend', () => {
     expect(tokIn(r.s)).toMatchObject({ x: postOf(world)!.post[0], y: postOf(world)!.post[1] });
   });
 
-  it('wer ihn wach angetroffen hat: In den wachen Tok gelaufen, singt und hüpft er (getroffen)', () => {
+  it('in den wachen Tok gelaufen, beginnt er Bau 1 (statt zu singen; mitwachsen-build.test.ts)', () => {
     let r = play(ready(world), world, [WAKE, ...ticks(200)]);
     const t = tokIn(r.s)!;
     const [dir, [dx, dy]] = (Object.entries(DIRS) as [Dir, readonly [number, number]][]).find(([, [dx, dy]]) => {
@@ -293,8 +298,11 @@ describe('Tok erscheint: am Abend schlafend', () => {
       return standHeight(world, [], ...p) !== null && !r.s.animals.some((a) => a.x === p[0] && a.y === p[1]);
     })!;
     r = play({ ...r.s, player: { x: t.x - dx, y: t.y - dy, dir: 's' } }, world, [{ type: 'move', dir }]);
-    expect(r.events.filter((e) => e.type === 'sing')).toEqual([{ type: 'sing', id: TOK, species: 'tok', first: true }]);
-    expect(r.s.met).toContain(TOK);
+    expect(r.events.filter((e) => e.type === 'sing')).toEqual([]);
+    expect(heralds(r.events, 'build')).toEqual([
+      { type: 'herald', what: 'build', id: TOK, x: t.x, y: t.y, persist: true },
+    ]);
+    expect(r.s.player).toMatchObject({ x: t.x - dx, y: t.y - dy, dir }); // die Figur bleibt stehen
     expect(tokIn(r.s)).toMatchObject({ x: t.x, y: t.y }); // er bleibt an seinem Platz
   });
 });
@@ -450,5 +458,45 @@ describe('Tok: Bild, Ton, Leiste, Hinweis', () => {
     expect(lacks(ready(world, { open: false }), 'hoehle')).toBeUndefined();
     expect(BAHN_PACK.view).toHaveProperty('lacks', lacks);
     expect(NEAR).toBe(2);
+  });
+});
+
+// Bau 1 (mitwachsen-build.ts) baut die Welt neu: hier, weil die Welten vor Ausbau 1 schon für Tok gebaut sind
+describe('Bau 1: wer im Weg stünde, rückt zur Seite', () => {
+  const FAELLIG = withTok(SLED_HOME, { stage: 'faellig' });
+  // nur die Seeds, deren Welt mit Ausbau 1 hier ohnehin gebaut wird (1 und 11, „Bahnhof Bär, den Tok erwartet …“), und
+  // Seed 39, an dem eine Biene im Häuschen stand: Jede weitere ganze Welt kostet test:deep gut 0,15 s, und es liegt schon
+  // knapp unter seiner Frist von 150 s in gates:ci; dass `unstick` jeden auf ein Feld bringt, auf dem man stehen kann,
+  // prüft der Test selbst, die Seeds zeigen nur, dass Bau 1 wirklich jemanden verdrängen kann
+  const SEEDS = [SAMPLE_SEEDS[0]!, ...REGRESSION_SEEDS, 39];
+  const stuck = (s: State, w: World) => [
+    ...s.animals.flatMap((a) => [
+      ...(standHeight(w, s.openGates, a.x, a.y) === null ? [`${a.id} auf ${a.x},${a.y}`] : []),
+      ...(standHeight(w, s.openGates, ...a.spawn) === null ? [`${a.id} wohnt auf ${key([...a.spawn])}`] : []),
+    ]),
+    ...(standHeight(w, s.openGates, s.player.x, s.player.y) === null ? ['Figur'] : []),
+  ];
+
+  it.each(SEEDS)('Seed %i: nach dem Neubau steht und wohnt niemand auf einem festen Feld', (seed) => {
+    // die Welt vor Ausbau 1 wie in „Tok erscheint: ankommen und warten“ (je Seed einmal gebaut); dass `World.relay`
+    // Feld für Feld dieselbe Welt baut wie ein neuer Bau, prüft „Bau 1: die Welt wird neu gebaut“ (mitwachsen-build.test.ts)
+    const before = worldOf(seed, BAHN);
+    const s = initialState(before, { openGates: ['eis'], garden: FULL, packs: FAELLIG });
+    const after = worldOf(seed, BAHN, { bahn: { built: 1 } });
+    expect(stuck(unstick(s, after), after), `Seed ${seed}`).toEqual([]);
+  });
+
+  it('Seed 39: die Biene der Lichtung wohnt dort, wo das Häuschen hinkommt; die Figur auf dem Häuschen rückt auch', () => {
+    const before = worldOf(39, BAHN);
+    const after = worldOf(39, BAHN, { bahn: { built: 1 } });
+    const hut = stationOf(after)!.hut!.at;
+    const s = { ...initialState(before, { packs: FAELLIG }), player: { x: hut[0], y: hut[1], dir: 's' as Dir } };
+    const bee = s.animals.find((a) => key([...a.spawn]) === key(hut));
+    expect(bee?.species).toBe('biene');
+    expect(stuck(s, after).length).toBeGreaterThan(1);
+    const moved = unstick(s, after);
+    expect(stuck(moved, after)).toEqual([]);
+    expect(moved.animals.find((a) => a.id === bee!.id)!.spawn).toEqual(after.spawns.get(bee!.id));
+    expect(unstick(moved, after)).toBe(moved); // niemand mehr im Weg: derselbe Zustand
   });
 });

@@ -33,7 +33,7 @@ import { crossBorder, type BorderEvent, type Mode } from './mitwachsen-border';
 import { lost, type GuideEvent, type GuideRules } from './mitwachsen-guide';
 import type { PackEvent, Ride, RideEvent, WorldRules } from './mitwachsen-pack-types';
 import type { MoveCmd, RideRules } from './mitwachsen-rider';
-import { hooksOf, type HeraldEvent, type HeraldRules } from './mitwachsen-herald';
+import { hooksOf, type HeraldEvent, type HeraldRules, type Work } from './mitwachsen-herald';
 import { listen } from './mitwachsen-listen';
 import { roostAt } from './mitwachsen-roost';
 
@@ -84,6 +84,7 @@ export type State = Omit<Progress, 'position'> & {
   ride?: Ride; // laufende Fahrt mit einem Fahrzeug (nicht gespeichert; Regeln aus dem Welt-Paket, `WorldRules.ride`)
   rideDue: number; // Takt, ab dem das Fahrzeug erscheint, danach: herbeigetrabt bzw. angestoßen (-1: nie; nicht gespeichert)
   heraldDue: number; // Bote einer Welt (Tok): Takt, ab dem er auftaucht bzw. aufgetaucht ist (-1: nicht fällig; nicht gespeichert, mitwachsen-herald.ts)
+  work?: Work; // Bote einer Welt baut (Tok: Bau 1), von Takt bis Takt; solange hüpft die Figur nur (nicht gespeichert, mitwachsen-herald.ts)
   late: boolean; // Abend: Die Uhr des Kinds hat `BED_AT` erreicht (die Komponente setzt es, mitwachsen-tired.ts; nicht gespeichert)
 };
 

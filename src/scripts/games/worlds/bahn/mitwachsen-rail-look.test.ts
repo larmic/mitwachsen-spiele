@@ -21,7 +21,7 @@ const cell = (rail?: Rail, h = 1): Cell => ({
   ride: 'hoehle',
   rail,
 });
-const at = (built?: number) => ({ packs: built === undefined ? {} : { bahn: { built } } });
+const at = (built?: number) => ({ packs: built === undefined ? {} : { bahn: { built } }, reduced: false });
 const has = (boxes: readonly (readonly unknown[])[] | null, color: string) => !!boxes?.some((b) => b.includes(color));
 
 describe('Aussehen des Gleises (2D und 3D gleich)', () => {
