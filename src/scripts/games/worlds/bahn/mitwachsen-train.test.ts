@@ -23,6 +23,7 @@ import { BAHN_PACK, BUILT, EIS_PACK, FAHRT_PACK, HOEHLE_PACK, worldOf } from '..
 import { withBuilt } from './mitwachsen-built';
 import { stationBodies, stationOf } from './mitwachsen-station-look';
 import { AHEAD, CARS, SEAT, TRAIN, lineOf, train, trainRoute } from './mitwachsen-train';
+import { batPlatform, bearPlatform } from './mitwachsen-platform';
 import { UH_UH, dim, trainFx, trainScores } from './mitwachsen-train-look';
 import { view } from './view-2d';
 
@@ -425,6 +426,62 @@ describe('Fahren mit der Höhlenbahn: Regeln (Fahr-Engine mit dem Zug)', () => {
     expect(parked(TRAIN, r2, cave, W2)?.end).toBe('home');
     expect(parked(TRAIN, r2, awake(W2, p.at, FAR, open), W2)?.end).toBe('out');
     expect(ALIGHT).toBe(10);
+    // ausgestiegen auf den Steinbahnsteig an der Tür (Haken `exit`), nicht auf die kahle Seite
+    const bat = batPlatform(W2)!;
+    expect(pos(run.s)).toEqual(bat.rows[bat.lane.findIndex((q) => keyOf(q) === keyOf(r2.stops.home))]!.edge);
+  });
+
+  it('Aussteigen sichtbar (Haken `exit`): auf den eigenen Bahnsteig, zuerst an der Tür, nie unter das Dach oder ins Häuschen; in der Bucht wie bei jedem Fahrzeug', () => {
+    const open = { openGates: ['hoehle' as const] };
+    const r2 = trainRoute(W2, { packs: FAR, ...open })!;
+    for (const [end, st] of [
+      ['out', bearPlatform(W2)!],
+      ['home', batPlatform(W2)!],
+    ] as const) {
+      const seat = r2.stops[end];
+      const exits = train.exit!(awake(W2, seat, FAR, open), W2, end);
+      const k = st.lane.findIndex((q) => keyOf(q) === keyOf(seat));
+      expect(k, end).toBe(SEAT); // der Sitz steht neben der Reihe 3 (vom Prellbock an Bahnhof Bär bzw. vom Anfang des Bahnsteigs)
+      expect(exits[0], end).toEqual(st.rows[k]!.edge); // die Tür des mittleren Wagens
+      const under = new Set(st.roof.flatMap((i) => [st.rows[i]!.edge, st.rows[i]!.back].map(keyOf)));
+      expect(
+        exits.filter((q) => under.has(keyOf(q)) || W2.cell(...q).stop !== 'hoehle'),
+        end,
+      ).toEqual([]);
+      if (st.hut) expect(exits.map(keyOf), end).not.toContain(keyOf(st.hut.at));
+      expect(exits, end).toHaveLength(2 * (st.rows.length - 2) - (st.hut ? 1 : 0));
+      expect(st.roof.includes(SEAT), end).toBe(false); // das Dach steht neben der Sitzreihe
+    }
+    expect(batPlatform(W2)!.roof).toEqual([5, 6]); // Bahnhof Fledermaus: über den letzten beiden der 7 Reihen
+    // ohne Ausbau 2 (am Prellbock in der Bucht) gibt es keinen Bahnsteig: wie bei jedem Fahrzeug das nächste freie Feld
+    expect(train.exit!(awake(W1, at), W1, 'home')).toEqual([]);
+    expect(train.exit!(awake(W2, at, FAR), W2, 'home')).toEqual([]); // Höhlentor zu: auch nur bis zum Prellbock
+  });
+
+  it('Aussteigen: die Fahr-Engine nimmt das erste freie Feld des Hakens `exit`, nie eine Torplatte; sonst das nächste freie', () => {
+    const g = W1.gates.get('hoehle')!;
+    const plate = plateRow(g, 0);
+    expect(W1.cell(...plate).plate).toBe('hoehle');
+    const seat = r1.stops.home;
+    const arrived = (exits: readonly Point[], more: Partial<State> = {}) => {
+      const s: State = {
+        ...awake(W1, seat),
+        ride: { id: TRAIN.id, phase: 'arrive', at: -ALIGHT, pos: r1.path.length - 1, speed: 1, to: 'home' },
+        ...more,
+      } as State;
+      s.ride = { ...s.ride!, feast: false, jingleAt: 0, greeted: [] };
+      s.tick = 0;
+      FAHRT_PACK.rules!.ride!([{ ...train, exit: () => exits }]).tick(s, W1, { push: () => 0 });
+      return s;
+    };
+    const plain = pos(arrived([])); // ohne Haken: das nächste freie Feld neben dem Sitz
+    expect(W1.cell(...plain).plate).toBeUndefined();
+    expect(pos(arrived([plate]))).toEqual(plain); // eine Torplatte nimmt sie nie, auch wenn der Haken sie nennt
+    const blocker = (p: Point) => ({ ...initialState(W1).animals[0]!, id: 'im-weg', x: p[0], y: p[1] });
+    const next = pos(arrived([], { animals: [blocker(plain)] })); // das nächste freie dahinter
+    expect(next).not.toEqual(plain);
+    expect(pos(arrived([next]))).toEqual(next); // der Haken geht vor dem nächsten freien
+    expect(pos(arrived([plain, next], { animals: [blocker(plain)] }))).toEqual(next); // besetzt: das nächste der Liste
   });
 });
 

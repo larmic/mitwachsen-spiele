@@ -31,7 +31,8 @@ export type End = 'home' | 'out';
  * Bucht), sagt `docked`, an welchem es zuletzt ankam (beides nicht gespeichert). `dozing`: Fahrzeuge, denen ein Paket
  * zum Fahren fehlt (Fahr-Engine, Ziel-Gegend; `dozingOf` in mitwachsen-preload.ts, `step` setzt es je Befehl): Sie
  * schlafen freundlich am Halt; `snored`: welches zuletzt auf einen Druck schnarchte und wann (Drossel, getrennt von
- * `nudged`, sonst stünde die Tür beim Aufwachen offen; beides nicht gespeichert)
+ * `nudged`, sonst stünde die Tür beim Aufwachen offen; beides nicht gespeichert); `alighted`: aus welchem die Figur
+ * zuletzt ausstieg und wann (im Bild steht dann kurz die Tür offen; nicht gespeichert)
  */
 export type Rider = Guided & {
   packs: Record<string, unknown>;
@@ -41,6 +42,7 @@ export type Rider = Guided & {
   docked?: Partial<Record<RideId, End>>;
   dozing?: readonly RideId[];
   snored?: { id: RideId; at: number };
+  alighted?: { id: RideId; at: number };
   work?: { from: number; to: number; laid?: true }; // ein Bote baut (`Work` in mitwachsen-herald.ts; Bau 2 wartet auf den Zug)
 };
 
@@ -110,7 +112,9 @@ export type Fan = { who: string; x: number; y: number };
  * (Fortschritt der Fahrt; undefined: weiter, der Halt ist gemacht). `feast`: Ist diese Fahrt auf die Lichtung (`to`
  * `'out'`) seine Festfahrt (danach Stufe `fest`, Wimpel)? Ohne: die erste Heimfahrt bei `bereit`, wenn es erst danach
  * auf der Lichtung hält (`spec.out` `'fest'`, der Schlitten); der Zug: die erste Heimfahrt nach voller Höhlen-Leiste
- * (die Laternenfahrt, Zierde, nie Bedingung)
+ * (die Laternenfahrt, Zierde, nie Bedingung). `exit`: Felder, auf die die Figur am Ziel `end` am liebsten aussteigt, die
+ * besten zuerst (Zug: der Bahnsteig an der Tür, nie unter dem Dach); die Engine nimmt das erste freie, das sie auch sonst
+ * nähme (nie Strecke, Halt, Plattform, Torplatte, höchstens eine Stufe), sonst wie ohne Haken das nächste freie
  */
 export type Vehicle = {
   spec: RideSpec;
@@ -123,6 +127,7 @@ export type Vehicle = {
   depart?(s: Rider, world: World, to: End, events: RideEvents): boolean;
   hold?(s: Rider, world: World, events: RideEvents): number | undefined;
   feast?(s: Rider, world: World): boolean;
+  exit?(s: Rider, world: World, end: End): readonly Point[];
 };
 
 /** Die Fahr-Engine (Paket der Fahrzeuge, `WorldRules.ride`): macht aus den Fahrzeugen der geladenen Pakete ihre Regeln */

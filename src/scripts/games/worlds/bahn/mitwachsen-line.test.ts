@@ -4,8 +4,9 @@ import { DIRS, type Dir } from '../../../../lib/games/front';
 import { animalId, type Point } from '../../../../data/games/mitwachsen';
 import { FIRST_MOLE } from '../../../../data/games/mitwachsen-hoehle';
 import { atHome } from '../../mitwachsen-meadow';
-import { SIGHT, stopsOf } from '../../mitwachsen-ride-kit';
+import { ALIGHT, SIGHT, stopsOf } from '../../mitwachsen-ride-kit';
 import { withTok } from '../../mitwachsen-ride-save';
+import type { End } from '../../mitwachsen-rider';
 import { initialState, step as stepGame, type Cmd, type GameEvent, type State } from '../../mitwachsen-state';
 import { LINE } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import type { Cell, Rail } from '../../mitwachsen-cell';
@@ -25,9 +26,10 @@ import {
 import { bayAt, besideRay, centreOf, hutOf } from './mitwachsen-bear';
 import { APPROACH, PORTAL_T, clean, joined } from './mitwachsen-line';
 import { STONE_GAPS } from './mitwachsen-stones';
-import { stationOf, stationBodies } from './mitwachsen-station-look';
+import { OPEN_TICKS, stationOf, stationBodies } from './mitwachsen-station-look';
 import { LETTERS, STEPS, gridOf } from './mitwachsen-trace';
-import { CARS, SEAT, TRAIN, lineOf as trackOf, trainRoute } from './mitwachsen-train';
+import { CARS, SEAT, TRAIN, lineOf as trackOf, train, trainRoute } from './mitwachsen-train';
+import { ROOF_HALF, batPlatform, bearPlatform } from './mitwachsen-platform';
 import { batBodies, batOf } from './mitwachsen-bat-look';
 import { NEAR, capOf, shedIn } from './mitwachsen-build2';
 import { withBuilt } from './mitwachsen-built';
@@ -107,6 +109,88 @@ function rideWatched(w: World, start: State, dir: Dir): Watched {
   const mole = out.s.animals.find((a) => a.id === FIRST_MOLE);
   out.s = { ...arrived, animals: arrived.animals.map((a) => (a.id === FIRST_MOLE && mole ? mole : a)) };
   return out;
+}
+
+const AT = { now: 0, frac: 1, reduced: false, lit: false };
+const MID = 'ride:hoehle:mid';
+/** Rechts von einer Blickrichtung (wie in mitwachsen-station-look.ts): Tür +1 geht dorthin auf, −1 zur anderen Seite */
+const RIGHT: Record<Dir, Point> = { e: [0, 1], w: [0, -1], s: [-1, 0], n: [1, 0] };
+
+/** Die Figur kommt im Zug am Halt `end` an und steigt aus (Fahr-Engine, ein Takt nach `ALIGHT`); `inWay` steht im Weg */
+function alighted(w: World, base: State, end: End, inWay?: Point): State {
+  const r = trainRoute(w, base)!;
+  const seat = r.stops[end];
+  const animals = inWay ? [{ ...base.animals[0]!, id: 'im-weg', x: inWay[0], y: inWay[1] }] : [];
+  const ride = { id: TRAIN.id, phase: 'arrive' as const, at: -ALIGHT, pos: r.path.length - 1, speed: 1, to: end };
+  const s: State = {
+    ...base,
+    tick: 0,
+    animals,
+    player: { x: seat[0], y: seat[1], dir: 's' },
+    ride: { ...ride, feast: false, jingleAt: 0, greeted: [] },
+  };
+  FAHRT_PACK.rules!.ride!([train]).tick(s, w, { push: () => 0 });
+  return s;
+}
+
+/** Zu welcher Seite des Gleises geht die Tür des mittleren Wagens auf (angestoßen oder, `nudge` false, ohne)? [0, 0]: zu */
+function doorSide(w: World, s: State, nudge = true): Point {
+  const look = nudge ? { ...s, nudged: { id: TRAIN.id, at: s.tick } } : s;
+  const mid = stationBodies(look, w, AT).find((b) => b.id === MID);
+  const open = Number(/^ride:hoehle:mid:[01](-?1|0)/.exec(mid?.key ?? '')?.[1] ?? 0);
+  const [rx, ry] = mid ? RIGHT[mid.dir] : [0, 0];
+  return [open * rx, open * ry];
+}
+
+/**
+ * Was am Aussteigen an beiden Bahnhöfen nicht stimmt (Rückmeldung zur Höhle, Punkt 2): Der Zug ist da (an Bahnhof Bär
+ * nach Bau 1, an Bahnhof Fledermaus nach Bau 2 mit offenem Höhlentor), die Figur sitzt am Halt, und die Fahr-Engine lässt
+ * sie aussteigen. Sie steht dann auf dem eigenen Bahnsteig an der Tür (dem Feld an der Kante neben dem Sitz), nie auf
+ * einer Torplatte, und entlang des Gleises weiter als die halbe Breite des Dachs (`ROOF_HALF`) von seiner Mitte (Körper
+ * `bahn:dach` bzw. `bahn:felsdach`); steht dort ein Tier, auf einem anderen Feld des Bahnsteigs, ebenso frei vom Dach.
+ * Gleich nach dem Aussteigen steht die Tür zum eigenen Bahnsteig offen (ohne Anstoßen), nach `OPEN_TICKS` ist sie zu;
+ * angestoßen geht sie ebenso zum eigenen Bahnsteig auf. Ohne Gleis (Seed 33) nichts zu prüfen
+ */
+function exitFaults(w: World): string[] {
+  const bad: string[] = [];
+  const packs = withBuilt(withTok({}, { stage: 'offen' }), 2);
+  const base = { ...initialState(w, { packs, openGates: ['eis', 'hoehle'] }), sleeping: false, wokeAt: -100 };
+  const r = trainRoute(w, base);
+  if (!r) return [];
+  const bodies = [...stationBodies(base, w, AT), ...batBodies(w)];
+  for (const [end, st, roof] of [
+    ['out', bearPlatform(w), 'bahn:dach'],
+    ['home', batPlatform(w), 'bahn:felsdach'],
+  ] as const) {
+    const top = bodies.find((b) => b.id === roof);
+    const door = st?.rows[st.lane.findIndex((p) => key(p) === key(r.stops[end]))]?.edge;
+    if (!st || !top || !door) {
+      bad.push(`${end}: kein Bahnsteig, Dach oder Tür`);
+      continue;
+    }
+    const [ax, ay] = [st.lane[1]![0] - st.lane[0]![0], st.lane[1]![1] - st.lane[0]![1]];
+    const along = (p: Point) => Math.abs((p[0] - top.x) * ax + (p[1] - top.y) * ay);
+    for (const inWay of [undefined, door]) {
+      const s = alighted(w, base, end, inWay);
+      const at: Point = [s.player.x, s.player.y];
+      const what = `${end}${inWay ? ' (Tür besetzt)' : ''}`;
+      if (s.ride) bad.push(`${what}: nicht ausgestiegen`);
+      if (!inWay && key(at) !== key(door)) bad.push(`${what}: nicht an der Tür ${key(at)}`);
+      if (w.cell(...at).stop !== 'hoehle') bad.push(`${what}: nicht auf dem Bahnsteig ${key(at)}`);
+      if (w.cell(...at).plate) bad.push(`${what}: auf der Torplatte`);
+      if (along(at) <= ROOF_HALF) bad.push(`${what}: unter dem Dach (${along(at).toFixed(2)} Felder von der Mitte)`);
+    }
+    // beim Aussteigen und angestoßen geht die Tür des mittleren Wagens zum eigenen Bahnsteig auf (nicht zur Seite von
+    // Bahnhof Bär); nach dem Aussteigen nur kurz
+    const off = alighted(w, base, end);
+    const out = doorSide(w, off, false);
+    if (key(out) !== key(st.side)) bad.push(`${end}: Tür beim Aussteigen zur Seite ${key(out)}`);
+    const later = doorSide(w, { ...off, tick: off.tick + OPEN_TICKS }, false);
+    if (key(later) !== key([0, 0])) bad.push(`${end}: Tür bleibt nach dem Aussteigen offen`);
+    const side = doorSide(w, off);
+    if (key(side) !== key(st.side)) bad.push(`${end}: Tür zur Seite ${key(side)}`);
+  }
+  return bad;
 }
 
 /**
@@ -535,6 +619,10 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
       expect(trainStoneFaults(w, laid), `Seed ${seed}`).toEqual([]);
     });
 
+    it(`Seed ${seed}: Aussteigen sichtbar: an Bahnhof Bär und Fledermaus auf den eigenen Bahnsteig, an der Tür, nie unter dem Dach`, () => {
+      expect(exitFaults(w), `Seed ${seed}`).toEqual([]);
+    });
+
     it(`Seed ${seed}: Bau 2 als ganze Fahrt: Tok klopft am Prellbock, der Zug fährt bis Bahnhof Fledermaus, der Maulwurf zieht ein und läuft heim, Tok im Lokschuppen`, () => {
       expect(build2Ride(w), `Seed ${seed}`).toEqual([]);
     });
@@ -586,6 +674,15 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
       expect(bad, `Seed ${seed}`).toEqual([]);
     });
   }
+
+  // Aussteigen sichtbar über 10 Seeds, im tiefen Lauf 1 bis 40 (wie die Messung der Konzeptseite): die oben nicht schon
+  // gebauten frisch, nicht über worldOf, damit sie nicht im Speicher bleiben (der tiefe Lauf hält schon 22 mit Gleis)
+  it.each(seedsFor(seedRange(1, 40), [2, 3]).filter((seed) => !SEEDS.includes(seed)))(
+    'Seed %i: Aussteigen sichtbar: an Bahnhof Bär und Fledermaus auf den eigenen Bahnsteig, an der Tür, nie unter dem Dach',
+    (seed) => {
+      expect(exitFaults(createWorld(seed, [HOEHLE_PACK, BAHN_PACK], BUILT)), `Seed ${seed}`).toEqual([]);
+    },
+  );
 
   it('ohne Grotte endet das Gleis am Prellbock vor der Tür, auf der Lichtung dasselbe', () => {
     const seed = SEEDS[0]!;

@@ -7,8 +7,9 @@
 // wird nie gespeichert. Ein neuer Druck zum Fahrzeug oder Antippen steigt ein, ein gehaltener Pfeil stößt nur an; 2 s
 // später geht es los, in diesen 2 s steigt ein Pfeil weg wieder aus. Gelenkt wird nie, jeder Druck unterwegs bekommt ein
 // Winken. Vor Tieren auf der Strecke hält es, nach 1 s hüpfen sie beiseite; hindurch fährt es nie. Vor einem Tunnel
-// kündigt es ihn an. Am Ziel steigt die Figur nach 1 s aus. Folgende Tiere fahren nie mit, sie warten am Halt. Fehlt
-// ihm ein Paket (Ziel-Gegend, `Rider.dozing`), schläft es am Halt: schnarcht, steigt niemanden ein, bis es da ist.
+// kündigt es ihn an. Am Ziel steigt die Figur nach 1 s aus (wohin, darf das Fahrzeug vorschlagen: `Vehicle.exit`).
+// Folgende Tiere fahren nie mit, sie warten am Halt. Fehlt ihm ein Paket (Ziel-Gegend, `Rider.dozing`), schläft es am
+// Halt: schnarcht, steigt niemanden ein, bis es da ist.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Der Schlitten“ und „Tok und die Bahn“, Fahren)
 
 import { DIRS } from '../../../../lib/games/front';
@@ -318,9 +319,10 @@ function cheer(c: Ctx, s: Rider, world: World, events: RideEvents, start: boolea
 }
 
 /**
- * Am Ziel: Die Figur steigt neben dem Halt aus (nie auf eine Torplatte), das Fahrzeug bleibt dort (`docked`). Nach der
- * ersten Heimfahrt das Fest (Stufe `fest`, gespeichert); danach, was das Paket des Fahrzeugs noch will (`landed`;
- * ändert es dabei den Spielstand, wird gleich gespeichert)
+ * Am Ziel: Die Figur steigt neben dem Halt aus (nie auf eine Torplatte), wo das Fahrzeug es will (`Vehicle.exit`, der
+ * Zug: auf den Bahnsteig an der Tür, nie unter das Dach), sonst auf das nächste freie Feld; das Fahrzeug bleibt dort
+ * (`docked`), wann sie ausstieg, merkt `alighted` (im Bild geht die Tür auf). Nach der ersten Heimfahrt das Fest (Stufe `fest`, gespeichert); danach, was das Paket des Fahrzeugs noch
+ * will (`landed`; ändert es dabei den Spielstand, wird gleich gespeichert)
  */
 function alight(c: Ctx, s: Rider, world: World, events: RideEvents) {
   const ride = s.ride!;
@@ -329,10 +331,12 @@ function alight(c: Ctx, s: Rider, world: World, events: RideEvents) {
   const ok = aside(c, world, seat);
   const near = (x: number, y: number) =>
     ok(x, y) && !world.cell(x, y).plate && Math.abs((standHeight(world, s.openGates, x, y) ?? h) - h) <= 1;
-  const spot = freeNear(s, world, seat, near);
+  const fits = ([x, y]: Point) => near(x, y) && standHeight(world, s.openGates, x, y) !== null && !occupied(s, x, y);
+  const spot = c.v.exit?.(s, world, ride.to).find(fits) ?? freeNear(s, world, seat, near);
   if (!spot) return; // gleich noch einmal
   delete s.ride;
   s.docked = { ...s.docked, [c.id]: ride.to };
+  s.alighted = { id: c.id, at: s.tick }; // im Bild steht die Tür kurz offen, die Figur hüpft hindurch
   s.player = { x: spot[0], y: spot[1], dir: dirTo(seat[0] - spot[0], seat[1] - spot[1]) };
   const off = ev(c, 'alight', spot);
   events.push(off);
