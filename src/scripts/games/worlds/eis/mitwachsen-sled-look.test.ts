@@ -93,6 +93,16 @@ describe('Aussehen des Schlittens (mitwachsen-sled-look.ts)', () => {
     expect(colors(part(lit, `${SLED_ID}:schuppen`)).has(LAMP)).toBe(true);
   });
 
+  it('schläft er (die Fahr-Engine fehlt noch, Vorladen), kein goldener Rahmen; sonst derselbe Schlitten', () => {
+    const ready = at(undefined, 'bereit');
+    const sleepy = part(bodies({ ...ready, dozing: ['schlitten'] }), SLED_ID);
+    expect(colors(sleepy).has(GOLD.top)).toBe(false);
+    expect(colors(sleepy).has(RIDES[0].color)).toBe(true);
+    expect(xy(sleepy)).toEqual(HOME.seat);
+    // der schlafende Zug zählt nicht für den Schlitten
+    expect(colors(part(bodies({ ...ready, dozing: ['hoehle'] }), SLED_ID)).has(GOLD.top)).toBe(true);
+  });
+
   it('steht am Halt der Gegend der Figur: auf der Lichtung erst nach der ersten Heimfahrt (der Schuppen bleibt im Kessel)', () => {
     const lichtung = world.homes.lichtung.bed;
     expect(bodies(at(lichtung, 'bereit')).map((b) => b.id)).toEqual([`${SLED_ID}:schuppen`]);

@@ -19,6 +19,12 @@ export type RideId = 'schlitten' | 'hoehle';
  * auf true
  */
 export const BAHN_LIVE: boolean = false;
+/**
+ * Vorladen am Halt (`RIDE_PRELOAD`, Konzept „Reisewege“): Steht die Figur höchstens so viele Felder (Schachbrett) vor
+ * einem Halt eines Fahrzeugs, holt das Spiel die Pakete, die es zum Fahren braucht (Fahr-Engine, Ziel-Gegend). Fehlt
+ * eines noch, schläft das Fahrzeug freundlich (mitwachsen-preload.ts)
+ */
+export const RIDE_PRELOAD = 6;
 /** Zeichen auf dem Wimpel nach der Festfahrt (Schlitten: Schneeflocke; Zug: Kristall, kommt mit der Laternenfahrt) */
 export type Pennant = 'flocke' | 'kristall';
 

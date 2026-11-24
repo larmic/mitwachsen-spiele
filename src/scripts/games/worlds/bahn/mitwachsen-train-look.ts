@@ -4,7 +4,8 @@
 // Töne als WebAudio in der C-Pentatonik, je Ereignis höchstens ein Ton sofort, nie mehr als drei zugleich: Angestoßen
 // tutet er und die Tür geht mit „pff“ auf; Einsteigen „Ding-Dong“; Abfahrt sein Pfiff A5 → C6 (sein Signal); unterwegs
 // tutet er auf einen Pfeil höchstens alle 1,5 s, sonst klingt ein leiser Einzelton; vor einem Hindernis tutet er
-// freundlich; vor dem Tunnel „Uh-uh“; Ankunft „Ding-Dong“; aussteigen G5–C6; Tok hüpft heraus mit „Ju-hu“. Die Glocke
+// freundlich; vor dem Tunnel „Uh-uh“; Ankunft „Ding-Dong“; aussteigen G5–C6; Tok hüpft heraus mit „Ju-hu“; schläft er,
+// weil ein Paket fehlt, schnarcht er leise (Sinus G4 → E4, ein Zzz steigt auf). Die Glocke
 // beim Wechsel der Gegend spielt der Kern (Ereignis `realm`). Die Körper zeichnet mitwachsen-station-look.ts.
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Fahren)
 
@@ -14,7 +15,7 @@ import type { RideFx } from '../../mitwachsen-ride-view';
 import type { State } from '../../mitwachsen-state';
 import type { World } from '../../mitwachsen-world';
 import type { Scored } from '../../sfx';
-import { dingDong, juhu, pff, whistle } from './mitwachsen-tok-look';
+import { ZZZ, dingDong, juhu, pff, whistle } from './mitwachsen-tok-look';
 import { TRAIN, inTunnel } from './mitwachsen-train';
 
 const [A5, C6] = TRAIN.signal as readonly [number, number];
@@ -51,6 +52,8 @@ export function trainScores(e: RideEvent): Scored[] {
       ];
     case 'guest':
       return juhu();
+    case 'snore': // er schläft, bis sein Paket da ist: leise wie Tok im Schlaf
+      return [ZZZ];
     default: // ein Tier hüpft beiseite: das zeigt das Bild
       return [];
   }
@@ -72,6 +75,8 @@ export function trainFx(e: RideEvent): RideFx | undefined {
       return { score, who: e.who };
     case 'guest':
       return { score, who: e.who, heart: true };
+    case 'snore':
+      return { score, zzz: true };
     default:
       return { score };
   }

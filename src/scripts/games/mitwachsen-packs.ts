@@ -1,5 +1,6 @@
 // Welt-Pakete laden (Browser): per import() aus dem Netz oder dem Cache des Service Workers, je Paket ein Lader
-// (`LOADERS`), aber erst, wenn sein Tor eine Rolle spielt (`needsPack`, mitwachsen-pack.ts; jedes Paket für sich). Braucht eine Welt das Paket schon beim Öffnen, wartet der Start
+// (`LOADERS`), aber erst, wenn sein Tor eine Rolle spielt (`needsPack`, mitwachsen-pack.ts; jedes Paket für sich) oder
+// die Figur 6 Felder vor dem Halt eines Fahrzeugs steht, das es braucht (`RIDE_PRELOAD`, mitwachsen-preload.ts). Braucht eine Welt das Paket schon beim Öffnen, wartet der Start
 // höchstens `PACK_WAIT_MS` darauf; sonst kommt es im Takt nach, sobald es nötig wird, und wird in die laufende Welt
 // eingebaut (`arrive`). Scheitert das Laden, läuft das Spiel ohne diese Welt weiter, still wie ohne WebGL: Hinter ihrem
 // Tor steht eine Eisklippe, der Spielstand behält alles; beim nächsten Bedarf (frühestens nach `RETRY_MS`) neu versucht.
@@ -107,7 +108,7 @@ export class Packs {
   /**
    * Braucht der Spielstand ein Paket und fehlt es noch, wird es geholt; erfüllt, sobald alle nötigen da sind (oder
    * scheiterten). Jedes Paket für sich: sein Tor (`behind` seiner Gegend; ohne eigenes Tor die Bahn: `bahnWanted`, die
-   * Fahrzeuge: `fahrtWanted`), sein Laden, sein Neuversuch
+   * Fahrzeuge: `fahrtWanted`) oder ein Halt in der Nähe (`need.ride`, Vorladen: `preloadOf`), sein Laden, sein Neuversuch
    */
   want(need: Need, gates: ReadonlyMap<GateId, { mid: Point }>, now = performance.now()): Promise<void> {
     return Promise.all(this.ids.map((id) => this.wantOne(id, need, gates, now))).then(noop);
@@ -116,7 +117,8 @@ export class Packs {
   private wantOne(id: PackId, need: Need, gates: ReadonlyMap<GateId, { mid: Point }>, now: number) {
     const gate = REGIONS.find((r) => r.id === id)?.behind;
     const own = id === 'bahn' ? bahnWanted(need) : id === 'fahrt' && fahrtWanted(need);
-    const wanted = this.extra.includes(id) || (gate ? needsPack(need, gates, beyondRing, gate) : own);
+    const wanted =
+      this.extra.includes(id) || !!need.ride?.includes(id) || (gate ? needsPack(need, gates, beyondRing, gate) : own);
     if (this.get(id) || !wanted) return Promise.resolve();
     if (!this.loading.has(id) && now - (this.failedAt.get(id) ?? -Infinity) >= RETRY_MS)
       this.loading.set(

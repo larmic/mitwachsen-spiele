@@ -162,6 +162,11 @@ export class World3D {
   private glow!: MeshBasicMaterial; // leuchtet, so hell das Welt-Paket sagt: Eiskristalle beim Polarlicht (`View3D.glow`)
   private platforms!: Platforms3D; // Portal-Plattformen
   private chunks = new Map<string, Chunk>();
+  /**
+   * Messung (nur gezählt, ändert nichts; scripts/measure-ride.ts liest sie): Bilder, Zeit je Bild in `render` (ohne
+   * GPU), davon Bauen der Stücke, gebaute Stücke, Bilder mit Loch (ein Stück um das Ziel fehlt noch)
+   */
+  readonly stats = { frames: 0, ms: 0, maxMs: 0, built: 0, buildMs: 0, maxBuildMs: 0, holes: 0 };
   private stale = new Set<string>(); // Stücke, die neu gebaut werden müssen; bis dahin bleibt das alte stehen
   private stamp = ''; // was am Zustand der Pakete ihre Stücke ändert (`Views3D.stamp`): ändert es sich, alles neu
   private at: DecoAt = { now: 0, reduced: true, picked: {}, packs: {} }; // für drawDeco: leere Büsche, Schneemänner
@@ -334,6 +339,7 @@ export class World3D {
   };
 
   render(world: World, state: State, sc: Scene) {
+    const t0 = performance.now();
     if (this.world !== world) this.reset(world);
     this.explored = sc.explored;
     const work = workOf(state); // ein Bote baut (Tok): Die Gleiswelle kommt in 3D in Stufen (`reduced`, in 3D zuckt nichts)
@@ -413,6 +419,11 @@ export class World3D {
     this.glow.color.setRGB(...this.views.glow(sc.aurora, sc.reduced, sc.now));
     this.views.layers(this.scene, world, state, sc); // was die Welt-Pakete je Bild nachführen (Fuß- und Schneespur)
     this.renderer.render(this.scene, this.camera);
+    const st = this.stats;
+    const ms = performance.now() - t0;
+    st.frames++;
+    st.ms += ms;
+    st.maxMs = Math.max(st.maxMs, ms);
   }
 
   /** Postkarte: die Front des Tors `id` als Standbild in `out` (mitwachsen-card-3d.ts); vor `render` rufen */
@@ -544,8 +555,16 @@ export class World3D {
       }
     // nächste Stücke zuerst
     missing.sort((a, b) => Math.hypot(a[0] - pcx, a[1] - pcy) - Math.hypot(b[0] - pcx, b[1] - pcy));
+    const t0 = performance.now();
     for (const [cx, cy] of missing.slice(0, BUILD_PER_FRAME))
       this.chunks.set(`${cx},${cy}`, this.buildChunk(world, cx, cy));
+    const st = this.stats; // Messung: Bauzeit, und ob ein Stück gleich um das Ziel noch fehlt (ein Loch im Bild)
+    const ms = performance.now() - t0;
+    st.built += Math.min(missing.length, BUILD_PER_FRAME);
+    st.buildMs += ms;
+    st.maxBuildMs = Math.max(st.maxBuildMs, ms);
+    if (missing.slice(BUILD_PER_FRAME).some(([cx, cy]) => Math.max(Math.abs(cx - pcx), Math.abs(cy - pcy)) <= 1))
+      st.holes++;
     // veraltete Stücke ersetzen: erst das neue bauen, dann das alte wegräumen (nahe zuerst, eins mehr je Bild)
     const stale = [...this.stale]
       .filter((k) => want.has(k))

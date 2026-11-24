@@ -9,6 +9,8 @@
 // Felder neben dem Gleis (nicht auf Torplatte und Toks Platz). Nach der ersten Fahrt hat die Tür keinen goldenen Rahmen
 // mehr (`gefahren`, gespeichert); kommt sie (Ausbau 1) am Prellbock an, hüpft Tok aus dem hinteren Wagen an seinen Platz
 // neben der Torplatte (`BESIDE`, `landed`).
+// Steht die Figur 6 Felder vor einem Halt (`RIDE_PRELOAD`), holt das Spiel die Grotte (`needs`) und die Fahr-Engine;
+// solange die Engine fehlt oder (ab Ausbau 2) die Grotte, schläft der Zug am Halt (mitwachsen-preload.ts).
 // Bis zum Freischalten (`BAHN_LIVE`) holt das Spiel das Paket der Bahn nie von selbst: Dann gibt es den Zug nur im
 // Blick hinein (Entwickler-Schalter).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Fahren)
@@ -177,5 +179,16 @@ export function landed(s: Rider, world: World, end: End, events: RideEvents) {
   tokOut(s, world, end, events);
 }
 
-/** Der Zug für die Fahr-Engine (`pack.rules.vehicle`): Eintrag, Strecke, nach der ersten Fahrt (`landed`) */
-export const train: Vehicle = { spec: TRAIN, route: trainRoute, landed };
+/**
+ * Der Zug für die Fahr-Engine (`pack.rules.vehicle`): Eintrag, Strecke, nach der ersten Fahrt (`landed`); seine
+ * Ziel-Gegend ist die Grotte (`needs`): vorgeladen schon, solange er nur bis zum Prellbock fährt, damit sie da ist, wenn
+ * Bau 2 kommt; schlafen (Vorladen, mitwachsen-preload.ts) muss er ohne sie erst ab Ausbau 2, wenn er hineinfährt
+ * (`reaches`). Die erste Fahrt wartet nie auf die Grotte
+ */
+export const train: Vehicle = {
+  spec: TRAIN,
+  route: trainRoute,
+  landed,
+  needs: ['hoehle'],
+  reaches: (s) => builtOf(s.packs) >= 2,
+};

@@ -35,6 +35,7 @@ import type { PackEvent, Ride, RideEvent, WorldRules } from './mitwachsen-pack-t
 import type { MoveCmd, RideEngine, RideRules, Vehicle } from './mitwachsen-rider';
 import type { RideId } from '../../data/games/mitwachsen-rides';
 import { hooksOf, type HeraldEvent, type HeraldRules, type Work } from './mitwachsen-herald';
+import { dozingOf } from './mitwachsen-preload';
 import { listen } from './mitwachsen-listen';
 import { roostAt } from './mitwachsen-roost';
 
@@ -87,6 +88,8 @@ export type State = Omit<Progress, 'position'> & {
   rideDue: number; // Takt, ab dem das Fahrzeug erscheint, danach: herbeigetrabt bzw. angestoßen (-1: nie; nicht gespeichert)
   nudged?: { id: RideId; at: number }; // zuletzt angestoßenes Fahrzeug, das nicht von selbst erscheint (Zug), und wann (nicht gespeichert)
   docked?: Partial<Record<RideId, 'home' | 'out'>>; // an welchem Halt ein Fahrzeug zuletzt ankam (beide Halte in einer Gegend; nicht gespeichert)
+  dozing?: readonly RideId[]; // Fahrzeuge, denen ein Paket zum Fahren fehlt: Sie schlafen am Halt (`dozingOf`, je Befehl; nicht gespeichert)
+  snored?: { id: RideId; at: number }; // zuletzt auf einen Druck schnarchendes Fahrzeug und wann (Drossel; nicht gespeichert)
   heraldDue: number; // Bote einer Welt (Tok): Takt, ab dem er auftaucht bzw. aufgetaucht ist (-1: nicht fällig; nicht gespeichert, mitwachsen-herald.ts)
   work?: Work; // Bote einer Welt baut (Tok: Bau 1), von Takt bis Takt; solange hüpft die Figur nur (nicht gespeichert, mitwachsen-herald.ts)
   late: boolean; // Abend: Die Uhr des Kinds hat `BED_AT` erreicht (die Komponente setzt es, mitwachsen-tired.ts; nicht gespeichert)
@@ -310,6 +313,10 @@ export function step(
   // versetzen die Figur (Schritt, Reise, Bett), Takte nie
   s.still = cmd.type === 'tick' && !cmd.held ? s.still + 1 : 0;
   const { ride, herald, meet } = hooksOf(rules); // aus den Paketen: Fahrzeug (fällig, erscheinen, fahren), Bote (Tok)
+  // Fehlt einem Fahrzeug ein Paket (Fahr-Engine, Ziel-Gegend), schläft es am Halt (Vorladen, mitwachsen-preload.ts)
+  const dozing = dozingOf(rules, world, s);
+  if (dozing.length) s.dozing = dozing;
+  else delete s.dozing;
   if (cmd.type === 'tick') {
     tick(s, world, events, ride);
     ride?.tick(s, world, events);

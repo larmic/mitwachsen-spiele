@@ -109,10 +109,10 @@ export const RULES: Rule[] = [
     pages: /^spielen\/index\.html$/,
     // Die Fahr-Engine aller Fahrzeuge (einsteigen, fahren, Hindernis, Tunnel, ankommen), samt dem, was sie mit den Paketen
     // der Fahrzeuge teilt (Halte, Spielstand packs.fahrt); keine eigene Welt, kein 3D-Teil. Kommt, sobald es ein Fahrzeug
-    // geben kann (Eistor offen)
+    // geben kann (Eistor offen); dazu das Schlafen am Halt, solange ein Paket fehlt (Vorladen)
     chunks: /\/welt-fahrt\.[\w-]+\.js$/,
-    // Gemessen 7791 Bytes (7,6 KB)
-    budget: 8.4 * 1024,
+    // Gemessen 8680 Bytes (8,5 KB)
+    budget: 9.4 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

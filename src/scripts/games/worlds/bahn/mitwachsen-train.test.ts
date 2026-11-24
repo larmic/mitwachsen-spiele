@@ -5,12 +5,12 @@ import { describe, expect, it } from 'vitest';
 import { fromKey } from '../../../../lib/games/chunks';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import { animalId, type Point } from '../../../../data/games/mitwachsen';
-import { BAHN_LIVE, RIDES } from '../../../../data/games/mitwachsen-rides';
+import { BAHN_LIVE, RIDES, RIDE_PRELOAD } from '../../../../data/games/mitwachsen-rides';
 import { BESIDE, plateRow } from '../../mitwachsen-bay';
 import { TUNNEL_LIGHT } from '../../mitwachsen-dusk';
 import { bahnWanted } from '../../mitwachsen-pack';
 import type { RideEvent } from '../../mitwachsen-pack-types';
-import { ALIGHT, DEPART, JINGLE_EVERY, SHOO, TAP_REACH, parked, stopsOf } from '../../mitwachsen-ride-kit';
+import { ALIGHT, DEPART, JINGLE_EVERY, SHOO, SNORE_EVERY, TAP_REACH, parked, stopsOf } from '../../mitwachsen-ride-kit';
 import { ridden, withTok } from '../../mitwachsen-ride-save';
 import { BENCH } from '../../mitwachsen-border';
 import { SLEEP_LOCK } from '../../mitwachsen-state';
@@ -429,6 +429,89 @@ describe('Fahren mit der Höhlenbahn: Regeln (Fahr-Engine mit dem Zug)', () => {
   });
 });
 
+describe('Vorladen am Halt: der Zug schläft, solange seine Ziel-Gegend fehlt (mitwachsen-preload.ts)', () => {
+  /** Ausbau 2 ohne Grotte: ihr Paket lädt noch (oder das Laden scheiterte); der Zug steht noch vor der ersten Fahrt */
+  const W2A = worldOf(1, [BAHN_PACK], BUILT);
+  const { at, dir } = onPlatform(W2A);
+  const midOf = (st: State, w: World, a = AT) => stationBodies(st, w, a).find((b) => b.id === 'ride:hoehle:mid')!;
+  const GOLDEN = '#b46a0c';
+  const sleepy = () => awake(W2A, at, FAR);
+
+  it('Ausbau 1: Die erste Fahrt bis zum Prellbock wartet nie auf die Grotte (vorgeladen wird sie trotzdem)', () => {
+    expect(train.needs).toEqual(['hoehle']);
+    const p = onPlatform(W1); // W1: ohne Grotte
+    const run = play(awake(W1, p.at), W1, [{ type: 'move', dir: p.dir, fresh: true }]);
+    expect(run.s.dozing).toBeUndefined();
+    expect(run.s.ride?.id).toBe('hoehle');
+  });
+
+  it('Hineinlaufen und Antippen steigen nicht ein, er schnarcht leise (gedrosselt), die Figur bleibt stehen', () => {
+    const fresh = play(sleepy(), W2A, [{ type: 'move', dir, fresh: true }]);
+    expect(fresh.s.dozing).toEqual(['hoehle']);
+    expect(rides(fresh.events).map((e) => e.what)).toEqual(['snore']);
+    expect(fresh.s.ride).toBeUndefined();
+    expect(pos(fresh.s)).toEqual(at); // durch den Zug läuft niemand, nichts ist zu
+    const tap: Cmd = { type: 'move', dir, fresh: true, tap: true, ride: 'hoehle' };
+    expect(rides(play(fresh.s, W2A, [...ticks(3), tap]).events)).toEqual([]); // gedrosselt
+    const later = play(fresh.s, W2A, [...ticks(JINGLE_EVERY), tap]);
+    expect(rides(later.events).map((e) => e.what)).toEqual(['snore']);
+    expect(later.s.ride).toBeUndefined();
+    expect(pos(later.s)).toEqual(at); // gelaufen wird per Antippen nie
+  });
+
+  it('er schnarcht von selbst alle 3 s, solange die Figur höchstens 6 Felder vor ihm steht; weiter weg ist er still', () => {
+    const near = play(sleepy(), W2A, ticks(SNORE_EVERY * 2));
+    expect(rides(near.events, 'snore')).toHaveLength(2);
+    const bed = W2A.homes.lichtung.bed;
+    const seat = trainRoute(W2A, { packs: FAR, openGates: [] })!.stops.out;
+    expect(Math.max(Math.abs(bed[0] - seat[0]), Math.abs(bed[1] - seat[1]))).toBeGreaterThan(RIDE_PRELOAD);
+    expect(rides(play(awake(W2A, bed, FAR), W2A, ticks(SNORE_EVERY * 2)).events)).toEqual([]);
+    expect(trainFx({ type: 'ride', what: 'snore', id: 'hoehle', x: 0, y: 0 })).toMatchObject({ zzz: true });
+  });
+
+  it('im Bild: keine goldene Tür, kein Dampf, keine Lampen (auch abends), nichts grau; ist die Grotte da, steigt man ein', () => {
+    const s = play(sleepy(), W2A, [TICK]).s;
+    const lit: RideAt = { ...AT, lit: true };
+    const bodies = stationBodies(s, W2A, lit);
+    expect(bodies.some((b) => b.id === 'ride:hoehle:dampf')).toBe(false);
+    expect(bodies.find((b) => b.id === 'ride:hoehle:loco')!.key.endsWith('0')).toBe(true);
+    expect(midOf(s, W2A).parts.some((p) => p[6] === GOLDEN)).toBe(false);
+    // nichts grau oder zu: der Wagen sieht aus wie nach der ersten Fahrt (Stufe `offen`, ohne Gold)
+    const opened = withBuilt(withTok({}, { stage: 'offen' }), 2);
+    expect(midOf(s, W2A).key).toBe(midOf(awake(W2, at, opened), W2).key);
+    // derselbe Spielstand, die Grotte ist angekommen: Er wacht auf, die Tür ist golden, ein neuer Druck steigt ein
+    const awakeNow = play(s, W2, [TICK]).s;
+    expect(awakeNow.dozing).toBeUndefined();
+    expect(midOf(awakeNow, W2).parts.some((p) => p[6] === GOLDEN)).toBe(true);
+    expect(play(awakeNow, W2, [{ type: 'move', dir, fresh: true }]).s.ride?.id).toBe('hoehle');
+  });
+
+  it('wacht er gleich nach dem Schnarchen auf, ist die Tür zu, und ein gehaltener Pfeil stößt ihn sofort an', () => {
+    const snored = play(sleepy(), W2A, [{ type: 'move', dir, fresh: true }]).s;
+    expect(snored.nudged).toBeUndefined(); // das Schnarchen öffnet keine Tür
+    const woke = play(snored, W2, [TICK]).s;
+    const shut = play(sleepy(), W2, [TICK]).s;
+    expect(midOf(woke, W2).key).toBe(midOf(shut, W2).key);
+    const held = play(woke, W2, [{ type: 'move', dir }]);
+    expect(rides(held.events).map((e) => e.what)).toEqual(['nudge']);
+  });
+
+  it('solange Tok baut (Bau 1), schläft nichts: kein Schnarchen, Dampf und Licht wie sonst', () => {
+    const work = { from: 0, to: 100_000 };
+    const run = play(awake(W2A, at, FAR, { work }), W2A, ticks(SNORE_EVERY * 2));
+    expect(run.s.dozing).toBeUndefined();
+    expect(rides(run.events, 'snore')).toEqual([]);
+    // ohne Fahr-Engine schliefe er sonst auch
+    expect(play(awake(W1, at, READY, { work }), W1, [TICK], [BAHN_PACK]).s.dozing).toBeUndefined();
+  });
+
+  it('ohne Fahr-Engine schläft er auch (nur das Bild, ohne Regeln fährt nichts); ohne Paket der Bahn gibt es keinen Zug', () => {
+    expect(play(awake(W1, at), W1, [TICK], [BAHN_PACK]).s.dozing).toEqual(['hoehle']);
+    expect(play(awake(W2, at, FAR), W2, [TICK], [BAHN_PACK]).s.dozing).toEqual(['hoehle']);
+    expect(play(awake(W1, at), W1, [TICK], [EIS_PACK, FAHRT_PACK]).s.dozing).toBeUndefined();
+  });
+});
+
 describe('Fahr-Engine mit zwei Fahrzeugen (Schlitten und Zug)', () => {
   it('ein Fahrzeug ohne `ready` stört das Erscheinen des anderen nicht; ein Antippen gehört dem angetippten', () => {
     // ein zweites Fahrzeug mit der Daten des Schlittens auf einer Strecke neben dem Bett der Lichtung
@@ -487,6 +570,7 @@ describe('Fahr-Engine mit zwei Fahrzeugen (Schlitten und Zug)', () => {
       'alight',
       'leave',
       'guest',
+      'snore',
     ];
     for (const what of all) {
       const score = trainScores(e(what, { ring: true }));

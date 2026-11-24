@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { DEV_BUILT, DEV_EVENING, DEV_PARAM, devLate, devProgress, glimpse, sandbox } from './mitwachsen-dev';
+import {
+  DEV_BUILT,
+  DEV_EVENING,
+  DEV_PARAM,
+  DEV_PRELOAD,
+  devLate,
+  devProgress,
+  glimpse,
+  sandbox,
+} from './mitwachsen-dev';
 import type { Progress } from './mitwachsen-state';
 import { PACK_IDS } from './mitwachsen-packs';
 import type { PackId } from './mitwachsen-pack-types';
@@ -83,6 +92,17 @@ describe('Entwickler-Schalter', () => {
     // zweimal vorgespielt: nichts doppelt
     expect(devProgress(['bahn'], '?entwickler=bahn&bau=0', p).garden).toEqual(p.garden);
     expect([p.position, p.met, p.day]).toEqual([saved.position, saved.met, saved.day]);
+  });
+
+  it('`&vorladen=1`: die Bahn bringt die Grotte nicht mit, sie kommt erst über das Vorladen am Halt (der Zug schläft bis dahin)', () => {
+    expect(DEV_PRELOAD).toBe('vorladen');
+    expect(glimpse('?entwickler=bahn&bau=1&vorladen=1', PACK_IDS)).toEqual({
+      packs: ['bahn', 'fahrt'],
+      home: 'lichtung',
+    });
+    expect(glimpse('?entwickler=bahn&vorladen=0', PACK_IDS).packs).toContain('hoehle');
+    // selbst genannt, kommt sie trotzdem
+    expect(glimpse('?entwickler=hoehle,bahn&vorladen=1', PACK_IDS).packs).toContain('hoehle');
   });
 
   it('`&abend=1`: Abend für die Regeln, nur im Blick hinein', () => {

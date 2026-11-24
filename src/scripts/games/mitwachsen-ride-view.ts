@@ -32,9 +32,10 @@ export type RideAt = { now: number; frac: number; reduced: boolean; lit: boolean
 
 /**
  * Antwort der Ansicht auf ein Ereignis eines Fahrzeugs: Töne, wer hüpft (`who`: Tier, `player`, sonst niemand), ob er
- * ein Herz bekommt, Funken an der Stelle des Ereignisses (`burst`, nicht bei reduzierter Bewegung)
+ * ein Herz bekommt, Funken an der Stelle des Ereignisses (`burst`, nicht bei reduzierter Bewegung), ein Zzz steigt dort
+ * auf (`zzz`: ein schlafendes Fahrzeug, nicht bei reduzierter Bewegung)
  */
-export type RideFx = { score: readonly Scored[]; who?: string; heart?: true; burst?: readonly string[] };
+export type RideFx = { score: readonly Scored[]; who?: string; heart?: true; burst?: readonly string[]; zzz?: true };
 
 /** Der Körper, in dem die Figur sitzt (nur während der Fahrt) */
 export const seatOf = (rides: readonly RideBody[]) => rides.find((r) => r.seat);

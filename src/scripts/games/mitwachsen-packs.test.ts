@@ -218,6 +218,21 @@ describe('Welt-Pakete laden (Packs)', () => {
     expect(bed.openGates).not.toContain('hoehle');
   });
 
+  it('Vorladen am Halt: `need.ride` holt die Pakete, die ein Fahrzeug braucht, auch ohne Bedarf am Tor (das Höhlentor bleibt zu)', async () => {
+    const asked: string[] = [];
+    const hoehle = { ...pack, id: 'hoehle', gate: 'hoehle' } as LoadedPack;
+    const packs = new Packs(
+      () => {},
+      (id) => (asked.push(id), Promise.resolve(id === 'eis' ? pack : hoehle)),
+      ['eis', 'hoehle'],
+    );
+    await packs.want({ ...bed, ride: [] }, gates);
+    expect(asked).toEqual([]);
+    await packs.want({ ...bed, ride: ['hoehle'] }, gates);
+    expect(asked).toEqual(['hoehle']);
+    expect(packs.get('hoehle')).toBe(hoehle);
+  });
+
   it('der echte Lader der Höhlenwelt bringt ihr Paket (Tor, Bau, Zeichenteile, 3D-Teil auf Abruf)', async () => {
     const packs = new Packs(() => {});
     packs.extra = ['hoehle'];

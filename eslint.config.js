@@ -48,7 +48,7 @@ export default defineConfig(
     files: ['src/scripts/games/mitwachsen-3d.ts'],
     rules: {
       complexity: ['error', 38],
-      'max-lines': ['error', { max: 857, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['error', { max: 901, skipBlankLines: true, skipComments: true }],
       'max-lines-per-function': ['error', { max: 140, skipBlankLines: true, skipComments: true }],
     },
   },

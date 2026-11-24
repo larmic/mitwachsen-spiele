@@ -40,6 +40,8 @@ import { createWorld, gatePlaces, standHeight, type World } from './mitwachsen-w
 import { unstick } from './mitwachsen-free';
 import { GUIDE_GATE, pending, type GuideRules } from './mitwachsen-guide';
 import { PACK_IDS, Packs, dawnOf, type LoadedPack } from './mitwachsen-packs';
+import { preloadOf } from './mitwachsen-preload';
+import type { Need } from './mitwachsen-pack';
 import { devLate, devProgress, glimpse, sandbox } from './mitwachsen-dev';
 import { randomId, randomSeed, savedOrNew, showName } from './mitwachsen-world-list';
 import { platformLift, portalColor } from './mitwachsen-portal';
@@ -356,8 +358,10 @@ class LarmicMitwachsen extends HTMLElement {
     this.state = state;
     // Ist die Leiste der Lichtung voll, gelten die Regeln des Pinguins aus dem Paket der Eis-Welt (bis er im Kessel wohnt)
     if (!this.guide && pending(state)) this.guide = this.packs.at(GUIDE_GATE)?.lead;
-    const { player, held } = state; // Pakete der Welten holen, sobald ihr Tor eine Rolle spielt
-    void this.packs.want({ ...state, at: [[player.x, player.y], held] }, this.world.gates);
+    // Pakete der Welten holen, sobald ihr Tor eine Rolle spielt; vor einem Halt, was sein Fahrzeug braucht (Vorladen)
+    const at: Need['at'] = [[state.player.x, state.player.y], state.held];
+    const ride = preloadOf(this.packs.loaded, this.world, state, at);
+    void this.packs.want({ ...state, at, ride }, this.world.gates);
     this.lift();
     if (events.length) this.react(events);
     if (cmd.type === 'tick') this.ageTired();
@@ -639,6 +643,10 @@ class LarmicMitwachsen extends HTMLElement {
     if (fx?.who) this.hops.set(fx.who, now);
     if (fx?.who && fx.heart) this.float('heart', fx.who, GAME_COLORS.heart, now + 150);
     if (fx?.burst) this.burst('', fx.burst, 24, { x: e.x, y: e.y, z: this.world.cell(e.x, e.y).h + 0.4 });
+    if (fx?.zzz && !this.reduced.matches) {
+      const z = this.world.cell(e.x, e.y).h + 1.2; // ein schlafendes Fahrzeug: Zzz über dem Dach (Ort statt Wesen)
+      this.floats.push({ kind: 'zzz', who: 'spot', color: GAME_COLORS.star, born: now, x: e.x, y: e.y, z, age: 0 });
+    }
     if (e.type === 'herald' && e.relay) this.relay();
     if (e.persist) this.save();
   }
@@ -898,7 +906,12 @@ class LarmicMitwachsen extends HTMLElement {
     const floats: Float[] = [];
     for (const f of this.floats) {
       if (t < f.born) continue;
-      const b = f.who === 'bed' ? { x: f.x, y: f.y, z: 1.3, hop: 0 } : this.bodies.get(f.who!);
+      const b =
+        f.who === 'bed'
+          ? { x: f.x, y: f.y, z: 1.3, hop: 0 }
+          : f.who === 'spot'
+            ? { x: f.x, y: f.y, z: f.z, hop: 0 }
+            : this.bodies.get(f.who!);
       if (!b) continue;
       floats.push({ ...f, x: b.x, y: b.y, z: b.z + (f.who === 'player' ? 1.5 : 0.9), age: t - f.born });
     }

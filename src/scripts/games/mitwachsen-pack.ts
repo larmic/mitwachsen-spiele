@@ -17,7 +17,7 @@ import {
 } from '../../data/games/mitwachsen';
 import { BAHN_LIVE } from '../../data/games/mitwachsen-rides';
 import { GUIDE_GATE, pending, type Guided } from './mitwachsen-guide';
-import type { Beyond } from './mitwachsen-pack-types';
+import type { Beyond, PackId } from './mitwachsen-pack-types';
 import { startRealm, type Realms } from './mitwachsen-home';
 
 /** So nah (in Feldern, auch schräg) muss die Figur dem Tor kommen, dann kommt das Paket seiner Welt schon einmal */
@@ -25,9 +25,13 @@ export const NEAR_GATE = 40;
 
 /**
  * Was die Entscheidung vom Spielstand braucht: offene Tore, Tiere zu Hause und die Orte, an denen die Figur ist oder
- * gespeichert war (`at`: Position und, solange ein Paket fehlt, die gehaltene Position im Spielstand)
+ * gespeichert war (`at`: Position und, solange ein Paket fehlt, die gehaltene Position im Spielstand); `ride`: Pakete,
+ * die ein Fahrzeug braucht, vor dessen Halt die Figur steht (Vorladen, `preloadOf` in mitwachsen-preload.ts)
  */
-export type Need = Pick<Guided, 'openGates' | 'garden'> & { at: readonly (readonly [number, number] | undefined)[] };
+export type Need = Pick<Guided, 'openGates' | 'garden'> & {
+  at: readonly (readonly [number, number] | undefined)[];
+  ride?: readonly PackId[];
+};
 
 /**
  * Braucht das Spiel das Paket der Welt hinter dem Tor `gate` (ohne Angabe das Eistor)? Ja, wenn das Tor offen ist, wenn

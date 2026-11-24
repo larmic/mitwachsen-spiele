@@ -7,12 +7,13 @@
 // wird nie gespeichert. Ein neuer Druck zum Fahrzeug oder Antippen steigt ein, ein gehaltener Pfeil stößt nur an; 2 s
 // später geht es los, in diesen 2 s steigt ein Pfeil weg wieder aus. Gelenkt wird nie, jeder Druck unterwegs bekommt ein
 // Winken. Vor Tieren auf der Strecke hält es, nach 1 s hüpfen sie beiseite; hindurch fährt es nie. Vor einem Tunnel
-// kündigt es ihn an. Am Ziel steigt die Figur nach 1 s aus. Folgende Tiere fahren nie mit, sie warten am Halt.
+// kündigt es ihn an. Am Ziel steigt die Figur nach 1 s aus. Folgende Tiere fahren nie mit, sie warten am Halt. Fehlt
+// ihm ein Paket (Ziel-Gegend, `Rider.dozing`), schläft es am Halt: schnarcht, steigt niemanden ein, bis es da ist.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Der Schlitten“ und „Tok und die Bahn“, Fahren)
 
 import { DIRS } from '../../../../lib/games/front';
 import type { Point } from '../../../../data/games/mitwachsen';
-import type { RideId } from '../../../../data/games/mitwachsen-rides';
+import { RIDE_PRELOAD, type RideId } from '../../../../data/games/mitwachsen-rides';
 import { dirTo, freeNear, occupied } from '../../mitwachsen-free';
 import type { Ride, RideEvent } from '../../mitwachsen-pack-types';
 import {
@@ -23,6 +24,7 @@ import {
   DUE,
   JINGLE_EVERY,
   SHOO,
+  SNORE_EVERY,
   TAP_REACH,
   cellOf,
   key,
@@ -182,6 +184,28 @@ function atStop(c: Ctx, s: Rider, world: World, at: Parked, cmd: MoveCmd, events
     events.push({ type: 'bump' }); // Schuppen
   else if (cmd.fresh) board(c, s, world, at, events);
   else nudge(c, s, at, events);
+  return true;
+}
+
+/** Schläft das Fahrzeug, weil ihm ein Paket fehlt (Fahr-Engine, Ziel-Gegend; `Rider.dozing`, mitwachsen-preload.ts)? */
+const dozes = (c: Ctx, s: Rider) => !!s.dozing?.includes(c.id);
+
+/**
+ * Am Halt, solange es schläft (ein Paket lädt noch): Hineinlaufen oder Antippen steigt nicht ein, es schnarcht nur leise
+ * (`snore`, höchstens alle `JINGLE_EVERY` Takte), die Figur bleibt stehen wie an jedem Fahrzeug; nichts ist zu, es
+ * wacht auf, sobald das Paket da ist
+ */
+function doze(c: Ctx, s: Rider, at: Parked, cmd: MoveCmd, events: RideEvents): boolean {
+  const p = s.player;
+  const [tx, ty] = [p.x + DIRS[cmd.dir][0], p.y + DIRS[cmd.dir][1]];
+  const reach = cmd.tap ? cheb(p.x, p.y, ...at.seat) <= TAP_REACH : at.cells.has(key(tx, ty));
+  if (!reach) return !!cmd.tap; // Laufen per Antippen gibt es nicht
+  if (!cmd.tap) p.dir = cmd.dir;
+  const last = s.snored?.id === c.id ? s.snored.at : -1; // eigene Drossel: `nudged` öffnet im Bild die Tür
+  if (last < 0 || s.tick - last >= JINGLE_EVERY) {
+    s.snored = { id: c.id, at: s.tick };
+    events.push(ev(c, 'snore', at.seat));
+  }
   return true;
 }
 
@@ -363,6 +387,12 @@ export function rideRules(v: Vehicle): One {
       if (!stageOf(s.packs, id)) return v.ready ? due(c, s, world, events) : undefined;
       const at = parked(v.spec, c.r, s, world);
       if (!at || s.sleeping) return; // nachts ist es still (auch `come` fällt dann aus)
+      if (dozes(c, s)) {
+        // es schläft, bis sein Paket da ist: schnarcht leise, wenn die Figur nah ist (kein `come`)
+        const near = cheb(s.player.x, s.player.y, ...at.seat) <= RIDE_PRELOAD;
+        if (near && s.tick % SNORE_EVERY === 0) events.push(ev(c, 'snore', at.seat));
+        return clear(c, s, world, at, events);
+      }
       if (v.ready && s.tick === s.rideDue) events.push(ev(c, 'come', at.seat)); // herbeigetrabt: bimmelt, schnaubt, Herz
       clear(c, s, world, at, events);
     },
@@ -376,7 +406,7 @@ export function rideRules(v: Vehicle): One {
         return true; // gelenkt wird nie
       }
       const at = parked(v.spec, c.r, s, world);
-      if (at) return atStop(c, s, world, at, cmd, events);
+      if (at) return dozes(c, s) ? doze(c, s, at, cmd, events) : atStop(c, s, world, at, cmd, events);
       return !!cmd.tap; // Antippen ohne Fahrzeug am Halt (Schuppen von fern): nichts, nie laufen
     },
     blocks(s, world, a, x, y) {

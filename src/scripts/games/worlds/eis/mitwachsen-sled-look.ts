@@ -130,7 +130,15 @@ export function sledBodies(state: State, world: World, at: RideAt): readonly Rid
   const [seat, pull] = pair.map((s) => narrow(s, g)) as [Spot, Spot];
   const since = state.tick - state.rideDue; // `rideDue`: Takt des Herbeitrabens bzw. des letzten Anstoßens
   const open = !state.ride && state.rideDue >= 0 && since >= 0 && since < OPEN_TICKS;
-  const look = { frame: stage === 'bereit', pennant: stage === 'fest', lamp: at.lit, seated: !!state.ride, open };
+  // schläft er (die Fahr-Engine fehlt noch, Vorladen), kein goldener Rahmen: Einsteigen geht dann nicht
+  const dozing = !!state.dozing?.includes(SLED.id);
+  const look = {
+    frame: stage === 'bereit' && !dozing,
+    pennant: stage === 'fest',
+    lamp: at.lit,
+    seated: !!state.ride,
+    open,
+  };
   const key = `${SLED_ID}:${+look.frame}${+look.pennant}${+look.lamp}${+look.seated}${+look.open}`;
   out.push(
     { id: SLED_ID, key, ...seat, parts: model(key, () => sledParts(look)), ...(state.ride && { seat: true as const }) },

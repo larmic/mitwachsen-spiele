@@ -9,7 +9,9 @@
 // die ganze Linie; der Zug steht dann am Bahnhof Bär, Stufe `bereit`, die Figur kann einsteigen und fahren). Mit
 // `&bau=0` spielt sie den Stand vor, in dem Tok kommt: noch nichts gebaut, Eistor offen (dafür holt sie das Paket der
 // Eis-Welt mit), Eis-Leiste voll, erste Heimfahrt mit dem Schlitten gemacht; `&abend=1` macht es Abend (Tok kommt
-// schlafend, `devLate`).
+// schlafend, `devLate`); `&vorladen=1` bringt die Grotte nicht mit: Sie kommt erst, wenn die Figur 6 Felder vor einem
+// Halt steht (`RIDE_PRELOAD`), bis dahin schläft der Zug (bei Ausbau 2, dem Standard; mit `&bau=1` fährt er ohne sie
+// bis zum Prellbock, sie wird nur vorgeladen).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Die Kristallgrotte“, Entwickler-Schalter, und „Tok und die Bahn“)
 
 import { REGIONS, animalId, type RegionId } from '../../data/games/mitwachsen';
@@ -23,6 +25,11 @@ export const DEV_PARAM = 'entwickler';
 export const DEV_BUILT = 'bau';
 /** Abend vorspielen (`&abend=1`): Die Regeln sehen die Uhr des Kinds bei `BED_AT` (Tok kommt schlafend) */
 export const DEV_EVENING = 'abend';
+/**
+ * Vorladen vorspielen (`&vorladen=1`): Die Bahn bringt die Grotte nicht mit, sie kommt erst, wenn die Figur 6 Felder vor
+ * einem Halt steht (`RIDE_PRELOAD`); bis dahin schläft der Zug am Bahnhof (ab Ausbau 2)
+ */
+export const DEV_PRELOAD = 'vorladen';
 /** Pakete, die ein Paket im Blick hinein mitbringt: die Bahn die Grotte (dort endet ihr Gleis) und die Fahr-Engine (der Zug fährt) */
 const WITH: Partial<Record<PackId, readonly PackId[]>> = { bahn: ['hoehle', 'fahrt'] };
 
@@ -38,14 +45,18 @@ const builtIn = (search: string): 0 | 1 | 2 => {
 /**
  * Pakete, in die der Entwickler-Schalter blicken lässt (`?entwickler=<welt>[,<welt>…]` in `search`, der Adresse ab
  * „?“), soweit es sie gibt (`ids`), in der genannten Reihe, dazu was sie mitbringen (`WITH`; die Bahn mit `&bau=0`
- * auch die Eis-Welt, deren Tor dann offen ist); `home`: die erste genannte Welt mit Bett, mit der Bahn allein die
+ * auch die Eis-Welt, deren Tor dann offen ist; mit `&vorladen=1` ohne die Grotte, die holt dann das Vorladen am Halt);
+ * `home`: die erste genannte Welt mit Bett, mit der Bahn allein die
  * Lichtung (null: kein Schalter). Kein Schalter oder nichts Bekanntes: keine Pakete
  */
 export function glimpse(search: string, ids: readonly PackId[]): Glimpse {
   const named = (new URLSearchParams(search).get(DEV_PARAM) ?? '').split(',');
   const own = ids.filter((id) => named.includes(id)).sort((a, b) => named.indexOf(a) - named.indexOf(b));
   const tok: PackId[] = own.includes('bahn') && builtIn(search) === 0 ? ['eis'] : [];
-  const packs = [...new Set([...own, ...own.flatMap((id) => WITH[id] ?? []), ...tok])].filter((id) => ids.includes(id));
+  // mit `&vorladen=1` kommt die Grotte erst am Halt (außer, sie ist selbst genannt)
+  const later = new URLSearchParams(search).get(DEV_PRELOAD) === '1' && !own.includes('hoehle');
+  const brought = own.flatMap((id) => WITH[id] ?? []).filter((id) => !(later && id === 'hoehle'));
+  const packs = [...new Set([...own, ...brought, ...tok])].filter((id) => ids.includes(id));
   const home =
     own.find((id): id is Exclude<PackId, 'bahn' | 'fahrt'> => id !== 'bahn' && id !== 'fahrt') ??
     (own.length ? 'lichtung' : null);

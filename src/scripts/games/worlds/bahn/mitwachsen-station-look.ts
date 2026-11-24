@@ -10,7 +10,8 @@
 // Fahren: Der Zug steht, wo die Regeln ihn parken (`parked`: an Bahnhof Bär, am Prellbock in der Bucht, an Bahnhof
 // Fledermaus), und fährt mit der Figur im mittleren Wagen das Gleis entlang (zwischen den Takten gleitend, bei
 // reduzierter Bewegung springt er ans Ziel); die Tür des mittleren Wagens hat bis zur ersten Fahrt (`gefahren`) einen
-// goldenen Rahmen, solange er dort steht, wo die Figur einsteigen kann, angestoßen geht sie kurz auf; im Tunnel und am
+// goldenen Rahmen, solange er dort steht, wo die Figur einsteigen kann (nicht, solange er schläft, weil ein Paket
+// fehlt: dann ohne Dampf und Licht), angestoßen geht sie kurz auf; im Tunnel und am
 // Abend leuchten die Lampen; Tok sitzt im hinteren Wagen, solange er nicht in der Bucht wartet. Teil des Pakets der
 // Bahn (view-2d.ts).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 1)
@@ -243,6 +244,20 @@ function placeOf(st: BearStation, world: World, state: State, work: number | und
 }
 
 /**
+ * Tür und Licht des Zugs: bis zur ersten Fahrt (`gefahren`, gespeichert) ein goldener Rahmen um die Tür, wo die Figur
+ * einsteigen kann, angestoßen geht sie kurz auf, abends und im Tunnel leuchten die Lampen. Schläft er (ein Paket fehlt
+ * noch, Vorladen), nichts davon: keine goldene Tür, die Tür bleibt zu, die Lampen sind aus, kein Dampf; nichts ist grau
+ */
+function doorOf(world: World, state: State, work: number | undefined, at: RideAt, riding: boolean) {
+  const r = work === undefined && !riding ? trainRoute(world, state) : undefined;
+  const dozing = !!state.dozing?.includes(TRAIN.id) && !riding;
+  const gold = !!r && !dozing && !ridden(state.packs, TRAIN.id) && !!parked(TRAIN, r, state, world);
+  const nudged = state.nudged?.id === TRAIN.id && state.tick - state.nudged.at < OPEN_TICKS && !riding && !dozing;
+  const lit = !dozing && (at.lit || inTunnel(state, world));
+  return { dozing, gold, nudged, lit };
+}
+
+/**
  * Lok und zwei Wagen am Gleis (beim Bau rollen sie aus dem Tunnelportal heran; ein Wagen, dessen Mitte noch hinter dem
  * Portal ist, ist nicht zu sehen; unterwegs sitzt die Figur im mittleren Wagen, `seat`), Dampf über der Lok (nicht bei
  * reduzierter Bewegung)
@@ -253,11 +268,7 @@ function trainParts(st: BearStation, world: World, state: State, work: number | 
   const riding = state.ride?.id === TRAIN.id;
   const tok = work === undefined ? tokOf(state.packs) !== undefined && !heraldOf(state) : work >= BUILD.board;
   const open = work !== undefined && work >= BUILD.door;
-  const r = work === undefined && !riding ? trainRoute(world, state) : undefined;
-  // bis zur ersten Fahrt (`gefahren`, gespeichert) ein goldener Rahmen um die Tür, wo die Figur einsteigen kann
-  const gold = !!r && !ridden(state.packs, TRAIN.id) && !!parked(TRAIN, r, state, world);
-  const nudged = state.nudged?.id === TRAIN.id && state.tick - state.nudged.at < OPEN_TICKS && !riding;
-  const lit = at.lit || inTunnel(state, world);
+  const { dozing, gold, nudged, lit } = doorOf(world, state, work, at, riding);
   const kinds: CarLook['kind'][] = ['loco', 'mid', 'rear'];
   const hidden = (a: number) => work !== undefined && st.portal !== undefined && a + CAR / 2 > st.portal;
   const out = kinds.flatMap((kind, i): RideBody[] => {
@@ -283,7 +294,7 @@ function trainParts(st: BearStation, world: World, state: State, work: number | 
     return [{ id: `${TRAIN_ID}:${kind}`, key: k, x, y, z, dir, parts: model(k, () => carParts(look)), ...seat }];
   });
   const loco = out.find((b) => b.id === `${TRAIN_ID}:loco`);
-  if (loco && !at.reduced) {
+  if (loco && !at.reduced && !dozing) {
     const phase = Math.floor(at.now / 400) % 4;
     const k = `${TRAIN_ID}:dampf:${phase}`;
     out.push({ ...loco, id: `${TRAIN_ID}:dampf`, key: k, parts: model(k, () => steamParts(phase)) });

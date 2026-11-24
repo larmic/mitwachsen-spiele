@@ -20,6 +20,7 @@ export const ALIGHT = 10; // so lange nach der Ankunft steigt die Figur von selb
 export const JINGLE_EVERY = 15; // höchstens so oft bimmelt bzw. tutet es (Anstoßen, Winken unterwegs)
 export const TAP_REACH = 4; // Antippen wirkt bis zu so vielen Feldern (Schachbrett)
 export const CHEER = 4; // auf der Festfahrt winken Tiere und Schneemänner bis so weit
+export const SNORE_EVERY = 30; // ein schlafendes Fahrzeug (ein Paket fehlt noch) schnarcht so oft, wenn die Figur nah ist
 const EPS = 1e-6;
 
 export const key = (x: number, y: number) => `${x},${y}`;

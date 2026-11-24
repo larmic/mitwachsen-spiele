@@ -122,7 +122,8 @@ export type RideEvent = {
     | 'cheer'
     | 'farewell'
     | 'tunnel'
-    | 'guest';
+    | 'guest'
+    | 'snore';
   id: RideId;
   x: number;
   y: number;

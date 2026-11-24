@@ -5,7 +5,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Der Schlitten“ und „Tok und die Bahn“, Fahren)
 
 import type { Dir } from '../../lib/games/front';
-import type { Point } from '../../data/games/mitwachsen';
+import type { Point, RegionId } from '../../data/games/mitwachsen';
 import type { RideId, RideSpec } from '../../data/games/mitwachsen-rides';
 import type { BorderEvent } from './mitwachsen-border';
 import type { Guided } from './mitwachsen-guide';
@@ -27,7 +27,10 @@ export type End = 'home' | 'out';
  * das Fahrzeug erscheint (`rideDue`, danach der Takt, an dem es herbeitrabt bzw. zuletzt angestoßen wurde; -1: nicht
  * fällig; nicht gespeichert). Fahrzeuge, die nicht von selbst erscheinen (der Zug: Tok baut ihn), merken sich das
  * Anstoßen in `nudged`; liegen beide Halte in derselben Gegend (der Zug bei Ausbau 1: Bahnhof Bär und Prellbock in der
- * Bucht), sagt `docked`, an welchem es zuletzt ankam (beides nicht gespeichert)
+ * Bucht), sagt `docked`, an welchem es zuletzt ankam (beides nicht gespeichert). `dozing`: Fahrzeuge, denen ein Paket
+ * zum Fahren fehlt (Fahr-Engine, Ziel-Gegend; `dozingOf` in mitwachsen-preload.ts, `step` setzt es je Befehl): Sie
+ * schlafen freundlich am Halt; `snored`: welches zuletzt auf einen Druck schnarchte und wann (Drossel, getrennt von
+ * `nudged`, sonst stünde die Tür beim Aufwachen offen; beides nicht gespeichert)
  */
 export type Rider = Guided & {
   packs: Record<string, unknown>;
@@ -35,6 +38,8 @@ export type Rider = Guided & {
   rideDue: number;
   nudged?: { id: RideId; at: number };
   docked?: Partial<Record<RideId, End>>;
+  dozing?: readonly RideId[];
+  snored?: { id: RideId; at: number };
 };
 
 /**
@@ -80,10 +85,15 @@ export type Fan = { who: string; x: number; y: number };
  * Was ein Paket über sein Fahrzeug sagt (`WorldRules.vehicle`): seinen Eintrag in `RIDES`, seine Strecke in einer Welt
  * (`route`; undefined: dort keins; sie darf vom Spielstand abhängen, der Zug fährt bei Ausbau 1 nur bis zum Prellbock),
  * ob es jetzt erscheinen soll (`ready`; ohne: es erscheint nie von selbst, der Zug kommt mit Bau 1), wer auf der
- * Festfahrt winkt (`fans`) und was nach dem Aussteigen geschieht (`landed`: Tok hüpft aus dem Zug an seinen Platz, die erste Fahrt ist gemacht)
+ * Festfahrt winkt (`fans`) und was nach dem Aussteigen geschieht (`landed`: Tok hüpft aus dem Zug an seinen Platz, die erste Fahrt ist gemacht).
+ * `needs`: Gegenden, deren Welt (aus ihrem Paket) es zum Fahren braucht, außer der eigenen (Zug: die Grotte, seine
+ * Ziel-Gegend); sie werden vor seinem Halt vorgeladen (`RIDE_PRELOAD`, mitwachsen-preload.ts). `reaches`: Fährt es beim
+ * jetzigen Stand schon dorthin (Zug: erst ab Ausbau 2; ohne: immer)? Nur dann schläft es, solange eine fehlt
  */
 export type Vehicle = {
   spec: RideSpec;
+  needs?: readonly RegionId[];
+  reaches?(s: Pick<Rider, 'packs'>): boolean;
   route(world: World, s: Pick<Rider, 'packs' | 'openGates'>): RideRoute | undefined;
   ready?(s: Rider, world: World): boolean;
   fans?(s: Rider, world: World): Fan[];

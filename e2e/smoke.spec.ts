@@ -672,6 +672,104 @@ test(
   },
 );
 
+// Ohne Service Worker: Er holte die Pakete sonst aus seinem Speicher, am Netz vorbei, das der Test hier anhält
+test.describe('Vorladen am Halt', () => {
+  test.use({ serviceWorkers: 'block' });
+
+  test(
+    'Spiel: Vorladen am Halt per Entwickler-Schalter: erst 6 Felder vor dem Zug kommt die Grotte, bis dahin schläft er, dann steigt man ein',
+    { tag: '@3d' },
+    async ({ page }) => {
+      const errors = watchErrors(page);
+      type Game = {
+        world: { cell(x: number, y: number): { stop?: string } };
+        state: {
+          player: { x: number; y: number; dir: string };
+          animals: unknown[];
+          ride?: { id: string };
+          dozing?: string[];
+        };
+        rides: { id: string; x: number; y: number }[];
+        apply(cmd: { type: 'move' | 'tick'; dir?: string; fresh?: boolean; held?: unknown }): void;
+      };
+      await page.addInitScript(() => {
+        const real = crypto.getRandomValues.bind(crypto);
+        const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+          a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+        Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+      });
+      // Das Paket der Grotte hängt im Netz, bis der Test es freigibt; gezählt wird, ob es überhaupt angefragt wurde
+      let asked = false;
+      let release = () => {};
+      const held = new Promise<void>((done) => (release = done));
+      await page.route(/\/welt-hoehle\.[\w-]+\.js$/, async (route) => {
+        asked = true;
+        await held;
+        await route.continue();
+      });
+      const game = await openGame(page, { clock: true, dev: 'bahn&vorladen=1' }); // Ausbau 2: ohne Grotte schläft er
+      await expectView(page);
+      await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+      await render(page);
+      // weit weg vom Zug (20 Felder neben dem mittleren Wagen, mehr als 6 vor jedem Halt): nichts wird vorgeladen
+      await game.evaluate((node) => {
+        const el = node as unknown as Game;
+        const mid = el.rides.find((r) => r.id === 'ride:hoehle:mid')!;
+        el.state = { ...el.state, animals: [], player: { x: Math.round(mid.x) + 20, y: Math.round(mid.y), dir: 's' } };
+      });
+      await ticks(page, 3);
+      expect(asked).toBe(false);
+      // auf den Bahnsteig neben den mittleren Wagen: Die Grotte wird angefragt, bis sie da ist, schläft der Zug
+      const dir = await game.evaluate((node) => {
+        const el = node as unknown as Game;
+        const mid = el.rides.find((r) => r.id === 'ride:hoehle:mid')!;
+        const [mx, my] = [Math.round(mid.x), Math.round(mid.y)];
+        const dirs: [string, number, number][] = [
+          ['e', 1, 0],
+          ['w', -1, 0],
+          ['s', 0, 1],
+          ['n', 0, -1],
+        ];
+        const [dir, dx, dy] = dirs.find(([, dx, dy]) => el.world.cell(mx - dx, my - dy).stop === 'hoehle')!;
+        el.state = { ...el.state, animals: [], player: { x: mx - dx, y: my - dy, dir: 's' } };
+        return dir;
+      });
+      await ticks(page, 1);
+      await expect.poll(() => asked).toBe(true);
+      const sleepy = await game.evaluate((node, d) => {
+        const el = node as unknown as Game;
+        const before = { ...el.state.player };
+        el.apply({ type: 'move', dir: d, fresh: true });
+        const { x, y } = el.state.player;
+        return { dozing: el.state.dozing, ride: el.state.ride?.id, stayed: x === before.x && y === before.y };
+      }, dir);
+      expect(sleepy).toEqual({ dozing: ['hoehle'], ride: undefined, stayed: true });
+      await render(page, 2);
+      // die Grotte kommt an: Er wacht auf, ein neuer Druck steigt ein
+      release();
+      await expect
+        .poll(async () => {
+          await ticks(page, 1);
+          return game.evaluate((node) => (node as unknown as Game).state.dozing ?? null);
+        })
+        .toBeNull();
+      await render(page, 2);
+      const boarded = await game.evaluate((node, d) => {
+        const el = node as unknown as Game;
+        el.apply({ type: 'move', dir: d, fresh: true });
+        return el.state.ride?.id;
+      }, dir);
+      expect(boarded).toBe('hoehle');
+      await render(page, 2);
+      await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+      expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
+        [],
+      );
+      expect(errors).toEqual([]);
+    },
+  );
+});
+
 // Je Welt ein Test, dass sie gezeichnet wird: im Projekt `game` in 2D, im Projekt `3d` mit WebGL samt dem 3D-Teil ihres
 // Welt-Pakets (Schmuck ihres Tors). Neue Welten kommen in die Liste
 for (const realm of ['lichtung', 'eis'] as const)
