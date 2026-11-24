@@ -63,7 +63,7 @@ export function stopsOf(r: RideRoute): Record<End, Parked> {
  * Wo das Fahrzeug steht, wenn es nicht fährt: am Halt der Gegend, in der die Figur ist, ab `bereit` (auf der Lichtung
  * erst ab der Stufe `spec.out`: der Schlitten nach der ersten Heimfahrt); liegen beide Halte in ihrer Gegend (der Zug
  * bei Ausbau 1), an dem, an dem es zuletzt ankam (`docked`, sonst auf der Lichtung). Undefined, solange es noch nicht da
- * ist, unterwegs oder in einer anderen Gegend
+ * ist, selbst unterwegs oder in einer anderen Gegend; fährt die Figur mit einem anderen Fahrzeug, steht es weiter da
  */
 export function parked(
   spec: Pick<RideSpec, 'id' | 'out'>,
@@ -72,7 +72,7 @@ export function parked(
   world: World,
 ): Parked | undefined {
   const stage = rank(stageOf(s.packs, spec.id));
-  if (s.ride || stage < rank('bereit')) return undefined;
+  if (s.ride?.id === spec.id || stage < rank('bereit')) return undefined;
   const at = stopsOf(r);
   const realm = world.realm(s.player.x, s.player.y);
   const home = realm === world.realm(...at.home.seat);

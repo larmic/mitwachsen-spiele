@@ -1018,6 +1018,83 @@ test(
   },
 );
 
+// Schlitten und Zug in einem Spiel per Entwickler-Schalter (`?entwickler=bahn&bau=1&eis=1`, fester Seed 1, 2D): wie der
+// echte Spielstand mit offener Eis-Welt und gefahrenem Schlitten. Fehler vom 24.11.2026: Beim Einsteigen in den Zug kam
+// das Bild des Schlittens (er sprang auf seine Strecke, die Figur saß in ihm). Jetzt sitzt die Figur nur im mittleren
+// Wagen, der Schlitten steht still an seinem Halt auf der Lichtung, ohne Sitz und ohne Figur
+test('Spiel: Zug mit offener Eis-Welt per Entwickler-Schalter: die Figur sitzt im Zug, der Schlitten bleibt stehen, ohne Fehler', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  type Body = { id: string; key: string; x: number; y: number; seat?: true };
+  type Game = {
+    world: { seed: number; cell(x: number, y: number): { stop?: string } };
+    state: {
+      player: { x: number; y: number; dir: string };
+      animals: unknown[];
+      ride?: { id: string; phase: string };
+      openGates: string[];
+    };
+    rides: Body[];
+    apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+  };
+  await page.addInitScript(() => {
+    const real = crypto.getRandomValues.bind(crypto);
+    const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+      a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+    Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+  });
+  const game = await openGame(page, { clock: true, dev: 'bahn&bau=1&eis=1' });
+  expect(await game.evaluate((node) => (node as unknown as Game).world.seed)).toBe(1);
+  await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+  // der Schlitten steht da, sobald das Paket der Eis-Welt angekommen ist
+  const sled = () =>
+    game.evaluate((node) => {
+      const b = (node as unknown as Game).rides.find((r) => r.id === 'ride:schlitten');
+      // Schlüssel `ride:schlitten:<Rahmen><Wimpel><Laterne><Figur><offen>` (mitwachsen-sled-look.ts): die Figur darin?
+      return b ? { x: b.x, y: b.y, seat: !!b.seat, rider: b.key.at(-2) === '1' } : null;
+    });
+  await expect
+    .poll(async () => {
+      await render(page);
+      return !!(await sled());
+    })
+    .toBe(true);
+  expect(await game.evaluate((node) => (node as unknown as Game).state.openGates)).toContain('eis');
+  const before = (await sled())!;
+  expect(before).toMatchObject({ seat: false, rider: false });
+  // auf den Bahnsteig neben den mittleren Wagen, ein neuer Druck zu ihm hin
+  const boarded = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const mid = el.rides.find((r) => r.id === 'ride:hoehle:mid')!;
+    const [mx, my] = [Math.round(mid.x), Math.round(mid.y)];
+    const dirs: [string, number, number][] = [
+      ['e', 1, 0],
+      ['w', -1, 0],
+      ['s', 0, 1],
+      ['n', 0, -1],
+    ];
+    const [dir, dx, dy] = dirs.find(([, dx, dy]) => el.world.cell(mx - dx, my - dy).stop === 'hoehle')!;
+    el.state = { ...el.state, animals: [], player: { x: mx - dx, y: my - dy, dir: 's' } };
+    el.apply({ type: 'move', dir, fresh: true });
+    return el.state.ride?.id;
+  });
+  expect(boarded).toBe('hoehle');
+  const seats = () =>
+    game.evaluate((node) => {
+      const el = node as unknown as Game;
+      return { phase: el.state.ride?.phase, seats: el.rides.filter((r) => r.seat).map((r) => r.id) };
+    });
+  await render(page, 2); // eingestiegen
+  expect(await seats()).toEqual({ phase: 'seated', seats: ['ride:hoehle:mid'] });
+  expect(await sled()).toEqual(before);
+  await ticks(page, 30); // unterwegs
+  await render(page, 2);
+  expect(await seats()).toEqual({ phase: 'go', seats: ['ride:hoehle:mid'] });
+  expect(await sled()).toEqual(before); // derselbe Platz, ohne Sitz und ohne Figur, nicht unterwegs
+  expect(errors).toEqual([]);
+});
+
 // Bau 2 per Entwickler-Schalter (`?entwickler=bahn&bau=1&tor=1`, fester Seed 1; @3d, weil die Welt am Prellbock neu
 // gebaut wird und 3D ihre Stücke tauscht): Das Hau-ruck ist gemacht, Tok wartet in der Bucht. Ein neuer Druck zum Zug an
 // Bahnhof Bär steigt ein; beim Abfahren steht Ausbau 2 im Spielstand, am Prellbock klopft Tok, der Prellbock versinkt,

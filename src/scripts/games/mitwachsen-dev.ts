@@ -18,7 +18,9 @@
 // kommt schlafend, `devLate`); `&vorladen=1` bringt die Grotte nicht mit: Sie kommt erst, wenn die Figur 6 Felder vor
 // einem Halt steht (`RIDE_PRELOAD`), bis dahin schläft der Zug (bei Ausbau 2, dem Standard; mit `&bau=1` fährt er ohne
 // sie bis zum Prellbock, sie wird nur vorgeladen). `&fest=1` (Ausbau 2) macht die Höhlen-Leiste voll und lässt die Figur im
-// Höhlenbett aufwachen: Die nächste Fahrt auf die Lichtung ist die Laternenfahrt.
+// Höhlenbett aufwachen: Die nächste Fahrt auf die Lichtung ist die Laternenfahrt. `&eis=1` (mit `&bau=1` oder 2) holt
+// die Eis-Welt mit und spielt dazu vor, was das Kind vor der Bahn schon hat (Eistor offen, Eis-Leiste voll, der
+// Schlitten nach der ersten Heimfahrt), wie im echten Spielstand: Schlitten und Zug in einem Spiel.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Die Kristallgrotte“, Entwickler-Schalter, und „Tok und die Bahn“)
 
 import { REGIONS, animalId, type RegionId } from '../../data/games/mitwachsen';
@@ -51,6 +53,11 @@ export const DEV_OPEN = 'tor';
  * ist die Laternenfahrt
  */
 export const DEV_FEAST = 'fest';
+/**
+ * Eis-Welt dazu vorspielen (`&eis=1`, mit `&bau=1` oder 2): Das Paket der Eis-Welt kommt mit, Eistor offen, Eis-Leiste
+ * voll, der Schlitten hat seine erste Heimfahrt gemacht (Stufe `fest`) – wie bei `&bau=0`, nur mit gebauter Bahn
+ */
+export const DEV_ICE = 'eis';
 /** Pakete, die ein Paket im Blick hinein mitbringt: die Bahn die Grotte (dort endet ihr Gleis) und die Fahr-Engine (der Zug fährt) */
 const WITH: Partial<Record<PackId, readonly PackId[]>> = { bahn: ['hoehle', 'fahrt'] };
 
@@ -66,14 +73,15 @@ const builtIn = (search: string): 0 | 1 | 2 => {
 /**
  * Pakete, in die der Entwickler-Schalter blicken lässt (`?entwickler=<welt>[,<welt>…]` in `search`, der Adresse ab
  * „?“), soweit es sie gibt (`ids`), in der genannten Reihe, dazu was sie mitbringen (`WITH`; die Bahn mit `&bau=0`
- * auch die Eis-Welt, deren Tor dann offen ist; mit `&vorladen=1` ohne die Grotte, die holt dann das Vorladen am Halt);
+ * auch die Eis-Welt, deren Tor dann offen ist, ebenso mit `&eis=1`; mit `&vorladen=1` ohne die Grotte, die holt dann das Vorladen am Halt);
  * `home`: die erste genannte Welt mit Bett, mit der Bahn allein die
  * Lichtung (mit `&fest=1` bei Ausbau 2 ohne `&vorladen=1` das Höhlenbett; null: kein Schalter). Kein Schalter oder nichts Bekanntes: keine Pakete
  */
 export function glimpse(search: string, ids: readonly PackId[]): Glimpse {
   const named = (new URLSearchParams(search).get(DEV_PARAM) ?? '').split(',');
   const own = ids.filter((id) => named.includes(id)).sort((a, b) => named.indexOf(a) - named.indexOf(b));
-  const tok: PackId[] = own.includes('bahn') && builtIn(search) === 0 ? ['eis'] : [];
+  const ice = builtIn(search) === 0 || new URLSearchParams(search).get(DEV_ICE) === '1';
+  const tok: PackId[] = own.includes('bahn') && ice ? ['eis'] : [];
   // mit `&vorladen=1` kommt die Grotte erst am Halt (außer, sie ist selbst genannt)
   const later = new URLSearchParams(search).get(DEV_PRELOAD) === '1' && !own.includes('hoehle');
   const brought = own.flatMap((id) => WITH[id] ?? []).filter((id) => !(later && id === 'hoehle'));
@@ -98,7 +106,8 @@ export function glimpse(search: string, ids: readonly PackId[]): Glimpse {
  * offene Höhlentor (Stufe `offen`, das Hau-ruck ist gemacht: Die nächste Fahrt spielt Bau 2); bei 2 mit `&fest=1` die
  * volle Höhlen-Leiste (Laternenfahrt); bei 0 dazu den Stand, in dem Tok kommt: Eistor offen,
  * von jeder Eis-Art ein Tier auf der Schneewiese (die Eis-Leiste voll) und die erste Heimfahrt mit dem Schlitten gemacht
- * (`packs.fahrt.schlitten`, Stufe `fest`). Ohne Bahn bleibt der Spielstand, wie er ist
+ * (`packs.fahrt.schlitten`, Stufe `fest`); diesen Stand der Eis-Welt bei 1 und 2 auch mit `&eis=1`. Ohne Bahn bleibt
+ * der Spielstand, wie er ist
  */
 export function devProgress(dev: readonly PackId[], search: string, p: Progress): Progress {
   if (!dev.includes('bahn')) return p;
@@ -115,9 +124,19 @@ export function devProgress(dev: readonly PackId[], search: string, p: Progress)
   const open = opened ? [...new Set([...p.openGates, 'hoehle' as const])] : p.openGates;
   const feast = built === 2 && opened && q.get(DEV_FEAST) === '1';
   const garden = built === 2 && opened ? (feast ? withCave(p.garden) : withMole(p.garden)) : p.garden;
-  if (built) return { ...p, openGates: open, garden, packs: { ...packs, fahrt: { ...fahrt, hoehle: train } } };
+  if (!built) return withIce({ ...p, packs: { ...packs, fahrt } });
+  const laid = { ...p, openGates: open, garden, packs: { ...packs, fahrt: { ...fahrt, hoehle: train } } };
+  return q.get(DEV_ICE) === '1' ? withIce(laid) : laid;
+}
+
+/**
+ * Der Stand der Eis-Welt, den das Kind vor der Bahn erreicht: Eistor offen, von jeder Eis-Art ein Tier auf der
+ * Schneewiese (die Eis-Leiste voll), die erste Heimfahrt mit dem Schlitten gemacht (`packs.fahrt.schlitten`, Stufe `fest`)
+ */
+function withIce(p: Progress): Progress {
   const eis = REGIONS.find((r) => r.id === 'eis')?.animals ?? [];
   const home = new Set(p.garden.map((a) => a.id));
+  const fahrt = typeof p.packs.fahrt === 'object' && p.packs.fahrt !== null ? p.packs.fahrt : {};
   return {
     ...p,
     openGates: [...new Set([...p.openGates, 'eis' as const])],
@@ -125,7 +144,7 @@ export function devProgress(dev: readonly PackId[], search: string, p: Progress)
       ...p.garden,
       ...eis.map(({ species }) => ({ id: animalId('eis', species), species })).filter((a) => !home.has(a.id)),
     ],
-    packs: { ...packs, fahrt: { ...fahrt, schlitten: { stage: 'fest' } } },
+    packs: { ...p.packs, fahrt: { ...fahrt, schlitten: { stage: 'fest' } } },
   };
 }
 

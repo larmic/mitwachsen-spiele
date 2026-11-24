@@ -116,8 +116,15 @@ function shed(r: Route, h: (x: number, y: number) => number, lit: boolean): Ride
 }
 
 /**
+ * Die Fahrt des Schlittens, sonst undefined: Fährt die Figur mit einem anderen Fahrzeug (dem Zug), steht der Schlitten
+ * an seinem Halt, ohne Figur, ohne Rahmen, und keine Spur wächst mit
+ */
+const sledRide = (state: Pick<State, 'ride'>) => (state.ride?.id === SLED.id ? state.ride : undefined);
+
+/**
  * Körper des Schlittens je Bild: Schuppen (sobald er da ist), Schlitten und Zugtier am Halt der Gegend der Figur oder
- * unterwegs; leer, solange er noch nicht erschienen ist oder die Welt keine Strecke hat
+ * unterwegs; leer, solange er noch nicht erschienen ist oder die Welt keine Strecke hat. Nur seine eigene Fahrt bewegt
+ * ihn und setzt die Figur hinein (`sledRide`)
  */
 export function sledBodies(state: State, world: World, at: RideAt): readonly RideBody[] {
   const r = sledRoute(world);
@@ -125,24 +132,26 @@ export function sledBodies(state: State, world: World, at: RideAt): readonly Rid
   if (!r || !stage) return [];
   const h = heightAt(state, world);
   const out = [shed(r, h, at.lit)];
-  const pair = state.ride ? riding(r, state.ride, at, h) : standing(r, state, world, at, h);
+  const ride = sledRide(state);
+  const pair = ride ? riding(r, ride, at, h) : standing(r, state, world, at, h);
   if (!pair) return out;
   const g = world.gates.get(SLED.gate);
   const [seat, pull] = pair.map((s) => narrow(s, g)) as [Spot, Spot];
   const since = state.tick - state.rideDue; // `rideDue`: Takt des Herbeitrabens bzw. des letzten Anstoßens
   const open = !state.ride && state.rideDue >= 0 && since >= 0 && since < OPEN_TICKS;
-  // schläft er (die Fahr-Engine fehlt noch, Vorladen), kein goldener Rahmen: Einsteigen geht dann nicht
+  // schläft er (die Fahr-Engine fehlt noch, Vorladen), kein goldener Rahmen: Einsteigen geht dann nicht; ebenso nicht,
+  // solange die Figur in einem anderen Fahrzeug sitzt
   const dozing = !!state.dozing?.includes(SLED.id);
   const look = {
-    frame: stage === 'bereit' && !dozing,
+    frame: stage === 'bereit' && !dozing && (!state.ride || !!ride),
     pennant: stage === 'fest',
     lamp: at.lit && !at.asleep?.includes(SLED.id), // nach „Gute Nacht“ ist die Laterne aus
-    seated: !!state.ride,
+    seated: !!ride,
     open,
   };
   const key = `${SLED_ID}:${+look.frame}${+look.pennant}${+look.lamp}${+look.seated}${+look.open}`;
   out.push(
-    { id: SLED_ID, key, ...seat, parts: model(key, () => sledParts(look)), ...(state.ride && { seat: true as const }) },
+    { id: SLED_ID, key, ...seat, parts: model(key, () => sledParts(look)), ...(ride && { seat: true as const }) },
     { id: `${SLED_ID}:rentier`, key: `${SLED_ID}:rentier`, ...pull, parts: REINDEER },
   );
   return out;
@@ -171,7 +180,8 @@ export function sledMarks(state: State, world: World): readonly Box[] {
   const r = sledRoute(world);
   const stage = r && stageOf(state.packs, SLED.id);
   if (!r || !stage) return NONE;
-  const reach = state.ride?.feast ? Math.floor(state.ride.pos) : stage === 'fest' ? r.path.length : -1;
+  const ride = sledRide(state); // die Laternenfahrt des Zugs lässt die Schneespur, wie sie ist
+  const reach = ride?.feast ? Math.floor(ride.pos) : stage === 'fest' ? r.path.length : -1;
   const key = `${stage}:${reach}`;
   const last = marked.get(world);
   if (last?.key === key) return last.boxes;

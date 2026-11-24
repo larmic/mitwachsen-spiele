@@ -52,7 +52,7 @@ import { heldTired, restPose, type Pose } from './mitwachsen-tired';
 import { advance, evening, freshDay, late, loadTired, newDay, saveTired, type Tired } from './mitwachsen-tired';
 import type { TiredEvent } from './mitwachsen-tired';
 import type { PackEvent } from './mitwachsen-pack-types';
-import { CHORUS_MS, seatOf, withHop, type RideBody } from './mitwachsen-ride-view';
+import { CHORUS_MS, ownSeat, seatOf, withHop, type RideBody } from './mitwachsen-ride-view';
 import { GoodNights, endsBedtime, rideLight } from './mitwachsen-bedtime';
 import { awayIn, packScore } from './mitwachsen-view';
 import { listenTap } from './mitwachsen-tap';
@@ -695,7 +695,11 @@ class LarmicMitwachsen extends HTMLElement {
     // Laterne und Lampen am Abend und nachts, ab 20 min warmes Licht (Fensterband des Zugs)
     const { lit, warm } = rideLight(night, evening(this.tired), this.state.sleeping, this.state.late);
     const at = { now: t, frac, reduced: this.reduced.matches, lit, warm, asleep };
-    this.rides = this.renderer.all((v) => v.bodies?.(this.state, this.world, at) ?? []);
+    // die Figur sitzt nur im Fahrzeug ihrer Fahrt (`ownSeat`), wie viele Pakete auch Körper liefern
+    this.rides = ownSeat(
+      this.renderer.all((v) => v.bodies?.(this.state, this.world, at) ?? []),
+      this.state.ride?.id,
+    );
   }
 
   /**

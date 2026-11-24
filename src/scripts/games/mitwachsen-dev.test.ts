@@ -4,6 +4,7 @@ import {
   DEV_BUILT,
   DEV_EVENING,
   DEV_FEAST,
+  DEV_ICE,
   DEV_OPEN,
   DEV_PARAM,
   DEV_PRELOAD,
@@ -116,6 +117,34 @@ describe('Entwickler-Schalter', () => {
     // zweimal vorgespielt: nichts doppelt
     expect(devProgress(['bahn'], '?entwickler=bahn&bau=0', p).garden).toEqual(p.garden);
     expect([p.position, p.met, p.day]).toEqual([saved.position, saved.met, saved.day]);
+  });
+
+  it('`&eis=1` (mit `&bau=1` oder 2): die Eis-Welt dazu wie im echten Spielstand, Schlitten und Zug in einem Spiel', () => {
+    expect(DEV_ICE).toBe('eis');
+    expect(glimpse('?entwickler=bahn&bau=1&eis=1', PACK_IDS)).toEqual({
+      packs: ['bahn', 'hoehle', 'fahrt', 'eis'],
+      home: 'lichtung', // die Figur wacht weiter auf der Lichtung auf, nah am Bahnhof
+    });
+    expect(glimpse('?entwickler=bahn&bau=1', PACK_IDS).packs).not.toContain('eis'); // ohne: wie bisher
+    const p = devProgress(['bahn', 'hoehle', 'fahrt', 'eis'], '?entwickler=bahn&bau=1&eis=1', saved);
+    expect(p.openGates).toContain('eis');
+    expect(
+      full(
+        p,
+        REGIONS.find((r) => r.id === 'eis')!,
+      ),
+    ).toBe(true);
+    expect(p.packs).toMatchObject({
+      bahn: { built: 1 },
+      fahrt: { hoehle: { stage: 'bereit' }, schlitten: { stage: 'fest' } },
+    });
+    const two = devProgress(['bahn', 'hoehle', 'fahrt', 'eis'], '?entwickler=bahn&eis=1', saved);
+    expect([...two.openGates].sort()).toEqual(['eis', 'hoehle']);
+    expect(two.packs).toMatchObject({
+      bahn: { built: 2 },
+      fahrt: { hoehle: { stage: 'offen' }, schlitten: { stage: 'fest' } },
+    });
+    expect(devProgress(['bahn'], '?entwickler=bahn&bau=1&eis=1', p).garden).toEqual(p.garden); // nichts doppelt
   });
 
   it('`&vorladen=1`: die Bahn bringt die Grotte nicht mit, sie kommt erst über das Vorladen am Halt (der Zug schläft bis dahin)', () => {

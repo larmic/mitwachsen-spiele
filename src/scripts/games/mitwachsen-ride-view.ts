@@ -68,6 +68,23 @@ export type GoodNight = { id: RideId; score: readonly Scored[] };
 /** Der Körper, in dem die Figur sitzt (nur während der Fahrt) */
 export const seatOf = (rides: readonly RideBody[]) => rides.find((r) => r.seat);
 
+/** Das Fahrzeug, dem ein Körper gehört, aus seiner Kennung `ride:<Fahrzeug>…`; undefined, wenn er keinem gehört */
+export const rideOfBody = (id: string): RideId | undefined =>
+  id.startsWith('ride:') ? (id.split(':')[1] as RideId | undefined) : undefined;
+
+/**
+ * Nur das Fahrzeug, in dem die Figur sitzt (`ride`, die Kennung von `State.ride`), trägt ihren Sitz: Meldet ein anderes
+ * (ein Paket, das jede Fahrt für seine hielte) einen Sitz, fällt er weg; ohne Fahrt sitzt sie nirgends. Ohne solchen
+ * Körper dieselbe Liste
+ */
+export function ownSeat(rides: readonly RideBody[], ride: RideId | undefined): readonly RideBody[] {
+  const stray = (r: RideBody) => !!r.seat && (!ride || rideOfBody(r.id) !== ride);
+  if (!rides.some(stray)) return rides;
+  return rides.map((r) =>
+    stray(r) ? { id: r.id, key: r.key, x: r.x, y: r.y, z: r.z, dir: r.dir, parts: r.parts } : r,
+  );
+}
+
 /** Die Figur hüpft im Sitz (winkt): Der Körper mit ihr hüpft um `hop` Felder mit */
 export const withHop = (rides: readonly RideBody[], hop: number): readonly RideBody[] =>
   hop ? rides.map((r) => (r.seat ? { ...r, z: r.z + hop } : r)) : rides;
@@ -126,7 +143,7 @@ export function tapRide<T extends Tap>(
  * Fahrzeug, dem der Körper gehört (aus seiner Kennung `ride:<Fahrzeug>…`), `who` der angetippte Bote
  */
 export const tapCmd = (r: Pick<Tap, 'id' | 'x' | 'y' | 'being'>, player: { x: number; y: number }): MoveCmd => {
-  const ride = r.being ? undefined : (r.id.split(':')[1] as RideId | undefined);
+  const ride = r.being ? undefined : rideOfBody(r.id);
   return {
     type: 'move',
     dir: dirTo(Math.round(r.x) - player.x, Math.round(r.y) - player.y),

@@ -318,7 +318,7 @@ function sideAt(st: BearStation, world: World, state: State, end: End): Point {
 function doorOf(world: World, state: State, work: number | undefined, at: RideAt, riding: boolean) {
   const r = work === undefined && !riding ? trainRoute(world, state) : undefined;
   const dozing = !!state.dozing?.includes(TRAIN.id) && !riding;
-  const gold = !!r && !dozing && !ridden(state.packs, TRAIN.id) && !!parked(TRAIN, r, state, world);
+  const gold = !!r && !dozing && !state.ride && !ridden(state.packs, TRAIN.id) && !!parked(TRAIN, r, state, world);
   const recent = (m: State['nudged']) => m?.id === TRAIN.id && state.tick - m.at < OPEN_TICKS;
   const nudged = (recent(state.nudged) || recent(state.alighted)) && !riding && !dozing;
   return { dozing, gold, nudged, ...lightOf(world, state, at, riding, dozing) };
