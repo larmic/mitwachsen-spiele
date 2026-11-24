@@ -17,7 +17,7 @@ import { GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-g
 import type { RegionId } from '../../../../data/games/mitwachsen';
 import type { DrawDeco, Turn, View2D } from '../../mitwachsen-view';
 import { sprite } from '../../mitwachsen-glyphs';
-import { caveBoxes, columnBoxes } from './mitwachsen-cave-look';
+import { caveBoxes, columnBoxes, patchOf } from './mitwachsen-cave-look';
 import { caveWeather, type CaveFx } from './mitwachsen-cave-sky';
 import { Chime } from './mitwachsen-chime-look';
 import { Drips } from './mitwachsen-drips';
@@ -63,14 +63,18 @@ export const fx: CaveFx = { chime: new Chime(), drips: new Drips(), olm: new Olm
 /**
  * Boden der Grotte (der Kern ruft das nur auf Grottenboden und Felswand): Lichtfleck unter einem Lichtschacht und neben
  * Kristallen als helles Licht obenauf (am Abend unter den Schächten golden-orange, `duskGround`); Ränder im Dunkel als
- * halb durchsichtiger Schatten, an der Wand über ihren obersten Block, auf dem Boden (auch unter Stalagmit oder Findling) obenauf (mitwachsen-glow.ts)
+ * halb durchsichtiger Schatten, an der Wand über ihren obersten Block, auf dem Boden (auch unter Stalagmit oder Findling) obenauf (mitwachsen-glow.ts);
+ * sonst die Flecken im Grottenboden (`patchOf`), damit er nicht wie Schnee wirkt
  */
 export const ground: View2D['ground'] = (c, x, y, _open, evening) => {
   if (c.light) {
     const glow = duskGround(c.light, c.shaft, evening); // am Abend unter den Schächten golden-orange
     return [x, y, c.h, 1, 1, 0.01, glow, glow];
   }
-  if (!c.dim) return null;
+  if (!c.dim) {
+    const patch = patchOf(c); // Fleck im Grottenboden: flach obenauf, kühl lila oder zart rosé
+    return patch ? [x, y, c.h, 1, 1, 0.01, patch, patch] : null;
+  }
   const s = shadowOver(c.dim);
   return isWall(c) ? [x, y, c.h - 1, 1, 1, 1, s, s] : [x, y, c.h, 1, 1, 0.01, s, s];
 };

@@ -6,13 +6,13 @@ import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitw
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import { platformsToWake } from '../../mitwachsen-portal';
 import { initialState, step, type State } from '../../mitwachsen-state';
-import { caveBoxes } from './mitwachsen-cave-look';
+import { caveBoxes, patchOf } from './mitwachsen-cave-look';
 import { roundCentre } from './mitwachsen-dusk-look';
 import { DUSK_DAY, DUSK_SKY, dayOf, nightIn, nightMix, sunLevel, type Rgb } from '../../mitwachsen-dusk';
 import { beyondRing, canStep, kesselPlace, type World } from '../../mitwachsen-world';
 import { HOEHLE_PACK, PACKS, REGRESSION_SEEDS, SAMPLE_SEEDS, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import { GROTTE_ROOM, bedSpots, fromMouth, shedAt, shedStoneAt, stationAt } from './mitwachsen-grotte';
-import { corridorAt, fillZone, type FillZone } from './mitwachsen-fill';
+import { corridorAt, fillZone, tipOf, type FillZone } from './mitwachsen-fill';
 import type { Site } from './mitwachsen-site';
 import type { Cell } from '../../mitwachsen-cell';
 
@@ -434,6 +434,35 @@ describe('Kristallgrotte: Gelände', () => {
         if (d < 3.5 || d > 14) bad.push(`Zone ${z}: ${d.toFixed(1)} feste Dinge je 100 Felder`);
       }
       expect(bad.slice(0, 5), `Seed ${seed}`).toEqual([]);
+    });
+
+    it(`Seed ${seed}: Farben je Zone: jeder Stalagmit und Felsbrocken trägt die Farbe seiner Zone an der Spitze`, () => {
+      const things = placeOf(seed)
+        .cells.map((p) => ({ p, c: w.cell(...p) }))
+        .filter(({ c }) => c.region === 'hoehle' && (c.deco === 'stalagmite' || c.deco === 'boulder'));
+      const wrong = things.filter(({ p, c }) => c.color !== tipOf(...site.uv(...p))).map(({ p }) => key(p));
+      const tips = new Set(things.map(({ c }) => c.color));
+      expect({ seed, wrong: wrong.slice(0, 3), many: things.length > 200, zones: tips.size >= 3 }).toEqual({
+        seed,
+        wrong: [],
+        many: true,
+        zones: true,
+      });
+      expect([...tips].filter((t) => !Object.values(GROTTE_COLORS.tips).includes(t as never))).toEqual([]);
+    });
+
+    it(`Seed ${seed}: Flecken im Grottenboden (2D): beide Farben, auf etwa einem Fünftel des freien Bodens`, () => {
+      const floor = placeOf(seed)
+        .cells.map((p) => w.cell(...p))
+        .filter((c) => c.region === 'hoehle' && c.ground === 'grotto' && !c.solid);
+      const share = (color: string) => floor.filter((c) => patchOf(c) === color).length / floor.length;
+      const [cool, warm] = GROTTE_COLORS.patches.map(share) as [number, number];
+      expect({ seed, cool: cool > 0.04, warm: warm > 0.04, all: cool + warm < 0.4 }).toEqual({
+        seed,
+        cool: true,
+        warm: true,
+        all: true,
+      });
     });
 
     it(`Seed ${seed}: Moos und Farn nur unter den Lichtschächten, Lehmhang des Dachses neben dem Pilzgarten`, () => {

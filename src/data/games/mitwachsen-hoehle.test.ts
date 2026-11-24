@@ -91,7 +91,7 @@ describe('Tiere der Höhlenwelt', () => {
   });
 
   it('Leuchtpilze in Rosa, Türkis und Gelb, gleich im Korb, im Beet und in der Schale; Korb und Kanne ohne Gold', () => {
-    expect(SHROOM_COLORS).toEqual(['#f08cc8', '#6fd6f0', '#ffe08a']);
+    expect(SHROOM_COLORS).toEqual(['#ff9cd4', '#6fd6f0', '#ffe08a']);
     expect(GROTTE_COLORS.shrooms).toBe(SHROOM_COLORS);
     const colors = (parts: typeof JUG_PARTS) => parts.flatMap((p) => p.slice(6));
     for (const c of SHROOM_COLORS) expect(colors(SHROOM_BASKET_PARTS)).toContain(c);

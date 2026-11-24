@@ -34,7 +34,7 @@ import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from '../../mitw
 import { findSpawns } from '../../mitwachsen-spawns';
 import { OBSTACLE_GAP } from '../../mitwachsen-world';
 import { caveHaunts } from './mitwachsen-cave-haunts';
-import { corridorAt, fillGrotte, shadeGrotte } from './mitwachsen-fill';
+import { corridorAt, fillGrotte, shadeGrotte, tipOf } from './mitwachsen-fill';
 import { dimGrotte } from './mitwachsen-glow';
 import { siteOf, type Site } from './mitwachsen-site';
 
@@ -402,8 +402,8 @@ function platforms(site: Site, bed: Point, ring: Point, map: Map<string, Cell>):
 
 /**
  * Dinge auf dem freien Boden (etwa 5 je 100 Felder, die Mitte bleibt licht): Kristalle in drei Farben, Stalagmiten in
- * drei Höhen (in der Tropfsteingrotte dichter), kleine Leuchtpilze (im Pilzgarten dichter, begehbar). Feste Dinge stehen
- * einzeln: im Umkreis von `OBSTACLE_GAP` Feldern kein anderes, so bleibt jeder Weg frei.
+ * drei Höhen (in der Tropfsteingrotte dichter, Spitze in der Farbe der Zone), kleine Leuchtpilze (im Pilzgarten
+ * dichter, begehbar). Feste Dinge stehen einzeln: im Umkreis von `OBSTACLE_GAP` Feldern kein anderes, so bleibt jeder Weg frei.
  */
 function scatter(seed: number, site: Site, free: (u: number, v: number) => boolean, map: Map<string, Cell>) {
   const { things, drip, hall, garden } = GROTTE;
@@ -437,7 +437,7 @@ function scatter(seed: number, site: Site, free: (u: number, v: number) => boole
           key(x, y),
           roll < crystal
             ? { ...c, deco: 'crystal', solid: true, color: GROTTE_COLORS.crystals[pick % 3] }
-            : { ...c, deco: 'stalagmite', solid: true, note: pick % 3 },
+            : { ...c, deco: 'stalagmite', solid: true, note: pick % 3, color: tipOf(u, v) },
         );
       } else if (roll < crystal + stalagmite + things.shroom)
         map.set(key(x, y), { ...c, deco: 'glowshroom', color: GROTTE_COLORS.shrooms[pick % 3] });

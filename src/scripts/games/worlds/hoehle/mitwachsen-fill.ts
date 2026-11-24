@@ -1,7 +1,8 @@
 // Füllung der Kristallgrotte – rein und deterministisch: Derselbe Seed ergibt dieselbe Füllung. Was auf der Lichtung
 // Bäume und Büsche sind, ist in der Grotte: Stalagmiten-Gruppen (3 bis 5 in drei Höhen, fest wie Bäume, dazwischen
 // begehbare Lücken), niedrige leuchtende Kristallbüsche (fest wie ein Busch), Felsbrocken, flache Felsinseln mit Moos
-// obenauf (eine Stufe hoch, begehbar), kleine türkise Pfützen und, nur unter den Lichtschächten, Moos und Farn. Am Rand
+// obenauf (eine Stufe hoch, begehbar), kleine türkise Pfützen und, nur unter den Lichtschächten, Moos und Farn.
+// Stalagmiten und Felsbrocken tragen die Farbe ihrer Zone an der Spitze (`tipOf`, `Cell.color`). Am Rand
 // und in der Tropfsteingrotte dichter, die Mitte und die Wege bleiben frei, ebenso die Spur für das künftige Gleis von
 // der Mündung bis zum Platz des Bahnhofs (`corridorAt`). Feste Dinge halten `OBSTACLE_GAP` Felder Abstand zu allem
 // anderen Festen (nur die Glieder einer Gruppe stehen enger, mit einem freien Feld dazwischen), so bleibt jedes Feld
@@ -41,6 +42,39 @@ export function fillZone(u: number, v: number): FillZone {
   const { drip } = GROTTE;
   if (Math.hypot(u - drip.across, v + ry - drip.out) <= drip.r + 3) return 'drip';
   return (u / rx) ** 2 + (v / ry) ** 2 > 0.6 ? 'rim' : 'side';
+}
+
+/** Zonen mit eigener Farbe der Spitzen: Mitte (u, v von der Mitte der Grotte) und Radius */
+const TIP_ZONES: readonly (readonly [keyof typeof GROTTE_COLORS.tips, number, number, number])[] = (() => {
+  const { garden, hall, drip, clay } = GROTTE;
+  return [
+    ['garden', garden.across, garden.out - ry, garden.r],
+    ['hall', hall.across, hall.out - ry, hall.r],
+    ['drip', drip.across, drip.out - ry, drip.r],
+    // Lehmhang: zwei Stufen nach außen von seiner Innenkante, `long` Felder lang um `out` (wie `mitwachsen-grotte.ts`
+    // ihn baut: von `out - long/2` an)
+    [
+      'clay',
+      clay.across - clay.step + 0.5,
+      clay.out - (clay.long >> 1) + (clay.long - 1) / 2 - ry,
+      clay.step + clay.long / 2,
+    ],
+  ];
+})();
+
+/**
+ * Farbe der Spitze eines Stalagmiten oder Felsbrockens bei (u, v) von der Mitte: die der nächsten Zone (Abstand zu ihrem
+ * Rand), so hat jede Zone ihre Farbe und die Grotte keine Lücke; der See hat keine (Türkis bleibt dem Wasser), dort und am
+ * Ende gilt die Tropfsteingrotte. Nur Rechnen, keine Suche
+ */
+export function tipOf(u: number, v: number): string {
+  let best = TIP_ZONES[0]!;
+  let near = Infinity;
+  for (const z of TIP_ZONES) {
+    const d = Math.hypot(u - z[1], v - z[2]) - z[3];
+    if (d < near) [best, near] = [z, d];
+  }
+  return GROTTE_COLORS.tips[best[0]];
 }
 
 /** Grottenboden ohne alles: hier darf etwas hin */
@@ -152,7 +186,8 @@ function groups(
     if (own.length < 3) continue;
     own.forEach((p, i) => {
       const [x, y] = at(...p);
-      map.set(key(x, y), { ...map.get(key(x, y))!, deco: 'stalagmite', solid: true, note: (i + turn) % 3 });
+      const color = tipOf(...p);
+      map.set(key(x, y), { ...map.get(key(x, y))!, deco: 'stalagmite', solid: true, note: (i + turn) % 3, color });
     });
   }
 }
@@ -176,7 +211,7 @@ function singles(seed: number, open: Open, at: At, clear: (x: number, y: number)
           key(x, y),
           crystal
             ? { ...c, deco: 'crystalbush', solid: true, color: GROTTE_COLORS.crystals[pick % 3] }
-            : { ...c, deco: 'boulder', solid: true },
+            : { ...c, deco: 'boulder', solid: true, color: tipOf(u, v) },
         );
       } else if (roll < bush * wb + boulder * wr + puddle * wp && c.h === 1) {
         map.set(key(x, y), { ...c, deco: 'puddle' });

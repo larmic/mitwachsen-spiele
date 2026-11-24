@@ -52,7 +52,7 @@ const contrast = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a
 const PALETTE = [
   ...Object.entries(GROTTE_COLORS)
     .filter(([k]) => k !== 'dark')
-    .flatMap(([, v]): unknown[] => (typeof v === 'string' ? [v] : [...v])),
+    .flatMap(([, v]): unknown[] => (typeof v === 'string' ? [v] : Array.isArray(v) ? [...v] : Object.values(v))),
   ...flatColors({ ground: 'grotto' } as Cell)!,
 ]
   .filter((c): c is string => typeof c === 'string')

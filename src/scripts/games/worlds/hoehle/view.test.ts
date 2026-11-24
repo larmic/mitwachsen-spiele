@@ -199,7 +199,7 @@ describe('Zeichenteile der Grotte (2D)', () => {
 describe('3D-Teil der Grotte', () => {
   it('Grottenstein in den Schichten, Lichtflecken auch auf Moos; Landschaft draußen bleibt, wie sie ist', () => {
     const floor = view3d.ground(cell(null, { solid: false, light: 0.2 }), [])!;
-    expect(floor).toMatchObject({ top: GROTTE_COLORS.floor[1], side: band(1), light: 0.2 });
+    expect(floor).toMatchObject({ top: GROTTE_COLORS.floor, side: band(1), light: 0.2 });
     const wall = view3d.ground(cell('rock', { region: 'border', h: 4 }), [])!;
     expect(wall).toMatchObject({ top: GROTTE_COLORS.bands[0], side: band(4) });
     expect(view3d.ground(cell(null, { ground: 'grass', light: 0.3 }), [])).toMatchObject({ light: 0.3 });

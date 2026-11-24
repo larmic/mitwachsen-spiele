@@ -62,7 +62,7 @@ export function maskFor(base: Rgb, level: number): number {
 }
 
 /** Grottenboden, wie 2D ihn zeichnet (Oberseite; dunkler als die Grundfarbe des Bodens in 3D) */
-export const FLOOR = rgbOf(flatColors({ ground: 'grotto' } as Cell)?.[1] ?? GROTTE_COLORS.floor[0]);
+export const FLOOR = rgbOf(flatColors({ ground: 'grotto' } as Cell)?.[1] ?? GROTTE_COLORS.floor);
 
 /** Stärke abseits der Figur („Höhle hell“: `bright`) */
 export const strengthOf = (bright: boolean) => (bright ? D.bright : D.mask);

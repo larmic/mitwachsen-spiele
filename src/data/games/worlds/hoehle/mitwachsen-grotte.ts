@@ -82,6 +82,11 @@ export const GROTTE = {
     gang: 12,
     night: 0.496,
   },
+  /**
+   * Flecken im Grottenboden (`GROTTE_COLORS.patches`): wo das weiche Rauschen des Bodens (`Cell.shade`, −1 … 1) unter
+   * `cool` liegt, ein kühl lila Fleck, über `warm` ein zart roséner
+   */
+  patch: { cool: -0.35, warm: 0.5 },
   /** Sockel der Kristall-Laterne, relativ zum Höhlenbett: rechts vorn, gespiegelt zum Platz des Klangsteins (−3, 1) */
   lantern: [3, 1],
   /**
@@ -137,7 +142,8 @@ export const GROTTE = {
 
 /**
  * Farben der Grotte. Höhlenhimmel (oben offen, nie dunkler als die Dämmerung der Lichtung) und Nebel-Maske über dem
- * Unerkundeten; Schichten der Klippen und des Bodens (wie am Höhlentor); Kristalle in Lila, Türkis und Rosa; Leuchtpilze
+ * Unerkundeten; Schichten der Klippen und des Bodens (wie am Höhlentor), Flecken im Boden; Kristalle in Lila, Türkis und Rosa;
+ * Stalagmiten und Felsbrocken mit dunklem Fuß und der Farbe ihrer Zone an der Spitze; Leuchtpilze
  * in Rosa, Türkis und Gelb; Moos; Holz des Dachs an der Kristallwand; türkises Wasser; Lehm; Schatten der Ränder und
  * Licht des Lichtkreises. Kein Gold: Das ist die Aktionsfarbe (nur die Kristall-Laterne trägt es, solange man sie nehmen kann).
  */
@@ -147,8 +153,28 @@ export const GROTTE_COLORS = {
   /** Himmel in 2D, drei Streifen von oben (dort scheint er durch den Nebel) */
   heaven: ['#7f77a8', '#8a82b0', '#968fba'],
   bands: ['#f0ecfa', '#d6d2e6', '#e6e2f2', '#ccc8de'],
-  floor: ['#d6d2e6', '#e6e2f2'],
-  crystals: ['#b48cf0', '#6fd6f0', '#f08cc8'],
+  /**
+   * Oberseite des Grottenbodens in 3D: etwas dunkler als früher (#e6e2f2), damit er nicht wie Schnee wirkt, und hell
+   * genug für die Maske (2D zeichnet ihn im Kern, `flatColors`, noch etwas dunkler)
+   */
+  floor: '#d6d2e6',
+  /**
+   * Flecken im Grottenboden (große, weiche Flecken aus `Cell.shade`), nur in 2D: kühl lila und zart rosé, kaum dunkler
+   * als der Boden (sonst verlöre Gold an Kontrast); nie auf Licht, Randschatten, Moos oder Steg
+   */
+  patches: ['#c6c4e2', '#d8c6d8'],
+  /**
+   * Leuchtendes (Kristalle in Lila, Türkis, Rosa): so hell, dass es gegen den Boden unter der Maske mindestens 3 : 1
+   * hat (Lila und Rosa heller als am Höhlentor, #b48cf0 und #f08cc8 hätten nur 2,3 und 2,7)
+   */
+  crystals: ['#cbacff', '#6fd6f0', '#ff9cd4'],
+  /** Stalagmiten und Felsbrocken: dunkler Fuß und Mitte (gegen den Boden mindestens 3 : 1), die Spitze in der Farbe der Zone */
+  stal: ['#5a5478', '#6e6690'],
+  /**
+   * Farbe der Spitzen je Zone (`tipOf` in mitwachsen-fill.ts): Pilzgarten grün, Kristallhalle lila, Tropfsteingrotte rosa,
+   * Lehmhang ocker. Türkis bleibt dem Wasser, Gelb und Orange bleiben weg (sie läsen sich als Gold)
+   */
+  tips: { garden: '#86b45a', hall: '#8f6ad8', drip: '#c0609a', clay: '#a9825e' },
   shrooms: SHROOM_COLORS,
   moss: ['#6f9a4a', '#86b45a'],
   wood: ['#8a5a34', '#a8723f'],

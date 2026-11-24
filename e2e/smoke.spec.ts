@@ -206,7 +206,7 @@ test(
     await render(page, 10);
     // gezeichnet: in 3D mit dem 3D-Teil der Grotte und ihrer Luft, in 2D mit lila Höhlenhimmel und Grottenboden (leicht
     // getönt von der Stimmung der Richtung, daher mit Spielraum)
-    const palette = [...GROTTE_COLORS.heaven, ...GROTTE_COLORS.floor].map((c) =>
+    const palette = [...GROTTE_COLORS.heaven, GROTTE_COLORS.floor, ...GROTTE_COLORS.patches].map((c) =>
       [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)),
     );
     await expect
@@ -527,9 +527,15 @@ test(
     // im Loch: fast so hell wie mit „Höhle hell“, nie dunkler als die Dämmerung
     expect(dark.near).toBeGreaterThan(0.75 * pale.near);
     expect(dark.near).toBeGreaterThanOrEqual(GROTTE.dark.dusk);
-    // außerhalb: deutlich dunkler als „Höhle hell“, aber nirgends schwarz
+    // außerhalb: deutlich dunkler als „Höhle hell“, aber nirgends schwarz. „Deutlich“ zählt über der Untergrenze 0,08,
+    // unter die die Maske nie drückt: Von der Helligkeit darüber bleibt höchstens gut ein Drittel (gemessen in 3D ein
+    // Viertel, 0,095 gegen 0,147 mit dem Boden #d6d2e6; in 2D ein Sechstel). Das bloße Verhältnis beider (früher unter
+    // 0,6) stieg mit jedem dunkleren Boden, obwohl es dunkler wurde: „Höhle hell“ wird mit dunkler, das Dunkel bleibt an
+    // der Untergrenze (mit #e6e2f2 lag es in 3D schon bei 0,597). Dazu unter der Dämmerung (3D 0,095, 2D 0,127 von 0,16)
     const mean = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
-    expect(mean(dark.ring)).toBeLessThan(0.6 * mean(pale.ring));
+    const above = (v: number) => v - GROTTE.dark.floor;
+    expect(above(mean(dark.ring))).toBeLessThan(0.35 * above(mean(pale.ring)));
+    expect(mean(dark.ring)).toBeLessThan(0.85 * GROTTE.dark.dusk);
     expect(Math.min(...dark.ring)).toBeGreaterThanOrEqual(GROTTE.dark.floor);
     expect(mean(dark.ring)).toBeLessThan(dark.near / 2);
     // der Nebel: nie unter 0,08; in 2D nie heller als der Boden unter der Maske. In 3D ist der beleuchtete Boden dunkler

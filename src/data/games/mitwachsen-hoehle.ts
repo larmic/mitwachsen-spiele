@@ -10,9 +10,10 @@ import type { SpeciesOf } from './mitwachsen-species';
 
 /**
  * Kleine Leuchtpilze in Rosa, Türkis und Gelb: in den Beeten des Pilzgartens, im Korb der Figur, in der Pilzschale. Die
- * übrigen Farben der Grotte (`GROTTE_COLORS`) braucht nur ihr Welt-Paket
+ * übrigen Farben der Grotte (`GROTTE_COLORS`) braucht nur ihr Welt-Paket. Rosa so hell wie die rosa Kristalle der Grotte: Alles,
+ * was leuchtet, hat gegen den Boden unter der Dunkelmaske mindestens 3 : 1
  */
-export const SHROOM_COLORS = ['#f08cc8', '#6fd6f0', '#ffe08a'] as const;
+export const SHROOM_COLORS = ['#ff9cd4', '#6fd6f0', '#ffe08a'] as const;
 const STEM = '#efe4d2'; // Stiel der Leuchtpilze
 
 /** Korb mit Leuchtpilzen auf dem Rücken (nach dem Sammeln am Beet, bis zur Pilzschale); der Korb wie bei den Beeren */

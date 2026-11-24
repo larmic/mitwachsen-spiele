@@ -3,8 +3,8 @@
 // Leuchtpilze, Pilzbeete (voll oder abgeerntet; das Stück wird bei `gather` und `regrow` neu gebaut), Tropfquelle,
 // Tropfmoos, Stalagmiten und Holzsteg (Quader aus mitwachsen-cave-look.ts, wie in 2D; Säulen stehen still, ihr
 // Leuchten beim Klingen zeichnet die Ebene darüber, mitwachsen-cave-sky.ts), Boden und Klippen in den zart lila-grauen
-// Schichten des Höhlentors, Lichtflecken in den Farben der Ecken (keine Punktlichter), Ränder im Dunkel (Wände und
-// Boden an ihnen dunkler, mitwachsen-glow.ts), der Sockel der Kristall-Laterne und der lila Höhlenhimmel ohne
+// Schichten des Höhlentors (der Boden etwas dunkler als früher, ohne Flecken), Lichtflecken in den Farben der Ecken
+// (keine Punktlichter), Ränder im Dunkel (Wände und Boden an ihnen dunkler, mitwachsen-glow.ts), der Sockel der Kristall-Laterne und der lila Höhlenhimmel ohne
 // Decke mit seiner Nebel-Maske. Braucht Three.js (wie die 3D-Ansicht) und kommt darum erst, wenn die 3D-Ansicht es will
 // (`pack.view3d`, index.ts): im Build `_astro/welt-hoehle-3d.<hash>.js` mit eigener Grenze (scripts/verify-bundles.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
@@ -56,12 +56,12 @@ export const view3d: View3D = {
     if (c.biome !== 'hoehle' || c.region === 'wild') return null;
     // Lichtfleck heller, Ränder im Dunkel dunkler (mitwachsen-glow.ts): beides über `Ground.light`, nie beides zugleich
     const light = c.light || (c.dim ? -c.dim : undefined);
-    // Grottenstein: Steinkachel, getönt in den zart lila-grauen Schichten (oben heller, Seiten je Höhe); die Felswand im
-    // Schatten auch an ihren Seiten dunkler
+    // Grottenstein: Steinkachel, getönt in den zart lila-grauen Schichten (oben heller, Seiten je Höhe; die Flecken gibt es
+    // nur in 2D, in 3D zeichnen Licht und Kachel den Boden); die Felswand im Schatten auch an ihren Seiten dunkler
     if (c.ground === 'grotto')
       return {
         tiles: ['stone', 'stone', 'stone'],
-        top: c.region === 'border' ? GROTTE_COLORS.bands[0] : GROTTE_COLORS.floor[1],
+        top: c.region === 'border' ? GROTTE_COLORS.bands[0] : GROTTE_COLORS.floor,
         side: isWall(c) && c.dim ? darken(band(c.h), c.dim) : band(c.h),
         light,
       };

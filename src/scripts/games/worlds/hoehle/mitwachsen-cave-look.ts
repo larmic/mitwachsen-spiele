@@ -1,11 +1,11 @@
 // Aussehen der Dinge in der Kristallgrotte, gleich für 2D und 3D: Pilzschale, Steintrog mit Tropfmoos am Rand,
 // Unterstand mit der Kristallwand, Kristall-Lampen, Kristallsäulen (leuchten kurz heller, wenn sie klingen), Kristallbogen,
-// Leuchtpilze, Pilzbeete (voll und leer), Tropfquelle, Tropfmoos, Stalagmiten in drei Höhen, der Holzsteg, der Sockel
-// der Kristall-Laterne und die
-// Füllung (Kristallbüsche, Felsbrocken, Moos auf Felsinseln, Lehm, Pfützen, Farn); dazu Boden
-// und Klippen in den Schichten des Höhlentors und die Lichtflecken. Eigene Voxel-Grafik: keine Drusen, keine Loren, kein
-// Tropfstein mit Kessel. Rein (ohne DOM und Three.js): liefert Quader in Feldern, die beide Ansichten zeichnen. Teil des
-// Welt-Pakets der Höhlenwelt: 2D über view-2d.ts, 3D über den 3D-Teil view-3d.ts.
+// Leuchtpilze, Pilzbeete (voll und leer), Tropfquelle, Tropfmoos, Stalagmiten in drei Höhen (dunkler Fuß, Spitze in der
+// Farbe ihrer Zone), der Holzsteg, der Sockel der Kristall-Laterne und die Füllung (Kristallbüsche, Felsbrocken, Moos auf
+// Felsinseln, Lehm, Pfützen, Farn); dazu Boden und Klippen in den Schichten des Höhlentors, Flecken im Boden in 2D
+// (`patchOf`) und die Lichtflecken. Eigene Voxel-Grafik: keine Drusen, keine Loren, kein Tropfstein mit Kessel. Rein (ohne
+// DOM und Three.js): liefert Quader in Feldern, die beide Ansichten zeichnen. Teil des Welt-Pakets der Höhlenwelt: 2D über
+// view-2d.ts, 3D über den 3D-Teil view-3d.ts.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
 
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
@@ -23,6 +23,8 @@ export const SHED_H = 2.2;
 
 /** Stiel der Leuchtpilze */
 const STEM: readonly [string, string] = ['#efe4d2', '#f7efe2'];
+/** Fuß und Mitte von Stalagmiten und Felsbrocken: dunkel, gegen den hellen Boden mindestens 3 : 1 */
+const [FOOT, MID] = C.stal;
 /** Tropfwasser: türkise Tropfen */
 const DROP = C.water[1];
 
@@ -64,17 +66,6 @@ export function caveBoxes(world: Realms, c: Cell, x: number, y: number, full = t
         [x + 0.46, y + 0.5, h, 0.08, 0.08, 0.16, '#efe4d2', '#f7efe2'],
         [x + 0.36, y + 0.42, h + 0.16, 0.28, 0.24, 0.1, c.color ?? KP, c.color ?? KP],
       ];
-    case 'stalagmite': {
-      // Stalagmit in drei Höhen (`note` 0 … 2), in den Schichten des Steins; draußen in der Landschaft wie immer
-      if (c.region !== 'hoehle') return null;
-      const k = 1 + (c.note ?? 0) * 0.5;
-      const [a, b] = [C.bands[1], C.bands[3]];
-      return [
-        [x + 0.22, y + 0.3, h, 0.56, 0.5, 0.4 * k, b, a],
-        [x + 0.32, y + 0.38, h + 0.4 * k, 0.36, 0.32, 0.4 * k, a, b],
-        [x + 0.41, y + 0.45, h + 0.8 * k, 0.18, 0.16, 0.35 * k, b, a],
-      ];
-    }
     default:
       return null;
   }
@@ -112,7 +103,23 @@ const OWN = new Map<Cell['deco'], (c: Cell, x: number, y: number) => Box[] | nul
   ...SUPPLIES.map((d) => [d, supplyBoxes] as const),
   ...FILL.map((d) => [d, fillBoxes] as const),
   ['lantern', post],
+  ['stalagmite', stalagmite],
 ]);
+
+/**
+ * Stalagmit in drei Höhen (`note` 0 … 2): dunkler Fuß, darüber die Mitte, die Spitze in der Farbe seiner Zone
+ * (`Cell.color`, mitwachsen-fill.ts) mit einem hellen Tupfen obenauf; draußen in der Landschaft wie immer
+ */
+function stalagmite(c: Cell, x: number, y: number): Box[] | null {
+  if (c.region !== 'hoehle') return null;
+  const [h, k] = [c.h, 1 + (c.note ?? 0) * 0.5];
+  const tip = c.color ?? C.tips.hall;
+  return [
+    [x + 0.22, y + 0.3, h, 0.56, 0.5, 0.4 * k, FOOT, MID],
+    [x + 0.32, y + 0.38, h + 0.4 * k, 0.36, 0.32, 0.4 * k, MID, tip],
+    [x + 0.41, y + 0.45, h + 0.8 * k, 0.18, 0.16, 0.35 * k, tip, lighten(tip, 0.3)],
+  ];
+}
 
 /** Sockel der Kristall-Laterne: niedriger Steinblock mit Platte, kein Gold (die Laterne darauf ist ein Körper) */
 function post(c: Cell, x: number, y: number): Box[] {
@@ -161,7 +168,7 @@ function supplyBoxes(c: Cell, x: number, y: number): Box[] {
 
 /**
  * Füllung der Grotte (mitwachsen-fill.ts): Kristallbusch (vier kurze Kristalle in seiner Farbe auf einem flachen Stein, kein Moos fern der Lichtschächte, niedriger als die Figur),
- * Felsbrocken (Stein der Grotte, oben heller), Moos auf einer Felsinsel, Lehm am Hang des Dachses (mit einem
+ * Felsbrocken (dunkler Fuß, Kappe in der Farbe der Zone), Moos auf einer Felsinsel, Lehm am Hang des Dachses (mit einem
  * Erdhügelchen), Pfütze (flach, türkis, mit Glanz), Farn (Wedel in Moosgrün)
  */
 function fillBoxes(c: Cell, x: number, y: number): Box[] | null {
@@ -179,11 +186,14 @@ function fillBoxes(c: Cell, x: number, y: number): Box[] | null {
         [x + 0.38, y + 0.56, h + 0.08, 0.16, 0.14, 0.3, l, k],
       ];
     }
-    case 'boulder':
+    case 'boulder': {
+      // Felsbrocken: dunkler Fuß, obenauf eine Kappe in der Farbe seiner Zone (`Cell.color`)
+      const tip = c.color ?? C.tips.hall;
       return [
-        [x + 0.12, y + 0.2, h, 0.76, 0.62, 0.42, C.bands[3], C.bands[1]],
-        [x + 0.24, y + 0.3, h + 0.42, 0.5, 0.4, 0.18, C.bands[1], C.bands[2]],
+        [x + 0.12, y + 0.2, h, 0.76, 0.62, 0.42, FOOT, MID],
+        [x + 0.24, y + 0.3, h + 0.42, 0.5, 0.4, 0.18, tip, lighten(tip, 0.3)],
       ];
+    }
     case 'mosstop':
       return [
         [x + 0.04, y + 0.04, h, 0.92, 0.92, 0.04, ...C.moss],
@@ -263,6 +273,17 @@ function shed(world: Realms, c: Cell, x: number, y: number): Box[] {
     [x1 + 0.75, y1 + 0.7, h, 0.2, 0.2, SHED_H, ...C.wood],
   );
   return out;
+}
+
+/**
+ * Fleck im Grottenboden (nur 2D; 3D hat den etwas dunkleren Boden): auf freiem Grottenboden der Grotte, wo das weiche Rauschen des Bodens
+ * (`Cell.shade`) über die Schwellen in `GROTTE.patch` geht, kühl lila oder zart rosé; nie auf Licht oder Randschatten
+ * (die haben Vorrang), nie auf Moos, Steg oder Fels. Sonst undefined
+ */
+export function patchOf(c: Cell): string | undefined {
+  if (c.region !== 'hoehle' || c.ground !== 'grotto' || c.light || c.dim || c.shade === undefined) return undefined;
+  const { cool, warm } = GROTTE.patch;
+  return c.shade < cool ? C.patches[0] : c.shade > warm ? C.patches[1] : undefined;
 }
 
 /** Farbe der Schicht auf Höhe `h` (Seiten der Klippen und des Bodens wie am Höhlentor) */
