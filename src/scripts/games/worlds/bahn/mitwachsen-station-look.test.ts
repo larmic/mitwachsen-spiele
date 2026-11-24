@@ -161,6 +161,8 @@ describe('Der Zug fährt immer vorwärts: er dreht nur bei der Abfahrt hinter Da
     expect(bad).toEqual([]);
     expect(headingOf({ phase: 'seated', to: 'home' })).toBe('out');
     expect(headingOf({ phase: 'seated', to: 'out' })).toBe('home');
+    // aus der Bucht in die Höhle (`Ride.from`): steht schon zum Tor, dreht also nicht
+    expect(headingOf({ phase: 'seated', to: 'home', from: { end: 'home', pos: 9 } })).toBe('home');
     for (const phase of ['go', 'stop', 'arrive'] as const)
       for (const to of ['home', 'out'] as const) expect(headingOf({ phase, to })).toBe(to);
   });

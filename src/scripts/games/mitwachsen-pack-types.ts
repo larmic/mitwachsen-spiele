@@ -85,7 +85,9 @@ export type Ruled = {
  * Lichtung (`out`; für das Kind die Heimfahrt); `feast` die Festfahrt (erste Heimfahrt);
  * `jingleAt` Takt des letzten Bimmelns; `greeted` Tiere, die auf der Festfahrt schon gewinkt haben; `stopover` ein Halt
  * unterwegs, den das Paket des Fahrzeugs beim Abfahren ansagt (`Vehicle.depart`, `Vehicle.hold`): steht noch aus
- * (`ahead`) oder ist gemacht (`done`; der Zug bei Bau 2: Tok versenkt den Prellbock und fährt dann im hinteren Wagen mit)
+ * (`ahead`) oder ist gemacht (`done`; der Zug bei Bau 2: Tok versenkt den Prellbock und fährt dann im hinteren Wagen mit);
+ * `from` beginnt die Fahrt mitten auf der Strecke (`Vehicle.onward`, der Zug aus der Bucht in die Höhle): an welchem
+ * Halt eingestiegen wurde (`end`, sonst immer der Halt gegenüber von `to`) und bei welchem Fortschritt (`pos`)
  */
 export type Ride = {
   id: RideId;
@@ -98,6 +100,7 @@ export type Ride = {
   jingleAt: number;
   greeted: string[];
   stopover?: 'ahead' | 'done';
+  from?: { end: 'home' | 'out'; pos: number };
 };
 
 /**

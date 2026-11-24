@@ -945,6 +945,140 @@ test(
   },
 );
 
+// Nach dem Hau-ruck direkt in die Höhle (Rückmeldung zur Höhle, Punkt 3), per Entwickler-Schalter
+// (`?entwickler=bahn&bau=1&bucht=1`, fester Seed 1; @3d, weil die Welt am Prellbock neu gebaut wird und 3D ihre Stücke
+// tauscht): Die erste Fahrt ist gemacht, der Zug steht in der Bucht (`docked`, wie nach dem Aussteigen dort), Tok wartet
+// neben der Torplatte. Das Hau-ruck öffnet das Höhlentor; wer jetzt in der Bucht einsteigt, fährt nicht zurück nach
+// Bahnhof Bär: Tok klopft gleich am Prellbock (Ausbau 2), dann fährt der Zug bis Bahnhof Fledermaus, die Figur steigt
+// auf den Bahnsteig, der Maulwurf zieht ein. Gewartet wird nur auf Zustände (Test-Uhr); gespeichert wird nichts
+test(
+  'Spiel: nach dem Hau-ruck in der Bucht eingestiegen, direkt bis Bahnhof Fledermaus, speichert nichts, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    type Game = {
+      world: {
+        seed: number;
+        gates: Map<string, { mid: [number, number]; out: [number, number] }>;
+        cell(x: number, y: number): { solid: boolean; ground: string; stop?: string; plate?: string; ride?: string };
+        realm(x: number, y: number): string;
+      };
+      state: {
+        player: { x: number; y: number; dir: string };
+        openGates: string[];
+        animals: { id: string; x: number; y: number; solo?: true }[];
+        garden: { id: string }[];
+        ride?: { id: string; to: string };
+        docked?: Record<string, string>;
+        work?: unknown;
+        heave?: unknown;
+        packs: { bahn?: { built?: number } };
+      };
+      packs: { loaded: { id: string }[] };
+      rides: { id: string; x: number; y: number }[];
+      fog: { reveal(x: number, y: number, r: number): void };
+      apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+    };
+    await page.addInitScript(() => {
+      const real = crypto.getRandomValues.bind(crypto);
+      const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+        a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+      Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    });
+    const game = await openGame(page, { clock: true, dev: 'bahn&bau=1&bucht=1' });
+    await expectView(page);
+    expect(await game.evaluate((node) => (node as unknown as Game).world.seed)).toBe(1);
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    await ticks(page, 2);
+    // der Zug steht in der Bucht, die Figur auf der Torplatte, Tok auf seinem Platz daneben (u +2)
+    await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const { mid, out } = el.world.gates.get('hoehle')!;
+      const row = (u: number): [number, number] => [mid[0] - out[0] * 2 - out[1] * u, mid[1] - out[1] * 2 + out[0] * u];
+      const [px, py] = row(0);
+      const [tx, ty] = row(2);
+      const animals = el.state.animals.map((a) => (a.id === 'hoehle:tok' ? { ...a, x: tx, y: ty } : a));
+      el.state = { ...el.state, animals, docked: { hoehle: 'home' }, player: { x: px, y: py, dir: 'n' } };
+      el.fog.reveal(px, py, 10);
+    });
+    // die Grotte kommt vor dem Hau-ruck (Vorladen am Halt in der Bucht)
+    await expect
+      .poll(async () => {
+        await ticks(page, 1);
+        return game.evaluate((node) => (node as unknown as Game).packs.loaded.some((p) => p.id === 'hoehle'));
+      })
+      .toBe(true);
+    // Hau-ruck: still auf der Platte, Tok stößt allein, nach drei Stößen ist das Höhlentor offen
+    for (let i = 0; i < 40; i++) {
+      if (await game.evaluate((node) => (node as unknown as Game).state.openGates.includes('hoehle'))) break;
+      await ticks(page, 10);
+    }
+    await ticks(page, 31); // 3 s Nische, Lampen, „Ju-hu“
+    await render(page, 2);
+    // in der Bucht einsteigen: von einem freien Feld neben dem mittleren Wagen ein neuer Druck zu ihm hin
+    const boarded = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const mid = el.rides.find((r) => r.id === 'ride:hoehle:mid')!;
+      const [mx, my] = [Math.round(mid.x), Math.round(mid.y)];
+      const dirs: [string, number, number][] = [
+        ['e', 1, 0],
+        ['w', -1, 0],
+        ['s', 0, 1],
+        ['n', 0, -1],
+      ];
+      const ok = (x: number, y: number) => {
+        const c = el.world.cell(x, y);
+        return (
+          !c.solid &&
+          !c.ride &&
+          !c.plate &&
+          c.ground !== 'water' &&
+          !el.state.animals.some((a) => a.x === x && a.y === y)
+        );
+      };
+      const [dir, dx, dy] = dirs.find(([, dx, dy]) => ok(mx - dx, my - dy))!;
+      el.state = { ...el.state, player: { x: mx - dx, y: my - dy, dir: 's' } };
+      const before = { open: el.state.openGates.includes('hoehle'), heave: !!el.state.heave };
+      el.apply({ type: 'move', dir, fresh: true });
+      return { ...before, realm: el.world.realm(mx, my), ride: el.state.ride?.to };
+    });
+    expect(boarded).toEqual({ open: true, heave: false, realm: 'lichtung', ride: 'home' }); // zur Höhle, nicht nach Bär
+    // nach 2 s mit geschlossenen Türen: Ausbau 2 gespeichert, Tok hüpft heran und klopft gleich am Prellbock
+    await ticks(page, 22);
+    await render(page, 2);
+    const knock = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      return { built: el.state.packs.bahn?.built, work: !!el.state.work, ride: !!el.state.ride };
+    });
+    expect(knock).toEqual({ built: 2, work: true, ride: true });
+    // 15 bis 20 s Restfahrt, dazu 3 s am Prellbock, dann steigt die Figur nach 1 s aus
+    for (let i = 0; i < 40; i++) {
+      if (!(await game.evaluate((node) => !!(node as unknown as Game).state.ride))) break;
+      await ticks(page, 10);
+      await render(page);
+    }
+    await render(page, 2);
+    const done = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const { x, y } = el.state.player;
+      return {
+        ride: !!el.state.ride,
+        realm: el.world.realm(x, y),
+        platform: el.world.cell(x, y).stop,
+        mole: el.state.garden.some((a) => a.id === 'hoehle:maulwurf'),
+        tok: el.state.animals.find((a) => a.id === 'hoehle:tok')?.solo ?? false,
+        station: el.rides.some((r) => r.id === 'bahn:felsdach'),
+      };
+    });
+    expect(done).toEqual({ ride: false, realm: 'hoehle', platform: 'hoehle', mole: true, tok: true, station: true });
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
+      [],
+    );
+    expect(errors).toEqual([]);
+  },
+);
+
 // Bahn und Höhle für das Kind, der ganze Weg ohne Entwickler-Schalter, mit echtem Spielstand (fester Seed 1, 2D, Test-Uhr):
 // Ein Spielstand nach der Eis-Welt (Eistor offen, Eis-Leiste voll, erste Heimfahrt mit dem Schlitten), wie ihn das Spiel
 // vor dem Freischalten schrieb. Beim Aufwachen im Bett der Lichtung kommt Tok (gespeichert: `faellig`); in ihn

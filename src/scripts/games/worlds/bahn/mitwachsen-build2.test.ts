@@ -10,7 +10,7 @@ import { BUILD2 } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import { TOK_MODEL, TOK_SOLO } from '../../../../data/games/worlds/bahn/mitwachsen-tok-model';
 import { bahnWanted } from '../../mitwachsen-pack';
 import type { RideEvent } from '../../mitwachsen-pack-types';
-import { DEPART, parked, stopsOf } from '../../mitwachsen-ride-kit';
+import { ALIGHT, DEPART, parked, stopsOf } from '../../mitwachsen-ride-kit';
 import { withTok } from '../../mitwachsen-ride-save';
 import { atHome } from '../../mitwachsen-meadow';
 import type { RideAt } from '../../mitwachsen-ride-view';
@@ -26,10 +26,10 @@ import {
 import type { World } from '../../mitwachsen-world';
 import { BAHN_PACK, BUILT, FAHRT_PACK, HOEHLE_PACK, worldOf } from '../../test-worlds';
 import { batBodies, batOf } from './mitwachsen-bat-look';
-import { NEAR, capOf, canBuild2, shedIn } from './mitwachsen-build2';
+import { NEAR, TOK_WAIT, capOf, canBuild2, onward2, shedIn } from './mitwachsen-build2';
 import { withBuilt } from './mitwachsen-built';
 import { railBoxes, railShown, sunkOf, waveStage } from './mitwachsen-rail-look';
-import { stationBodies, stationOf } from './mitwachsen-station-look';
+import { headingOf, puffOf, stationBodies, stationOf } from './mitwachsen-station-look';
 import { SEAT, TRAIN, lineOf, train, trainRoute } from './mitwachsen-train';
 import { heraldFx } from './mitwachsen-tok-look';
 import { BAT_CALL, BEAR_CALL, trainScores } from './mitwachsen-train-look';
@@ -93,6 +93,24 @@ function rideIn(s: State, w: World, watch: (r: Run) => void = () => {}, limit = 
     watch(r);
   }
   return r;
+}
+
+/** Ein Pfeil von der Figur in einen Wagen des Zugs am Halt `end` (undefined: keiner daneben) */
+function intoTrain(s: State, w: World, end: 'home' | 'out'): Dir | undefined {
+  const at = stopsOf(trainRoute(w, s)!)[end];
+  return (Object.entries(DIRS) as [Dir, readonly [number, number]][]).find(([, [dx, dy]]) =>
+    at.board.has(`${s.player.x + dx},${s.player.y + dy}`),
+  )?.[0];
+}
+
+/**
+ * Vor dem Hau-ruck (Höhlentor zu) von Bahnhof Bär bis an den Prellbock in der Bucht gefahren und ausgestiegen (Tok hüpft
+ * an seinen Platz neben der Torplatte), dann geht das Tor auf: Der Zug steht in der Bucht, die Lok zum Tor
+ */
+function inBay(): Run {
+  const shut = awake(W1, onPlatform(W1).at, OPENED, ['eis']);
+  const r = rideIn(shut, W1);
+  return { ...r, s: { ...r.s, openGates: [...OPEN_GATES] } };
 }
 
 describe('Bau 2: bei der nächsten Fahrt nach dem Hau-ruck (mitwachsen-build2.ts)', () => {
@@ -312,6 +330,134 @@ describe('Bau 2: bei der nächsten Fahrt nach dem Hau-ruck (mitwachsen-build2.ts
     expect(cheb(before!, buffer)).toBeLessThan(cheb(atGo!, buffer)); // er hüpft schon während der Fahrt
     expect(cheb(atSink!, buffer)).toBeLessThanOrEqual(NEAR); // geklopft wird nie ohne ihn
     expect(W1.cell(...atSink!).ride).toBeUndefined();
+  });
+
+  it('nach dem Hau-ruck in der Bucht eingestiegen: Tok klopft gleich am Prellbock, dann fährt der Zug, Lok voran, bis Bahnhof Fledermaus', () => {
+    const bay = inBay();
+    expect(bay.s.docked).toEqual({ hoehle: 'home' });
+    expect(bay.w.realm(bay.s.player.x, bay.s.player.y)).toBe('lichtung');
+    expect(bay.s.animals.find((a) => a.id === TOK)).toMatchObject({ mode: 'herald' });
+    const cap = capOf(W1);
+    expect(onward2(bay.s, W1, 'home')).toEqual({ to: 'home', pos: cap });
+    const dir = intoTrain(bay.s, bay.w, 'home')!;
+    expect(dir).toBeDefined();
+    const seat = stopsOf(trainRoute(W1, bay.s)!).home.seat;
+    let r = play(bay.s, bay.w, [{ type: 'move', dir, fresh: true }]);
+    const boardTick = r.s.tick;
+    expect(r.s.ride).toMatchObject({ to: 'home', pos: cap, from: { end: 'home', pos: cap }, phase: 'seated' });
+    expect([r.s.player.x, r.s.player.y]).toEqual(seat);
+    // im Bild: der Zug steht, wo er stand (auch bei reduzierter Bewegung), die Lok zum Tor, keine Dampfwolke
+    const loco = (s: State, reduced = false) =>
+      stationBodies(s, r.w, { ...AT, reduced }).find((b) => b.id === 'ride:hoehle:loco')!;
+    for (const reduced of [false, true]) {
+      const [a, b] = [loco(bay.s, reduced), loco(r.s, reduced)];
+      expect([b.x, b.y, b.dir]).toEqual([a.x, a.y, a.dir]);
+    }
+    let goTick = -1;
+    let sinkTick = -1;
+    let moving = 0;
+    const bad: string[] = [];
+    for (let i = 0; i < 500 && r.s.ride; i++) {
+      const before = r.s.ride.pos;
+      const was = r.s.animals.find((a) => a.id === TOK);
+      const n = play(r.s, r.w, [TICK]);
+      const now = n.s.animals.find((a) => a.id === TOK);
+      // Tok hüpft heran (höchstens ein Feld je Takt), er steht nie plötzlich woanders
+      if (was && now && cheb([was.x, was.y], [now.x, now.y]) > 1)
+        bad.push(`Takt ${n.s.tick}: Tok springt von ${was.x},${was.y} nach ${now.x},${now.y}`);
+      r = { ...n, events: [...r.events, ...n.events] };
+      if (goTick < 0 && rides(n.events, 'go').length) goTick = n.s.tick;
+      if (sinkTick < 0 && heralds(n.events, 'sink').length) sinkTick = n.s.tick;
+      const ride = n.s.ride;
+      if (!ride) continue;
+      if (ride.pos > before) moving++;
+      if (headingOf(ride) !== 'home') bad.push(`Takt ${n.s.tick}: Lok schaut ${headingOf(ride)}`);
+      for (const frac of [0, 0.5, 1])
+        if (puffOf(n.s, n.w, { ...AT, frac }) !== undefined) bad.push(`Takt ${n.s.tick}: Dampfwolke`);
+    }
+    expect(bad).toEqual([]);
+    // nach den 2 s mit geschlossenen Türen: Ausbau 2 gespeichert, Tok hüpft heran und klopft gleich (der Sitz steht schon
+    // am Prellbock), ohne dass der Zug bis `TOK_WAIT` auf ihn warten muss
+    expect(goTick).toBe(boardTick + DEPART);
+    expect(sinkTick).toBeGreaterThan(goTick);
+    expect(sinkTick).toBeLessThan(goTick + TOK_WAIT);
+    expect(rides(r.events, 'go')[0]!.persist).toBe(true);
+    expect(heralds(r.events, 'sink')).toHaveLength(1);
+    expect(heralds(r.events, 'pop')).toHaveLength(1);
+    expect(heralds(r.events, 'board')).toHaveLength(1);
+    // die Restfahrt bleibt in 15–20 s (Tempo aus der Restlänge), dazu die 3 s des Klopfens
+    expect(moving).toBeGreaterThanOrEqual(150);
+    expect(moving).toBeLessThanOrEqual(200);
+    expect(r.s.tick - goTick).toBeLessThanOrEqual(200 + BUILD2.ticks + ALIGHT + 2);
+    // „Uh-uh“ vor dem Tor und die Glocke beim Wechsel in die Grotte kommen trotz Start mitten auf der Linie
+    expect(rides(r.events, 'tunnel')).toHaveLength(1);
+    expect(r.events.filter((e) => e.type === 'realm')).toEqual([{ type: 'realm', to: 'hoehle' }]);
+    // angekommen am Bahnhof Fledermaus: die Figur auf dem Bahnsteig, der Maulwurf zieht ein, Tok in den Lokschuppen
+    expect(r.s.ride).toBeUndefined();
+    expect(r.w.realm(r.s.player.x, r.s.player.y)).toBe('hoehle');
+    expect(r.w.cell(r.s.player.x, r.s.player.y).stop).toBe(TRAIN.id);
+    expect(r.s.packs.bahn).toEqual({ built: 2 });
+    expect(r.events.filter((e) => e.type === 'home')).toEqual([{ type: 'home', id: FIRST_MOLE, species: 'maulwurf' }]);
+    expect(r.s.animals.find((a) => a.id === TOK)).toMatchObject({ solo: true });
+  });
+
+  it('aus der Bucht: in den ersten 2 s wieder in die Bucht ausgestiegen, nichts gebaut; zu Fuß oder nach dem Laden der alte Weg', () => {
+    const bay = inBay();
+    const dir = intoTrain(bay.s, bay.w, 'home')!;
+    const seated = play(bay.s, bay.w, [{ type: 'move', dir, fresh: true }, ...ticks(DEPART - 2)]);
+    const at = stopsOf(trainRoute(W1, seated.s)!).home;
+    const off = (Object.entries(DIRS) as [Dir, readonly [number, number]][]).filter(([, [dx, dy]]) => {
+      const [x, y] = [seated.s.player.x + dx, seated.s.player.y + dy];
+      return !at.cells.has(`${x},${y}`) && W1.cell(x, y).ride === undefined && !W1.cell(x, y).solid;
+    });
+    expect(off.length).toBeGreaterThan(0);
+    const left = play(seated.s, W1, [{ type: 'move', dir: off[0]![0] }]);
+    expect(left.s.ride).toBeUndefined();
+    expect(rides(left.events, 'leave')).toHaveLength(1);
+    expect(left.w.realm(left.s.player.x, left.s.player.y)).toBe('lichtung'); // in der Bucht, nicht an Bahnhof Bär
+    expect(cheb([left.s.player.x, left.s.player.y], at.seat)).toBe(1);
+    expect(left.s.packs).toEqual(bay.s.packs);
+    expect(left.s.work).toBeUndefined();
+    // nur in der Bucht und nur, solange Bau 2 aussteht: an Bahnhof Bär, Tor zu, ohne Tok, schon gebaut nicht
+    const s = bay.s;
+    expect(onward2(s, W1, 'out')).toBeUndefined();
+    expect(onward2({ ...s, openGates: ['eis'] }, W1, 'home')).toBeUndefined();
+    expect(onward2({ ...s, packs: withBuilt({}, 1) }, W1, 'home')).toBeUndefined();
+    expect(onward2({ ...s, packs: withBuilt(OPENED, 2) }, W2, 'home')).toBeUndefined();
+    // Tor zu: aus der Bucht wie bisher zurück nach Bahnhof Bär
+    const shut = play({ ...bay.s, openGates: ['eis'] }, W1, [{ type: 'move', dir, fresh: true }]);
+    expect(shut.s.ride).toMatchObject({ to: 'out', pos: 0 });
+    expect(shut.s.ride!.from).toBeUndefined();
+    // nach dem Laden steht der Zug wieder an Bahnhof Bär (`docked` wird nicht gespeichert): Bau 2 von dort, wie bisher
+    const loaded = awake(W1, onPlatform(W1).at, progressOf(bay.s).packs);
+    expect(loaded.docked).toBeUndefined();
+    expect(parked(TRAIN, trainRoute(W1, loaded)!, loaded, W1)?.end).toBe('out');
+    const fromBear = rideIn(loaded, W1);
+    expect(heralds(fromBear.events, 'sink')).toHaveLength(1);
+    expect(fromBear.w.realm(fromBear.s.player.x, fromBear.s.player.y)).toBe('hoehle');
+  });
+
+  it('Start mitten auf der Linie kurz vor dem Tor (Fahr-Engine, `Vehicle.onward`): Das „Uh-uh“ kommt beim ersten Schritt, nie hinter dem Zug', () => {
+    const cap = capOf(W2);
+    const r2 = trainRoute(W2, { packs: withBuilt(OPENED, 2), openGates: [...OPEN_GATES] })!;
+    const len = r2.path.length - 1;
+    const dark = (i: number) => r2.dark!.has(r2.path[len - i]!.join(','));
+    const gate = Array.from({ length: len - cap }, (_, k) => cap + k).find((i) => dark(i) && !dark(i - 1))!;
+    const start = gate - 2; // näher am Tor als `WARN`: ab hier sähe der Blick nach vorn den Anfang nie
+    expect(dark(start)).toBe(false);
+    const probe = { ...train, depart: undefined, hold: undefined, onward: () => ({ to: 'home' as const, pos: start }) };
+    const engine = FAHRT_PACK.rules!.ride!([probe]);
+    const s = structuredClone(awake(W2, onPlatform(W2).at, withBuilt(OPENED, 2)));
+    const events: GameEvent[] = [];
+    expect(engine.move(s, W2, { type: 'move', dir: onPlatform(W2).dir, fresh: true }, events)).toBe(true);
+    expect(s.ride).toMatchObject({ to: 'home', pos: start, from: { end: 'out', pos: start } });
+    for (let i = 0; i < DEPART + 5; i++) {
+      s.tick++;
+      engine.tick(s, W2, events);
+    }
+    const warns = rides(events, 'tunnel');
+    expect(warns).toHaveLength(1);
+    expect([warns[0]!.x, warns[0]!.y]).toEqual(r2.path[len - start]); // dort, wo der Zug losfuhr
   });
 
   it('mitten in der Fahrt neu geladen (Ausbau 2, der Maulwurf läuft frei): Bei der nächsten Ankunft am Bahnhof Fledermaus zieht er ein, dann erwacht das Portal', () => {

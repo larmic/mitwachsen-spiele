@@ -10,9 +10,10 @@
 // (`rules.vehicle`, mitwachsen-train.ts; die Fahrregeln bringt das Paket der Fahrzeuge, worlds/fahrt/; Ton und Licht im
 // Tunnel in mitwachsen-train-look.ts): die erste Fahrt bis zum Prellbock in der Bucht, dort hüpft Tok an seinen Platz
 // neben der Torplatte; das Hau-ruck am Höhlentor bringt das Paket der Höhlenwelt. Bei der nächsten Fahrt danach Bau 2
-// (mitwachsen-build2.ts): Am Prellbock klopft Tok, der Prellbock versinkt, Bahnhof Fledermaus und der Lokschuppen
-// entstehen, der Zug fährt bis in die Grotte; der Maulwurf von Toks Helm zieht als erstes Höhlen-Tier ein (bis dahin
-// wohnt er nicht in der Grotte, `away`), und Tok wohnt von nun an im Lokschuppen, ohne ihn (`solos`). Mit dem Gleis setzt
+// (mitwachsen-build2.ts; steigt das Kind nach dem Hau-ruck in der Bucht ein, fährt der Zug von dort direkt in die
+// Höhle, `onward2`, sonst von Bahnhof Bär aus): Am Prellbock klopft Tok, der Prellbock versinkt, Bahnhof Fledermaus
+// und der Lokschuppen entstehen, der Zug fährt bis in die Grotte; der Maulwurf von Toks Helm zieht als erstes
+// Höhlen-Tier ein (bis dahin wohnt er nicht in der Grotte, `away`), und Tok wohnt von nun an im Lokschuppen, ohne ihn (`solos`). Mit dem Gleis setzt
 // es seine Klangsteine (mitwachsen-stones.ts): am Bahnhof Bär ab Bau 1 (`bahnhof`), am Lokschuppen ab Bau 2 (`lokschuppen`).
 // Schmuck mit Zug (mitwachsen-feast-look.ts): Pfeif-Gruß der Murmeltiere, die Laternenfahrt nach voller Höhlen-Leiste
 // (`feast`, danach der Kristall-Wimpel), warmes Licht ab 20 min und „Gute Nacht, Bahn“ mit Nachtlicht.

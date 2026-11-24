@@ -114,7 +114,10 @@ export type Fan = { who: string; x: number; y: number };
  * auf der Lichtung hält (`spec.out` `'fest'`, der Schlitten); der Zug: die erste Heimfahrt nach voller Höhlen-Leiste
  * (die Laternenfahrt, Zierde, nie Bedingung). `exit`: Felder, auf die die Figur am Ziel `end` am liebsten aussteigt, die
  * besten zuerst (Zug: der Bahnsteig an der Tür, nie unter dem Dach); die Engine nimmt das erste freie, das sie auch sonst
- * nähme (nie Strecke, Halt, Plattform, Torplatte, höchstens eine Stufe), sonst wie ohne Haken das nächste freie
+ * nähme (nie Strecke, Halt, Plattform, Torplatte, höchstens eine Stufe), sonst wie ohne Haken das nächste freie.
+ * `onward`: beim Einsteigen am Halt `at`; liefert es etwas, fährt diese Fahrt nicht zum Halt gegenüber, sondern weiter
+ * nach `to`, ab dem Fortschritt `pos` dieser Strecke (der Zug: nach dem Hau-ruck aus der Bucht direkt in die Höhle, ab
+ * dem Prellbock); die Engine merkt den echten Start (`Ride.from`) und rechnet das Tempo aus der Restlänge
  */
 export type Vehicle = {
   spec: RideSpec;
@@ -128,6 +131,7 @@ export type Vehicle = {
   hold?(s: Rider, world: World, events: RideEvents): number | undefined;
   feast?(s: Rider, world: World): boolean;
   exit?(s: Rider, world: World, end: End): readonly Point[];
+  onward?(s: Rider, world: World, at: End): { to: End; pos: number } | undefined;
 };
 
 /** Die Fahr-Engine (Paket der Fahrzeuge, `WorldRules.ride`): macht aus den Fahrzeugen der geladenen Pakete ihre Regeln */

@@ -10,7 +10,11 @@
 // Tier, das einzieht; erst danach erwacht das Portal am stillen See, `Portal.later`), und Tok hüpft an seinen Platz im
 // Lokschuppen: Dort wohnt er von nun an (`inShed`/`backToShed` in mitwachsen-tok.ts), ohne den Maulwurf (`solo`).
 // Wer mitten in der Fahrt neu lädt, findet Ausbau 2 fertig vor; der Maulwurf läuft dann frei gegenüber dem Bahnhof, bis
-// das Kind ihn heimbringt oder wieder mit dem Zug am Bahnhof Fledermaus ankommt (dann zieht er ein). Teil des Pakets der Bahn (Zug: mitwachsen-train.ts; Tok: mitwachsen-tok.ts).
+// das Kind ihn heimbringt oder wieder mit dem Zug am Bahnhof Fledermaus ankommt (dann zieht er ein).
+// Steigt das Kind nach dem Hau-ruck in der Bucht ein, fährt der Zug von dort direkt in die Höhle (`onward2`): Er steht
+// schon am Prellbock, Tok hüpft gleich nach den 2 s heran und klopft (`TOK_WAIT`), dann geht es weiter (Rückmeldung zur
+// Höhle, Punkt 3).
+// Teil des Pakets der Bahn (Zug: mitwachsen-train.ts; Tok: mitwachsen-tok.ts).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 2)
 
 import { DIRS } from '../../../../lib/games/front';
@@ -33,8 +37,14 @@ import { SEAT, lineOf } from './mitwachsen-train-line';
 /** Tok unter den Wesen (wie `TOK` in mitwachsen-tok.ts, das diese Datei importiert) */
 const TOK = animalId('hoehle', 'tok');
 const EPS = 1e-6;
-/** So nah (Felder) muss Tok am Prellbock sein, wenn er zu klopfen beginnt; weiter weg, steht er gleich dort */
+/** So nah (Felder) muss Tok am Prellbock sein, wenn er zu klopfen beginnt; weiter weg, steht er bald dort (`TOK_WAIT`) */
 export const NEAR = 2;
+/**
+ * So viele Takte nach der Abfahrt wartet der Zug am Prellbock höchstens auf Tok, bis er auf `NEAR` heran ist (nach dem
+ * Hau-ruck in der Bucht eingestiegen, `onward2`: er steht noch an seinem Platz neben der Torplatte und hüpft erst los);
+ * danach steht er gleich dort. Von Bahnhof Bär aus ist die Fahrt bis zum Prellbock länger, dort zählt das nie
+ */
+export const TOK_WAIT = 10;
 
 type Walker = Heralded['animals'][number];
 
@@ -74,6 +84,22 @@ export function depart2(s: Rider, world: World, to: End): boolean {
 export const capOf = (world: World): number => lineOf(world, false).length - 1 - 2 * SEAT;
 
 /**
+ * Beim Einsteigen (`Vehicle.onward`, Rückmeldung zur Höhle, Punkt 3): Wer nach dem Hau-ruck in der Bucht einsteigt (Halt
+ * `home` bei Ausbau 1, Höhlentor offen, Tok kam), fährt direkt in die Höhle, ab dem Prellbock (`capOf`). Bau 2 beginnt
+ * dann bei der Abfahrt wie von Bahnhof Bär aus (`depart2`), und Tok hüpft
+ * heran und klopft gleich (`hold2`: der Sitz steht schon dort, der Zug wartet bis zu `TOK_WAIT` Takte auf ihn).
+ * Zu Fuß in der Höhle oder nach dem Neuladen (der Zug steht wieder an Bahnhof Bär, `docked` wird nicht gespeichert)
+ * bleibt es beim alten Weg: Bau 2 bei der nächsten Fahrt von Bär aus
+ */
+export function onward2(
+  s: Pick<Rider, 'packs' | 'openGates'>,
+  world: World,
+  at: End,
+): { to: End; pos: number } | undefined {
+  return at === 'home' && canBuild2(s, world, 'home') ? { to: 'home', pos: capOf(world) } : undefined;
+}
+
+/**
  * Solange der Halt unterwegs aussteht (`Vehicle.hold`): bis an den Prellbock fahren, dort beginnt Tok zu klopfen (die
  * Arbeit beginnt jetzt, `BUILD2.ticks` Takte), und warten, bis er fertig ist und eingestiegen (dann undefined: weiter)
  */
@@ -82,12 +108,15 @@ export function hold2(s: Rider, world: World, events: RideEvents): number | unde
   if (!ride || !s.work) return undefined;
   const cap = capOf(world);
   if (!waiting(s) || ride.pos < cap - EPS) return cap;
-  s.work = { from: s.tick, to: s.tick + BUILD2.ticks };
   const t = s.animals.find((a) => a.id === TOK);
+  const spot = t && besideBuffer(s, world);
+  const far = !!(t && spot && Math.max(Math.abs(t.x - spot[0]), Math.abs(t.y - spot[1])) > NEAR);
+  // eben erst abgefahren (aus der Bucht, `onward2`): Tok hüpft noch heran (`build2Step`), der Zug wartet am Prellbock
+  if (far && s.tick - s.work.from < TOK_WAIT) return cap;
+  s.work = { from: s.tick, to: s.tick + BUILD2.ticks };
   // kam er unterwegs nicht heran (etwa morgens noch vom Bett der Lichtung her, oder an einer Felskante hängen
   // geblieben), steht er jetzt am Prellbock: Geklopft wird nie ohne ihn
-  const spot = t && besideBuffer(s, world);
-  if (t && spot && Math.max(Math.abs(t.x - spot[0]), Math.abs(t.y - spot[1])) > NEAR) {
+  if (t && spot && far) {
     [t.x, t.y] = spot;
     const buffer = lineOf(world, false).at(-1);
     if (buffer) t.dir = dirTo(buffer[0] - t.x, buffer[1] - t.y);

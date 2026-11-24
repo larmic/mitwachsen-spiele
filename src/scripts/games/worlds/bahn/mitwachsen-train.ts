@@ -8,7 +8,8 @@
 // darin gedimmtes Licht. Warteplätze für folgende Tiere: die Bank auf dem Bahnsteig (`SEATS`-Muster), in der Bucht
 // Felder neben dem Gleis (nicht auf Torplatte und Toks Platz). Nach der ersten Fahrt hat die Tür keinen goldenen Rahmen
 // mehr (`gefahren`, gespeichert); kommt sie (Ausbau 1) am Prellbock an, hüpft Tok aus dem hinteren Wagen an seinen Platz
-// neben der Torplatte (`BESIDE`, `landed`). An beiden Bahnhöfen steigt die Figur auf den eigenen Bahnsteig aus, an der
+// neben der Torplatte (`BESIDE`, `landed`); steigt die Figur nach dem Hau-ruck dort wieder ein, fährt er direkt in die
+// Höhle (`onward`, Bau 2 ab dem Prellbock). An beiden Bahnhöfen steigt die Figur auf den eigenen Bahnsteig aus, an der
 // Tür, nie unter das Dach (`exit`, mitwachsen-platform.ts).
 // Steht die Figur 6 Felder vor einem Halt (`RIDE_PRELOAD`), holt das Spiel die Grotte (`needs`) und die Fahr-Engine;
 // solange die Engine fehlt oder (ab Ausbau 2) die Grotte, schläft der Zug am Halt (mitwachsen-preload.ts).
@@ -25,7 +26,7 @@ import { standHeight, type World } from '../../mitwachsen-world';
 import { builtOf } from './mitwachsen-built';
 import { key } from './mitwachsen-ground';
 import { CARS, SEAT, TRAIN, lineOf } from './mitwachsen-train-line';
-import { arrive2, depart2, hold2 } from './mitwachsen-build2';
+import { arrive2, depart2, hold2, onward2 } from './mitwachsen-build2';
 import { batPlatform, bearPlatform, exitsOf } from './mitwachsen-platform';
 
 export { CARS, SEAT, TRAIN, bearEnd, lineOf } from './mitwachsen-train-line';
@@ -169,8 +170,9 @@ export const feast = (s: Rider): boolean =>
  * Ziel-Gegend ist die Grotte (`needs`): vorgeladen schon, solange er nur bis zum Prellbock fährt, damit sie da ist, wenn
  * Bau 2 kommt; schlafen (Vorladen, mitwachsen-preload.ts) muss er ohne sie erst ab Ausbau 2, wenn er hineinfährt
  * (`reaches`). Die erste Fahrt wartet nie auf die Grotte. Bau 2 (mitwachsen-build2.ts): beginnt beim Abfahren von
- * Bahnhof Bär nach dem Hau-ruck (`depart`), der Zug hält am Prellbock, bis Tok fertig ist (`hold`). Die erste Heimfahrt
- * nach voller Höhlen-Leiste ist die Laternenfahrt (`feast`). Ausgestiegen wird auf den Bahnsteig (`exit`)
+ * Bahnhof Bär nach dem Hau-ruck (`depart`), der Zug hält am Prellbock, bis Tok fertig ist (`hold`); wer nach dem
+ * Hau-ruck in der Bucht einsteigt, fährt von dort direkt in die Höhle (`onward`). Die erste Heimfahrt nach voller
+ * Höhlen-Leiste ist die Laternenfahrt (`feast`). Ausgestiegen wird auf den Bahnsteig (`exit`)
  */
 export const train: Vehicle = {
   spec: TRAIN,
@@ -178,6 +180,7 @@ export const train: Vehicle = {
   landed,
   depart: depart2,
   hold: hold2,
+  onward: onward2,
   feast,
   exit,
   needs: ['hoehle'],

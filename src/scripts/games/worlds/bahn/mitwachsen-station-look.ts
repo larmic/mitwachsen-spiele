@@ -222,14 +222,18 @@ export const OPEN_TICKS = 10;
  */
 type Place = { line: readonly Point[]; front: number; heading: End; side: Point };
 
+/** Halt, an dem eine Fahrt begann: der echte Start (`Ride.from`, aus der Bucht in die Höhle), sonst gegenüber von `to` */
+export const startOf = (ride: Pick<NonNullable<State['ride']>, 'to' | 'from'>): End =>
+  ride.from?.end ?? (ride.to === 'out' ? 'home' : 'out');
+
 /**
  * Wohin die Lok während einer Fahrt schaut: bis zur Abfahrt (Phase `seated`, Türen zu) wie angekommen, also zum Halt, an
- * dem sie steht (die Gegenrichtung von `to`); ab dem Takt, an dem der Zug losfährt, in Fahrtrichtung (`to`). Geparkt
- * schaut sie zum Halt, an dem sie steht. Der Spielstand weiß davon nichts, es ist nur Bild
+ * dem sie steht (`startOf`; aus der Bucht in die Höhle schon zum Tor, sie dreht also nicht); ab dem Takt, an dem der Zug
+ * losfährt, in Fahrtrichtung (`to`). Geparkt schaut sie zum Halt, an dem sie steht. Der Spielstand weiß davon nichts,
+ * es ist nur Bild
  */
-export function headingOf(ride: Pick<NonNullable<State['ride']>, 'phase' | 'to'>): End {
-  if (ride.phase !== 'seated') return ride.to;
-  return ride.to === 'out' ? 'home' : 'out';
+export function headingOf(ride: Pick<NonNullable<State['ride']>, 'phase' | 'to' | 'from'>): End {
+  return ride.phase !== 'seated' ? ride.to : startOf(ride);
 }
 
 /**
@@ -249,7 +253,7 @@ const PUFF_STEPS = 4;
 export function puffOf(state: Pick<State, 'ride' | 'tick'>, world: World, at: RideAt): number | undefined {
   const ride = state.ride?.id === TRAIN.id ? state.ride : undefined;
   if (!ride || at.reduced || ride.phase === 'arrive') return undefined;
-  if (headingOf({ phase: 'seated', to: ride.to }) === ride.to) return undefined; // er dreht nicht (künftig: aus der Bucht in die Höhle)
+  if (startOf(ride) === ride.to) return undefined; // er dreht nicht (aus der Bucht in die Höhle)
   const t =
     ride.phase === 'seated'
       ? state.tick - ride.at + at.frac - DEPART
@@ -263,14 +267,15 @@ export function puffOf(state: Pick<State, 'ride' | 'tick'>, world: World, at: Ri
 /**
  * Fortschritt des Sitzes in diesem Bild: zwischen den Takten gleitend, außer der Zug hält am Prellbock, wo Tok Bau 2
  * baut (`Ride.stopover`); bei reduzierter Bewegung springt er ans Ziel und steht bis zur Ankunft am Halt (bei Bau 2 ab
- * dem Prellbock dort)
+ * dem Prellbock dort; aus der Bucht in die Höhle am Start, `Ride.from`, das ist derselbe Prellbock)
  */
 function seatAt(ride: NonNullable<State['ride']>, len: number, world: World, at: RideAt): number {
   const cap = ride.stopover ? capOf(world) : Infinity;
+  const start = ride.from?.pos ?? 0;
   const held = ride.stopover === 'ahead' && ride.pos >= cap - 1e-6;
-  const p = ride.phase === 'go' && !held ? Math.max(0, ride.pos - ride.speed * (1 - at.frac)) : ride.pos;
+  const p = ride.phase === 'go' && !held ? Math.max(start, ride.pos - ride.speed * (1 - at.frac)) : ride.pos;
   if (!at.reduced || p >= len) return p;
-  return p >= cap - 1e-6 ? cap : 0;
+  return p >= cap - 1e-6 ? cap : start;
 }
 
 /**
@@ -285,7 +290,7 @@ function placeOf(st: BearStation, world: World, state: State, work: number | und
     const line = lineOf(world, farOf(state));
     const p = seatAt(ride, r.path.length - 1, world, at);
     const q = ride.to === 'out' ? line.length - 1 - SEAT - p : SEAT + p;
-    const by: End = ride.phase === 'seated' ? (ride.to === 'out' ? 'home' : 'out') : ride.to;
+    const by: End = ride.phase === 'seated' ? startOf(ride) : ride.to;
     return { line, front: q - SEAT + PARK, heading: headingOf(ride), side: sideAt(st, world, state, by) };
   }
   const end = r && (parked(TRAIN, r, state, world)?.end ?? state.docked?.[TRAIN.id]);

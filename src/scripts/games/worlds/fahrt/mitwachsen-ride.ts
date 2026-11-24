@@ -114,32 +114,44 @@ export function rideTicks(spec: Pick<Vehicle['spec'], 'ticks' | 'pace'>, len: nu
   return Math.min(hi, Math.max(lo, Math.round(spec.pace ? len / spec.pace : len * 1.5)));
 }
 
+/**
+ * Tempo einer Fahrt ab Fortschritt `pos` auf einer Strecke der Länge `len`: aus der Restlänge, damit auch eine Fahrt,
+ * die mitten auf der Strecke beginnt (`Vehicle.onward`), in `ticks` bleibt
+ */
+const speedOf = (spec: Vehicle['spec'], len: number, pos: number) => (len - pos) / rideTicks(spec, len - pos);
+
 /** Erste Heimfahrt eines Fahrzeugs, das erst danach auf der Lichtung hält (Schlitten, `spec.out` `'fest'`) */
 const firstHome = (c: Ctx, s: Rider) => stageOf(s.packs, c.id) === 'bereit' && c.v.spec.out === 'fest';
 
 /**
  * Einsteigen: Die Figur setzt sich, folgende Tiere setzen sich auf die Warteplätze des Halts; dort warten sie, bis die
- * Figur wieder nah ist (`bench`) oder schläft
+ * Figur wieder nah ist (`bench`) oder schläft. Gefahren wird zum Halt gegenüber, außer das Fahrzeug will von hier weiter
+ * (`Vehicle.onward`, der Zug nach dem Hau-ruck aus der Bucht in die Höhle): dann ab dessen Fortschritt, mit echtem Start
+ * (`Ride.from`), die Figur schaut in die neue Fahrtrichtung
  */
 function board(c: Ctx, s: Rider, world: World, at: Parked, events: RideEvents) {
   clear(c, s, world, at, events);
   const len = c.r.path.length - 1;
-  const ticks = rideTicks(c.v.spec, len);
-  const to: End = at.end === 'home' ? 'out' : 'home';
+  const on = c.v.onward?.(s, world, at.end);
+  const to: End = on?.to ?? (at.end === 'home' ? 'out' : 'home');
+  const pos = on ? Math.min(len, Math.max(0, on.pos)) : 0;
   // sein Fest (`Vehicle.feast`; sonst die erste Heimfahrt eines Fahrzeugs, das erst danach auf der Lichtung hält: Schlitten)
   const feast = to === 'out' && (c.v.feast?.(s, world) ?? firstHome(c, s));
   s.ride = {
     id: c.id,
     phase: 'seated',
     at: s.tick,
-    pos: 0,
-    speed: len / ticks,
+    pos,
+    speed: speedOf(c.v.spec, len, pos),
     to,
     feast,
     jingleAt: s.tick,
     greeted: [],
+    ...(on && { from: { end: at.end, pos } }),
   };
-  s.player = { x: at.seat[0], y: at.seat[1], dir: dirTo(at.pull[0] - at.seat[0], at.pull[1] - at.seat[1]) };
+  const [ax, ay] = on ? at.pull : at.seat; // weiter: weg vom Nachbarfeld der Strecke, sonst darauf zu
+  const [bx, by] = on ? at.seat : at.pull;
+  s.player = { x: at.seat[0], y: at.seat[1], dir: dirTo(bx - ax, by - ay) };
   const seats = c.r.seats[at.end];
   for (const id of s.followers) {
     const a = s.animals.find((t) => t.id === id)!;
@@ -213,12 +225,15 @@ function doze(c: Ctx, s: Rider, at: Parked, cmd: MoveCmd, events: RideEvents): b
   return true;
 }
 
-/** Ein Pfeil im Fahrzeug: in den ersten 2 s weg vom Fahrzeug wieder aussteigen, sonst winken (gedrosselt bimmeln) */
+/**
+ * Ein Pfeil im Fahrzeug: in den ersten 2 s weg vom Fahrzeug wieder aussteigen (am echten Start-Halt, `Ride.from`: aus der
+ * Bucht wieder in die Bucht), sonst winken (gedrosselt bimmeln)
+ */
 function inside(c: Ctx, s: Rider, world: World, cmd: MoveCmd, events: RideEvents) {
   const ride = s.ride!;
   const p = s.player;
   const [tx, ty] = [p.x + DIRS[cmd.dir][0], p.y + DIRS[cmd.dir][1]];
-  const at = stopsOf(c.r)[ride.to === 'out' ? 'home' : 'out'];
+  const at = stopsOf(c.r)[ride.from?.end ?? (ride.to === 'out' ? 'home' : 'out')];
   const off = !at.cells.has(key(tx, ty)) && canStep(world, s.openGates, p.x, p.y, tx, ty) && !occupied(s, tx, ty);
   if (ride.phase === 'seated' && off && !cmd.tap) {
     delete s.ride;
@@ -255,16 +270,17 @@ const reachOf = (c: Ctx, ride: Ride) =>
 
 /**
  * Tunnel voraus: Ist eines der Felder `from` bis `to` (Fortschritt des Sitzes) `WARN` Felder vor dem ersten Feld eines
- * Tunnels (`RideRoute.dark`)? Dann kündigt es ihn dort an, je Einfahrt einmal
+ * Tunnels (`RideRoute.dark`)? Dann kündigt es ihn dort an (nie hinter `here`, dem Feld, auf dem es gerade ist), je
+ * Einfahrt einmal
  */
-function tunnelAhead(c: Ctx, ride: Ride, from: number, to: number): Point | undefined {
+function tunnelAhead(c: Ctx, ride: Ride, from: number, to: number, here = from): Point | undefined {
   const dark = c.r.dark;
   const len = c.r.path.length - 1;
   if (!dark?.size) return undefined;
-  for (let i = from; i <= to; i++) {
+  for (let i = Math.max(0, from); i <= to; i++) {
     if (i + WARN > len) break;
     const [a, b] = [cellOf(c.r, ride, i + WARN - 1), cellOf(c.r, ride, i + WARN)];
-    if (dark.has(key(...b)) && !dark.has(key(...a))) return cellOf(c.r, ride, i);
+    if (dark.has(key(...b)) && !dark.has(key(...a))) return cellOf(c.r, ride, Math.max(i, here));
   }
   return undefined;
 }
@@ -285,8 +301,11 @@ function go(c: Ctx, s: Rider, world: World, events: RideEvents) {
   if (ride.stopover === 'ahead' && cap === undefined) ride.stopover = 'done';
   if (cap !== undefined && ride.pos >= cap - EPS) return; // wartet am Halt unterwegs (Zug: Tok versenkt den Prellbock)
   const goal = Math.min(len, cap ?? len);
+  // beginnt die Fahrt mitten auf der Strecke (`Ride.from`), schaut der erste Schritt auch auf die Felder bis zum Start:
+  // Liegt der Tunnel schon näher als `WARN`, kommt das „Uh-uh“ gleich
+  const first = ride.from !== undefined && ride.pos === ride.from.pos;
   ride.pos = goal - ride.pos - ride.speed < EPS ? goal : ride.pos + ride.speed;
-  const warn = tunnelAhead(c, ride, i + 1, Math.floor(ride.pos + EPS));
+  const warn = tunnelAhead(c, ride, first ? i + 1 - WARN : i + 1, Math.floor(ride.pos + EPS), i);
   if (warn) events.push(ev(c, 'tunnel', warn));
   const [x, y] = cellOf(c.r, ride, ride.pos);
   const p = s.player;
@@ -352,7 +371,8 @@ function alight(c: Ctx, s: Rider, world: World, events: RideEvents) {
 /**
  * Abfahrt: Was das Paket des Fahrzeugs dabei will (`Vehicle.depart`; der Zug: Bau 2 beginnt). Sagt es einen Halt
  * unterwegs an, merkt die Fahrt ihn (`stopover`); ändert es den Spielstand, wird gleich gespeichert und die Strecke neu
- * gerechnet (der Zug fährt dann bis in die Grotte): Das Tempo passt sich an, damit die Fahrt in `ticks` bleibt
+ * gerechnet (der Zug fährt dann bis in die Grotte): Das Tempo passt sich an, damit die Fahrt in `ticks` bleibt (aus der
+ * Restlänge ab dem Fortschritt, bei dem sie steht: aus der Bucht ab dem Prellbock)
  */
 function depart(c: Ctx, s: Rider, world: World, go: RideEvent, events: RideEvents) {
   const ride = s.ride!;
@@ -361,7 +381,7 @@ function depart(c: Ctx, s: Rider, world: World, go: RideEvent, events: RideEvent
   if (s.packs === packs) return;
   go.persist = true;
   const r = c.v.route(world, s);
-  if (r) ride.speed = (r.path.length - 1) / rideTicks(c.v.spec, r.path.length - 1);
+  if (r) ride.speed = speedOf(c.v.spec, r.path.length - 1, ride.pos);
 }
 
 /** Ein Takt mit Fahrt: abfahren, fahren, halten und Tiere verscheuchen, ankommen und aussteigen */
