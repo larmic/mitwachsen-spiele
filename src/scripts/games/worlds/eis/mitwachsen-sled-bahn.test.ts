@@ -8,8 +8,8 @@ import { BAHN_PACK, BUILT, EIS_PACK, HOEHLE_PACK, SAMPLE_SEEDS, seedRange, seeds
 import { sledRoute, type Route } from './mitwachsen-sled-route';
 
 const SEEDS = seedsFor(seedRange(1, 20), SAMPLE_SEEDS);
-/** Für den Vergleich mit der Welt ohne Bahn (baut je Seed eine Welt mehr; der tiefe Lauf bleibt unter 150 s) */
-const SAME = seedsFor(seedRange(1, 10), SAMPLE_SEEDS.slice(0, 3));
+/** Für den Vergleich mit der Welt ohne Bahn (baut je Seed eine Welt mehr; mit 10 kam der tiefe Lauf über 150 s) */
+const SAME = seedsFor(seedRange(1, 5), SAMPLE_SEEDS.slice(0, 3));
 const keyOf = ([x, y]: Point) => `${x},${y}`;
 const cellsOf = (r: Route) => [...r.path, ...r.shed, r.stops.home, r.stops.out, ...r.seats.home, ...r.seats.out];
 

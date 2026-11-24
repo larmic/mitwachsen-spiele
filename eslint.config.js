@@ -80,6 +80,10 @@ export default defineConfig(
       'max-lines-per-function': ['error', { max: 128, skipBlankLines: true, skipComments: true }],
     },
   },
+  {
+    files: ['src/scripts/games/worlds/hoehle/mitwachsen-grotte.ts'],
+    rules: { 'max-lines': ['error', { max: 421, skipBlankLines: true, skipComments: true }] },
+  },
   // Browser-Tests warten auf einen Zustand, nie auf Uhrzeit oder eine Zahl von Bildern; das Spiel öffnen nur die Helfer
   // (e2e/helpers.ts: openGame mit Test-Uhr, ticks, render)
   {

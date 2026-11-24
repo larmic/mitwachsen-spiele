@@ -114,5 +114,7 @@ describe('Feld-Schlüssel', () => {
   it('liest „x,y“ zurück, auch negativ; Kaputtes wird NaN statt still 0', () => {
     expect(fromKey('3,-7')).toEqual([3, -7]);
     expect(fromKey('5')).toEqual([5, NaN]);
+    expect(fromKey('1,2,3')).toEqual([1, 2]); // wie split: nur die ersten beiden Teile
+    expect(fromKey('a,')).toEqual([NaN, 0]);
   });
 });

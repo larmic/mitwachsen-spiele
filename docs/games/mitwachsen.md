@@ -215,14 +215,14 @@ Große, freie Wiese (gut 160 × 136 Felder) mit sanften Hügeln, Teichen, einzel
 
 ## Klangsteine und Geschichten
 
-Das Kind kann noch nicht lesen, darum erzählen die Geschichten Klangsteine. Ein **Klangstein** ist ein kleiner Steinblock, über dem eine goldene Note schwebt (Gold heißt auf der ganzen Seite: hier kannst du etwas tun). Einer steht links vorn neben dem Bett, einer vor jedem großen Tor, gegenüber der Portal-Plattform vor dem anderen Turm, und einer im Gletscherkessel links vorn neben dem Schneebett.
+Das Kind kann noch nicht lesen, darum erzählen die Geschichten Klangsteine. Ein **Klangstein** ist ein kleiner Steinblock, über dem eine goldene Note schwebt (Gold heißt auf der ganzen Seite: hier kannst du etwas tun). Einer steht links vorn neben dem Bett, einer vor jedem großen Tor, gegenüber der Portal-Plattform vor dem anderen Turm, einer im Gletscherkessel links vorn neben dem Schneebett und einer in der Kristallgrotte links vorn neben dem Höhlenbett. Mit der Bahn kommen zwei dazu: neben Toks Häuschen am Bahnhof Bär (mit Bau 1) und neben dem Lokschuppen am Bahnhof Fledermaus (mit Bau 2). Die Geschichte `see` am Steg (Konzept: ab 4, optional) gibt es noch nicht.
 
 - **Hineinlaufen** spielt die Geschichte des Ortes, wie alles andere im Spiel ohne Leertaste. Noch einmal hineinlaufen hält sie an, ein anderer Stein löst den vorigen ab. Nichts spielt von selbst.
 - **Zuhören:** Solange die Figur stehen bleibt, sitzt sie am Stein, Noten steigen auf, und Tiere in der Nähe drehen sich zu ihr um und bleiben eine Weile stehen. Geht sie los, läuft die Geschichte weiter. Menü, Schlafen oder ein Wechsel des Tabs halten sie an.
 - **Neu oder schon gehört:** Die Note einer noch nie gehörten Geschichte ist größer und pulsiert sanft; danach schwebt sie ruhig. So sieht das Kind ohne Text, wo es etwas Neues gibt. Was gehört ist, wird gespeichert.
 - **Erst Musik, später die Stimme:** Jeder Ort hat eine kurze Melodie, die zu seiner Welt passt (am Bett ein Schlaflied, Eis hell und klirrend, Lava tief und brummend, in der Höhle mit Echo …), erzeugt im Browser wie alle Töne. Spricht der Vater einen Text ein, spielt die Melodie als Vorspiel und danach die Aufnahme. Fehlt eine Aufnahme, bleibt es bei der Melodie; so können die Texte nach und nach dazukommen.
 - **Aufnahmen einbauen:** Datei als `public/games/mitwachsen/stimme/<id>.m4a` ablegen (AAC, mono, etwa 30 bis 40 Sekunden, auf gleiche Lautstärke gebracht) und in `src/data/games/mitwachsen-stories.ts` bei `voice` eintragen. Ein Test prüft, dass jede eingetragene Datei da ist. Geladen wird sie erst, wenn das Kind in den Stein läuft; die Startseite lädt nichts davon.
-- **Die Texte** stehen in `src/data/games/mitwachsen-story-texts.ts` (das Spiel lädt sie nicht, es spielt nur Melodie und Aufnahme) und hier wortgleich zum Vorlesen und Einsprechen; ein Test hält beide gleich. Wer einen Text ändert, ändert beide Stellen. Sie sind in der Du-Form geschrieben, ohne Angst und ohne Druck. Mehrere sagen bewusst „wenn du ein bisschen größer bist“: Diese Tore gehen in späteren Altersstufen auf, das passt zu Mitwachsen. Das Eistor öffnet schon jetzt der Pinguin; seine Geschichte hat darum zwei Fassungen.
+- **Die Texte** stehen in `src/data/games/mitwachsen-story-texts.ts` (das Spiel lädt sie nicht, es spielt nur Melodie und Aufnahme) und hier wortgleich zum Vorlesen und Einsprechen; ein Test hält beide gleich. Wer einen Text ändert, ändert beide Stellen. Sie sind in der Du-Form geschrieben, ohne Angst und ohne Druck. Mehrere sagen bewusst „wenn du ein bisschen größer bist“: Diese Tore gehen in späteren Altersstufen auf, das passt zu Mitwachsen. Das Eistor öffnet schon jetzt der Pinguin; seine Geschichte hat darum zwei Fassungen. Ebenso die Höhlen-Geschichte: Das Höhlentor öffnet Tok mit dem Hau-ruck, sobald die Bahn freigeschaltet ist; bis dahin erzählt sein Stein wortgleich die erste Fassung.
 
 **Am Bett** (`bett`)
 
@@ -251,6 +251,18 @@ Das Kind kann noch nicht lesen, darum erzählen die Geschichten Klangsteine. Ein
 **Tor zur Höhlenwelt** (`hoehle`)
 
 > Hinter diesem Tor geht es unter die Erde, in eine große Höhle. Dunkel ist es dort aber nicht, denn an den Wänden wachsen Kristalle, die in allen Farben glitzern. Eine Fledermaus wohnt da. Sie schläft am Tag mit dem Kopf nach unten und wacht erst auf, wenn du ins Bett gehst. Vielleicht weckst du sie später einmal.
+
+**Am Höhlenbett** (`hoehle-offen`, Klangstein in der Kristallgrotte links vorn neben dem Höhlenbett und, sobald das Höhlentor offen ist, auch der Stein vor dem Höhlentor; die zweite Fassung der Höhlen-Geschichte mit derselben Melodie, der erste Satz gleich; das Höhlentor geht erst mit dem Hau-ruck der Bahn-Phase auf)
+
+> Hinter diesem Tor geht es unter die Erde, in eine große Höhle. Und jetzt ist sie offen, weil du mit Tok zusammen den großen Stein weggeschoben hast: Hau – ruck! Die Kristalle leuchten lila, türkis und rosa, und durch die Löcher oben scheint die Sonne herein. Eine Fledermaus ist kurz aufgewacht und hat dir zugewinkt. Jetzt schläft sie wieder im Kristallbogen. Wenn du heute Abend ins Bett gehst, wacht sie auf und fliegt eine Runde für dich.
+
+**Im Lokschuppen** (`lokschuppen`, Toks Geschichte: Klangstein neben dem Lokschuppen am Bahnhof Fledermaus, kommt mit Bau 2 der Bahn)
+
+> Tok hat eine Spitzhacke, aber er haut damit nichts kaputt. Er klopft nur die Nägel in die Schienen: pink, pink, pink. Sein bester Freund ist der Maulwurf. Der sitzt immer oben auf Toks Helm und zeigt, wo es langgeht, denn unter der Erde kennt er sich aus. Abends fährt die kleine Bahn in den Schuppen, und der Siebenschläfer schläft schon im Wagen.
+
+**Am Bahnhof Bär** (`bahnhof`, Klangstein neben Toks Häuschen am Bahnhof Bär, kommt mit Bau 1 der Bahn)
+
+> Hier ist der Bahnhof beim Bären. Hörst du, wie es pfeift? Die kleine lila Bahn fährt unter die Erde, zu den Kristallen. Lauf einfach hinein.
 
 **Tor zum Wald** (`wald`)
 

@@ -8,8 +8,11 @@ export const chunkOf = (x: number, y: number): [number, number] => [Math.floor(x
 
 /** Feld aus einem Schlüssel „x,y“ (so stehen Felder in Maps und im Spielstand) */
 export function fromKey(key: string): [number, number] {
-  const [x = NaN, y = NaN] = key.split(',').map(Number);
-  return [x, y];
+  // ohne split: läuft beim Bau jeder Welt für jedes Feld, oft mehrmals
+  const i = key.indexOf(',');
+  if (i < 0) return [Number(key), NaN];
+  const j = key.indexOf(',', i + 1);
+  return [Number(key.slice(0, i)), Number(j < 0 ? key.slice(i + 1) : key.slice(i + 1, j))];
 }
 
 /** Gleiche Felder? (gleiches Objekt oder gleicher Inhalt) */

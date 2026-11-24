@@ -12,10 +12,11 @@ import { seedRange, seedsFor, worldOf } from './test-worlds';
 beforeAll(() => [1, 2, 3].forEach((s) => worldOf(s)));
 
 /**
- * Seeds der wilden Läufe ab dem Schneebett: sonst 1 bis 3, tief (MITWACHSEN_DEEP) 1 bis 12 (seedsFor). Die Läufe durchs
+ * Seeds der wilden Läufe ab dem Schneebett: sonst 1 bis 3, tief (MITWACHSEN_DEEP) 1 bis 8 (seedsFor; bis 12 brachte
+ * test:deep in gates:ci über 150 s). Die Läufe durchs
  * Tor stellen die Kette von Hand in die Bucht der Seeds 1 und 2, sie bleiben bei diesen
  */
-const WILD = seedsFor(seedRange(1, 12), [1, 2, 3]);
+const WILD = seedsFor(seedRange(1, 8), [1, 2, 3]);
 const ACT: Cmd = { type: 'action' };
 const TICK: Cmd = { type: 'tick' };
 

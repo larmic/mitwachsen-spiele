@@ -33,6 +33,18 @@ export const STORY_TEXTS: Record<StoryId, { title: string; text: string }> = {
     title: 'Tor zur Höhlenwelt',
     text: 'Hinter diesem Tor geht es unter die Erde, in eine große Höhle. Dunkel ist es dort aber nicht, denn an den Wänden wachsen Kristalle, die in allen Farben glitzern. Eine Fledermaus wohnt da. Sie schläft am Tag mit dem Kopf nach unten und wacht erst auf, wenn du ins Bett gehst. Vielleicht weckst du sie später einmal.',
   },
+  'hoehle-offen': {
+    title: 'Am Höhlenbett',
+    text: 'Hinter diesem Tor geht es unter die Erde, in eine große Höhle. Und jetzt ist sie offen, weil du mit Tok zusammen den großen Stein weggeschoben hast: Hau – ruck! Die Kristalle leuchten lila, türkis und rosa, und durch die Löcher oben scheint die Sonne herein. Eine Fledermaus ist kurz aufgewacht und hat dir zugewinkt. Jetzt schläft sie wieder im Kristallbogen. Wenn du heute Abend ins Bett gehst, wacht sie auf und fliegt eine Runde für dich.',
+  },
+  lokschuppen: {
+    title: 'Im Lokschuppen',
+    text: 'Tok hat eine Spitzhacke, aber er haut damit nichts kaputt. Er klopft nur die Nägel in die Schienen: pink, pink, pink. Sein bester Freund ist der Maulwurf. Der sitzt immer oben auf Toks Helm und zeigt, wo es langgeht, denn unter der Erde kennt er sich aus. Abends fährt die kleine Bahn in den Schuppen, und der Siebenschläfer schläft schon im Wagen.',
+  },
+  bahnhof: {
+    title: 'Am Bahnhof Bär',
+    text: 'Hier ist der Bahnhof beim Bären. Hörst du, wie es pfeift? Die kleine lila Bahn fährt unter die Erde, zu den Kristallen. Lauf einfach hinein.',
+  },
   wald: {
     title: 'Tor zum Wald',
     text: 'Hinter diesem Tor stehen so viele Bäume, dass die Sonne nur in kleinen Flecken bis auf den Boden kommt. Dort wohnen ein Reh und ein Specht, der den ganzen Tag an die Bäume klopft: tock, tock, tock. Das Tor ist noch zu. Aber der Specht klopft schon mal an, damit es bald aufgeht.',

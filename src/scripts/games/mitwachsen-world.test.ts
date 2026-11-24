@@ -414,16 +414,20 @@ describe('Landschaft', () => {
 describe('Klangsteine', () => {
   for (const seed of [1, 42, 2026]) {
     const w = worldOf(seed);
-    it(`Seed ${seed}: einer am Bett, einer vor jedem Tor, einer am Schneebett; fest, erreichbar, der Weg zum Tor bleibt frei`, () => {
-      expect([...w.stones.keys()].sort()).toEqual(['bett', ...GATES.map((g) => g.id), 'eis-offen'].sort());
-      // die der Lichtung bei geschlossenen Toren; der am Schneebett liegt im Gletscherkessel: erreichbar, sobald das Eistor offen ist
+    it(`Seed ${seed}: einer am Bett, einer vor jedem Tor, einer am Schneebett, einer am Höhlenbett; fest, erreichbar, der Weg zum Tor bleibt frei`, () => {
+      // ohne das Paket der Bahn (bis zum Freischalten) keine Steine der Bahn
+      expect([...w.stones.keys()].sort()).toEqual(
+        ['bett', ...GATES.map((g) => g.id), 'eis-offen', 'hoehle-offen'].sort(),
+      );
+      // die der Lichtung bei geschlossenen Toren; der am Schneebett liegt im Gletscherkessel: erreichbar, sobald das Eistor
+      // offen ist, der am Höhlenbett in der Grotte, sobald auch das Höhlentor offen ist
       const keys = (open: GateId[]) => new Set(reachable(w, open, START, 200000).map(([x, y]) => `${x},${y}`));
-      const [lichtung, kessel] = [keys([]), keys(['eis'])];
+      const [lichtung, kessel, grotte] = [keys([]), keys(['eis']), keys(['eis', 'hoehle'])];
       for (const [id, [x, y]] of w.stones) {
         const c = w.cell(x, y);
         expect([c.deco, c.story, c.solid], id).toEqual(['klangstein', id, true]);
         const sides = Object.values(DIRS).map(([dx, dy]) => `${x + dx},${y + dy}`);
-        const reach = id === 'eis-offen' ? kessel : lichtung;
+        const reach = id === 'eis-offen' ? kessel : id === 'hoehle-offen' ? grotte : lichtung;
         expect(
           sides.some((k) => reach.has(k)),
           `${id}: man kommt heran`,

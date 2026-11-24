@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MOOD_LIGHT, REGIONS, animalId, type Point } from '../../../../data/games/mitwachsen';
 import { FIRST_MOLE } from '../../../../data/games/mitwachsen-hoehle';
+import { CAVE_STONE, told } from '../../../../data/games/mitwachsen-stories';
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import { platformsToWake } from '../../mitwachsen-portal';
@@ -9,7 +10,7 @@ import { caveBoxes } from './mitwachsen-cave-look';
 import { DUSK_DAY, DUSK_SKY, dayOf, nightIn, nightMix, sunLevel, type Rgb } from '../../mitwachsen-dusk';
 import { beyondRing, canStep, kesselPlace, type World } from '../../mitwachsen-world';
 import { HOEHLE_PACK, PACKS, REGRESSION_SEEDS, SAMPLE_SEEDS, seedRange, seedsFor, worldOf } from '../../test-worlds';
-import { GROTTE_ROOM, bedSpots, fromMouth, shedAt, stationAt } from './mitwachsen-grotte';
+import { GROTTE_ROOM, bedSpots, fromMouth, shedAt, shedStoneAt, stationAt } from './mitwachsen-grotte';
 import { corridorAt, fillZone, type FillZone } from './mitwachsen-fill';
 import type { Site } from './mitwachsen-site';
 import type { Cell } from '../../mitwachsen-cell';
@@ -499,6 +500,42 @@ describe('Kristallgrotte: Gelände', () => {
       ];
       if (!site.turn) expect(site.uv(...lane(g.deep + 1))[0]).toBe(2);
       expect(GROTTE.station.side).toBeGreaterThan(2); // der Bahnhof liegt auf der Seite u+
+    });
+
+    it(`Seed ${seed}: Klangstein am Höhlenbett links vorn (hoehle-offen), außerhalb des freien Platzes, erreichbar`, () => {
+      const [sx, sy] = w.stones.get('hoehle-offen')!;
+      expect([sx - home.bed[0], sy - home.bed[1]]).toEqual([...CAVE_STONE]);
+      expect(Math.max(Math.abs(CAVE_STONE[0]), Math.abs(CAVE_STONE[1]))).toBeGreaterThan(home.clear);
+      const c = w.cell(sx, sy);
+      expect([c.deco, c.story, c.solid, c.garden, w.realm(sx, sy)]).toEqual([
+        'klangstein',
+        'hoehle-offen',
+        true,
+        true,
+        'hoehle',
+      ]);
+      expect(home.wake.some(([x, y]) => x === sx && y === sy)).toBe(false);
+      expect(Object.values(DIRS).some(([dx, dy]) => steps.has(key([sx + dx, sy + dy])))).toBe(true);
+      expect(told('hoehle-offen', [])).toBe('hoehle-offen'); // der Stein am Höhlenbett erzählt immer die zweite Fassung
+    });
+
+    it(`Seed ${seed}: Platz des Klangsteins am Lokschuppen frei gehalten (Cell.stone), ohne Bahn kein Stein`, () => {
+      const cells = placeOf(seed).cells.map((p) => ({ p, c: w.cell(...p) }));
+      const spot = cells.filter(({ c }) => c.stone);
+      expect(spot.map(({ c }) => c.stone)).toEqual(['lokschuppen']);
+      const [x, y] = spot[0]!.p;
+      expect(shedStoneAt(...site.uv(x, y))).toBe(true);
+      const c = w.cell(x, y);
+      expect([c.deco, c.solid, c.story, steps.has(key([x, y]))]).toEqual([null, false, undefined, true]);
+      // ringsum frei und eben, gleich neben dem Platz des Lokschuppens, zwei Felder neben dem Platz des Bahnhofs
+      const ring = AROUND.map(([dx, dy]) => w.cell(x + dx, y + dy));
+      expect(ring.every((n) => !n.solid && n.ground !== 'water' && n.h === c.h)).toBe(true);
+      expect(ring.some((n) => n.shed === 'hoehle')).toBe(true);
+      expect(ring.some((n) => n.stop)).toBe(false);
+      // dort wohnt kein Tier und kommt keins hin (mit Bau 2 steht dort ein Stein)
+      expect([...w.spawns.values()].some(([sx, sy]) => sx === x && sy === y)).toBe(false);
+      expect(w.spotsOf('hoehle').some(([sx, sy]) => sx === x && sy === y)).toBe(false);
+      expect([...w.stones.keys()].filter((id) => id === 'lokschuppen' || id === 'bahnhof')).toEqual([]);
     });
   }
 });

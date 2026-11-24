@@ -26,7 +26,7 @@ import { ARCH_PERCH } from '../../../../data/games/worlds/hoehle/mitwachsen-cave
 import { FIRST_MOLE } from '../../../../data/games/mitwachsen-hoehle';
 import { HOMES } from '../../../../data/games/mitwachsen-homes';
 import { CAVE_PORTAL } from '../../../../data/games/mitwachsen-portals';
-import { BED_STONE } from '../../../../data/games/mitwachsen-stories';
+import { CAVE_STONE } from '../../../../data/games/mitwachsen-stories';
 import type { Cell } from '../../mitwachsen-cell';
 import { placeHome } from '../../mitwachsen-home';
 import type { Beyond, Gang, Kessel, KesselPlace } from '../../mitwachsen-pack-types';
@@ -135,7 +135,7 @@ export function buildGrotte(
   fillGrotte(seed, site, free, map); // Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken, Felsinseln, Pfützen
   scatter(seed, site, free, map);
   shadeGrotte(seed, site, (u, v) => Math.abs(u) <= 3 || nearStation(u, v), map); // Moos und Farn unter den Schächten
-  level([...realm], map);
+  level(realm, map);
   const reach = reachOf(home.wake, map);
   for (const k of realm) {
     // was man nicht erreichen kann, wird Fels: keine Ecke, die man sieht, aber nie betritt
@@ -147,23 +147,21 @@ export function buildGrotte(
   markStation(realm, site, map);
   const path = pathsOf(site, bed, ringHome);
   dimGrotte(realm, (x, y) => path(...site.uv(x, y)), map); // Ränder im Dunkel, Wege und Licht bleiben hell
-  const stone: Point = [bed[0] + BED_STONE[0], bed[1] + BED_STONE[1]];
+  const stone: Point = [bed[0] + CAVE_STONE[0], bed[1] + CAVE_STONE[1]]; // Klangstein `hoehle-offen` (homeGround)
   const spots = spotsOf(site, reach, map);
   // Wohnorte der Höhlen-Tiere: das erste je Art an seinem Fundort, die anderen verteilt über die Grotte
   const spawns = findSpawns(seed, caveHaunts(spots, map, at, bed), spots, bed);
   return { bed, realm, spots, spawns, stone, portal: [CAVE_PORTAL, portal] };
 }
 
-/**
- * Plätze von Bahnhof Fledermaus und Lokschuppen: für das Paket der Bahn markiert (`Cell.stop`, `Cell.shed`), das neben dem
- * Bahnsteig sein Gleis legt und mit Bau 2 Bahnsteig und Lokschuppen baut
- */
+/** Plätze von Bahnhof Fledermaus, Lokschuppen und Klangstein, für die Bahn markiert (`Cell.stop`, `shed`, `stone`) */
 function markStation(realm: ReadonlySet<string>, site: Site, map: Map<string, Cell>) {
   for (const k of realm) {
     const c = map.get(k);
     const uv = site.uv(...fromKey(k));
     if (c && stationAt(...uv)) map.set(k, { ...c, stop: 'hoehle' });
     else if (c && shedAt(...uv) && !c.solid) map.set(k, { ...c, shed: 'hoehle' });
+    else if (c && shedStoneAt(...uv) && !c.solid) map.set(k, { ...c, stone: 'lokschuppen' });
   }
 }
 
@@ -204,9 +202,13 @@ export const stationAt = strip(GROTTE.station);
 /** Platz für den Lokschuppen: neben dem Bahnhof, zwei Felder weiter außen */
 export const shedAt = strip(GROTTE.shed);
 
-/** Die Spur des künftigen Gleises und die Plätze von Bahnhof und Lokschuppen samt einem Feld ringsum quer */
+/** Platz des Klangsteins `lokschuppen` (Bau 2): neben der vorderen Ecke des Lokschuppens zum Höhlenbett hin */
+export const shedStoneAt = strip({ ...GROTTE.shed, out: GROTTE.shed.out + GROTTE.shed.long, long: 1, wide: 1 });
+
+/** Spur des künftigen Gleises, Plätze von Bahnhof und Lokschuppen samt einem Feld quer, Klangstein samt Feld ringsum */
 const nearStation = (u: number, v: number) =>
-  corridorAt(u, v) || [-1, 0, 1].some((d) => stationAt(u + d, v) || shedAt(u + d, v));
+  corridorAt(u, v) ||
+  [-1, 0, 1].some((d) => stationAt(u + d, v) || shedAt(u + d, v) || [-1, 0, 1].some((e) => shedStoneAt(u + d, v + e)));
 
 /**
  * Was frei bleibt (keine Hügel, keine Kristalle, keine Stalagmiten, keine Füllung), in (u, v) von der Mitte: die Mündung
@@ -365,6 +367,7 @@ function homeGround(h: ReturnType<typeof placeHome>, set: (x: number, y: number,
   set(...h.food, fixed('shroombowl'));
   set(...h.water, fixed('stonetrough'));
   set(h.bed[0] + GROTTE.lantern[0], h.bed[1] + GROTTE.lantern[1], fixed('lantern')); // Sockel der Kristall-Laterne
+  set(h.bed[0] + CAVE_STONE[0], h.bed[1] + CAVE_STONE[1], { ...fixed('klangstein'), story: 'hoehle-offen' }); // zweite Fassung
   const { x0, y0, x1, y1 } = h.shelter;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, { ...moss(), garden: true, roof: true });
   for (let x = x0; x <= x1; x++) set(x, y0 - 1, fixed('shed')); // Rückwand: die Kristallwand, ihre Mitte ist `shelterStem`
@@ -445,22 +448,29 @@ function scatter(seed: number, site: Site, free: (u: number, v: number) => boole
  * Keine Stufe höher als eins (wie auf der Lichtung): Boden wird nur abgesenkt; Bett, Wiese, Plattformen und Wege
  * ziehen die Hügel ringsum herunter
  */
-function level(cells: readonly string[], map: Map<string, Cell>) {
-  const land = (c: Cell | undefined) => !!c && !c.solid && c.ground !== 'water';
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const k of cells) {
-      let c = map.get(k);
-      if (!land(c) || c!.region !== 'hoehle') continue;
-      const [x, y] = k.split(',').map(Number) as [number, number];
-      for (const [dx, dy] of NEIGHBOURS) {
-        const n = map.get(key(x + dx, y + dy));
-        if (!land(n) || c!.h <= n!.h + 1) continue;
-        map.set(k, (c = { ...c!, h: n!.h + 1 }));
-        changed = true;
-      }
+function level(cells: ReadonlySet<string>, map: Map<string, Cell>) {
+  const land = (c: Cell | undefined): c is Cell => !!c && !c.solid && c.ground !== 'water';
+  /** Ein Feld auf Nachbar + 1 absenken; sank es, kommen seine Nachbarn aus `cells` in `next` */
+  const lower = (k: string, next: Set<string>) => {
+    const c = map.get(k);
+    if (!land(c) || c.region !== 'hoehle') return;
+    const [x, y] = fromKey(k);
+    let h = c.h;
+    for (const [dx, dy] of NEIGHBOURS) {
+      const n = map.get(key(x + dx, y + dy));
+      if (land(n) && n.h + 1 < h) h = n.h + 1;
     }
+    if (h === c.h) return;
+    map.set(k, { ...c, h });
+    for (const [dx, dy] of NEIGHBOURS) if (cells.has(key(x + dx, y + dy))) next.add(key(x + dx, y + dy));
+  };
+  // Einmal über alle Felder, danach nur die Nachbarn gesunkener; das Ergebnis hängt nicht von der Reihenfolge ab
+  let next = new Set<string>();
+  for (const k of cells) lower(k, next);
+  while (next.size) {
+    const todo = next;
+    next = new Set();
+    for (const k of todo) lower(k, next);
   }
 }
 
@@ -531,7 +541,7 @@ function spotsOf(site: Site, reach: ReadonlySet<string>, map: ReadonlyMap<string
   const out: Point[] = [];
   for (const k of reach) {
     const c = map.get(k)!;
-    if (c.region !== 'hoehle' || c.garden || c.portal) continue;
+    if (c.region !== 'hoehle' || c.garden || c.portal || c.stone) continue; // dort steht mit Bau 2 ein Klangstein
     const [x, y] = k.split(',').map(Number) as [number, number];
     const [u, v] = site.uv(x, y);
     const [, o] = mouthward(u, v);

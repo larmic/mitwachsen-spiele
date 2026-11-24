@@ -63,8 +63,11 @@ import { HOLD_MS } from './input-pace';
 beforeAll(() => [1, 2, 3].forEach((s) => worldOf(s)));
 
 const TICK: Cmd = { type: 'tick' };
-/** Seeds der wilden Läufe mit führendem Pinguin: sonst 1 und 2, tief (MITWACHSEN_DEEP) 1 bis 12 (seedsFor) */
-const WILD = seedsFor(seedRange(1, 12), [1, 2]);
+/**
+ * Seeds der wilden Läufe mit führendem Pinguin: sonst 1 und 2, tief (MITWACHSEN_DEEP) 1 bis 8 (seedsFor; bis 12 brachte
+ * test:deep in gates:ci über 150 s)
+ */
+const WILD = seedsFor(seedRange(1, 8), [1, 2]);
 const TICK_MS = 100; // Takt der Regeln (larmic-mitwachsen.ts)
 const HELD: Cmd = { type: 'tick', held: true }; // Takt mit gedrücktem Pfeil
 const key = ([x, y]: Point) => `${x},${y}`;

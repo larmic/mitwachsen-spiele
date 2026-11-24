@@ -58,7 +58,7 @@ export type World = Realms & {
   readonly portals: ReadonlyMap<PortalId, Portal>;
   /** Die großen Tore: Lage und Reihenfolge würfelt der Seed */
   readonly gates: ReadonlyMap<GateId, GatePlace>;
-  /** Klangsteine: einer am Bett, einer vor jedem großen Tor, einer am Bett jeder Welt aus einem Paket (Schneebett) */
+  /** Klangsteine: einer am Bett, einer vor jedem großen Tor, einer am Bett jeder Welt aus einem Paket (Schneebett, Höhlenbett), dazu die, die ein Paket ohne eigene Welt legt (Bahn: Bahnhof Bär, Lokschuppen) */
   readonly stones: ReadonlyMap<StoryId, Point>;
   /** Stimmung an einem Ort: Richtung des nächsten Tors und wie stark (0 am Bett … 1 am Felsring) */
   climate(x: number, y: number): Climate;
@@ -196,13 +196,22 @@ function stonesOf(places: readonly Layout[]): Map<StoryId, Point> {
   ]);
 }
 
+/** Die feste Karte samt Wohnorten, Plätzen der Lichtung, Welten hinter den Toren und Klangsteinen der Pakete ohne Welt */
+type Start = {
+  map: Map<string, Cell>;
+  spawns: Map<string, Point>;
+  spots: Point[];
+  inner: Map<RegionId, Behind>;
+  laid: [StoryId, Point][];
+};
+
 /** Lichtung als feste Karte: Bett in der Mitte, Hügel, Teiche, Wäldchen, Blumenwiesen, Steine, Felsring, große Tore */
 function buildStart(
   seed: number,
   places: readonly Layout[],
   packs: readonly WorldPack[],
   saved: Readonly<Record<string, unknown>>,
-): { map: Map<string, Cell>; spawns: Map<string, Point>; spots: Point[]; inner: Map<RegionId, Behind> } {
+): Start {
   const map = new Map<string, Cell>();
   const set = (x: number, y: number, c: Cell) => map.set(key(x, y), c);
   const { rx, ry } = lichtung.shape;
@@ -325,8 +334,9 @@ function buildStart(
         if (c && (c.region === 'lichtung' || c.deco === 'rock')) set(x, y, { ...grass('lichtung'), h: c.h || 1 });
       }
   smooth(map);
-  // Pakete ohne eigene Welt legen jetzt etwas in die fertige Karte, je nach ihrem Spielstand (die Bahn: das Gleis)
-  for (const p of packs) p.lay?.({ seed, map, gates: gatesOf(places), beds: bedsOf(inner), packs: saved });
+  // Pakete ohne eigene Welt legen jetzt nach ihrem Spielstand etwas in die Karte (Bahn: Gleis, Klangsteine)
+  const at = { seed, map, gates: gatesOf(places), beds: bedsOf(inner), packs: saved };
+  const laid = packs.flatMap((p) => p.lay?.(at) ?? []);
 
   // Was man nicht erreichen kann, wird Fels: keine Ecken, die man sieht, aber nie betreten kann
   const reach = reachOf(map);
@@ -338,7 +348,7 @@ function buildStart(
     ...findSpawns(seed, lichtung, spots, LICHTUNG_HOME.bed),
     ...[...inner.values()].flatMap((b) => [...b.spawns]),
   ]);
-  return { map, spawns, spots, inner };
+  return { map, spawns, spots, inner, laid };
 }
 
 /**
@@ -414,20 +424,29 @@ function placePlatforms(map: Map<string, Cell>, portals: ReadonlyMap<GateId, Por
  * Felder werden nur abgesenkt; flache Stellen (am Bett, an Portalen und Toren) ziehen die Hügel ringsum herunter.
  */
 function smooth(map: Map<string, Cell>) {
-  const land = (c: Cell | undefined) => !!c && c.ground !== 'water' && (c.region === 'lichtung' || !!c.gate);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const [k, cell] of map) {
-      let c = cell;
-      if (!land(c) || c.gate) continue;
-      const [x, y] = fromKey(k);
-      for (const [dx, dy] of NEIGHBOURS) {
-        const n = map.get(key(x + dx, y + dy));
-        if (!land(n) || c.h <= n!.h + 1) continue;
-        map.set(k, (c = { ...c, h: n!.h + 1 }));
-        changed = true;
-      }
+  const land = (c: Cell | undefined): c is Cell => !!c && c.ground !== 'water' && (c.region === 'lichtung' || !!c.gate);
+  /** Ein Feld auf Nachbar + 1 absenken; sank es, kommen seine Nachbarn in `next` */
+  const lower = (k: string, c: Cell, next: Set<string>) => {
+    const [x, y] = fromKey(k);
+    let h = c.h;
+    for (const [dx, dy] of NEIGHBOURS) {
+      const n = map.get(key(x + dx, y + dy));
+      if (land(n) && n.h + 1 < h) h = n.h + 1;
+    }
+    if (h === c.h) return;
+    map.set(k, { ...c, h });
+    for (const [dx, dy] of NEIGHBOURS) next.add(key(x + dx, y + dy));
+  };
+  // Einmal über die ganze Karte, danach nur noch die Nachbarn gesunkener Felder, bis keins mehr sinkt. Das Ergebnis
+  // hängt nicht von der Reihenfolge ab: Jedes Feld endet auf dem kleinsten Wert aus Nachbar + 1
+  let next = new Set<string>();
+  for (const [k, c] of map) if (land(c) && !c.gate) lower(k, c, next);
+  while (next.size) {
+    const todo = next;
+    next = new Set();
+    for (const k of todo) {
+      const c = map.get(k);
+      if (land(c) && !c.gate) lower(k, c, next);
     }
   }
 }
@@ -709,7 +728,7 @@ function build(
 ): { world: World; chunks: readonly string[] } {
   const places = layouts(seed);
   const built = [...packs]; // gebaut mit diesen Paketen (die Liste draußen kann danach noch wachsen)
-  const { map: regions, spawns, spots, inner } = buildStart(seed, places, built, saved);
+  const { map: regions, spawns, spots, inner, laid } = buildStart(seed, places, built, saved);
   const realms = realmsOf(inner);
   const worlds = [...inner.values()];
   const cache = new ChunkCache<Cell>((cx, cy) => {
@@ -738,7 +757,7 @@ function build(
     away: new Set(built.flatMap((p) => p.away?.(saved) ?? [])),
     spotsOf: (realm) => (realm === lichtung.id ? spots : (inner.get(realm)?.spots ?? [])),
     portals: new Map([...portalsOf(places), ...worlds.flatMap((b) => b.portals)]),
-    stones: new Map<StoryId, Point>([...stonesOf(places), ...worlds.flatMap((b) => b.stones)]),
+    stones: new Map<StoryId, Point>([...stonesOf(places), ...worlds.flatMap((b) => b.stones), ...laid]),
     // In der Welt hinter einem Tor überall ihr Licht wie ganz nah an ihrem Tor (Eis-Welt: kühles Licht)
     climate: (x, y) => {
       const gate = REGIONS.find((r) => r.id === realms.realm(x, y))?.behind;

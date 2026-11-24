@@ -11,7 +11,8 @@
 //   durch das Gelände). Auf der Lichtung darf die Trasse in Hügel einschneiden und Teiche auf einem Damm queren.
 // - Ausbau 2: durch die Tür und den Gang auf derselben Spur, in der Grotte bis an das Gleis hinter dem Bahnhof Fledermaus
 //   (dessen Platz die Grotte frei hält und markiert, `Cell.stop`), so lang wie der Bahnsteig.
-// Die Trasse meidet Wiese, Tröge, Unterstand, Plattformen, Torplatten und Klangsteine samt einem Feld ringsum und den
+// Die Trasse meidet Wiese, Tröge, Unterstand, Plattformen, Torplatten und Klangsteine samt einem Feld ringsum (in der
+// Grotte auch den Platz des künftigen Klangsteins am Lokschuppen, `Cell.stone`) und den
 // Fußweg vom Bett zur Torplatte; sie biegt rechtwinklig mit mindestens vier Feldern Gerade dazwischen, Rampen höchstens
 // eine Stufe je drei Felder. Gesucht wird begrenzt (`LINE.tries`, `LINE.budget`). Das Gleis ist Boden (`Cell.ride`,
 // begehbar wie die Rutschspur); was dort liegt, sagt `Cell.rail`. Gibt es keinen Platz (Teiche liegen im Bereich von
@@ -350,7 +351,7 @@ function grotto(
       standable(c) &&
       !taken.has(key(x, y)) &&
       !used.has(key(x, y)) &&
-      !near(map, [x, y], 1, (n) => !!n.portal || !!n.garden)
+      !near(map, [x, y], 1, (n) => !!n.portal || !!n.garden || !!n.stone) // nicht am Platz des Klangsteins am Lokschuppen
     );
   });
   const out = dirOf([0, 0], g.out);

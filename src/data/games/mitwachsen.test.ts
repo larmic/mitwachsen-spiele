@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GATES, REGIONS, REGION_IDS, gateOfKey, keyOf, realmOfAnimal, regionBehind, speciesOf } from './mitwachsen';
 import { HOMES } from './mitwachsen-homes';
+import { BAHN_LIVE, tryBahn } from './mitwachsen-live';
 import { STORIES, openStory, told } from './mitwachsen-stories';
 
 describe('Gegenden und Tore', () => {
@@ -34,13 +35,31 @@ describe('Gegenden und Tore', () => {
 });
 
 describe('Was ein Klangstein erzählt (told)', () => {
-  it('die zweite Fassung je Tor, wenn es eine gibt und das Tor offen ist: heute nur die Eis-Geschichte', () => {
+  it('die zweite Fassung je Tor, wenn es eine gibt und das Tor offen ist: Eis- und Höhlen-Geschichte', () => {
     expect(openStory('eis')).toBe('eis-offen');
-    expect(GATES.filter((g) => openStory(g.id)).map((g) => g.id)).toEqual(['eis']);
+    expect(openStory('hoehle')).toBe('hoehle-offen');
+    expect(GATES.filter((g) => openStory(g.id)).map((g) => g.id)).toEqual(['eis', 'hoehle']);
     expect(told('eis', [])).toBe('eis');
     expect(told('eis', ['eis'])).toBe('eis-offen');
-    expect(told('hoehle', ['hoehle', 'eis'])).toBe('hoehle'); // Höhle: ohne zweite Fassung bleibt es beim Text
-    expect(told('bett', ['eis'])).toBe('bett');
+    expect(told('hoehle', ['eis'])).toBe('hoehle'); // Höhlentor zu: die erste Fassung, wortgleich wie bisher
+    expect(told('hoehle', ['hoehle', 'eis'])).toBe('hoehle-offen');
+    expect(told('bett', ['eis', 'hoehle'])).toBe('bett');
+    // die Steine der Bahn erzählen immer ihre eigene Geschichte
+    expect(told('bahnhof', ['eis', 'hoehle'])).toBe('bahnhof');
+    expect(told('lokschuppen', ['eis', 'hoehle'])).toBe('lokschuppen');
     expect(Object.hasOwn(STORIES, 'hoehle')).toBe(true);
+  });
+
+  it('solange die Bahn-Phase aus ist (BAHN_LIVE), geht das Höhlentor nicht auf: sein Stein erzählt die erste Fassung', () => {
+    expect(BAHN_LIVE).toBe(false);
+    expect(keyOf('hoehle')).toBeUndefined(); // ohne Schlüssel kommt das Höhlentor nie in die offenen Tore
+    expect(told('hoehle', ['eis'])).toBe('hoehle');
+    tryBahn();
+    try {
+      expect(keyOf('hoehle')).toBe('tok'); // im Blick hinein (Entwickler-Schalter): Tok öffnet es, dann die zweite
+      expect(told('hoehle', ['eis', 'hoehle'])).toBe('hoehle-offen');
+    } finally {
+      tryBahn(false);
+    }
   });
 });

@@ -5,8 +5,10 @@ import { STORIES, melodyLength } from './mitwachsen-stories';
 import { STORY_TEXTS } from './mitwachsen-story-texts';
 
 describe('Geschichten der Klangsteine', () => {
-  it('gibt es am Bett, für jedes große Tor und am Schneebett (zweite Fassung der Eis-Geschichte)', () => {
-    expect(Object.keys(STORIES).sort()).toEqual(['bett', ...GATES.map((g) => g.id), 'eis-offen'].sort());
+  it('gibt es am Bett, für jedes große Tor, am Schneebett und am Höhlenbett (zweite Fassungen) und an der Bahn', () => {
+    expect(Object.keys(STORIES).sort()).toEqual(
+      ['bett', ...GATES.map((g) => g.id), 'eis-offen', 'hoehle-offen', 'lokschuppen', 'bahnhof'].sort(),
+    );
     expect(Object.keys(STORY_TEXTS).sort()).toEqual(Object.keys(STORIES).sort());
     // beide Fassungen der Eis-Geschichte beginnen gleich und klingen gleich
     const [first, open] = [STORY_TEXTS.eis, STORY_TEXTS['eis-offen']];
@@ -15,6 +17,25 @@ describe('Geschichten der Klangsteine', () => {
     );
     expect(first.text.split('. ')[0]).toBe(open.text.split('. ')[0]);
     expect(STORIES['eis-offen'].melody).toEqual(STORIES.eis.melody);
+  });
+
+  it('die Höhlen-Geschichte hat zwei Fassungen: gleicher erster Satz, gleiche Melodie; die erste bleibt wortgleich', () => {
+    const [first, open] = [STORY_TEXTS.hoehle, STORY_TEXTS['hoehle-offen']];
+    // die Geschichte am geschlossenen Höhlentor bleibt, wie sie war (Konzept „Gleisbauer und Höhlen-Welt“)
+    expect(first.text).toBe(
+      'Hinter diesem Tor geht es unter die Erde, in eine große Höhle. Dunkel ist es dort aber nicht, denn an den Wänden wachsen Kristalle, die in allen Farben glitzern. Eine Fledermaus wohnt da. Sie schläft am Tag mit dem Kopf nach unten und wacht erst auf, wenn du ins Bett gehst. Vielleicht weckst du sie später einmal.',
+    );
+    expect(first.text.split('. ')[0]).toBe(open.text.split('. ')[0]);
+    expect(open.text.split('. ')[1]).toMatch(/^Und jetzt ist sie offen, weil du mit Tok zusammen/);
+    expect(STORIES['hoehle-offen'].melody).toEqual(STORIES.hoehle.melody);
+  });
+
+  it('die Geschichten der Bahn: Toks Geschichte im Lokschuppen und der Bahnhof Bär, mit eigener Melodie', () => {
+    expect(STORY_TEXTS.lokschuppen.text.startsWith('Tok hat eine Spitzhacke')).toBe(true);
+    expect(STORY_TEXTS.bahnhof.text.startsWith('Hier ist der Bahnhof beim Bären.')).toBe(true);
+    // ohne Aufnahme spielt die Melodie allein, darum hat jede genug Töne
+    for (const id of ['lokschuppen', 'bahnhof'] as const)
+      expect(STORIES[id].melody.notes.length, id).toBeGreaterThan(4);
   });
 
   it('stehen wortgleich in der Doku (docs/games/mitwachsen.md), zum Vorlesen und Einsprechen', () => {

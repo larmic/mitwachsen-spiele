@@ -8,6 +8,7 @@
 import type { Dir, Part } from '../../lib/games/front';
 import type { GateId, Point, RegionId, SpeciesId } from '../../data/games/mitwachsen';
 import type { RideId } from '../../data/games/mitwachsen-rides';
+import type { StoryId } from '../../data/games/mitwachsen-stories';
 import type { Cell } from './mitwachsen-cell';
 import type { Portal, PortalId } from './mitwachsen-portal';
 
@@ -189,7 +190,9 @@ export type Laid = {
  * Ein Welt-Paket. `build` baut die Welt hinter seinem Tor `gate` in die Karte der festen Felder (`map`, dort liegt schon
  * der Gang durch den Felsring; `passage` liefert ein Feld des Gangs), `place` sagt nur, wo sie läge; beides hat nur ein
  * Paket mit eigener Welt. `lay`: Ein Paket ohne eigene Welt (die Bahn) legt etwas in die fertig gebaute Karte (das Gleis
- * auf Lichtung und Grotte), nachdem alle Welten stehen und bevor die Lichtung ihre unerreichbaren Ecken zu Fels macht. `lead`: Regeln, die das Paket der
+ * auf Lichtung und Grotte), nachdem alle Welten stehen und bevor die Lichtung ihre unerreichbaren Ecken zu Fels macht; es
+ * liefert die Klangsteine, die es dabei gesetzt hat (Bahn: am Bahnhof Bär und am Lokschuppen), sie kommen zu
+ * `World.stones`. `lead`: Regeln, die das Paket der
  * Ansicht mitbringt (Eis-Welt: der verlaufene Pinguin führt zum Tor und öffnet es, `GuideRules`). `view`: ihre
  * Zeichenteile für die Ansicht (Eis-Welt: `View2D` aus mitwachsen-view.ts, Wetter und Bild der Weltgrenze). `view3d`:
  * lädt ihren 3D-Teil nach (`View3D` aus mitwachsen-view-3d.ts; braucht Three.js, darum ein eigener `import()`, erst wenn
@@ -221,7 +224,7 @@ export type WorldPack<
     map: Map<string, Cell>,
   ): Kessel;
   place?(seed: number, gang: Gang, beyond: Beyond): KesselPlace;
-  lay?(laid: Laid): void;
+  lay?(laid: Laid): readonly [StoryId, Point][] | void;
   lead?: Rules;
   rules?: WorldRules<Ride, Herald, Vehicle>;
   dawn?(packs: Readonly<Record<string, unknown>>): Record<string, unknown>;

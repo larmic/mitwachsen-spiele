@@ -96,11 +96,12 @@ function unmirrored(gang: Gang, beyond: Beyond, { rx, ry, gap }: { rx: number; r
     if (!hullFree(f.at, A, B, beyond)) return null;
     const floor: Point[] = [];
     for (let t = end + 1; t <= end + c; t++) for (let u = -h; u <= h; u++) floor.push(gang.at(u, t));
+    if (!free(floor)) return null; // erst der Boden, die Wände zu sammeln kostet mehr
     const walls = wallsOf(floor, wall).filter(([x, y]) => {
       const t = (x - o[0]) * out[0] + (y - o[1]) * out[1];
       return t > end; // die Wände des Gangs im Felsring stehen schon
     });
-    return free(floor) && free(walls) ? { ...f, floor, walls, turn: false } : null;
+    return free(walls) ? { ...f, floor, walls, turn: false } : null;
   };
   const bent = (k: number, m: number, side: 1 | -1): Site | null => {
     const t1 = end + 1 + h + k; // Reihe der Ecke
@@ -112,8 +113,9 @@ function unmirrored(gang: Gang, beyond: Beyond, { rx, ry, gap }: { rx: number; r
     const floor: Point[] = [];
     for (let t = end + 1; t <= t1 + h; t++) for (let u = -h; u <= h; u++) floor.push(gang.at(u, t));
     for (let s = h + 1; s <= h + 1 + m; s++) for (let w = -h; w <= h; w++) floor.push(add(add(turn, f, s), out, w));
+    if (!free(floor)) return null;
     const walls = wallsOf(floor, wall).filter(([x, y]) => (x - o[0]) * out[0] + (y - o[1]) * out[1] > end);
-    return free(floor) && free(walls) ? { ...site, floor, walls, turn: true } : null;
+    return free(walls) ? { ...site, floor, walls, turn: true } : null;
   };
   for (let cost = 0; cost <= MAX_COST; cost++) {
     const s = straight(cost);

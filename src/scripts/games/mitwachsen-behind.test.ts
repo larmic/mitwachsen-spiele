@@ -63,10 +63,13 @@ describe('Was hinter dem Gang eines Tors liegt (behind)', () => {
     expect(eis.bed).toEqual([0, 20]);
     expect(eis.stones).toEqual([['eis-offen', [2, 20]]]);
     expect(eis.portals.map(([id]) => id)).toEqual(['eiskessel']);
-    // die Höhlen-Geschichte hat (noch) keine zweite Fassung: dann kein Stein mit Geschichte
+    // die Höhlen-Geschichte hat auch eine zweite Fassung: Ihr Stein steht am Höhlenbett
     const hoehle = behind(fakePack('hoehle', 'hoehle'), 1, GANG, everywhere, passage, new Map(), 'hoehle');
-    expect(hoehle.stones).toEqual([]);
+    expect(hoehle.stones).toEqual([['hoehle-offen', [2, 20]]]);
     expect(hoehle.built).toBe(true);
+    // ein Tor ohne zweite Fassung: dann kein Stein mit Geschichte
+    const sand = behind(fakePack('eis', 'sand'), 1, GANG, everywhere, passage, new Map(), 'sand');
+    expect(sand.stones).toEqual([]);
   });
 });
 

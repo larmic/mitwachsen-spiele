@@ -109,6 +109,7 @@ export type Cell = {
   rail?: Rail; // Stück des Gleises auf dem Feld (nur mit `ride`; Paket der Bahn, worlds/bahn/)
   stop?: RideId; // Platz eines Halts dieses Fahrzeugs (Bahnsteig; den Platz in der Grotte hält ihr Paket frei, den Bahnsteig baut das Paket des Fahrzeugs)
   shed?: RideId; // Platz des Schuppens dieses Fahrzeugs (Lokschuppen neben Bahnhof Fledermaus; den Platz hält die Grotte frei, den Schuppen baut das Paket der Bahn mit Bau 2)
+  stone?: StoryId; // Platz eines Klangsteins, den ein Paket ohne eigene Welt später setzt (neben dem Lokschuppen: die Grotte hält ihn frei, das Paket der Bahn setzt den Stein `lokschuppen` mit Bau 2)
 };
 
 /**

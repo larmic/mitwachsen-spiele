@@ -1,12 +1,14 @@
-// Geschichten von Mitwachsen: Klangsteine am Bett, vor jedem großen Tor und am Schneebett im Gletscherkessel (die
-// zweite Fassung der Eis-Geschichte, „Wenn das Tor offen ist“). Läuft die Figur hinein, erklingt die
+// Geschichten von Mitwachsen: Klangsteine am Bett, vor jedem großen Tor, am Schneebett im Gletscherkessel (die zweite
+// Fassung der Eis-Geschichte, „Wenn das Tor offen ist“) und am Höhlenbett (die zweite Fassung der Höhlen-Geschichte);
+// dazu die Steine der Bahn, die erst mit ihr kommen (Paket der Bahn, hinter `BAHN_LIVE`): am Bahnhof Bär ab Bau 1 und am
+// Lokschuppen ab Bau 2 (worlds/bahn/mitwachsen-stones.ts). Läuft die Figur hinein, erklingt die
 // Melodie des Ortes, später danach die eingesprochene Geschichte. Titel und Texte stehen in mitwachsen-story-texts.ts
 // (nicht im Spiel, das nur Melodie und Aufnahme spielt).
 // Aufnahmen: public/games/mitwachsen/stimme/<id>.m4a ablegen und hier bei `voice` eintragen (ein Test prüft die Datei).
 
 import type { GateId, Point } from './mitwachsen';
 
-export type StoryId = 'bett' | GateId | 'eis-offen';
+export type StoryId = 'bett' | GateId | 'eis-offen' | 'hoehle-offen' | 'lokschuppen' | 'bahnhof';
 
 /** Melodie: Töne [Hz, Länge in s, Lautstärke?] nacheinander, alle aus der Pentatonik C–D–E–G–A */
 export type Melody = {
@@ -24,6 +26,8 @@ export type Story = {
 export const BED_STONE: Point = [-3, 1];
 /** Klangstein am Schneebett im Gletscherkessel: genauso links vorn, relativ zum Schneebett (`HOMES.eis`) */
 export const ICE_STONE: Point = [-3, 1];
+/** Klangstein am Höhlenbett in der Kristallgrotte: genauso links vorn, relativ zum Höhlenbett (`HOMES.hoehle`) */
+export const CAVE_STONE: Point = [-3, 1];
 
 // Töne der Pentatonik
 const C3 = 130.81,
@@ -55,6 +59,22 @@ const ICE_MELODY: Melody = {
     [A5, 0.14],
     [C6, 0.2],
     [E6, 0.5, 0.06],
+  ],
+};
+
+/** Melodie der Höhlen-Geschichte: Jeder Ton kommt leise als Echo zurück (beide Fassungen) */
+const CAVE_MELODY: Melody = {
+  wave: 'sine',
+  gap: 0.05,
+  notes: [
+    [A4, 0.3],
+    [A4, 0.3, 0.04],
+    [E4, 0.3],
+    [E4, 0.3, 0.04],
+    [C5, 0.3],
+    [C5, 0.3, 0.04],
+    [A4, 0.6],
+    [A4, 0.6, 0.03],
   ],
 };
 
@@ -135,19 +155,44 @@ export const STORIES: Record<StoryId, Story> = {
     },
   },
   hoehle: {
-    // jeder Ton kommt leise als Echo zurück
+    melody: CAVE_MELODY,
+  },
+  // Zweite Fassung der Höhlen-Geschichte, am Höhlenbett in der Kristallgrotte
+  'hoehle-offen': {
+    melody: CAVE_MELODY,
+  },
+  lokschuppen: {
+    // dreimal klopft Tok die Nägel ein (pink, pink, pink), dann schaukelt die kleine Bahn in den Schuppen
     melody: {
-      wave: 'sine',
+      wave: 'triangle',
+      gap: 0.08,
+      notes: [
+        [E6, 0.06, 0.12],
+        [E6, 0.06, 0.12],
+        [E6, 0.06, 0.12],
+        [G4, 0.3],
+        [E4, 0.3],
+        [G4, 0.3],
+        [D4, 0.3],
+        [C4, 0.7],
+      ],
+    },
+  },
+  bahnhof: {
+    // zweimal pfeift die Bahn, dann rattert sie los
+    melody: {
+      wave: 'triangle',
       gap: 0.05,
       notes: [
-        [A4, 0.3],
-        [A4, 0.3, 0.04],
-        [E4, 0.3],
-        [E4, 0.3, 0.04],
-        [C5, 0.3],
-        [C5, 0.3, 0.04],
-        [A4, 0.6],
-        [A4, 0.6, 0.03],
+        [G5, 0.3],
+        [A5, 0.45],
+        [G5, 0.3],
+        [A5, 0.45],
+        [C4, 0.12, 0.2],
+        [E4, 0.12, 0.2],
+        [C4, 0.12, 0.2],
+        [E4, 0.12, 0.2],
+        [G4, 0.5],
       ],
     },
   },
@@ -203,7 +248,7 @@ export const STORIES: Record<StoryId, Story> = {
 };
 
 /**
- * Zweite Fassung der Geschichte eines Tors, „Wenn das Tor offen ist“ (`<tor>-offen`, heute nur die Eis-Geschichte);
+ * Zweite Fassung der Geschichte eines Tors, „Wenn das Tor offen ist“ (`<tor>-offen`: Eis und Höhle);
  * undefined, wenn es keine gibt. Sie erzählen der Stein vor dem offenen Tor und der Stein am Bett der Welt dahinter.
  */
 export function openStory(gate: GateId): StoryId | undefined {
@@ -211,7 +256,11 @@ export function openStory(gate: GateId): StoryId | undefined {
   return Object.hasOwn(STORIES, id) ? (id as StoryId) : undefined;
 }
 
-/** Was ein Klangstein erzählt: Ist sein Tor offen und hat es eine zweite Fassung, erzählt der Stein davor diese */
+/**
+ * Was ein Klangstein erzählt, je Tor: Ist sein Tor offen und hat es eine zweite Fassung, erzählt der Stein davor diese
+ * (Eistor `eis-offen`, Höhlentor `hoehle-offen`; das Höhlentor geht erst mit der Bahn-Phase auf, bis dahin bleibt es bei
+ * `hoehle`). Alle anderen Steine erzählen immer ihre eigene Geschichte
+ */
 export const told = (id: StoryId, open: readonly GateId[]): StoryId =>
   (open.includes(id as GateId) && openStory(id as GateId)) || id;
 

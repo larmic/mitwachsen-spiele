@@ -24,6 +24,7 @@ import {
 } from '../../test-worlds';
 import { bayAt, besideRay, centreOf, hutOf } from './mitwachsen-bear';
 import { APPROACH, PORTAL_T, clean, joined } from './mitwachsen-line';
+import { STONE_GAPS } from './mitwachsen-stones';
 import { stationOf, stationBodies } from './mitwachsen-station-look';
 import { LETTERS, STEPS, gridOf } from './mitwachsen-trace';
 import { CARS, SEAT, TRAIN, lineOf as trackOf, trainRoute } from './mitwachsen-train';
@@ -35,6 +36,8 @@ import { withBuilt } from './mitwachsen-built';
 const TURNED = [26, 30];
 /** Eigenschafts-Tests über ganze Welten: wenige Seeds, im tiefen Lauf 20 und die gebogenen */
 const SEEDS = seedsFor([...seedRange(1, 20), ...TURNED], [...SAMPLE_SEEDS, ...TURNED]);
+/** Seed, auf dem zwei Felder vom Bahnhof Bär kein Platz für den Klangstein passt (aus einer Probe über Seeds 21–140) */
+const BEAR_FAR = 38;
 const key = ([x, y]: Point) => `${x},${y}`;
 const step = ([x, y]: Point, l: string): Point => {
   const [dx, dy] = STEPS[LETTERS.indexOf(l)]!;
@@ -200,6 +203,54 @@ function platformOf(laid: Laid, realm: Cell['region']): Point[] {
   return [...out.values()];
 }
 
+/**
+ * Was am Klangstein `id` der Bahn nicht stimmt: Feld, mindestens zwei Felder vom Gleis, genau `gap` Felder von den
+ * Feldern `near` (Bahnhof oder Lokschuppen), ringsum frei und eben, von `free` (erreichbar vom Bett) aus zu erreichen
+ */
+function stoneFaults(
+  w: World,
+  laid: Laid,
+  id: 'bahnhof' | 'lokschuppen',
+  free: Set<string>,
+  near: Point[],
+  gaps: readonly number[],
+) {
+  const p = w.stones.get(id);
+  if (!p) return [`kein Stein ${id}`];
+  const bad: string[] = [];
+  const c = w.cell(...p);
+  if (c.deco !== 'klangstein' || c.story !== id || !c.solid) bad.push(`${id}: Feld`);
+  if (laid.cells.some((q) => cheb(q, p) < 2)) bad.push(`${id}: zu nah am Gleis`);
+  if (!gaps.includes(Math.min(...near.map((q) => cheb(q, p))))) bad.push(`${id}: nicht am Bahnhof oder Schuppen`);
+  const ring = [-1, 0, 1].flatMap((dy) =>
+    [-1, 0, 1].flatMap((dx): Point[] => (dx || dy ? [[p[0] + dx, p[1] + dy]] : [])),
+  );
+  const open = (q: Point) => !w.cell(...q).solid && w.cell(...q).ground !== 'water' && w.cell(...q).h === c.h;
+  if (!ring.every(open) || ring.some((q) => w.cell(...q).ride)) bad.push(`${id}: ringsum nicht frei`);
+  if (!ring.some((q) => free.has(key(q)))) bad.push(`${id}: nicht erreichbar`);
+  return bad;
+}
+
+/**
+ * Was an den Klangsteinen der Bahn nicht stimmt: am Bahnhof Bär zwei Felder von Bahnsteig und Gleis (notfalls drei oder
+ * vier, `STONE_GAPS`), am Kopf bei Toks Häuschen; am Lokschuppen ein Feld daneben; beide erreichbar und frei umgehbar
+ */
+function trainStoneFaults(w: World, laid: Laid) {
+  const bear = stationOf(w);
+  const station = bear ? [...bear.line.slice(0, LINE.bear.long), ...bear.rows.flatMap((r) => [r.edge, r.back])] : [];
+  const bad = [
+    ...stoneFaults(w, laid, 'bahnhof', reach(w, w.homes.lichtung.wake, new Set()), station, STONE_GAPS),
+    ...stoneFaults(w, laid, 'lokschuppen', reach(w, w.homes.hoehle.wake, new Set()), shedIn(w).cells, [1]),
+  ];
+  // am Kopf des Bahnhofs bei Toks Häuschen, fern vom Bett: näher am Häuschen als am anderen Ende des Bahnsteigs
+  const stone = w.stones.get('bahnhof');
+  const hut = bear?.hut;
+  const other = hut && bear.rows[hut.row === 0 ? bear.rows.length - 1 : 0]?.back;
+  const dist = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  if (!stone || !hut || !other || dist(stone, hut.at) >= dist(stone, other)) bad.push('bahnhof: nicht am Häuschen');
+  return bad;
+}
+
 /** Was an einem Feld von Bahnhof Bär nicht stimmt: Lichtung, trocken, frei, außerhalb des Portalrings, nichts Gemiedenes nah */
 function siteFaults(laid: Laid, p: Point, bed: Point, hut?: Point): string[] {
   const bad: string[] = [];
@@ -250,6 +301,12 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
       });
     });
     expect(bad).toEqual([]);
+  });
+
+  it(`Seed ${BEAR_FAR}: zwei Felder vom Bahnhof Bär passt kein Feld, der Stein steht drei oder vier Felder weit, erreichbar`, () => {
+    // frisch gebaut, nicht über worldOf: Die Welt bleibt nicht im Speicher
+    const w = createWorld(BEAR_FAR, [HOEHLE_PACK, BAHN_PACK], BUILT);
+    expect(trainStoneFaults(w, lineOf(w)), `Seed ${BEAR_FAR}`).toEqual([]);
   });
 
   for (const seed of SEEDS) {
@@ -465,6 +522,10 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
       if (dormouse && shed.home && key(dormouse) === key(shed.home)) bad.push('Siebenschläfer auf Toks Platz');
       if (!batBodies(w).some((b) => b.id === 'bahn:schuppen')) bad.push('Lokschuppen nicht im Bild');
       expect(bad, `Seed ${seed}`).toEqual([]);
+    });
+
+    it(`Seed ${seed}: Klangsteine der Bahn: am Bahnhof Bär neben Toks Häuschen, am Lokschuppen; je zwei Felder vom Gleis, frei umgehbar`, () => {
+      expect(trainStoneFaults(w, laid), `Seed ${seed}`).toEqual([]);
     });
 
     it(`Seed ${seed}: Bau 2 als ganze Fahrt: Tok klopft am Prellbock, der Zug fährt bis Bahnhof Fledermaus, der Maulwurf zieht ein und läuft heim, Tok im Lokschuppen`, () => {

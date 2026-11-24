@@ -92,8 +92,8 @@ export function seedChunks(seeds: readonly number[], size: number) {
 export function reachable(world: World, open: GateId[], start: readonly [number, number], limit = 30000) {
   const seen = new Set<string>([`${start[0]},${start[1]}`]);
   const queue: [number, number][] = [[start[0], start[1]]];
-  while (queue.length && seen.size < limit) {
-    const [x, y] = queue.shift()!;
+  for (let i = 0; i < queue.length && seen.size < limit; i++) {
+    const [x, y] = queue[i]!; // Index statt shift(): shift kopiert die ganze Schlange, bei 30000 Feldern spürbar
     for (const [dx, dy] of Object.values(DIRS)) {
       const k = `${x + dx},${y + dy}`;
       if (seen.has(k) || !canStep(world, open, x, y, x + dx, y + dy)) continue;

@@ -173,7 +173,7 @@ function land(
         set(x, y, v < 0 && Math.abs(u) <= gang.half ? passage(x, y) : cliffCell(seed, u, v, x, y));
         continue;
       }
-      const c = lake(u, v) ?? foot(seed, u, v) ?? floorCell(seed, place.bed, x, y, !free(u, v) && pineFits(u, v));
+      const c = lake(u, v) ?? foot(seed, u, v) ?? floorCell(seed, place.bed, x, y, () => !free(u, v) && pineFits(u, v));
       if (c.deco === 'tree') pines.add(key(u, v));
       set(x, y, c);
     }
@@ -227,10 +227,12 @@ export const KESSEL_WILDS = { pines: 4, blocks: 2 } as const;
  * im Hain, sonst 0,8 %); um das Bett eben. Tannen nur, wo der Kessel nicht frei bleibt und Platz ist (`pine`). Glattes
  * Eis liegt auf den Seen (`lakes`), Eisblöcke setzt erst `winter`.
  */
-function floorCell(seed: number, bed: Point, x: number, y: number, pine: boolean): Cell {
+function floorCell(seed: number, bed: Point, x: number, y: number, pine: () => boolean): Cell {
   if (Math.hypot(x - bed[0], y - bed[1]) <= KESSEL.flat) return snow(1);
-  const pines = pine ? (grove(seed, x, y) > GROVE ? 0.1 : 0.008) : 0;
-  return eisCell(snow(hill(seed, x, y)), 1, rand01(seed, x, y, 66), pines, 0);
+  const roll = rand01(seed, x, y, 66);
+  // `pine` nur fragen, wo eine Tanne überhaupt wachsen könnte (höchstens 10 %): Die Prüfung ringsum kostet
+  const pines = roll < 0.1 && pine() ? (grove(seed, x, y) > GROVE ? 0.1 : 0.008) : 0;
+  return eisCell(snow(hill(seed, x, y)), 1, roll, pines, 0);
 }
 
 /**
@@ -356,20 +358,28 @@ const NEAR_2 = [-2, -1, 0, 1, 2].flatMap((dy) => [-2, -1, 0, 1, 2].map((dx) => [
  * die Wiese, die Spur, die Kisten und das Ufer ziehen die Hügel ringsum herunter
  */
 function level(cells: readonly Point[], map: Map<string, Cell>) {
-  const land = (c: Cell | undefined) => !!c && !c.solid && c.ground !== 'water';
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const [x, y] of cells) {
-      let c = map.get(key(x, y));
-      if (!land(c) || c!.region !== 'eis') continue;
-      for (const [dx, dy] of NEIGHBOURS) {
-        const n = map.get(key(x + dx, y + dy));
-        if (!land(n) || c!.h <= n!.h + 1) continue;
-        map.set(key(x, y), (c = { ...c!, h: n!.h + 1 }));
-        changed = true;
-      }
+  const land = (c: Cell | undefined): c is Cell => !!c && !c.solid && c.ground !== 'water';
+  const mine = new Set(cells.map(([x, y]) => key(x, y)));
+  /** Ein Feld auf Nachbar + 1 absenken; sank es, kommen seine Nachbarn aus `cells` in `next` */
+  const lower = (x: number, y: number, next: Point[]) => {
+    const c = map.get(key(x, y));
+    if (!land(c) || c.region !== 'eis') return;
+    let h = c.h;
+    for (const [dx, dy] of NEIGHBOURS) {
+      const n = map.get(key(x + dx, y + dy));
+      if (land(n) && n.h + 1 < h) h = n.h + 1;
     }
+    if (h === c.h) return;
+    map.set(key(x, y), { ...c, h });
+    for (const [dx, dy] of NEIGHBOURS) if (mine.has(key(x + dx, y + dy))) next.push([x + dx, y + dy]);
+  };
+  // Einmal über alle Felder, danach nur die Nachbarn gesunkener; das Ergebnis hängt nicht von der Reihenfolge ab
+  let next: Point[] = [];
+  for (const [x, y] of cells) lower(x, y, next);
+  while (next.length) {
+    const todo = next;
+    next = [];
+    for (const [x, y] of todo) lower(x, y, next);
   }
 }
 
