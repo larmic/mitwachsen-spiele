@@ -46,13 +46,13 @@ export const STATION_COLORS = {
 /** Bär für das Schild auf Grün, 8 × 8 Pixel (b braun, k dunkel, l hell; Punkt: frei) */
 const BEAR = ['bb....bb', 'bbbbbbbb', '.bbbbbb.', '.bkbbkb.', '.bbllbb.', '.blkklb.', '..bllb..', '...bb...'];
 /** Fledermaus im Zielfenster der Lok, 9 × 7 Pixel (aus der Skizze, ohne Zähne) */
-const BAT = ['..p...p..', '..pgggp..', 'w.gkgkg.w', 'ww.glg.ww', 'wwwgggwww', '.ww.g.ww.', '..w...w..'];
+export const BAT = ['..p...p..', '..pgggp..', 'w.gkgkg.w', 'ww.glg.ww', 'wwwgggwww', '.ww.g.ww.', '..w...w..'];
 
 /**
  * Pixelbild als Teile auf einer Fläche, die nach vorn (+vorn) schaut: bei vorn `f`, Mitte quer bei `r`, Oberkante bei
  * `top`, je Pixel `px` groß
  */
-function pixels(
+export function pixels(
   rows: readonly string[],
   pal: Readonly<Record<string, string>>,
   f: number,

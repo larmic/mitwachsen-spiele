@@ -7,7 +7,7 @@
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Tok erscheint)
 
 import { SPECIES, type GateId, type SpeciesId } from '../../../../data/games/mitwachsen';
-import { BUILD } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
+import { BUILD, BUILD2 } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import { TOK_CRUMBS } from '../../../../data/games/worlds/bahn/mitwachsen-tok-model';
 import { RULE_TICK_MS } from '../../mitwachsen-turn-pace';
 import { heraldOf, type HeraldEvent, type Heralded } from '../../mitwachsen-herald';
@@ -66,15 +66,38 @@ export function buildScore(): Scored[] {
   ];
 }
 
+/** Der Prellbock versinkt: weicher Sinus G4, gleitet hinab zu C4 */
+export const sink = (at = 0): Scored => [392, 0.3, 'sine', 0.05, 261.63 / 392, at];
+/** Sekunden ab dem Beginn von Bau 2 bis zu einem seiner Augenblicke (`BUILD2`) */
+const sec2 = (beat: number) => (beat * BUILD2.ticks * RULE_TICK_MS) / 1000;
+
+/**
+ * Töne von Bau 2, eingeplant, wenn Tok am Prellbock zu klopfen beginnt: pink-pink (`BUILD2.taps` Paare bis zum
+ * Augenblick `pop`), der Prellbock versinkt, je Stufe der Gleiswelle durch den Gang ein „klonk“ (das „Ju-hu“ kommt, wenn
+ * Tok einsteigt)
+ */
+export function build2Score(): Scored[] {
+  const [w0, w1] = BUILD2.wave;
+  const every = sec2(BUILD2.pop) / BUILD2.taps;
+  return [
+    ...Array.from({ length: BUILD2.taps }, (_, i) => [pink(0.1 + i * every), pink(0.26 + i * every)]).flat(),
+    sink(sec2(BUILD2.sink[0])),
+    ...[0, 1, 2].flatMap((k) => klonk(sec2(w0 + (k * (w1 - w0)) / 3))),
+  ];
+}
+
 /**
  * Bild und Ton zu einem Ereignis von Tok: auftauchen (es klopft pink-pink, Steinkrümel stieben, „Ju-hu“, Hüpfer),
  * ankommen (Ruf, Hüpfer, Herz), rufen und aufwachen (Ruf, Hüpfer), schlafend kommen und schnarchen (leises „Zzz“), Bau 1
- * beginnen (die Töne des ganzen Baus, Hüpfer, Steinkrümel), in den Zug steigen („Ju-hu“)
+ * beginnen (die Töne des ganzen Baus, Hüpfer, Steinkrümel), Bau 2 am Prellbock (pink-pink, der Prellbock versinkt,
+ * „klonk“, Hüpfer, Steinkrümel), in den Zug steigen („Ju-hu“)
  */
 export function heraldFx(e: HeraldEvent): RideFx {
   switch (e.what) {
     case 'build':
       return { score: buildScore(), who: e.id, burst: TOK_CRUMBS };
+    case 'sink':
+      return { score: build2Score(), who: e.id, burst: TOK_CRUMBS };
     case 'pop':
       return { score: [] }; // das Plopp klingt schon mit den Tönen des Baus
     case 'board':

@@ -33,4 +33,9 @@ export type SpeciesOf<Id extends string> = {
    * das Modell bringt das Welt-Paket mit (`addModels`), bis dahin ist es leer (Fledermaus)
    */
   roost?: readonly Part[];
+  /**
+   * Modell ohne den, der auf ihr sitzt (Tok ohne den Maulwurf auf dem Helm, nachdem der eingezogen ist): Ein Tier mit
+   * `solo` zeigt es; das Modell bringt das Welt-Paket mit (`WorldPack.solos`)
+   */
+  solo?: readonly Part[];
 };

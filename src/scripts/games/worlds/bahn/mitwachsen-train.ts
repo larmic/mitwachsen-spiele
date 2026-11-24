@@ -16,7 +16,6 @@
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Fahren)
 
 import { animalId, type Point } from '../../../../data/games/mitwachsen';
-import { RIDES } from '../../../../data/games/mitwachsen-rides';
 import { BESIDE, plateRow } from '../../mitwachsen-bay';
 import { dirTo, freeNear } from '../../mitwachsen-free';
 import { heraldOf } from '../../mitwachsen-herald';
@@ -25,55 +24,14 @@ import type { End, RideEvents, RideRoute, Rider, Vehicle } from '../../mitwachse
 import { standHeight, type World } from '../../mitwachsen-world';
 import { builtOf } from './mitwachsen-built';
 import { key } from './mitwachsen-ground';
-import { LETTERS, STEPS } from './mitwachsen-trace';
+import { CARS, SEAT, TRAIN, lineOf } from './mitwachsen-train-line';
+import { arrive2, depart2, hold2 } from './mitwachsen-build2';
 
-/** Der Zug in `RIDES` */
-export const TRAIN = RIDES.find((r) => r.id === 'hoehle')!;
-/** So viele Felder des Gleises belegt der haltende Zug (Lok und zwei Wagen, gut 5 Felder lang) */
-export const CARS = 6;
-/** Feld des Sitzes (Mitte des mittleren Wagens), vom Ende des Gleises an gezählt */
-export const SEAT = 3;
+export { CARS, SEAT, TRAIN, bearEnd, lineOf } from './mitwachsen-train-line';
 /** So viele Felder vor dem Sitz müssen frei sein: die Wagen davor und zwei Felder */
 export const AHEAD = CARS - 1 - SEAT + 2;
 /** So viele Warteplätze hat jeder Halt (die Bank auf dem Bahnsteig, in der Bucht neben dem Gleis) */
 const WAIT = 8;
-/** So weit ums Bett der Lichtung wird nach dem Prellbock von Bahnhof Bär gesucht (er liegt 13 bis 16 Felder weg) */
-const SEARCH = 24;
-
-/** Der Prellbock am Anfang der Linie auf der Lichtung (Bahnhof Bär), gesucht ums Bett */
-export function bearEnd(world: World): Point | undefined {
-  const [bx, by] = world.homes.lichtung.bed;
-  for (let y = by - SEARCH; y <= by + SEARCH; y++)
-    for (let x = bx - SEARCH; x <= bx + SEARCH; x++) {
-      const c = world.cell(x, y);
-      if (c.rail?.part === 'end' && c.rail.stage === 1 && c.region === 'lichtung') return [x, y];
-    }
-  return undefined;
-}
-
-const lines = new WeakMap<World, Map<boolean, Point[]>>();
-/**
- * Das Gleis, auf dem der Zug fährt, in Reihe von Bahnhof Bär an (je Welt einmal): bis an den Prellbock in der Bucht
- * (`far` false; ohne Grotte endet das Gleis dort ohnehin), sonst bis an das Ende hinter Bahnhof Fledermaus; leer ohne Gleis
- */
-export function lineOf(world: World, far: boolean): Point[] {
-  let byFar = lines.get(world);
-  if (!byFar) lines.set(world, (byFar = new Map<boolean, Point[]>()));
-  const known = byFar.get(far);
-  if (known) return known;
-  const line: Point[] = [];
-  for (let p = bearEnd(world); p && line.length < 600;) {
-    line.push(p);
-    const r = world.cell(...p).rail;
-    if (!r || (line.length > 1 && (r.part === 'end' || (r.part === 'buffer' && !far)))) break;
-    const on = line.length === 1 ? r.to[0] : r.to[1];
-    if (!on) break;
-    const [dx, dy] = STEPS[LETTERS.indexOf(on)]!;
-    p = [p[0] + dx, p[1] + dy];
-  }
-  byFar.set(far, line);
-  return line;
-}
 
 /** Fährt der Zug bis in die Grotte? Erst ab Ausbau 2 und mit offenem Höhlentor (sonst bis zum Prellbock in der Bucht) */
 export const farOf = (s: Pick<Rider, 'packs' | 'openGates'>) => builtOf(s.packs) >= 2 && s.openGates.includes('hoehle');
@@ -173,23 +131,28 @@ export function tokOut(s: Rider, world: World, end: End, events: RideEvents) {
 
 /**
  * Nach dem Aussteigen (`Vehicle.landed`): Die erste Fahrt ist gemacht (`gefahren`, gespeichert: kein goldener Rahmen
- * mehr an der Tür), Tok hüpft in der Bucht aus (`tokOut`)
+ * mehr an der Tür), Tok hüpft in der Bucht aus (`tokOut`); am Bahnhof Fledermaus nach Bau 2 zieht der Maulwurf ein, und
+ * Tok hüpft in den Lokschuppen (`arrive2`, mitwachsen-build2.ts)
  */
 export function landed(s: Rider, world: World, end: End, events: RideEvents) {
   s.packs = withRidden(s.packs, TRAIN.id);
   tokOut(s, world, end, events);
+  if (end === 'home' && farOf(s)) arrive2(s, world, events);
 }
 
 /**
  * Der Zug für die Fahr-Engine (`pack.rules.vehicle`): Eintrag, Strecke, nach der ersten Fahrt (`landed`); seine
  * Ziel-Gegend ist die Grotte (`needs`): vorgeladen schon, solange er nur bis zum Prellbock fährt, damit sie da ist, wenn
  * Bau 2 kommt; schlafen (Vorladen, mitwachsen-preload.ts) muss er ohne sie erst ab Ausbau 2, wenn er hineinfährt
- * (`reaches`). Die erste Fahrt wartet nie auf die Grotte
+ * (`reaches`). Die erste Fahrt wartet nie auf die Grotte. Bau 2 (mitwachsen-build2.ts): beginnt beim Abfahren von
+ * Bahnhof Bär nach dem Hau-ruck (`depart`), der Zug hält am Prellbock, bis Tok fertig ist (`hold`)
  */
 export const train: Vehicle = {
   spec: TRAIN,
   route: trainRoute,
   landed,
+  depart: depart2,
+  hold: hold2,
   needs: ['hoehle'],
   reaches: (s) => builtOf(s.packs) >= 2,
 };

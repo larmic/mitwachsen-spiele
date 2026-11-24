@@ -22,6 +22,7 @@ export type Traveller = Omit<Crowd, 'player' | 'animals'> & {
   animals: { id: string; x: number; y: number; mode: Mode }[];
   followers: string[];
   portals: PortalId[]; // wache Portal-Plattformen (je Portal eine, mit Gegenstück am Bett)
+  garden?: readonly { id: string }[]; // wer zu Hause wohnt: Ein Portal mit `later` wartet auf ein Tier (der Maulwurf)
   arrived: Point | null; // Mittelfeld, auf dem die Figur angekommen ist: erst runter, dann wieder rauf
 };
 type Events = { push(e: PortalEvent): unknown };
@@ -29,12 +30,14 @@ type Events = { push(e: PortalEvent): unknown };
 /**
  * Plattformen, an die die wache Figur herangekommen ist, erwachen (nur, wo der Nebel schon weg ist: `explored`). Ein
  * Portal am Bett (das Eis-Portal) erwacht erst, wenn der Pinguin nicht mehr unterwegs zum Schneebett ist (Modus `lead`):
- * Er zieht zuerst ein, erst dann erwacht es.
+ * Er zieht zuerst ein, erst dann erwacht es. Eines mit `later` (das Portal am stillen See der Grotte) erst, wenn dieses
+ * Tier zu Hause wohnt (der erste Maulwurf, nach Bau 2 der Bahn).
  */
 export function wakePortals(s: Traveller, world: World, explored: (x: number, y: number) => boolean, events: Events) {
   if (s.sleeping) return;
   const guiding = s.animals.some((a) => a.mode === 'lead');
-  for (const id of platformsToWake(world.portals, s.portals, s.player.x, s.player.y, explored)) {
+  const home = new Set((s.garden ?? []).map((a) => a.id));
+  for (const id of platformsToWake(world.portals, s.portals, s.player.x, s.player.y, explored, home)) {
     if (guiding && world.portals.get(id)?.bed) continue;
     s.portals.push(id);
     events.push({ type: 'portal', id });

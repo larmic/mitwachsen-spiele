@@ -95,14 +95,14 @@ export const RULES: Rule[] = [
     parts: [
       // Gleis der Höhlenbahn auf Lichtung und Grotte: Trassen-Suche, Bahnhof Bär, Zeichenteile der 2D-Ansicht; Tok, der
       // Bote der Höhlenwelt (Regeln, Modell, Bild und Ton); Bau 1 mit Bahnhof Bär und Zug (Modelle, Körper, Töne); der Zug
-      // als Fahrzeug (Strecke, Bild beim Fahren, Ton, Licht im Tunnel); bis zum Freischalten (BAHN_LIVE) holt es nur der
-      // Entwickler-Schalter
+      // als Fahrzeug (Strecke, Bild beim Fahren, Ton, Licht im Tunnel); Bau 2 mit Bahnhof Fledermaus und Lokschuppen;
+      // bis zum Freischalten (BAHN_LIVE) holt es nur der Entwickler-Schalter
       { chunks: /\/welt-bahn\.[\w-]+\.js$/ },
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Bahn
       { chunks: /\/welt-bahn-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-bahn)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 37 829 Bytes (36,9 KB)
-    budget: 41 * 1024,
+    // Gemessen 48 187 Bytes (47,1 KB)
+    budget: 52 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

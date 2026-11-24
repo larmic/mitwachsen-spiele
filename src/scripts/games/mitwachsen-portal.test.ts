@@ -121,16 +121,21 @@ describe('Eis-Portal (Gletscherkessel)', () => {
 describe('Portal am stillen See (Kristallgrotte)', () => {
   const all = () => true;
   const cave = new Map<PortalId, Portal>([
-    ['hoehlensee', { gate: [0, 130], home: [0, 19], bed: [0, 28], later: true }],
+    ['hoehlensee', { gate: [0, 130], home: [0, 19], bed: [0, 28], later: 'hoehle:maulwurf' }],
   ]);
 
-  it('erwacht noch nicht, weder am Höhlenbett noch an der Plattform (erst nach dem Maulwurf, kommt später)', () => {
-    for (const [x, y] of [
-      [1, 28], // am Bett
-      [0, 130], // auf der Plattform am See
-      [0, 19], // auf dem Gegenstück
-    ] as const)
-      expect(platformsToWake(cave, [], x, y, all), `${x},${y}`).toEqual([]);
+  it('erwacht erst, wenn der erste Maulwurf zu Hause wohnt (`later`), dann beim Ankommen am Höhlenbett', () => {
+    for (const home of [new Set<string>(), new Set(['hoehle:dachs', 'hoehle:maulwurf:2'])])
+      for (const [x, y] of [
+        [1, 28], // am Bett
+        [0, 130], // auf der Plattform am See
+        [0, 19], // auf dem Gegenstück
+      ] as const)
+        expect(platformsToWake(cave, [], x, y, all, home), `${x},${y}`).toEqual([]);
+    const mole = new Set(['hoehle:maulwurf']);
+    expect(platformsToWake(cave, [], 1, 28, all, mole)).toEqual(['hoehlensee']); // am Bett, wie das Eis-Portal
+    expect(platformsToWake(cave, [], 0, 130, all, mole)).toEqual([]); // nicht durch Nähe zur fernen Plattform
+    expect(platformsToWake(cave, [], 1, 28, () => false, mole)).toEqual([]); // nicht im Nebel
     // ohne `later` erwachte es am Bett wie das Eis-Portal
     expect(
       platformsToWake(new Map([['hoehlensee', { ...cave.get('hoehlensee')!, later: undefined }]]), [], 1, 28, all),

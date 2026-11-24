@@ -196,7 +196,7 @@ export class Renderer {
         this.shadow(P, b.x + 0.5, b.y + 0.5, b.z, 0.26 * scale);
         if (perch !== undefined && sp.roost)
           drawModel(ctx, P, sp.roost, b.x + 0.5, b.y + 0.5, b.z + perch, a.dir, scale);
-        else drawModel(ctx, P, sp.parts, b.x + 0.5, b.y + 0.5, b.z + b.hop, a.dir, scale);
+        else drawModel(ctx, P, (a.solo && sp.solo) || sp.parts, b.x + 0.5, b.y + 0.5, b.z + b.hop, a.dir, scale);
       }
     }
 

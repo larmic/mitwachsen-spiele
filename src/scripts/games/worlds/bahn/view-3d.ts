@@ -2,7 +2,8 @@
 // denselben Quadern wie in 2D (mitwachsen-rail-look.ts). Ändert sich, welche Stücke des Gleises liegen (der Ausbau
 // `packs.bahn.built` oder, solange Tok baut, die Stufe der Gleiswelle, in 3D immer drei Stufen), baut die 3D-Ansicht
 // ihre Stücke neu (`stamp`): Stufe 0 zeigt dasselbe wie der Ausbau davor, die letzte dasselbe wie der fertige, so baut
-// sie bei Bau 1 nur dreimal neu. Bahnhof und Zug sind Körper wie in 2D (`bodies` in der Ansicht,
+// sie bei Bau 1 nur dreimal neu; bei Bau 2 ebenso (bis Tok am Prellbock klopft, Stufe 0: der Prellbock steht, und mit
+// den Stufen versinkt er). Bahnhof und Zug sind Körper wie in 2D (`bodies` in der Ansicht,
 // mitwachsen-station-look.ts). Im Build `_astro/welt-bahn-3d.<hash>.js`.
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“)
 
@@ -16,7 +17,7 @@ export const view3d: View3D = {
   rails: railBoxes,
   stamp: (packs, work) => {
     const built = builtOf(packs);
-    const wave = waveStage(work);
+    const wave = waveStage(work, built >= 2 ? 2 : 1);
     if (wave === undefined || wave >= STAGES) return `bahn${built}`;
     return wave === 0 ? `bahn${built - 1}` : `bahn${built - 1}:${wave}`;
   },

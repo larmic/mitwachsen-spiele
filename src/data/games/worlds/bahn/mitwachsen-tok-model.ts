@@ -45,8 +45,8 @@ const s = (x: number, y: number, z: number, w: number, h: number, d: number, c: 
 
 const C = TOK_COLORS;
 
-/** Tok von vorn, wie er steht und hüpft (Gangart `huepfen`) */
-export const TOK_MODEL: readonly Part[] = [
+/** Tok von vorn ohne den Maulwurf (der sitzt in `MOLE_ON_HELM`) */
+const TOK_ALONE: readonly Part[] = [
   // Spitzhacke hinten über der Schulter: Stiel aus vier Voxeln Holz, Kopf als flaches T in Felsgrau
   ...[0, 1, 2, 3].map((i) => s(0.36 + i * 0.05, 0.42 + i * 0.2, 0.05, 0.09, 0.2, 0.09, C.wood)),
   s(0.12, 1.18, 0.02, 0.62, 0.08, 0.12, C.pick),
@@ -77,7 +77,10 @@ export const TOK_MODEL: readonly Part[] = [
   s(-0.37, 1.16, -0.3, 0.74, 0.06, 0.62, C.brim),
   s(-0.35, 1.22, -0.27, 0.7, 0.14, 0.56, C.helm, '#e0574a'),
   s(-0.08, 1.17, -0.32, 0.16, 0.14, 0.03, C.lamp),
-  // der Maulwurf oben auf dem Helm: Körper, Schnauze, rosa Nase, helle Brille, rosa Hände (er winkt)
+];
+
+/** Der Maulwurf oben auf dem Helm: Körper, Schnauze, rosa Nase, helle Brille, rosa Hände (er winkt) */
+const MOLE_ON_HELM: readonly Part[] = [
   s(-0.15, 1.36, -0.13, 0.3, 0.16, 0.3, C.mole, '#3a3640'),
   s(-0.09, 1.38, -0.18, 0.18, 0.1, 0.05, C.mole),
   s(-0.04, 1.42, -0.2, 0.08, 0.05, 0.02, C.pink),
@@ -86,3 +89,11 @@ export const TOK_MODEL: readonly Part[] = [
   s(-0.25, 1.42, -0.12, 0.1, 0.06, 0.1, C.pink),
   s(0.15, 1.42, -0.12, 0.1, 0.06, 0.1, C.pink),
 ];
+
+/** Tok von vorn, wie er steht und hüpft (Gangart `huepfen`), mit dem Maulwurf auf dem Helm */
+export const TOK_MODEL: readonly Part[] = [...TOK_ALONE, ...MOLE_ON_HELM];
+/**
+ * Tok nach Bau 2: Der Maulwurf ist von seinem Helm gehüpft und wohnt im Gehege am Höhlenbett (`Species.solo`, für Tok
+ * mit `solo`)
+ */
+export const TOK_SOLO: readonly Part[] = TOK_ALONE;

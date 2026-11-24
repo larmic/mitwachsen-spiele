@@ -82,7 +82,9 @@ export type Ruled = {
  * gleich steigt die Figur aus); `at` Takt, an dem die Phase begann; `pos` Fortschritt auf der Strecke in Feldern,
  * `speed` Felder je Takt; `to` Halt, zu dem es fährt: sein Zuhause am Schuppen in der Welt (`home`) oder der Halt auf der
  * Lichtung (`out`; für das Kind die Heimfahrt); `feast` die Festfahrt (erste Heimfahrt);
- * `jingleAt` Takt des letzten Bimmelns; `greeted` Tiere, die auf der Festfahrt schon gewinkt haben
+ * `jingleAt` Takt des letzten Bimmelns; `greeted` Tiere, die auf der Festfahrt schon gewinkt haben; `stopover` ein Halt
+ * unterwegs, den das Paket des Fahrzeugs beim Abfahren ansagt (`Vehicle.depart`, `Vehicle.hold`): steht noch aus
+ * (`ahead`) oder ist gemacht (`done`; der Zug bei Bau 2: Tok versenkt den Prellbock und fährt dann im hinteren Wagen mit)
  */
 export type Ride = {
   id: RideId;
@@ -94,6 +96,7 @@ export type Ride = {
   feast: boolean;
   jingleAt: number;
   greeted: string[];
+  stopover?: 'ahead' | 'done';
 };
 
 /**
@@ -196,6 +199,9 @@ export type Laid = {
  * `vehicle`, der Zug; Fahrzeuge: `ride`, die Fahr-Engine), `step` hereingereicht.
  * `dawn`: Ein neuer echter Spieltag beginnt (mehr als `BREAK` Pause, mitwachsen-tired.ts): neuer Zustand der Pakete (Bahn:
  * Tok, der am Abend schlafend kam, wacht auf); die Spielseite fragt es beim Start und nach langer Pause.
+ * `away`: Tiere, die nach dem Spielstand der Pakete gerade nicht in ihrer Welt wohnen (Bahn: der erste Maulwurf sitzt
+ * bis Bau 2 auf Toks Helm); die Welt merkt sie sich (`World.away`), sie werden nicht verteilt. `solos`: Modell einer
+ * Art ohne den, der auf ihr sitzt (Tok ohne den Maulwurf), für Tiere mit `solo`.
  */
 export type WorldPack<
   Rules = unknown,
@@ -219,8 +225,10 @@ export type WorldPack<
   lead?: Rules;
   rules?: WorldRules<Ride, Herald, Vehicle>;
   dawn?(packs: Readonly<Record<string, unknown>>): Record<string, unknown>;
+  away?(packs: Readonly<Record<string, unknown>>): readonly string[];
   view?: View;
   view3d?: () => Promise<View3>;
   models?: Partial<Record<SpeciesId, readonly Part[]>>;
   roosts?: Partial<Record<SpeciesId, readonly Part[]>>;
+  solos?: Partial<Record<SpeciesId, readonly Part[]>>;
 };

@@ -32,6 +32,8 @@ import { futureBear } from './mitwachsen-line';
 import { REAR_ROW } from './mitwachsen-station-look';
 import { ridden, sledHome, tokOf, withTok } from '../../mitwachsen-ride-save';
 import { farOf } from './mitwachsen-train';
+import { build2Step, shedIn, tokInShed } from './mitwachsen-build2';
+import type { Rider } from '../../mitwachsen-rider';
 
 /** Tok unter den Wesen: ein Gast aus der Höhlenwelt (wie der Pinguin `eis:pinguin`) */
 export const TOK = animalId('hoehle', 'tok');
@@ -165,13 +167,15 @@ export function tokStep(
   events: Events,
   explored: Explored,
 ) {
+  if (s.work && builtOf(s.packs) >= 2) return void build2Step(s, world, cmd, events); // Bau 2 (mitwachsen-build2.ts)
   if (s.work) return void build(s, world, cmd, events); // Bau 1 (mitwachsen-build.ts)
   const t = s.animals.find((a) => a.id === TOK);
   if (!tokWanted(s)) {
     s.heraldDue = -1;
+    const shed = farOf(s); // nach Bau 2 wohnt er im Lokschuppen
     if (t?.mode === 'herald' && builtOf(s.packs) >= 1)
-      inBay(s, world, t, cmd, events); // nach der ersten Fahrt
-    else if (!t) backToBay(s, world);
+      (shed ? inShed : inBay)(s, world, t, cmd, events); // nach der ersten Fahrt in der Bucht
+    else if (!t) (shed ? backToShed : backToBay)(s, world);
     return;
   }
   const woke = events.some((e) => e.type === 'wake');
@@ -451,6 +455,42 @@ export function backToBay(s: Heralded, world: World) {
     }
   }
   s.animals.pop();
+}
+
+/**
+ * Nach Bau 2 wohnt Tok im Lokschuppen neben Bahnhof Fledermaus (mitwachsen-build2.ts): Dort steht er an seinem Platz und
+ * schaut zur Figur, wenn sie in der Grotte nah ist (Rufen kommt nur, wenn man in ihn hineinläuft: Er singt und hüpft);
+ * schläft die Figur ein, schläft er dort auch (`nap`, Zzz), morgens wacht er auf und ruft, wenn sie ihn sieht. Steht er
+ * nicht an seinem Platz, hüpft er hin
+ */
+export function inShed(s: Heralded, world: World, t: Walker, cmd: 'move' | 'action' | 'tick', events: Events) {
+  if (events.some((e) => e.type === 'sleep')) return void (t.nap = true);
+  if (events.some((e) => e.type === 'wake')) {
+    delete t.nap;
+    if (world.realm(s.player.x, s.player.y) === 'hoehle' && cheb(t, s.player) <= SIGHT) call(s, t, events, 'wake');
+    return;
+  }
+  const home = shedIn(world).home;
+  if (cmd !== 'tick' || s.sleeping || !home) return;
+  if (t.x !== home[0] || t.y !== home[1]) {
+    if (s.tick % PACE.lead === 0) stepTo(s, world, t, (x, y) => Math.hypot(x - home[0], y - home[1]));
+    return;
+  }
+  if (world.realm(s.player.x, s.player.y) === 'hoehle' && cheb(t, s.player) <= SIGHT)
+    t.dir = dirTo(s.player.x - t.x, s.player.y - t.y);
+}
+
+/**
+ * Nach dem Laden (Ausbau 2, Höhlentor offen): Tok ist gleich in seinem Lokschuppen, ohne den Maulwurf (`solo`); schläft
+ * die Figur, schläft er dort. Nicht, solange er im Zug sitzt (Bau 2: zwischen Prellbock und Bahnhof Fledermaus) oder
+ * baut, und nur, wenn die Grotte da ist (sonst gibt es den Lokschuppen nicht)
+ */
+export function backToShed(s: Heralded & Pick<Rider, 'ride'>, world: World) {
+  if (s.work || s.ride?.stopover) return;
+  const t = tokInShed(s, world);
+  if (!t) return;
+  if (s.sleeping) t.nap = true;
+  s.animals.push(t);
 }
 
 /** Toks Regeln für `step` (`WorldRules.herald`) */

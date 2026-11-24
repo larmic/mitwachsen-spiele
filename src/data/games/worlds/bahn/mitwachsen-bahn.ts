@@ -73,3 +73,19 @@ export const BUILD = {
   door: 0.87,
   board: 0.92,
 } as const;
+
+/**
+ * Bau 2 (bei der nächsten Fahrt nach dem Hau-ruck, am Prellbock in der Bucht): so viele Takte zu 0,1 s (`ticks`, 3 s)
+ * und was wann geschieht, als Bruchteil des Baus (0 … 1): Tok hüpft an den Prellbock und klopft pink-pink (`taps`, so
+ * viele Paare), Bahnhof Fledermaus und Lokschuppen entstehen in der Grotte (`pop`, die Welt wird neu gebaut), der
+ * Prellbock versinkt (`sink`), eine Gleiswelle läuft durch Tür und Gang bis zum Bahnhof Fledermaus (`wave`, bei
+ * reduzierter Bewegung in drei Stufen), Tok steigt in den hinteren Wagen (`board`, „Ju-hu“), dann fährt der Zug weiter
+ */
+export const BUILD2 = {
+  ticks: 30,
+  taps: 3,
+  pop: 0.5,
+  sink: [0.5, 0.65],
+  wave: [0.65, 0.9],
+  board: 0.95,
+} as const;

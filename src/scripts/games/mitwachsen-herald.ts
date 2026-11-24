@@ -25,7 +25,8 @@ export type Heralded = Guided & {
 };
 
 /**
- * Arbeit eines Boten (Tok baut: Bau 1), von Takt `from` bis vor Takt `to`; solange hüpft die Figur auf jeden Pfeil nur
+ * Arbeit eines Boten (Tok baut: Bau 1 und Bau 2), von Takt `from` bis vor Takt `to` (`to` Infinity: Sie wartet noch,
+ * Fortschritt 0; Bau 2 wartet auf den Zug am Prellbock); solange hüpft die Figur auf jeden Pfeil nur
  * (nicht gespeichert: Wer mitten im Bau neu lädt, findet ihn fertig, denn sein Ergebnis ist schon gespeichert).
  * `laid`: Was er baut, steht schon in der Welt (sie wurde neu gebaut, `relay`)
  */
@@ -40,13 +41,14 @@ export const workOf = (s: { tick: number; work?: Work }): number | undefined =>
  * bei ihr angekommen (`arrive`: Hüpfer, Herz), ruft an seinem Platz (`call`: Ruf und Hüpfer), kommt am Abend schon
  * schlafend (`nap`, gespeichert), schnarcht leise, wenn man in ihn hineinläuft, während er schläft (`snore`), wacht am
  * nächsten echten Spieltag auf (`wake`, Ruf und Hüpfer), beginnt zu bauen (`build`: Läuft die Figur in den wachen Boten
- * und gibt es einen nächsten Bau, Tok: Bau 1), was er baut, ploppt auf (`pop`, die Welt wird neu gebaut) und er steigt
- * am Ende des Baus in den Zug (`board`). `persist`: gleich speichern; `relay`: Der Spielstand der Pakete, nach dem ein
+ * und gibt es einen nächsten Bau, Tok: Bau 1), beginnt Bau 2 am Prellbock in der Bucht (`sink`: Er klopft, der
+ * Prellbock versinkt), was er baut, ploppt auf (`pop`, die Welt wird neu gebaut) und er steigt am Ende des Baus in den
+ * Zug (`board`). `persist`: gleich speichern; `relay`: Der Spielstand der Pakete, nach dem ein
  * Paket ohne eigene Welt legt, hat sich geändert, die Welt wird neu gebaut (`World.relay`)
  */
 export type HeraldEvent = {
   type: 'herald';
-  what: 'appear' | 'arrive' | 'call' | 'nap' | 'snore' | 'wake' | 'build' | 'pop' | 'board';
+  what: 'appear' | 'arrive' | 'call' | 'nap' | 'snore' | 'wake' | 'build' | 'sink' | 'pop' | 'board';
   id: string;
   x: number;
   y: number;

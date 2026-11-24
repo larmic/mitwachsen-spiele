@@ -15,8 +15,10 @@ export type CaveHaunt = 'floor' | 'shrooms' | 'clay' | 'jetty' | 'scree' | 'arch
 /**
  * Fundorte über die ganze Grotte, in der Reihenfolge der Leiste: `at` [quer, vom Tor weg] von der Mündung aus sagt, wo;
  * dort sucht die Grotte das nächste Feld mit dem Thema `near` und darum das nächste erreichbare Feld. Das erste Tier
- * jeder Art wohnt dort, die anderen drei verteilt der Seed über die Grotte. Der Maulwurf wohnt vorerst gegenüber dem
- * Platz des Bahnhofs (später kommt er auf Toks Helm), der Siebenschläfer neben dem Platz des Lokschuppens, der Dachs am
+ * jeder Art wohnt dort, die anderen drei verteilt der Seed über die Grotte. Der erste Maulwurf wohnt gegenüber dem
+ * Platz des Bahnhofs, solange es die Bahn nicht gibt (Blick hinein); mit der Bahn sitzt er auf Toks Helm und zieht nach
+ * Bau 2 ins Gehege am Höhlenbett (`WorldPack.away` im Paket der Bahn). Der Siebenschläfer schläft vorn im Lokschuppen
+ * (in seiner ersten Reihe, nah am Gleis; der Lokschuppen kommt mit Bau 2), der Dachs am
  * Lehmhang neben dem Pilzgarten, die Glühwürmchen zwischen den Leuchtpilzen, die Fledermaus unter dem Kristallbogen, der
  * Grottenolm am Steg, Murmeltier und Sonnen-Eidechse auf dem Geröllhang am See.
  */
@@ -25,7 +27,7 @@ export const CAVE_ANIMALS: readonly { species: CaveSpeciesId; near: CaveHaunt; a
   { species: 'dachs', near: 'clay', at: [-36, 43] },
   { species: 'grottenolm', near: 'jetty', at: [0, 109] },
   { species: 'eidechse', near: 'scree', at: [22, 112] },
-  { species: 'siebenschlaefer', near: 'floor', at: [15, 13] },
+  { species: 'siebenschlaefer', near: 'floor', at: [9, 13] },
   { species: 'fledermaus', near: 'arch', at: [25, 62] },
   { species: 'murmeltier', near: 'scree', at: [28, 120] },
   { species: 'gluehwuermchen', near: 'shrooms', at: [-22, 50] },

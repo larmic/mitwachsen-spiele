@@ -1,18 +1,35 @@
 import { describe, expect, it } from 'vitest';
 import { fromKey } from '../../../../lib/games/chunks';
-import type { Point } from '../../../../data/games/mitwachsen';
+import { DIRS, type Dir } from '../../../../lib/games/front';
+import { animalId, type Point } from '../../../../data/games/mitwachsen';
+import { FIRST_MOLE } from '../../../../data/games/mitwachsen-hoehle';
+import { tryBahn } from '../../../../data/games/mitwachsen-live';
+import { atHome } from '../../mitwachsen-meadow';
+import { withTok } from '../../mitwachsen-ride-save';
+import { initialState, step as stepGame, type Cmd, type GameEvent, type State } from '../../mitwachsen-state';
 import { LINE } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import type { Cell, Rail } from '../../mitwachsen-cell';
 import { LICHTUNG_HOME } from '../../mitwachsen-home';
 import { BESIDE, plateRow } from '../../mitwachsen-bay';
 import { canStep, createWorld, type World } from '../../mitwachsen-world';
-import { BAHN_PACK, BUILT, HOEHLE_PACK, SAMPLE_SEEDS, seedRange, seedsFor, worldOf } from '../../test-worlds';
+import {
+  BAHN_PACK,
+  BUILT,
+  FAHRT_PACK,
+  HOEHLE_PACK,
+  SAMPLE_SEEDS,
+  seedRange,
+  seedsFor,
+  worldOf,
+} from '../../test-worlds';
 import { bayAt, besideRay, centreOf, hutOf } from './mitwachsen-bear';
 import { APPROACH, PORTAL_T, clean, joined } from './mitwachsen-line';
 import { stationOf, stationBodies } from './mitwachsen-station-look';
-import type { State } from '../../mitwachsen-state';
 import { LETTERS, STEPS, gridOf } from './mitwachsen-trace';
-import { CARS, TRAIN, trainRoute } from './mitwachsen-train';
+import { CARS, SEAT, TRAIN, lineOf as trackOf, trainRoute } from './mitwachsen-train';
+import { batBodies, batOf } from './mitwachsen-bat-look';
+import { NEAR, capOf, shedIn } from './mitwachsen-build2';
+import { withBuilt } from './mitwachsen-built';
 
 /** Seeds, deren Grotte um eine Ecke liegt (wie in mitwachsen-grotte.test.ts): Dort biegt auch das Gleis im Gang ab */
 const TURNED = [26, 30];
@@ -24,6 +41,90 @@ const step = ([x, y]: Point, l: string): Point => {
   return [x + dx, y + dy];
 };
 const cheb = (a: Point, b: Point) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
+
+const TOK = animalId('hoehle', 'tok');
+const TICK: Cmd = { type: 'tick' };
+const heralds = (e: readonly GameEvent[], what: string) => e.filter((x) => x.type === 'herald' && x.what === what);
+/** Wach auf dem Bahnsteig von Bahnhof Bär neben dem mittleren Wagen, nach dem Hau-ruck, samt Richtung zum Zug */
+function onPlatformAfterHeave(w: World): { s: State; dir: Dir } | null {
+  const st = stationOf(w);
+  const row = st?.rows[SEAT];
+  const lane = st?.line[SEAT];
+  if (!row || !lane) return null;
+  const dir = (Object.entries(DIRS) as [Dir, readonly [number, number]][]).find(
+    ([, [dx, dy]]) => row.edge[0] + dx === lane[0] && row.edge[1] + dy === lane[1],
+  )?.[0];
+  if (!dir) return null;
+  const packs = withBuilt(withTok({}, { stage: 'offen' }), 1);
+  const s0 = initialState(w, { packs, openGates: ['eis', 'hoehle'] });
+  const player = { x: row.edge[0], y: row.edge[1], dir: 's' as const };
+  return { s: { ...s0, sleeping: false, wokeAt: -100, player, animals: [] }, dir };
+}
+
+type Watched = { s: State; events: GameEvent[]; held: boolean; tokNear: boolean };
+
+/** Einsteigen und fahren, bis die Figur ausgestiegen ist; dabei: Steht der Zug beim Klopfen am Prellbock, Tok daneben? */
+function rideWatched(w: World, start: State, dir: Dir): Watched {
+  const rules = [HOEHLE_PACK, BAHN_PACK, FAHRT_PACK];
+  const cap = capOf(w);
+  const buffer = trackOf(w, false).at(-1)!;
+  const out: Watched = { s: start, events: [], held: true, tokNear: false };
+  let sunk = false;
+  const play = (c: Cmd) => {
+    const r = stepGame(out.s, w, c, undefined, undefined, rules);
+    out.s = r.state;
+    out.events.push(...r.events);
+    return r.events;
+  };
+  play(TICK); // Tok setzt sich in die Bucht
+  play({ type: 'move', dir, fresh: true });
+  for (let i = 0; i < 500 && out.s.ride; i++) {
+    const now = play(TICK);
+    const { work, ride } = out.s;
+    if (work && work.to !== Infinity && ride && ride.pos !== cap) out.held = false;
+    if (sunk || !heralds(now, 'sink').length) continue;
+    sunk = true;
+    const t = out.s.animals.find((a) => a.id === TOK);
+    out.tokNear = !!t && cheb([t.x, t.y], buffer) <= NEAR;
+  }
+  // die Figur geht weiter (stünde sie auf seinem Weg, wartete der Maulwurf wie jedes heimkehrende Tier)
+  const arrived = out.s;
+  const wake = w.homes.lichtung.wake[0]!;
+  out.s = { ...out.s, player: { x: wake[0], y: wake[1], dir: 's' } };
+  const before = out.events.length;
+  for (let i = 0; i < 400; i++) play(TICK);
+  out.events.length = before;
+  const mole = out.s.animals.find((a) => a.id === FIRST_MOLE);
+  out.s = { ...arrived, animals: arrived.animals.map((a) => (a.id === FIRST_MOLE && mole ? mole : a)) };
+  return out;
+}
+
+/**
+ * Bau 2 als ganze Fahrt in einer Welt (wie in mitwachsen-build2.test.ts, dort an Seed 1 im Einzelnen): nach dem Hau-ruck
+ * wach auf dem Bahnsteig von Bahnhof Bär, einsteigen und fahren, bis die Figur in der Grotte ausgestiegen ist; der
+ * Maulwurf danach 400 Takte später, während sie an ihrem Bett steht. Gespielt in der schon gebauten Welt des Ausbaus 2:
+ * Ihre Felder sind die, die `relay` zum Augenblick `pop` baut (die Strecke liegt bis dahin wie bei Ausbau 1); das spart
+ * je Seed zwei Neubauten. Fehler gesammelt
+ */
+function build2Ride(w: World): string[] {
+  const start = onPlatformAfterHeave(w);
+  if (!start) return ['kein Einstieg an Bahnhof Bär'];
+  const { s, events, held, tokNear } = rideWatched(w, start.s, start.dir);
+  const bad: string[] = [];
+  for (const what of ['sink', 'pop', 'board'])
+    if (heralds(events, what).length !== 1) bad.push(`${what} ${heralds(events, what).length}×`);
+  if (!held) bad.push('der Zug stand beim Klopfen nicht am Prellbock');
+  if (!tokNear) bad.push('Tok klopfte nicht neben dem Prellbock');
+  if (s.ride || w.realm(s.player.x, s.player.y) !== 'hoehle') bad.push('nicht in der Grotte');
+  if (!events.some((e) => e.type === 'home' && e.id === FIRST_MOLE)) bad.push('Maulwurf zog nicht ein');
+  if (!s.garden.some((a) => a.id === FIRST_MOLE)) bad.push('Maulwurf nicht im Gehege');
+  const tok = s.animals.find((a) => a.id === TOK);
+  const home = shedIn(w).home;
+  if (!tok?.solo || !home || tok.x !== home[0] || tok.y !== home[1]) bad.push('Tok nicht im Lokschuppen');
+  const mole = s.animals.find((a) => a.id === FIRST_MOLE);
+  if (!mole || !atHome(w, mole.home, mole.x, mole.y)) bad.push(`Maulwurf nicht am Höhlenbett (${mole?.x}, ${mole?.y})`);
+  return bad;
+}
 
 type Laid = { cells: Point[]; rails: Rail[]; c: (p: Point) => Cell };
 
@@ -345,6 +446,34 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
       if (laid.cells.some((p) => portal.some((q) => cheb(p, q) <= 2))) bad.push('an einer Plattform');
       if (laid.cells.some((p) => laid.c(p).garden)) bad.push('auf der Mooswiese');
       expect(bad, `Seed ${seed}`).toEqual([]);
+    });
+
+    it(`Seed ${seed}: Bau 2: Bahnhof Fledermaus eine Stufe über dem Gleis, Lokschuppen daneben mit fester Rückwand, Toks Platz und der Siebenschläfer darin erreichbar`, () => {
+      const bad: string[] = [];
+      const st = batOf(w);
+      if (!st || st.rows.length !== LINE.bear.long) bad.push('kein Bahnsteig');
+      const shed = shedIn(w);
+      if (!shed.cells.length || !shed.wall.length) bad.push('kein Lokschuppen');
+      if (shed.wall.some((p) => !w.cell(...p).solid)) bad.push('Rückwand nicht fest');
+      const track = new Set(laid.cells.map(key));
+      const free = reach(w, w.homes.hoehle.wake, track);
+      if (!shed.home || !free.has(key(shed.home))) bad.push('Toks Platz nicht erreichbar');
+      if (shed.cells.some((p) => track.has(key(p)))) bad.push('Lokschuppen auf dem Gleis');
+      const dormouse = w.spawns.get('hoehle:siebenschlaefer');
+      if (!dormouse || w.cell(...dormouse).shed !== 'hoehle' || !free.has(key(dormouse)))
+        bad.push('Siebenschläfer nicht im Schuppen');
+      if (dormouse && shed.home && key(dormouse) === key(shed.home)) bad.push('Siebenschläfer auf Toks Platz');
+      if (!batBodies(w).some((b) => b.id === 'bahn:schuppen')) bad.push('Lokschuppen nicht im Bild');
+      expect(bad, `Seed ${seed}`).toEqual([]);
+    });
+
+    it(`Seed ${seed}: Bau 2 als ganze Fahrt: Tok klopft am Prellbock, der Zug fährt bis Bahnhof Fledermaus, der Maulwurf zieht ein und läuft heim, Tok im Lokschuppen`, () => {
+      tryBahn(); // die Bahn-Phase an wie im Blick hinein, sonst gilt das Höhlentor als zu
+      try {
+        expect(build2Ride(w), `Seed ${seed}`).toEqual([]);
+      } finally {
+        tryBahn(false);
+      }
     });
 
     it(`Seed ${seed}: Strecke des Zugs (Fahren): bis zum Prellbock bzw. Bahnhof Fledermaus, Wagen auf dem Gleis, Bank auf dem Bahnsteig, jede Fahrt 15–20 s mit höchstens 8 Feldern je Sekunde`, () => {

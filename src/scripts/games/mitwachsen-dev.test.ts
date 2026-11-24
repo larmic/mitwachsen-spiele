@@ -3,6 +3,7 @@ import {
   DEV_BAY,
   DEV_BUILT,
   DEV_EVENING,
+  DEV_OPEN,
   DEV_PARAM,
   DEV_PRELOAD,
   devLate,
@@ -16,6 +17,7 @@ import type { PackId } from './mitwachsen-pack-types';
 import { GATES, REGIONS, keyOf } from '../../data/games/mitwachsen';
 import { BAHN_LIVE, tryBahn } from '../../data/games/mitwachsen-live';
 import { full } from './mitwachsen-guide';
+import { FIRST_MOLE } from '../../data/games/mitwachsen-hoehle';
 
 describe('Entwickler-Schalter', () => {
   it('blickt nur in eine Welt mit Paket, und nur über die Adresse', () => {
@@ -69,12 +71,24 @@ describe('Entwickler-Schalter', () => {
       ...saved,
       packs: { ...saved.packs, bahn: { built: 1 }, fahrt: { hoehle: { stage: 'bereit' } } },
     }); // der Zug steht am Bahnhof (Stufe `bereit` wie nach Bau 1), sonst bleibt alles
-    // Ausbau 2 kommt erst nach dem Hau-ruck: das Höhlentor offen, Stufe `offen`
+    // Ausbau 2 kommt erst nach dem Hau-ruck: das Höhlentor offen, Stufe `offen`; der Maulwurf zog mit Bau 2 ein
+    const mole = { id: FIRST_MOLE, species: 'maulwurf' as const };
     expect(devProgress(['bahn'], '?entwickler=bahn', saved)).toEqual({
       ...saved,
       openGates: [...saved.openGates, 'hoehle'],
+      garden: [...saved.garden, mole],
       packs: { ...saved.packs, bahn: { built: 2 }, fahrt: { hoehle: { stage: 'offen' } } },
     });
+    const twice = devProgress(['bahn'], '?entwickler=bahn', devProgress(['bahn'], '?entwickler=bahn', saved));
+    expect(twice.garden).toEqual([...saved.garden, mole]); // nichts doppelt
+    // `&bau=1&tor=1`: das Hau-ruck ist gemacht (Tor offen, Stufe `offen`), Bau 2 kommt mit der nächsten Fahrt
+    expect(DEV_OPEN).toBe('tor');
+    expect(devProgress(['bahn'], '?entwickler=bahn&bau=1&tor=1', saved)).toEqual({
+      ...saved,
+      openGates: [...saved.openGates, 'hoehle'],
+      packs: { ...saved.packs, bahn: { built: 1 }, fahrt: { hoehle: { stage: 'offen' } } },
+    });
+    expect(devProgress(['bahn'], '?entwickler=bahn&tor=1', saved).packs.bahn).toEqual({ built: 2 }); // bei 2 ohnehin offen
     // mit `&vorladen=1` bleibt es zu (die Grotte kommt erst über das Vorladen am Halt, nicht mit dem offenen Tor)
     expect(devProgress(['bahn'], '?entwickler=bahn&vorladen=1', saved).openGates).toEqual(saved.openGates);
     const further = { ...saved, packs: { fahrt: { hoehle: { stage: 'fest' }, schlitten: { stage: 'fest' } } } };

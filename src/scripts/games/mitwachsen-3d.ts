@@ -948,6 +948,7 @@ export class World3D {
       if (perch !== undefined && sc.away(a.x, a.y)) continue; // gerade auf ihrer Runde (Bild des Welt-Pakets)
       if (b && perch !== undefined && sp.roost)
         place(a.id, this.model(`${a.species}-roost`, sp.roost), sp.scale, a.dir, { ...b, z: b.z + perch, hop: 0 });
+      else if (a.solo && sp.solo) place(a.id, this.model(`${a.species}-solo`, sp.solo), sp.scale, a.dir);
       else place(a.id, this.model(a.species, sp.parts), sp.scale, a.dir);
     }
     for (const r of sc.rides)

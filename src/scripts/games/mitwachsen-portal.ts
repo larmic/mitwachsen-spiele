@@ -12,9 +12,10 @@ export type { PortalId };
 /**
  * Ein Portal: Mittelfelder der Plattform am Tor und ihres Gegenstücks am Bett (dort kommt man an). Mit `bed` (das
  * Eis-Portal) erwacht es nicht durch Nähe, sondern sobald die Figur an diesem Bett ankommt. Mit `later` (das Portal am
- * stillen See der Grotte) erwacht es noch gar nicht: Es wartet auf eine Regel, die erst später kommt (der Maulwurf).
+ * stillen See der Grotte) erwacht es erst, wenn dieses Tier zu Hause wohnt (der erste Maulwurf: Er zieht nach Bau 2 der
+ * Bahn als erstes Höhlen-Tier ein).
  */
-export type Portal = { gate: Point; home: Point; bed?: Point; later?: true };
+export type Portal = { gate: Point; home: Point; bed?: Point; later?: string };
 /** Teil einer Plattform: Mittelfeld, Seitenmitte oder Eckfeld (beide begehbarer Rand; in den Ecken steht Zierde) */
 export type PlatformPart = 'centre' | 'edge' | 'corner';
 /** Was auf einem Feld einer Plattform liegt */
@@ -88,7 +89,7 @@ export const platformArea = (portals: ReadonlyMap<PortalId, Portal>): string[] =
  * entfernt (auch schräg), und ihr Mittelfeld schon erkundet (im Nebel leuchtet nichts auf). Die Gegenstücke am Bett
  * wecken nichts: Sie erwachen mit ihrer Plattform am Tor und verraten vorher nicht, wohin sie führen. Ein Portal mit
  * `bed` erwacht stattdessen, sobald die Figur höchstens BED_ARRIVAL Felder vor diesem Bett steht (und es erkundet ist),
- * eines mit `later` noch nie.
+ * eines mit `later` erst, wenn dieses Tier zu Hause wohnt (`home`: Kennungen der Tiere auf ihrer Wiese).
  */
 export function platformsToWake(
   portals: ReadonlyMap<PortalId, Portal>,
@@ -96,11 +97,12 @@ export function platformsToWake(
   x: number,
   y: number,
   explored: (x: number, y: number) => boolean,
+  home: ReadonlySet<string> = new Set(),
 ): PortalId[] {
   const near = ({ gate, bed }: Portal) =>
     bed ? cheb(x, y, bed[0], bed[1]) <= BED_ARRIVAL : cheb(x, y, gate[0], gate[1]) <= PLATFORM_HALF + PORTAL_WAKE;
   return [...portals]
-    .filter(([id, p]) => !awake.includes(id) && !p.later && near(p))
+    .filter(([id, p]) => !awake.includes(id) && (!p.later || home.has(p.later)) && near(p))
     .filter(([, { gate, bed = gate }]) => explored(bed[0], bed[1]))
     .map(([id]) => id);
 }

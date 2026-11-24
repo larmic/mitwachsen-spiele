@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MOOD_LIGHT, REGIONS, type Point } from '../../../../data/games/mitwachsen';
+import { MOOD_LIGHT, REGIONS, animalId, type Point } from '../../../../data/games/mitwachsen';
+import { FIRST_MOLE } from '../../../../data/games/mitwachsen-hoehle';
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import { platformsToWake } from '../../mitwachsen-portal';
@@ -233,20 +234,26 @@ describe('Kristallgrotte: Gelände', () => {
       expect(w.climate(...home.bed)).toEqual({ id: 'hoehle', strength: 1 });
     });
 
-    it(`Seed ${seed}: Bett 28 Felder hinter der Mündung, das fernste Feld weit weg; Portal am See schläft noch`, () => {
+    it(`Seed ${seed}: Bett 28 Felder hinter der Mündung, das fernste Feld weit weg; Portal am See schläft, bis der Maulwurf zu Hause ist`, () => {
       expect(mouthOf(site, home.bed)).toEqual([0, GROTTE.bed]);
       const far = Math.max(...floor.map((k) => steps.get(k)!));
       expect(far).toBeGreaterThan(110);
       expect(far).toBeLessThan(160);
       const portal = w.portals.get('hoehlensee')!;
-      expect(portal.later).toBe(true);
+      expect(portal.later).toBe(FIRST_MOLE);
       expect(portal.bed).toEqual(home.bed);
       expect(mouthOf(site, portal.gate)).toEqual(GROTTE.portal);
       expect(steps.get(key(portal.gate))).toBeGreaterThan(100); // der lange Weg ans Ende
       expect(Math.round(Math.hypot(portal.home[0] - home.bed[0], portal.home[1] - home.bed[1]))).toBe(9);
-      // auch am Bett und auf der Plattform erwacht es nicht
+      expect(FIRST_MOLE).toBe(animalId('hoehle', 'maulwurf'));
+      // auch am Bett und auf der Plattform erwacht es nicht, solange der erste Maulwurf nicht zu Hause wohnt
+      const others = new Set([animalId('hoehle', 'dachs'), animalId('hoehle', 'maulwurf', 2)]);
       for (const p of [home.wake[0]!, portal.gate])
-        expect(platformsToWake(w.portals, [], p[0], p[1], () => true)).not.toContain('hoehlensee');
+        expect(platformsToWake(w.portals, [], p[0], p[1], () => true, others)).not.toContain('hoehlensee');
+      // wohnt er zu Hause, erwacht es beim Ankommen am Höhlenbett (wie das Eis-Portal), nicht an der fernen Plattform
+      const mole = new Set([FIRST_MOLE]);
+      expect(platformsToWake(w.portals, [], ...home.wake[0]!, () => true, mole)).toContain('hoehlensee');
+      expect(platformsToWake(w.portals, [], ...portal.gate, () => true, mole)).not.toContain('hoehlensee');
     });
 
     it(`Seed ${seed}: Zonen: Lampengang, Plätze von Bahnhof und Lokschuppen, Unterstand, Pilzgarten, Halle, Tropfsteine, See, Hang`, () => {

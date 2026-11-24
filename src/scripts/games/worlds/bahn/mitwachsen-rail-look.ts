@@ -3,11 +3,13 @@
 // Ausbau 1 ist, vor der Tür des Höhlentors; das Tunnelportal aus Stein mit Grasdach und die niedrigen Wände des oben
 // offenen Einschnitts. Was liegt, sagt der Ausbau im Spielstand (`packs.bahn.built`): 0 nichts, 1 die Lichtung bis zum
 // Prellbock, 2 die ganze Linie; solange Tok baut, läuft die Gleiswelle (`railShown`, bei reduzierter Bewegung und in 3D in
-// drei Stufen). Liegt nichts, zeigt sich das Feld wie sonst (Gras, Büschel, Blumen). Teil des Pakets der Bahn
+// drei Stufen). Bau 2: Ab der Abfahrt steht Ausbau 2 im Spielstand, doch bis Tok am Prellbock klopft, wartet der Bau
+// (`State.work` ohne Ende, Fortschritt 0): Der Prellbock steht, durch die Tür liegt noch nichts; dann versinkt er
+// (`BUILD2.sink`) und die Gleiswelle läuft durch Gang und Grotte (`BUILD2.wave`). Liegt nichts, zeigt sich das Feld wie sonst (Gras, Büschel, Blumen). Teil des Pakets der Bahn
 // (view-2d.ts, view-3d.ts).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Gleis als Boden)
 
-import { BUILD, RAIL_COLORS } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
+import { BUILD, BUILD2, RAIL_COLORS } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import type { Cell, Rail } from '../../mitwachsen-cell';
 import type { Box, DecoAt, DrawRails } from '../../mitwachsen-view';
 import { builtOf } from './mitwachsen-built';
@@ -31,12 +33,29 @@ const CURVE: readonly Local[] = [
   [P2, P1, RAIL_Z, 1 - P2, W, 0.07, ...RAIL_COLORS.rail],
   [P1, P2, RAIL_Z, 1 - P1, W, 0.07, ...RAIL_COLORS.rail],
 ];
-/** Prellbock quer über dem Gleis, `y` seine Vorderkante (nach unten), mit zwei dunklen Puffern zur Strecke hin (oben) */
-const buffer = (y: number): Local[] => [
-  [0.08, y, 0, 0.84, 0.3, 0.45, ...RAIL_COLORS.buffer],
-  [0.16, y - 0.05, 0.22, 0.2, 0.05, 0.14, RAIL_COLORS.pads, RAIL_COLORS.pads],
-  [0.64, y - 0.05, 0.22, 0.2, 0.05, 0.14, RAIL_COLORS.pads, RAIL_COLORS.pads],
-];
+/**
+ * Prellbock quer über dem Gleis, `y` seine Vorderkante (nach unten), mit zwei dunklen Puffern zur Strecke hin (oben);
+ * `sunk` 0 … 1: so weit ist er schon im Boden versunken (Bau 2), ganz versunken ist er weg
+ */
+const buffer = (y: number, sunk = 0): Local[] => {
+  const k = 1 - sunk;
+  if (k <= 0) return [];
+  return [
+    [0.08, y, 0, 0.84, 0.3, 0.45 * k, ...RAIL_COLORS.buffer],
+    ...(k > 0.5
+      ? ([0.16, 0.64].map((x) => [
+          x,
+          y - 0.05,
+          0.22 * k,
+          0.2,
+          0.05,
+          0.14 * k,
+          RAIL_COLORS.pads,
+          RAIL_COLORS.pads,
+        ]) as Local[])
+      : []),
+  ];
+};
 /** Ende der Linie, die Strecke kommt von oben: halbe Gerade, dann der Prellbock */
 const END: readonly Local[] = [sleeper(0.1), rail(P1, 0, 0.7), rail(P2, 0, 0.7), ...buffer(0.62)];
 /** Tunnelportal über der Geraden: zwei Pfeiler, Sturz, Grasdach */
@@ -78,19 +97,34 @@ function shape(to: string): [readonly Local[], number] {
  * Ab welchem Augenblick des Baus (0 … 1, `BUILD.wave`) liegt ein Stück, das so weit (`along`) in seinem Ausbau liegt: Die
  * Gleiswelle läuft gleichmäßig vom Anfang bis zum Ende; bei reduzierter Bewegung kommt das Gleis in drei Stufen
  */
-export function waveAt(along: number, reduced: boolean): number {
-  const [from, to] = BUILD.wave;
+export function waveAt(along: number, reduced: boolean, stage: 1 | 2 = 1): number {
+  const [from, to] = stage === 2 ? BUILD2.wave : BUILD.wave;
   const k = reduced ? Math.min(STAGES - 1, Math.floor(along * STAGES)) / STAGES : along;
   return from * (1 - k) + to * k; // am Ende genau `to`
 }
 /** Stufen der Gleiswelle bei reduzierter Bewegung (und in 3D, dort zuckt nichts) */
 export const STAGES = 3;
 
-/** Wie viele der drei Stufen der Gleiswelle liegen, solange gebaut wird (`work`), sonst undefined (alles liegt) */
-export const waveStage = (work: number | undefined): number | undefined =>
+/**
+ * Wie viele der drei Stufen der Gleiswelle des Ausbaus `stage` liegen, solange gebaut wird (`work`), sonst undefined
+ * (alles liegt)
+ */
+export const waveStage = (work: number | undefined, stage: 1 | 2 = 1): number | undefined =>
   work === undefined
     ? undefined
-    : Array.from({ length: STAGES }, (_, k) => k / STAGES).filter((a) => work >= waveAt(a, true)).length;
+    : Array.from({ length: STAGES }, (_, k) => k / STAGES).filter((a) => work >= waveAt(a, true, stage)).length;
+
+/**
+ * Wie weit der Prellbock vor der Tür versunken ist (0 … 1): bei Ausbau 1 gar nicht, bei Ausbau 2 ganz, solange Tok baut
+ * (Bau 2) von `BUILD2.sink` an; bei reduzierter Bewegung auf einmal, an seinem Ende
+ */
+export function sunkOf(at: Pick<DecoAt, 'packs' | 'reduced' | 'work'>): number {
+  if (builtOf(at.packs) < 2) return 0;
+  if (at.work === undefined) return 1;
+  const [from, to] = BUILD2.sink;
+  if (at.reduced) return at.work >= to ? 1 : 0;
+  return Math.max(0, Math.min(1, (at.work - from) / (to - from)));
+}
 
 /**
  * Liegt das Stück schon? Nach dem Ausbau in `at.packs`; das Stück des Ausbaus, der gerade gebaut wird (`at.work`), erst,
@@ -99,7 +133,7 @@ export const waveStage = (work: number | undefined): number | undefined =>
 export function railShown(r: Rail, at: Pick<DecoAt, 'packs' | 'reduced' | 'work'>): boolean {
   const built = builtOf(at.packs);
   if (r.stage > built) return false;
-  return at.work === undefined || r.stage < built || at.work >= waveAt(r.along ?? 0, at.reduced);
+  return at.work === undefined || r.stage < built || at.work >= waveAt(r.along ?? 0, at.reduced, r.stage);
 }
 
 /**
@@ -109,11 +143,15 @@ export function railShown(r: Rail, at: Pick<DecoAt, 'packs' | 'reduced' | 'work'
 export const railBoxes: DrawRails = (c: Cell, x: number, y: number, at) => {
   const r = c.rail;
   if (!r || !railShown(r, at)) return null;
-  // Prellbock vor der Tür nur, solange der Ausbau 1 ist (danach geht es weiter durch die Tür): Ende zur Strecke hin
-  const end = r.part === 'end' || (r.part === 'buffer' && builtOf(at.packs) < 2);
+  // Prellbock vor der Tür, solange der Ausbau 1 ist (danach geht es weiter durch die Tür): Ende zur Strecke hin; bei
+  // Bau 2 versinkt er, dann liegt dort eine Gerade (das Gleis durch die Tür kommt mit der Gleiswelle)
+  const sunk = r.part === 'buffer' ? sunkOf(at) : 0;
+  const end = r.part === 'end' || (r.part === 'buffer' && sunk < 1);
   const to = end ? r.to.slice(0, 1) : r.to;
   const [form, k] = shape(to);
-  const own = r.part === 'portal' ? PORTAL : r.part === 'cut' ? CUT : form;
+  const sinking = end && r.part === 'buffer' && sunk > 0;
+  const stub = [sleeper(0.1), rail(P1, 0, 0.7), rail(P2, 0, 0.7), ...buffer(0.62, sunk)];
+  const own = r.part === 'portal' ? PORTAL : r.part === 'cut' ? CUT : sinking ? stub : form;
   const q = r.part === 'portal' || r.part === 'cut' ? shape(r.to)[1] : k;
   return own.map((b): Box => {
     const [bx, by, bz, w, d, h, side, top] = turn(b, q);

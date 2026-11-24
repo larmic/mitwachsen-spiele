@@ -40,6 +40,8 @@ import { parked } from '../../mitwachsen-ride-kit';
 import { ridden, tokOf } from '../../mitwachsen-ride-save';
 import { LETTERS, STEPS } from './mitwachsen-trace';
 import { SEAT, TRAIN, bearEnd, farOf, inTunnel, lineOf, trainRoute } from './mitwachsen-train';
+import { batBodies } from './mitwachsen-bat-look';
+import { capOf } from './mitwachsen-build2';
 
 /** Bahnhof Bär in einer Welt: das Gleis vom Prellbock an (Ausbau 1, bis an den Prellbock vor der Tür), Reihen, Häuschen */
 export type BearStation = {
@@ -125,9 +127,12 @@ export const TRAIN_ID = 'ride:hoehle';
 /** So lange ploppt der Bahnhof auf (Bruchteil des Baus) */
 const POP_FOR = 0.06;
 
-/** Wie weit der Bau ist, zwischen den Takten weiter (`frac`); undefined: es wird nicht gebaut */
+/**
+ * Wie weit Bau 1 ist, zwischen den Takten weiter (`frac`); undefined: es wird nicht gebaut (oder es ist Bau 2, der den
+ * Bahnhof Bär nicht ändert und den Zug fahren lässt)
+ */
 function progress(state: State, at: Pick<RideAt, 'frac'>): number | undefined {
-  const w = workOf(state);
+  const w = builtOf(state.packs) >= 2 ? undefined : workOf(state);
   return w === undefined ? undefined : Math.min(1, w + at.frac / BUILD.ticks);
 }
 
@@ -169,14 +174,15 @@ export function frontAt(
 const RIGHT: Record<Dir, Point> = { e: [0, 1], w: [0, -1], s: [-1, 0], n: [1, 0] };
 
 /**
- * Körper von Bahnhof Bär und Zug je Bild (`View2D.bodies`), ab Ausbau 1; leer davor und in einer Welt ohne Gleis
+ * Körper von Bahnhof Bär und Zug je Bild (`View2D.bodies`), ab Ausbau 1; ab Ausbau 2 in der Welt dazu Bahnhof
+ * Fledermaus und der Lokschuppen (mitwachsen-bat-look.ts); leer davor und in einer Welt ohne Gleis
  */
 export function stationBodies(state: State, world: World, at: RideAt): readonly RideBody[] {
   if (builtOf(state.packs) < 1) return [];
   const st = stationOf(world);
   if (!st) return [];
   const work = progress(state, at);
-  return [...stationParts(st, world, work, at.reduced), ...trainParts(st, world, state, work, at)];
+  return [...stationParts(st, world, work, at.reduced), ...trainParts(st, world, state, work, at), ...batBodies(world)];
 }
 
 /** Bahnsteig, Dach mit Bank, Schild und Häuschen; beim Bau erst ab `pop`, dann wachsen sie kurz aus dem Boden */
@@ -219,6 +225,19 @@ export const OPEN_TICKS = 10;
 type Place = { line: readonly Point[]; front: number };
 
 /**
+ * Fortschritt des Sitzes in diesem Bild: zwischen den Takten gleitend, außer der Zug hält am Prellbock, wo Tok Bau 2
+ * baut (`Ride.stopover`); bei reduzierter Bewegung springt er ans Ziel und steht bis zur Ankunft am Halt (bei Bau 2 ab
+ * dem Prellbock dort)
+ */
+function seatAt(ride: NonNullable<State['ride']>, len: number, world: World, at: RideAt): number {
+  const cap = ride.stopover ? capOf(world) : Infinity;
+  const held = ride.stopover === 'ahead' && ride.pos >= cap - 1e-6;
+  const p = ride.phase === 'go' && !held ? Math.max(0, ride.pos - ride.speed * (1 - at.frac)) : ride.pos;
+  if (!at.reduced || p >= len) return p;
+  return p >= cap - 1e-6 ? cap : 0;
+}
+
+/**
  * Wo der Zug gerade ist: unterwegs mit der Figur (der Sitz zwischen den Takten gleitend; bei reduzierter Bewegung steht
  * er bis zur Ankunft am Halt, von dem er abfuhr, und springt dann ans Ziel; die Kamera folgt dem Sitz, bleibt also still), am Halt in der Welt (Prellbock in der Bucht, Bahnhof Fledermaus) oder an Bahnhof Bär
  * (dort rollt er beim Bau heran und hält vor der Figur, `frontAt`); undefined, solange er noch nicht da ist
@@ -228,9 +247,7 @@ function placeOf(st: BearStation, world: World, state: State, work: number | und
   const ride = state.ride?.id === TRAIN.id ? state.ride : undefined;
   if (r && ride) {
     const line = lineOf(world, farOf(state));
-    const len = r.path.length - 1;
-    let p = ride.phase === 'go' ? Math.max(0, ride.pos - ride.speed * (1 - at.frac)) : ride.pos;
-    if (at.reduced && p < len) p = 0; // bei reduzierter Bewegung springt er ans Ziel: bis zur Ankunft steht er am Halt
+    const p = seatAt(ride, r.path.length - 1, world, at);
     const q = ride.to === 'out' ? line.length - 1 - SEAT - p : SEAT + p;
     return { line, front: q - SEAT + PARK };
   }

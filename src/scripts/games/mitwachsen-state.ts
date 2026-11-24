@@ -58,6 +58,7 @@ export type Animal = {
   spawn: readonly [number, number];
   rest: number; // Takte bis zum nächsten Schritt beim Umherlaufen
   nap?: true; // ein Bote schläft (Tok, am Abend gekommen; mitwachsen-herald.ts)
+  solo?: true; // ohne den, der auf ihm saß (Tok nach Bau 2: Der Maulwurf ist eingezogen; Modell `Species.solo`)
   bench?: true; // wartet am Halt eines Fahrzeugs, bis die Figur wieder nah ist (mitwachsen-border.ts, `BENCH`)
 };
 export type HomeAnimal = { id: string; species: SpeciesId };
@@ -234,7 +235,8 @@ function placeAnimals(world: World, open: GateId[], garden: HomeAnimal[], presen
     for (const { id, species } of regionAnimalList(r)) {
       const at = world.spawns.get(id); // die Welt kennt den erreichbaren Wohnort
       // der verlaufene Pinguin wohnt nicht hinter seinem Tor, solange es den Schlüssel hat und zu ist (`lost`)
-      if (at && !atHomeIds.has(id) && !present.has(id) && !lost(id, open))
+      // … und wer gerade woanders ist (`World.away`: der erste Maulwurf auf Toks Helm bis Bau 2)
+      if (at && !atHomeIds.has(id) && !present.has(id) && !lost(id, open) && !world.away?.has(id))
         animals.push(settle(id, species, at, 'wander', { kind: 'region', region: r.id }, r.id));
     }
   const placed = new Map<RegionId, number>(); // je Gegend: so viele Tiere stehen schon auf ihrer Wiese
@@ -258,7 +260,7 @@ function placeAnimals(world: World, open: GateId[], garden: HomeAnimal[], presen
 export function attachPack(state: State, world: World): State {
   const s: State = { ...state };
   delete s.held;
-  s.animals = state.animals.filter((a) => canStay(world, a));
+  s.animals = state.animals.filter((a) => canStay(world, a) && (a.mode !== 'wander' || !world.away?.has(a.id)));
   const fresh = placeAnimals(world, s.openGates, s.garden, new Set(s.animals.map((a) => a.id)));
   s.animals.push(...scatterArrivals(s, fresh, world, s.day)); // verteilt nur die neuen Tiere
   return s;

@@ -23,6 +23,7 @@ import { hash, rand01, valueNoise } from '../../../../lib/games/rng';
 import type { Point } from '../../../../data/games/mitwachsen';
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import { ARCH_PERCH } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-animals';
+import { FIRST_MOLE } from '../../../../data/games/mitwachsen-hoehle';
 import { HOMES } from '../../../../data/games/mitwachsen-homes';
 import { CAVE_PORTAL } from '../../../../data/games/mitwachsen-portals';
 import { BED_STONE } from '../../../../data/games/mitwachsen-stories';
@@ -153,11 +154,16 @@ export function buildGrotte(
   return { bed, realm, spots, spawns, stone, portal: [CAVE_PORTAL, portal] };
 }
 
-/** Platz des Bahnhofs Fledermaus: für das Paket der Bahn markiert (`Cell.stop`), das daneben sein Gleis legt */
+/**
+ * Plätze von Bahnhof Fledermaus und Lokschuppen: für das Paket der Bahn markiert (`Cell.stop`, `Cell.shed`), das neben dem
+ * Bahnsteig sein Gleis legt und mit Bau 2 Bahnsteig und Lokschuppen baut
+ */
 function markStation(realm: ReadonlySet<string>, site: Site, map: Map<string, Cell>) {
   for (const k of realm) {
     const c = map.get(k);
-    if (c && stationAt(...site.uv(...fromKey(k)))) map.set(k, { ...c, stop: 'hoehle' });
+    const uv = site.uv(...fromKey(k));
+    if (c && stationAt(...uv)) map.set(k, { ...c, stop: 'hoehle' });
+    else if (c && shedAt(...uv) && !c.solid) map.set(k, { ...c, shed: 'hoehle' });
   }
 }
 
@@ -366,11 +372,12 @@ function homeGround(h: ReturnType<typeof placeHome>, set: (x: number, y: number,
 
 /**
  * Die beiden Plattformen des Portals `hoehlensee` (3 × 3, flach, ringsum ebener Boden): hinter dem See am Ende der
- * Grotte und im Kreis um das Höhlenbett in Richtung des Tors. Es schläft noch (`later`): Erwachen soll es erst, wenn der
- * Maulwurf eingezogen ist (kommt mit Tok und dem Zug).
+ * Grotte und im Kreis um das Höhlenbett in Richtung des Tors. Es erwacht erst, wenn der erste Maulwurf zu Hause wohnt
+ * (`later`; mit der Bahn zieht er nach Bau 2 als erstes ein, im Blick hinein ohne Bahn bringt ihn das Kind heim), dann
+ * beim Ankommen am Höhlenbett wie das Eis-Portal (`bed`).
  */
 function platforms(site: Site, bed: Point, ring: Point, map: Map<string, Cell>): Portal {
-  const portal: Portal = { gate: site.at(...fromMouth(GROTTE.portal)), home: ring, bed, later: true };
+  const portal: Portal = { gate: site.at(...fromMouth(GROTTE.portal)), home: ring, bed, later: FIRST_MOLE };
   for (const side of ['gate', 'home'] as const) {
     const [cx, cy] = portal[side];
     const around = PLATFORM_HALF + 1;
@@ -528,7 +535,9 @@ function spotsOf(site: Site, reach: ReadonlySet<string>, map: ReadonlyMap<string
     const [x, y] = k.split(',').map(Number) as [number, number];
     const [u, v] = site.uv(x, y);
     const [, o] = mouthward(u, v);
-    if (o < 2 || stationAt(u, v) || shedAt(u, v) || !(u ** 2 / rx ** 2 + v ** 2 / ry ** 2 < 1)) continue;
+    // im Lokschuppen nur die vordere Reihe am Gleis (dort schläft der Siebenschläfer), hinten steht mit Bau 2 die Wand
+    const shed = shedAt(u, v) && u !== GROTTE.shed.side;
+    if (o < 2 || stationAt(u, v) || shed || !(u ** 2 / rx ** 2 + v ** 2 / ry ** 2 < 1)) continue;
     out.push([x, y]);
   }
   return out;

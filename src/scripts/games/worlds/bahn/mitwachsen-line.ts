@@ -69,9 +69,16 @@ function gridAround(
  * Das Gleis als Felder schreiben: Richtungen in Reihe der Linie (zurück, vor), Ausbau, wie weit das Stück in seinem
  * Ausbau liegt (`along`, für die Gleiswelle beim Bau), was dort steht. Der Bahnsteig von Bahnhof Bär liegt eine Stufe
  * über dem Gleis (Holzplanken auf festgetretenem Boden, `path`), Toks Häuschen an seinem Kopf ist fest (`hutOf`); den
- * Platz von Bahnhof Fledermaus markiert nur `Cell.stop` (sein Bahnsteig kommt mit Bau 2)
+ * Platz von Bahnhof Fledermaus markiert vor Bau 2 nur `Cell.stop`, ab Ausbau 2 liegt sein Bahnsteig wie der von Bahnhof
+ * Bär eine Stufe über dem Gleis (Stein), und die Rückwand des Lokschuppens daneben ist fest (`shedOf`)
  */
-function write(map: Map<string, Cell>, line: Line, parts: ReadonlyMap<number, Rail['part']>, bed: Point) {
+function write(
+  map: Map<string, Cell>,
+  line: Line,
+  parts: ReadonlyMap<number, Rail['part']>,
+  bed: Point,
+  built: number,
+) {
   const { cells, buffer } = line;
   const rest = Math.max(1, cells.length - 1 - buffer);
   cells.forEach((p, i) => {
@@ -90,10 +97,47 @@ function write(map: Map<string, Cell>, line: Line, parts: ReadonlyMap<number, Ra
     const solid = !!hut && key(...p) === key(...hut);
     if (c) map.set(key(...p), { ...c, h: lane.h + 1, ground: 'path', deco: null, tufts: undefined, solid, stop: RIDE });
   }
-  for (const p of line.bat?.platform ?? []) {
+  const bat = line.bat;
+  const laneH = bat && map.get(key(...bat.lane[0]!))?.h;
+  for (const p of bat?.platform ?? []) {
     const c = map.get(key(...p));
-    if (c) map.set(key(...p), { ...c, stop: RIDE });
+    if (c && built >= 2 && laneH !== undefined)
+      map.set(key(...p), { ...c, h: laneH + 1, ground: 'stone', deco: null, solid: false, stop: RIDE });
+    else if (c) map.set(key(...p), { ...c, stop: RIDE });
   }
+  if (bat && built >= 2)
+    for (const p of shedOf(map, bat).wall) map.set(key(...p), { ...map.get(key(...p))!, solid: true });
+}
+
+/** Der Lokschuppen neben Bahnhof Fledermaus, aus dem Platz, den die Grotte frei hält (`Cell.shed`) */
+export type Shed = { cells: Point[]; wall: Point[]; home?: Point; dir: Point };
+
+/**
+ * Lokschuppen: die Felder seines Platzes (`Cell.shed`, gleich neben dem Gleis von Bahnhof Fledermaus), die Rückwand (die
+ * Reihe fern vom Gleis, fest), Toks Platz darunter (`home`: das Feld in der Mitte, nicht in der vorderen Reihe, dort
+ * schläft der Siebenschläfer) und vom Gleis weg
+ * (`dir`). Leer ohne Platz
+ */
+export function shedOf(cells: { get(k: string): Cell | undefined }, bat: Pick<Station, 'lane'>): Shed {
+  const lane = bat.lane;
+  const out: Point[] = [];
+  for (const [x, y] of lane)
+    for (let dy = -6; dy <= 6; dy++)
+      for (let dx = -6; dx <= 6; dx++) if (cells.get(key(x + dx, y + dy))?.shed === RIDE) out.push([x + dx, y + dy]);
+  const all = [...new Map(out.map((p) => [key(...p), p])).values()];
+  const mid = lane[Math.floor(lane.length / 2)]!;
+  if (!all.length) return { cells: [], wall: [], dir: [0, 0] };
+  const cx = all.reduce((a, p) => a + p[0], 0) / all.length,
+    cy = all.reduce((a, p) => a + p[1], 0) / all.length;
+  const [ax, ay] = [lane.at(-1)![0] - lane[0]![0], lane.at(-1)![1] - lane[0]![1]];
+  const dir: Point = Math.abs(ax) > Math.abs(ay) ? [0, Math.sign(cy - mid[1]) || 1] : [Math.sign(cx - mid[0]) || 1, 0];
+  const depth = (p: Point) => p[0] * dir[0] + p[1] * dir[1];
+  const back = Math.max(...all.map(depth));
+  const wall = all.filter((p) => depth(p) === back);
+  const free = all.filter((p) => depth(p) !== back);
+  const far = (p: Point) => Math.hypot(p[0] - cx, p[1] - cy);
+  const home = free.filter((p) => depth(p) !== Math.min(...free.map(depth))).sort((a, b) => far(a) - far(b))[0];
+  return { cells: all, wall, dir, ...(home && { home }) };
 }
 
 /** Hängen die Felder als Kette von Nachbarn zusammen, ohne ein Feld zweimal und ohne sich selbst zu berühren? */
@@ -268,7 +312,7 @@ export function layLine({ seed, map, gates, beds, packs }: Laid): Line | null {
     [line.buffer, line.bat ? 'buffer' : 'end'],
   ]);
   if (line.bat) parts.set(line.cells.length - 1, 'end');
-  write(map, line, parts, home.bed);
+  write(map, line, parts, home.bed, builtOf(packs));
   return line;
 }
 

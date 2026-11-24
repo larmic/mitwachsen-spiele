@@ -734,6 +734,85 @@ test(
   },
 );
 
+// Bau 2 per Entwickler-Schalter (`?entwickler=bahn&bau=1&tor=1`, fester Seed 1; @3d, weil die Welt am Prellbock neu
+// gebaut wird und 3D ihre Stücke tauscht): Das Hau-ruck ist gemacht, Tok wartet in der Bucht. Ein neuer Druck zum Zug an
+// Bahnhof Bär steigt ein; beim Abfahren steht Ausbau 2 im Spielstand, am Prellbock klopft Tok, der Prellbock versinkt,
+// der Zug fährt bis Bahnhof Fledermaus in der Grotte; dort zieht der Maulwurf ins Gehege, Tok wohnt im Lokschuppen.
+// Gespeichert wird im Blick hinein nichts; ohne Schalter gibt es die Bahn nicht (Freigabe aus)
+test(
+  'Spiel: Bau 2 per Entwickler-Schalter: Prellbock versinkt, Fahrt bis Bahnhof Fledermaus, Maulwurf zieht ein, speichert nichts, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    type Game = {
+      world: { seed: number; cell(x: number, y: number): { stop?: string }; realm(x: number, y: number): string };
+      state: {
+        player: { x: number; y: number; dir: string };
+        animals: { id: string; solo?: true }[];
+        garden: { id: string }[];
+        ride?: { id: string };
+        packs: { bahn?: { built?: number } };
+      };
+      rides: { id: string; x: number; y: number }[];
+      apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+    };
+    await page.addInitScript(() => {
+      const real = crypto.getRandomValues.bind(crypto);
+      const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+        a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+      Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    });
+    const game = await openGame(page, { clock: true, dev: 'bahn&bau=1&tor=1' });
+    await expectView(page);
+    expect(await game.evaluate((node) => (node as unknown as Game).world.seed)).toBe(1);
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    await render(page);
+    const boarded = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const mid = el.rides.find((r) => r.id === 'ride:hoehle:mid')!;
+      const [mx, my] = [Math.round(mid.x), Math.round(mid.y)];
+      const dirs: [string, number, number][] = [
+        ['e', 1, 0],
+        ['w', -1, 0],
+        ['s', 0, 1],
+        ['n', 0, -1],
+      ];
+      const [dir, dx, dy] = dirs.find(([, dx, dy]) => el.world.cell(mx - dx, my - dy).stop === 'hoehle')!;
+      el.state = { ...el.state, player: { x: mx - dx, y: my - dy, dir: 's' } };
+      el.apply({ type: 'move', dir, fresh: true });
+      return el.state.ride?.id;
+    });
+    expect(boarded).toBe('hoehle');
+    await ticks(page, 30);
+    expect(await game.evaluate((node) => (node as unknown as Game).state.packs.bahn?.built)).toBe(2);
+    // 15 bis 20 s Fahrt, dazu 3 s am Prellbock, dann steigt die Figur nach 1 s aus
+    for (let i = 0; i < 40; i++) {
+      if (!(await game.evaluate((node) => !!(node as unknown as Game).state.ride))) break;
+      await ticks(page, 10);
+      await render(page);
+    }
+    await render(page, 2);
+    const done = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const { x, y } = el.state.player;
+      return {
+        ride: !!el.state.ride,
+        realm: el.world.realm(x, y),
+        mole: el.state.garden.some((a) => a.id === 'hoehle:maulwurf'),
+        tok: el.state.animals.find((a) => a.id === 'hoehle:tok')?.solo ?? false,
+        shed: el.rides.some((r) => r.id === 'bahn:schuppen'),
+        station: el.rides.some((r) => r.id === 'bahn:felsdach'),
+      };
+    });
+    expect(done).toEqual({ ride: false, realm: 'hoehle', mole: true, tok: true, shed: true, station: true });
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
+      [],
+    );
+    expect(errors).toEqual([]);
+  },
+);
+
 // Ohne Service Worker: Er holte die Pakete sonst aus seinem Speicher, am Netz vorbei, das der Test hier anhält
 test.describe('Vorladen am Halt', () => {
   test.use({ serviceWorkers: 'block' });

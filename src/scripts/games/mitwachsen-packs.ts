@@ -57,9 +57,10 @@ type Models = Partial<Record<SpeciesId, readonly Part[]>>;
  * Modell leer (der Kern kennt nur Name, Ton, Gangart). Ändert `SPECIES` für die ganze Seite (in Tests: test-worlds.ts
  * ruft es beim Import).
  */
-export function addModels(models: Models = {}, roosts: Models = {}) {
+export function addModels(models: Models = {}, roosts: Models = {}, solos: Models = {}) {
   for (const [id, parts] of Object.entries(models) as [SpeciesId, readonly Part[]][]) SPECIES[id].parts = parts;
   for (const [id, parts] of Object.entries(roosts) as [SpeciesId, readonly Part[]][]) SPECIES[id].roost = parts;
+  for (const [id, parts] of Object.entries(solos) as [SpeciesId, readonly Part[]][]) SPECIES[id].solo = parts;
 }
 const noop = () => {};
 
@@ -125,7 +126,7 @@ export class Packs {
         id,
         this.load(id).then(
           (pack) => {
-            addModels(pack.models, pack.roosts);
+            addModels(pack.models, pack.roosts, pack.solos);
             this.ready.push(pack);
             this.arrive(pack);
           },

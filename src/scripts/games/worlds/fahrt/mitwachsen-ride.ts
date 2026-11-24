@@ -277,7 +277,11 @@ function go(c: Ctx, s: Rider, world: World, events: RideEvents) {
     events.push(ev(c, 'stop', [block.x, block.y], { who: block.id }));
     return;
   }
-  ride.pos = len - ride.pos - ride.speed < EPS ? len : ride.pos + ride.speed;
+  const cap = ride.stopover === 'ahead' ? c.v.hold?.(s, world, events) : undefined;
+  if (ride.stopover === 'ahead' && cap === undefined) ride.stopover = 'done';
+  if (cap !== undefined && ride.pos >= cap - EPS) return; // wartet am Halt unterwegs (Zug: Tok versenkt den Prellbock)
+  const goal = Math.min(len, cap ?? len);
+  ride.pos = goal - ride.pos - ride.speed < EPS ? goal : ride.pos + ride.speed;
   const warn = tunnelAhead(c, ride, i + 1, Math.floor(ride.pos + EPS));
   if (warn) events.push(ev(c, 'tunnel', warn));
   const [x, y] = cellOf(c.r, ride, ride.pos);
@@ -338,6 +342,21 @@ function alight(c: Ctx, s: Rider, world: World, events: RideEvents) {
   if (s.packs !== packs) off.persist = true; // was das Paket des Fahrzeugs dabei merkt (Zug: `gefahren`), gleich speichern
 }
 
+/**
+ * Abfahrt: Was das Paket des Fahrzeugs dabei will (`Vehicle.depart`; der Zug: Bau 2 beginnt). Sagt es einen Halt
+ * unterwegs an, merkt die Fahrt ihn (`stopover`); ändert es den Spielstand, wird gleich gespeichert und die Strecke neu
+ * gerechnet (der Zug fährt dann bis in die Grotte): Das Tempo passt sich an, damit die Fahrt in `ticks` bleibt
+ */
+function depart(c: Ctx, s: Rider, world: World, go: RideEvent, events: RideEvents) {
+  const ride = s.ride!;
+  const packs = s.packs;
+  if (c.v.depart?.(s, world, ride.to, events)) ride.stopover = 'ahead';
+  if (s.packs === packs) return;
+  go.persist = true;
+  const r = c.v.route(world, s);
+  if (r) ride.speed = (r.path.length - 1) / rideTicks(c.v.spec, r.path.length - 1);
+}
+
 /** Ein Takt mit Fahrt: abfahren, fahren, halten und Tiere verscheuchen, ankommen und aussteigen */
 function drive(c: Ctx, s: Rider, world: World, events: RideEvents) {
   const ride = s.ride!;
@@ -346,7 +365,9 @@ function drive(c: Ctx, s: Rider, world: World, events: RideEvents) {
     if (since < DEPART) return;
     ride.phase = 'go';
     ride.at = s.tick;
-    events.push(ev(c, 'go', [s.player.x, s.player.y]));
+    const go = ev(c, 'go', [s.player.x, s.player.y]);
+    events.push(go);
+    depart(c, s, world, go, events);
     if (!ride.feast) return;
     events.push(ev(c, 'farewell', [s.player.x, s.player.y])); // der Bote winkt zum Abschied (Pinguin)
     cheer(c, s, world, events, true); // die Tiere auf der Wiese winken mit

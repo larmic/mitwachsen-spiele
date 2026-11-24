@@ -44,6 +44,11 @@ export type World = Realms & {
   cell(x: number, y: number): Cell;
   /** Wohnort jedes Tiers der Gegenden: nächstes vom Bett aus erreichbares Feld zum Wunschort */
   readonly spawns: ReadonlyMap<string, Point>; // je Tier-Kennung
+  /**
+   * Tiere, die nach dem Spielstand der Pakete, mit dem die Welt gebaut ist, gerade nicht in ihrer Welt wohnen
+   * (`WorldPack.away`; Bahn: der erste Maulwurf sitzt bis Bau 2 auf Toks Helm): Sie werden nicht verteilt
+   */
+  readonly away?: ReadonlySet<string>;
   /** Alle vom Bett aus erreichbaren Felder einer Gegend außerhalb der Wiese: hier dürfen ihre Tiere wohnen */
   spotsOf(realm: RegionId): readonly Point[];
   /**
@@ -730,6 +735,7 @@ function build(
     ...realms,
     gates: gatesOf(places),
     spawns,
+    away: new Set(built.flatMap((p) => p.away?.(saved) ?? [])),
     spotsOf: (realm) => (realm === lichtung.id ? spots : (inner.get(realm)?.spots ?? [])),
     portals: new Map([...portalsOf(places), ...worlds.flatMap((b) => b.portals)]),
     stones: new Map<StoryId, Point>([...stonesOf(places), ...worlds.flatMap((b) => b.stones)]),

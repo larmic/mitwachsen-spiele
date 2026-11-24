@@ -185,6 +185,13 @@ export const TOK_SPECIES: { tok: SpeciesOf<'tok'> } = {
   },
 };
 
+/**
+ * Der erste Maulwurf (Kennung wie `animalId('hoehle', 'maulwurf')`; hier als Text, mitwachsen.ts importiert diese
+ * Datei): Er sitzt auf Toks Helm, bis Tok mit Bau 2 in der Grotte ankommt (Paket der Bahn), und zieht dann als erstes
+ * Höhlen-Tier ins Gehege am Höhlenbett. Erst danach erwacht das Portal am stillen See (`Portal.later`)
+ */
+export const FIRST_MOLE = 'hoehle:maulwurf';
+
 /** Die Arten der Höhlenwelt samt Tok, ihrem Boten (für `SPECIES`, `SpeciesId`) */
 export type CaveBeingId = CaveSpeciesId | 'tok';
 export const CAVE_BEINGS: { [K in CaveBeingId]: SpeciesOf<K> } = { ...CAVE_SPECIES, ...TOK_SPECIES };

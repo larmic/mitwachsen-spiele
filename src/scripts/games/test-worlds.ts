@@ -19,7 +19,7 @@ import type { WorldPack } from './mitwachsen-pack-types';
 
 addModels(eis.models); // wie im Spiel, wenn das Paket ankommt: Modelle der Eis-Tiere
 addModels(hoehle.models, hoehle.roosts); // und der Höhlen-Tiere samt der Fledermaus kopfüber
-addModels(bahn.models); // und Tok, der Gleisbauer
+addModels(bahn.models, {}, bahn.solos); // und Tok, der Gleisbauer (nach Bau 2 ohne den Maulwurf)
 /** Alle Pakete, die das Spiel von selbst holt (die Bahn nicht, unten): Eis-Welt, Grotte und die Fahr-Engine */
 export const PACKS = [eis, hoehle, fahrt] as const;
 export const EIS_PACK = eis;

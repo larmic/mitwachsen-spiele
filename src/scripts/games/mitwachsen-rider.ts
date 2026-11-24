@@ -5,7 +5,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Der Schlitten“ und „Tok und die Bahn“, Fahren)
 
 import type { Dir } from '../../lib/games/front';
-import type { Point, RegionId } from '../../data/games/mitwachsen';
+import type { Point, RegionId, SpeciesId } from '../../data/games/mitwachsen';
 import type { RideId, RideSpec } from '../../data/games/mitwachsen-rides';
 import type { BorderEvent } from './mitwachsen-border';
 import type { Guided } from './mitwachsen-guide';
@@ -40,13 +40,26 @@ export type Rider = Guided & {
   docked?: Partial<Record<RideId, End>>;
   dozing?: readonly RideId[];
   snored?: { id: RideId; at: number };
+  work?: { from: number; to: number; laid?: true }; // ein Bote baut (`Work` in mitwachsen-herald.ts; Bau 2 wartet auf den Zug)
 };
 
 /**
- * Ereignisse, die ein Fahrzeug ausgibt: seine eigenen, dazu Warten der folgenden Tiere, Wechsel der Gegend und `bump`
- * (gegen den Schuppen gelaufen, wie gegen jede Wand)
+ * Ereignisse, die ein Fahrzeug ausgibt: seine eigenen, dazu Warten der folgenden Tiere, Wechsel der Gegend, `bump`
+ * (gegen den Schuppen gelaufen, wie gegen jede Wand), `home` (ein Tier zieht nach der Fahrt ein: der Maulwurf nach
+ * Bau 2) und, was ein Bote dabei tut (`herald`, `sink`: Tok beginnt Bau 2 am Prellbock; `HeraldEvent` in
+ * mitwachsen-herald.ts, das diese Datei nicht importiert)
  */
-export type RideEvents = { push(...e: (RideEvent | BorderEvent | { type: 'bump' })[]): unknown };
+export type RideEvents = {
+  push(
+    ...e: (
+      | RideEvent
+      | BorderEvent
+      | { type: 'herald'; what: 'sink'; id: string; x: number; y: number }
+      | { type: 'bump' }
+      | { type: 'home'; id: string; species: SpeciesId }
+    )[]
+  ): unknown;
+};
 
 /**
  * Haken der Fahrzeuge in `step` (aus der Fahr-Engine, `RideEngine`). `tick`: nach dem Takt der Tiere (fällig,
@@ -88,7 +101,11 @@ export type Fan = { who: string; x: number; y: number };
  * Festfahrt winkt (`fans`) und was nach dem Aussteigen geschieht (`landed`: Tok hüpft aus dem Zug an seinen Platz, die erste Fahrt ist gemacht).
  * `needs`: Gegenden, deren Welt (aus ihrem Paket) es zum Fahren braucht, außer der eigenen (Zug: die Grotte, seine
  * Ziel-Gegend); sie werden vor seinem Halt vorgeladen (`RIDE_PRELOAD`, mitwachsen-preload.ts). `reaches`: Fährt es beim
- * jetzigen Stand schon dorthin (Zug: erst ab Ausbau 2; ohne: immer)? Nur dann schläft es, solange eine fehlt
+ * jetzigen Stand schon dorthin (Zug: erst ab Ausbau 2; ohne: immer)? Nur dann schläft es, solange eine fehlt.
+ * `depart`: beim Abfahren (nach den 2 s, in denen ein Pfeil wieder aussteigt); true: Diese Fahrt hält unterwegs einmal
+ * (`Ride.stopover`, der Zug: Bau 2 beginnt, Ausbau 2 sofort gespeichert); ändert es den Spielstand, rechnet die Engine
+ * die Strecke neu und speichert gleich. `hold`: solange der Halt unterwegs aussteht, bis wohin es höchstens fahren darf
+ * (Fortschritt der Fahrt; undefined: weiter, der Halt ist gemacht)
  */
 export type Vehicle = {
   spec: RideSpec;
@@ -98,6 +115,8 @@ export type Vehicle = {
   ready?(s: Rider, world: World): boolean;
   fans?(s: Rider, world: World): Fan[];
   landed?(s: Rider, world: World, end: End, events: RideEvents): void;
+  depart?(s: Rider, world: World, to: End, events: RideEvents): boolean;
+  hold?(s: Rider, world: World, events: RideEvents): number | undefined;
 };
 
 /** Die Fahr-Engine (Paket der Fahrzeuge, `WorldRules.ride`): macht aus den Fahrzeugen der geladenen Pakete ihre Regeln */
