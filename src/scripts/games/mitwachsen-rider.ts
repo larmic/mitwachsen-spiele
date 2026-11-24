@@ -105,7 +105,10 @@ export type Fan = { who: string; x: number; y: number };
  * `depart`: beim Abfahren (nach den 2 s, in denen ein Pfeil wieder aussteigt); true: Diese Fahrt hält unterwegs einmal
  * (`Ride.stopover`, der Zug: Bau 2 beginnt, Ausbau 2 sofort gespeichert); ändert es den Spielstand, rechnet die Engine
  * die Strecke neu und speichert gleich. `hold`: solange der Halt unterwegs aussteht, bis wohin es höchstens fahren darf
- * (Fortschritt der Fahrt; undefined: weiter, der Halt ist gemacht)
+ * (Fortschritt der Fahrt; undefined: weiter, der Halt ist gemacht). `feast`: Ist diese Fahrt auf die Lichtung (`to`
+ * `'out'`) seine Festfahrt (danach Stufe `fest`, Wimpel)? Ohne: die erste Heimfahrt bei `bereit`, wenn es erst danach
+ * auf der Lichtung hält (`spec.out` `'fest'`, der Schlitten); der Zug: die erste Heimfahrt nach voller Höhlen-Leiste
+ * (die Laternenfahrt, Zierde, nie Bedingung)
  */
 export type Vehicle = {
   spec: RideSpec;
@@ -117,6 +120,7 @@ export type Vehicle = {
   landed?(s: Rider, world: World, end: End, events: RideEvents): void;
   depart?(s: Rider, world: World, to: End, events: RideEvents): boolean;
   hold?(s: Rider, world: World, events: RideEvents): number | undefined;
+  feast?(s: Rider, world: World): boolean;
 };
 
 /** Die Fahr-Engine (Paket der Fahrzeuge, `WorldRules.ride`): macht aus den Fahrzeugen der geladenen Pakete ihre Regeln */

@@ -497,12 +497,13 @@ function reachOf(wake: readonly Point[], map: ReadonlyMap<string, Cell>): Set<st
 
 /**
  * Licht ohne Punktlichter: unter den drei Lichtschächten ein Lichtfleck (Radius `GROTTE.shaft.r`, in der Mitte bis 35 %
- * heller), Kristalle, Kristallbüsche, Leuchtpilze, Säulen und Lampen machen ihr Feld und die acht Nachbarn um `GROTTE.glow` heller.
- * Höchstens 0,5: Hell wird es, nie grell.
+ * heller; welcher Schacht, steht in `Cell.shaft`), Kristalle, Kristallbüsche, Leuchtpilze, Säulen und Lampen machen ihr
+ * Feld und die acht Nachbarn um `GROTTE.glow` heller. Höchstens 0,5: Hell wird es, nie grell.
  */
 function light(realm: ReadonlySet<string>, at: (p: readonly [number, number]) => Point, map: Map<string, Cell>) {
   const shafts = GROTTE.shafts.map(at);
   const lit = new Map<string, number>();
+  const under = new Map<string, number>(); // Lichtfleck welches Schachts (`Cell.shaft`)
   const glows = (c: Cell) =>
     c.deco === 'crystal' ||
     c.deco === 'glowshroom' ||
@@ -515,10 +516,13 @@ function light(realm: ReadonlySet<string>, at: (p: readonly [number, number]) =>
     if (!c) continue;
     const [x, y] = k.split(',').map(Number) as [number, number];
     let l = 0;
-    for (const [sx, sy] of shafts) {
+    shafts.forEach(([sx, sy], i) => {
       const d = Math.hypot(x - sx, y - sy);
-      if (d < GROTTE.shaft.r) l = Math.max(l, GROTTE.shaft.light * (1 - d / GROTTE.shaft.r));
-    }
+      const here = GROTTE.shaft.light * (1 - d / GROTTE.shaft.r);
+      if (d >= GROTTE.shaft.r || here <= l) return;
+      l = here; // der hellste Schacht zählt, auch für `Cell.shaft`
+      under.set(k, i);
+    });
     if (l > 0) lit.set(k, l);
     if (!glows(c)) continue;
     for (let dy = -1; dy <= 1; dy++)
@@ -529,7 +533,9 @@ function light(realm: ReadonlySet<string>, at: (p: readonly [number, number]) =>
   }
   for (const [k, l] of lit) {
     const c = map.get(k);
-    if (c && c.region !== 'border') map.set(k, { ...c, light: Math.min(0.5, Math.round(l * 100) / 100) });
+    const shaft = under.get(k);
+    if (c && c.region !== 'border')
+      map.set(k, { ...c, light: Math.min(0.5, Math.round(l * 100) / 100), ...(shaft !== undefined && { shaft }) });
   }
 }
 

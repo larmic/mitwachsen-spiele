@@ -543,6 +543,53 @@ test('Spiel: Hau-ruck am Höhlentor per Entwickler-Schalter, Tok stößt allein,
   expect(errors).toEqual([]);
 });
 
+// „Gute Nacht, Bahn“ per Entwickler-Schalter (`?entwickler=bahn&bau=1`, 2D): Schläft die Figur im Bett der Lichtung und
+// steht der Zug an Bahnhof Bär, pfeift er nach dem Schlaflied leise gute Nacht und macht sein Licht aus (nur das kleine
+// Nachtlicht bleibt, Schlüssel des Bilds `…:n`); eine Taste (auch die Leertaste, die so kurz nach dem Einschlafen nicht
+// weckt) beendet es sofort. Über die Test-Uhr und den Zustand, nie über Wartezeit
+test('Spiel: Gute Nacht, Bahn per Entwickler-Schalter, Licht aus nach dem Pfiff, eine Taste beendet es, ohne Fehler', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  type Game = {
+    world: { homes: Record<string, { bed: [number, number] }> };
+    state: { player: { x: number; y: number; dir: string }; sleeping: boolean; wokeAt: number };
+    rides: { id: string; key: string }[];
+    apply(cmd: { type: 'move'; dir: string } | { type: 'action' }): void;
+  };
+  const game = await openGame(page, { clock: true, dev: 'bahn&bau=1' });
+  await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+  await ticks(page, 2);
+  const night = () =>
+    game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const loco = el.rides.find((r) => r.id === 'ride:hoehle:loco');
+      return { sleeping: el.state.sleeping, loco: !!loco, out: !!loco?.key.endsWith(':n') };
+    });
+  const toBed = () =>
+    game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const [bx, by] = el.world.homes.lichtung!.bed;
+      el.state = { ...el.state, sleeping: false, wokeAt: -1e6, player: { x: bx, y: by + 1, dir: 'n' } };
+      el.apply({ type: 'move', dir: 'n' });
+    });
+  await render(page, 2);
+  expect(await night()).toEqual({ sleeping: false, loco: true, out: false });
+  await toBed();
+  await render(page, 2);
+  expect(await night()).toEqual({ sleeping: true, loco: true, out: false }); // erst das Schlaflied
+  await render(page, 40, 200); // 8 s: Pfiff nach dem Schlaflied, danach Licht aus
+  expect(await night()).toEqual({ sleeping: true, loco: true, out: true });
+  // noch einmal ins Bett; diesmal beendet die Leertaste die gute Nacht gleich nach dem Schlaflied
+  await toBed();
+  await render(page, 11, 200); // gut 2 s: der Pfiff hat begonnen, das Licht brennt noch
+  expect(await night()).toEqual({ sleeping: true, loco: true, out: false });
+  await game.evaluate((node) => (node as unknown as Game).apply({ type: 'action' }));
+  await render(page, 1);
+  expect(await night()).toEqual({ sleeping: true, loco: true, out: true });
+  expect(errors).toEqual([]);
+});
+
 // Bau 1 per Entwickler-Schalter (`?entwickler=bahn&bau=0`; @3d, weil die Welt dabei neu gebaut wird und 3D ihre Stücke
 // austauscht): Läuft die Figur in den wachen Tok, baut er 8 s lang (Pfeile lassen sie nur hüpfen), die Welt wird mit dem
 // Gleis neu gebaut, danach stehen Bahnhof Bär und der Zug da, Tok sitzt im hinteren Wagen. Gespeichert wird im Blick

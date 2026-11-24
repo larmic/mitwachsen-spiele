@@ -3,6 +3,7 @@ import {
   DEV_BAY,
   DEV_BUILT,
   DEV_EVENING,
+  DEV_FEAST,
   DEV_OPEN,
   DEV_PARAM,
   DEV_PRELOAD,
@@ -164,6 +165,26 @@ describe('Entwickler-Schalter', () => {
       hoehle: { stage: 'bereit', gefahren: true },
     });
     expect(devProgress(['bahn'], '?entwickler=bahn&bau=1&bucht=1', saved).openGates).toEqual(saved.openGates); // Tor zu
+  });
+
+  it('`&fest=1` (Ausbau 2): Höhlen-Leiste voll, die Figur wacht im Höhlenbett auf; die nächste Fahrt auf die Lichtung ist die Laternenfahrt', () => {
+    expect(DEV_FEAST).toBe('fest');
+    const cave = REGIONS.find((r) => r.id === 'hoehle')!;
+    const p = devProgress(['bahn', 'hoehle', 'fahrt'], '?entwickler=bahn&fest=1', saved);
+    expect(full(p, cave)).toBe(true);
+    expect(p.garden.filter((a) => a.id === FIRST_MOLE)).toHaveLength(1);
+    expect(p.openGates).toContain('hoehle');
+    expect(p.packs.fahrt).toMatchObject({ hoehle: { stage: 'offen' } });
+    expect(glimpse('?entwickler=bahn&fest=1', PACK_IDS).home).toBe('hoehle');
+    expect(glimpse('?entwickler=bahn', PACK_IDS).home).toBe('lichtung');
+    expect(glimpse('?entwickler=eis,bahn&fest=1', PACK_IDS).home).toBe('eis'); // eine genannte Welt geht vor
+    // ohne `&fest=1` oder bei Ausbau 1 bleibt die Leiste, wie sie ist
+    expect(full(devProgress(['bahn'], '?entwickler=bahn', saved), cave)).toBe(false);
+    expect(devProgress(['bahn'], '?entwickler=bahn&bau=1&fest=1', saved).garden).toEqual(saved.garden);
+    // dann wacht die Figur auch nicht im Höhlenbett auf (das Tor bleibt zu, mit `&vorladen=1` fehlt die Grotte)
+    expect(glimpse('?entwickler=bahn&bau=1&fest=1', PACK_IDS).home).toBe('lichtung');
+    expect(glimpse('?entwickler=bahn&bau=0&fest=1', PACK_IDS).home).toBe('lichtung');
+    expect(glimpse('?entwickler=bahn&vorladen=1&fest=1', PACK_IDS).home).toBe('lichtung');
   });
 
   it('Höhlenpaket und Bahn gibt es (Lader); das Höhlentor hat seinen Schlüssel nur mit der Bahn-Phase (beide Stellungen)', () => {

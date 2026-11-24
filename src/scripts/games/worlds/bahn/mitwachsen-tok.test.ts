@@ -22,7 +22,7 @@ import { stationOf } from './mitwachsen-station-look';
 import { BAHN_PACK, EIS_PACK, REGRESSION_SEEDS, SAMPLE_SEEDS, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import { CALL_EVERY, COME, SIGHT, TOK, TOK_NEAR, postOf, tokWanted } from './mitwachsen-tok';
 import { heraldFx, juhu, lacks, pink } from './mitwachsen-tok-look';
-import { sledHome, tokOf, wakeTok, withTok } from '../../mitwachsen-ride-save';
+import { sledHome, tokOf, wakeRides, withTok } from '../../mitwachsen-ride-save';
 
 const BAHN = [BAHN_PACK];
 const ICE = REGIONS.find((r) => r.id === 'eis')!;
@@ -386,9 +386,9 @@ describe('Tok: Spielstand', () => {
 
   it('ein neuer echter Spieltag weckt nur, was schläft', () => {
     const asleep = withTok(SLED_HOME, { stage: 'faellig', schlaeft: true });
-    expect(wakeTok(asleep)).toEqual(withTok(SLED_HOME, { stage: 'faellig' }));
-    expect(wakeTok(SLED_HOME)).toEqual(SLED_HOME);
-    expect(BAHN_PACK).toHaveProperty('dawn', wakeTok);
+    expect(wakeRides(asleep)).toEqual(withTok(SLED_HOME, { stage: 'faellig' }));
+    expect(wakeRides(SLED_HOME)).toEqual(SLED_HOME);
+    expect(BAHN_PACK).toHaveProperty('dawn', wakeRides);
   });
 });
 

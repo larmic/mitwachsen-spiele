@@ -24,6 +24,9 @@ export const TRAIN_COLORS = {
   lamp: '#ffe08a',
   lit: '#fffbe6', // Lampe an (Tunnel, Abend), mit Schein
   glow: '#fff3b0',
+  warm: '#ffc06a', // warmes Licht im Fensterband (ab 20 min, nachts bis „Gute Nacht“, auf der Laternenfahrt)
+  night: '#f6dca0', // kleines Nachtlicht nach „Gute Nacht“
+  mast: '#8a5a34', // Stange des Kristall-Wimpels
   steam: '#ffffff',
   crystal: ['#b48cf0', '#6fd6f0', '#f08cc8'], // Raute: lila, türkis, rosa
   bat: { p: '#f2a7b8', g: '#a08c7c', k: '#1d2838', l: '#f2a7b8', w: '#b9b2dc' },
@@ -139,10 +142,28 @@ const frame = (side: 1 | -1): Part[] => {
   ];
 };
 
+/** Warmes Licht in den vier Fenstern zwischen den Stegen, auf beiden Seiten (kein Punktlicht, nur Farbe) */
+const WARM: readonly Part[] = [-0.76, -0.36, 0.06, 0.48].flatMap((f) =>
+  both([f, -HW - 0.01, 0.6, 0.28, 0.012, 0.2, TRAIN_COLORS.warm]),
+);
+/** Kleines Nachtlicht über der Tür der Lok, nach „Gute Nacht“ (die Lampen sind aus) */
+const NIGHT: readonly Part[] = both([-0.06, -HW - 0.012, 0.9, 0.12, 0.012, 0.08, TRAIN_COLORS.night]);
+/**
+ * Kristall-Wimpel nach der Laternenfahrt (Stufe `fest`): Stange auf dem Dach der Lok, ein lila Wimpel mit Kristall-Raute
+ * in Türkis und Rosa (kein Gold: dort kann das Kind nichts tun)
+ */
+const PENNANT: readonly Part[] = [
+  [-0.5, -0.03, 0.96, 0.05, 0.05, 0.62, TRAIN_COLORS.mast],
+  [-0.5, 0.02, 1.32, 0.02, 0.36, 0.24, TRAIN_COLORS.lila],
+  [-0.5, 0.14, 1.4, 0.022, 0.1, 0.08, TRAIN_COLORS.crystal[1]],
+  [-0.5, 0.25, 1.42, 0.022, 0.06, 0.04, TRAIN_COLORS.crystal[2]],
+];
+
 /**
  * Wagen des Zugs: die Lok (`loco`, `lit`: die Lampen leuchten), der mittlere (`rider`: mit der Figur), der hintere (mit
  * Tok, sobald er sitzt); `door`: die Tür zum Bahnsteig offen (+1 rechts, −1 links, 0 zu), `frame`: goldener Rahmen um
- * die Tür auf dieser Seite (0: keiner)
+ * die Tür auf dieser Seite (0: keiner); `warm`: warmes Licht im Fensterband (jeder Wagen); `night`: nur das kleine
+ * Nachtlicht der Lok (nach „Gute Nacht“); `pennant`: der Kristall-Wimpel auf der Lok (nach der Laternenfahrt)
  */
 export type CarLook = {
   kind: 'loco' | 'mid' | 'rear';
@@ -151,6 +172,9 @@ export type CarLook = {
   rider?: boolean;
   frame?: 0 | 1 | -1;
   lit?: boolean;
+  warm?: boolean;
+  night?: boolean;
+  pennant?: boolean;
 };
 export const carParts = (k: CarLook): Part[] => [
   ...BODY,
@@ -160,6 +184,9 @@ export const carParts = (k: CarLook): Part[] => [
   ...(k.rider ? FIGURE : []),
   ...(k.door ? [door(k.door)] : []),
   ...(k.frame ? frame(k.frame) : []),
+  ...(k.warm ? WARM : []),
+  ...(k.kind === 'loco' && k.night ? NIGHT : []),
+  ...(k.kind === 'loco' && k.pennant ? PENNANT : []),
 ];
 
 /** Weiße Dampfwölkchen über der Lok, je Phase (0 … 3) anders hoch (nicht bei reduzierter Bewegung) */

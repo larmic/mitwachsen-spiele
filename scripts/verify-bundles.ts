@@ -96,13 +96,14 @@ export const RULES: Rule[] = [
       // Gleis der Höhlenbahn auf Lichtung und Grotte: Trassen-Suche, Bahnhof Bär, Zeichenteile der 2D-Ansicht; Tok, der
       // Bote der Höhlenwelt (Regeln, Modell, Bild und Ton); Bau 1 mit Bahnhof Bär und Zug (Modelle, Körper, Töne); der Zug
       // als Fahrzeug (Strecke, Bild beim Fahren, Ton, Licht im Tunnel); Bau 2 mit Bahnhof Fledermaus und Lokschuppen;
+      // Schmuck mit Zug (Pfeif-Gruß, Laternenfahrt mit Glühwürmchen und Kristall-Wimpel, warmes Licht, Gute Nacht);
       // bis zum Freischalten (BAHN_LIVE) holt es nur der Entwickler-Schalter
       { chunks: /\/welt-bahn\.[\w-]+\.js$/ },
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Bahn
       { chunks: /\/welt-bahn-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-bahn)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 48 187 Bytes (47,1 KB)
-    budget: 52 * 1024,
+    // Gemessen 51,3 KB
+    budget: 56.5 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {
@@ -110,10 +111,11 @@ export const RULES: Rule[] = [
     pages: /^spielen\/index\.html$/,
     // Die Fahr-Engine aller Fahrzeuge (einsteigen, fahren, Hindernis, Tunnel, ankommen), samt dem, was sie mit den Paketen
     // der Fahrzeuge teilt (Halte, Spielstand packs.fahrt); keine eigene Welt, kein 3D-Teil. Kommt, sobald es ein Fahrzeug
-    // geben kann (Eistor offen); dazu das Schlafen am Halt, solange ein Paket fehlt (Vorladen)
+    // geben kann (Eistor offen); dazu das Schlafen am Halt, solange ein Paket fehlt (Vorladen), das Fest je Fahrzeug
+    // (`Vehicle.feast`) und das Aufwachen am neuen Spieltag (`schlaeft`)
     chunks: /\/welt-fahrt\.[\w-]+\.js$/,
-    // Gemessen 8680 Bytes (8,5 KB)
-    budget: 9.4 * 1024,
+    // Gemessen 9,2 KB
+    budget: 10.1 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

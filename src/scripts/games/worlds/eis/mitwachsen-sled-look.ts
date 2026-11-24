@@ -5,20 +5,22 @@
 // Erscheinen trabt er aus den Tannen herbei, unterwegs gleitet er zwischen den Takten weiter (bei reduzierter Bewegung
 // in ruhigen Sprüngen alle 3 Felder). Durch die Tür rückt er etwas zur Mitte, sonst führe er durch die Torflügel.
 // Marken: die Schneespur im Kessel ab dem Erscheinen, auf der Lichtung ab der ersten Heimfahrt (auf ihr wächst sie mit),
-// dazu der Schneefleck am Halt. Töne: Schellen-Bimmeln D6/A5 (`RIDES`), Abfahrt, Tuten, Schnauben, Fest.
+// dazu der Schneefleck am Halt. Töne: Schellen-Bimmeln D6/A5 (`RIDES`), Abfahrt, Tuten, Schnauben, Fest. „Gute Nacht“
+// (`sledGoodNight`, mit der Freigabe der Bahn): leise Schellen, dann ist die Laterne aus.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Der Schlitten“)
 
 import type { Dir, Part } from '../../../../lib/games/front';
 import type { Point } from '../../../../data/games/mitwachsen';
 import { REINDEER, shedParts, sledParts } from '../../../../data/games/worlds/eis/mitwachsen-sled-models';
+import { bahnOn } from '../../../../data/games/mitwachsen-live';
 import { dirTo } from '../../mitwachsen-free';
 import type { Ride, RideEvent } from '../../mitwachsen-pack-types';
-import type { RideAt, RideBody, RideFx } from '../../mitwachsen-ride-view';
+import type { GoodNight, RideAt, RideBody, RideFx } from '../../mitwachsen-ride-view';
 import type { State } from '../../mitwachsen-state';
 import type { Box } from '../../mitwachsen-view';
 import { standHeight, type GatePlace, type World } from '../../mitwachsen-world';
 import type { Scored } from '../../sfx';
-import { COME, cellOf, parked, trotFrom } from '../../mitwachsen-ride-kit';
+import { COME, bedSight, cellOf, parked, trotFrom } from '../../mitwachsen-ride-kit';
 import { stageOf } from '../../mitwachsen-ride-save';
 import { SLED } from './mitwachsen-sled';
 import { sledRoute, type Route } from './mitwachsen-sled-route';
@@ -135,7 +137,7 @@ export function sledBodies(state: State, world: World, at: RideAt): readonly Rid
   const look = {
     frame: stage === 'bereit' && !dozing,
     pennant: stage === 'fest',
-    lamp: at.lit,
+    lamp: at.lit && !at.asleep?.includes(SLED.id), // nach „Gute Nacht“ ist die Laterne aus
     seated: !!state.ride,
     open,
   };
@@ -266,4 +268,18 @@ export function rideFx(e: RideEvent, state: State): RideFx {
     default:
       return { score };
   }
+}
+
+/** Leises Gute-Nacht des Schlittens: viermal ganz leise Schellen, dann ein weiches A5 */
+export const SLED_NIGHT: readonly Scored[] = [...jingle(4, 0.02), [LO, 0.3, 'sine', 0.02, 1, 0.3]];
+
+/**
+ * „Gute Nacht, Fahrzeuge“ (`View2D.goodNight`): Schläft die Figur im Bett der Lichtung und steht der Schlitten auf
+ * seinem Platz in Sichtweite (`bedSight`), bimmelt er leise gute Nacht, danach ist seine Laterne aus. Kommt mit dem
+ * Freischalten der Bahn (`bahnOn`, mitwachsen-live.ts): Bis dahin sagt er nichts, und die Laterne bleibt an
+ */
+export function sledGoodNight(state: State, world: World): GoodNight | undefined {
+  const r = sledRoute(world);
+  if (!bahnOn() || !r || state.dozing?.includes(SLED.id)) return undefined;
+  return bedSight(SLED, r, state, world) ? { id: SLED.id, score: SLED_NIGHT } : undefined;
 }

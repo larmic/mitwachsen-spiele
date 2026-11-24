@@ -11,7 +11,7 @@ import {
   sledHome,
   stageOf,
   tokOf,
-  wakeTok,
+  wakeRides,
   withRidden,
   withRide,
   withTok,
@@ -113,7 +113,19 @@ describe('Spielstand der Fahrzeuge (packs.fahrt)', () => {
     expect(rideOf({ fahrt: { hoehle: { stage: 'bereit', gefahren: 'ja' } } })).toEqual({ hoehle: { stage: 'bereit' } });
     expect(withRide(after, 'hoehle', 'offen')).toEqual({ fahrt: { hoehle: { stage: 'offen', gefahren: true } } });
     const asleep = withTok({}, { stage: 'bereit', schlaeft: true, gefahren: true });
-    expect(tokOf(wakeTok(asleep))).toEqual({ stage: 'bereit', gefahren: true });
+    expect(tokOf(wakeRides(asleep))).toEqual({ stage: 'bereit', gefahren: true });
+  });
+
+  it('`schlaeft` gilt für jedes Fahrzeug: am nächsten echten Spieltag fällt es bei allen weg, sonst bleibt alles', () => {
+    const both = withRide(withTok({ eis: { x: 1 } }, { stage: 'faellig', schlaeft: true }), 'schlitten', 'fest', true);
+    expect(rideOf(both).schlitten).toEqual({ stage: 'fest', schlaeft: true });
+    expect(wakeRides(both)).toEqual({
+      eis: { x: 1 },
+      fahrt: { hoehle: { stage: 'faellig' }, schlitten: { stage: 'fest' } },
+    });
+    const awake = withRide({}, 'schlitten', 'fest');
+    expect(wakeRides(awake)).toEqual(awake);
+    expect(wakeRides(awake)).not.toBe(awake);
   });
 
   it('übersteht Spielstart und Speichern über progressOf', () => {

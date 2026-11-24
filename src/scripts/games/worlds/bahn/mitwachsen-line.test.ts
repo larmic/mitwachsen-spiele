@@ -5,6 +5,7 @@ import { animalId, type Point } from '../../../../data/games/mitwachsen';
 import { FIRST_MOLE } from '../../../../data/games/mitwachsen-hoehle';
 import { tryBahn } from '../../../../data/games/mitwachsen-live';
 import { atHome } from '../../mitwachsen-meadow';
+import { SIGHT, stopsOf } from '../../mitwachsen-ride-kit';
 import { withTok } from '../../mitwachsen-ride-save';
 import { initialState, step as stepGame, type Cmd, type GameEvent, type State } from '../../mitwachsen-state';
 import { LINE } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
@@ -35,6 +36,13 @@ import { withBuilt } from './mitwachsen-built';
 /** Seeds, deren Grotte um eine Ecke liegt (wie in mitwachsen-grotte.test.ts): Dort biegt auch das Gleis im Gang ab */
 const TURNED = [26, 30];
 /** Eigenschafts-Tests über ganze Welten: wenige Seeds, im tiefen Lauf 20 und die gebogenen */
+/** Gute Nacht, Bahn (Schmuck mit Zug): Liegt Bahnhof Bär in Sichtweite (`SIGHT`) des Lichtungsbetts? */
+function bearInSight(w: World, r: NonNullable<ReturnType<typeof trainRoute>>): boolean {
+  const [bx, by] = w.homes.lichtung.bed;
+  const [sx, sy] = stopsOf(r).out.seat;
+  return Math.max(Math.abs(sx - bx), Math.abs(sy - by)) <= SIGHT;
+}
+
 const SEEDS = seedsFor([...seedRange(1, 20), ...TURNED], [...SAMPLE_SEEDS, ...TURNED]);
 /** Seed, auf dem zwei Felder vom Bahnhof Bär kein Platz für den Klangstein passt (aus einer Probe über Seeds 21–140) */
 const BEAR_FAR = 38;
@@ -535,6 +543,14 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
       } finally {
         tryBahn(false);
       }
+    });
+
+    it(`Seed ${seed}: Gute Nacht, Bahn: Bahnhof Bär liegt in Sichtweite des Lichtungsbetts`, () => {
+      const shut = trainRoute(w, {
+        packs: { bahn: { built: 2 }, fahrt: { hoehle: { stage: 'bereit' } } },
+        openGates: [],
+      });
+      expect({ seed, ok: !shut || bearInSight(w, shut) }).toEqual({ seed, ok: true });
     });
 
     it(`Seed ${seed}: Strecke des Zugs (Fahren): bis zum Prellbock bzw. Bahnhof Fledermaus, Wagen auf dem Gleis, Bank auf dem Bahnsteig, jede Fahrt 15–20 s mit höchstens 8 Feldern je Sekunde`, () => {

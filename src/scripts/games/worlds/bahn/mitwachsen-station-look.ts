@@ -12,8 +12,11 @@
 // reduzierter Bewegung springt er ans Ziel); die Tür des mittleren Wagens hat bis zur ersten Fahrt (`gefahren`) einen
 // goldenen Rahmen, solange er dort steht, wo die Figur einsteigen kann (nicht, solange er schläft, weil ein Paket
 // fehlt: dann ohne Dampf und Licht), angestoßen geht sie kurz auf; im Tunnel und am
-// Abend leuchten die Lampen; Tok sitzt im hinteren Wagen, solange er nicht in der Bucht wartet. Teil des Pakets der
-// Bahn (view-2d.ts).
+// Abend leuchten die Lampen; ab 20 min Spielzeit (und nachts) leuchtet das Fensterband warm; nach „Gute Nacht“ sind
+// Lampen, Fenster und Dampf aus, nur ein kleines Nachtlicht brennt; auf der Laternenfahrt leuchtet alles, und
+// Glühwürmchen folgen ihm, solange er in der Höhlenwelt ist (nicht bei reduzierter Bewegung); danach trägt die Lok den
+// Kristall-Wimpel (Stufe `fest`). Tok sitzt im hinteren Wagen, solange er nicht in der Bucht wartet. Teil des Pakets
+// der Bahn (view-2d.ts).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 1)
 
 import type { Dir, Part } from '../../../../lib/games/front';
@@ -37,11 +40,12 @@ import { hutOf, rowsOf } from './mitwachsen-bear';
 import { builtOf } from './mitwachsen-built';
 import { key } from './mitwachsen-ground';
 import { parked } from '../../mitwachsen-ride-kit';
-import { ridden, tokOf } from '../../mitwachsen-ride-save';
+import { ridden, stageOf, tokOf } from '../../mitwachsen-ride-save';
 import { LETTERS, STEPS } from './mitwachsen-trace';
 import { SEAT, TRAIN, bearEnd, farOf, inTunnel, lineOf, trainRoute } from './mitwachsen-train';
 import { batBodies } from './mitwachsen-bat-look';
 import { capOf } from './mitwachsen-build2';
+import { FLIES, fireflies } from './mitwachsen-feast-look';
 
 /** Bahnhof Bär in einer Welt: das Gleis vom Prellbock an (Ausbau 1, bis an den Prellbock vor der Tür), Reihen, Häuschen */
 export type BearStation = {
@@ -270,8 +274,23 @@ function doorOf(world: World, state: State, work: number | undefined, at: RideAt
   const dozing = !!state.dozing?.includes(TRAIN.id) && !riding;
   const gold = !!r && !dozing && !ridden(state.packs, TRAIN.id) && !!parked(TRAIN, r, state, world);
   const nudged = state.nudged?.id === TRAIN.id && state.tick - state.nudged.at < OPEN_TICKS && !riding && !dozing;
-  const lit = !dozing && (at.lit || inTunnel(state, world));
-  return { dozing, gold, nudged, lit };
+  return { dozing, gold, nudged, ...lightOf(world, state, at, riding, dozing) };
+}
+
+/**
+ * Licht des Zugs: Lampen im Tunnel, am Abend und auf der Laternenfahrt, warmes Fensterband ab 20 min und auf der
+ * Laternenfahrt; nach „Gute Nacht“ (`asleep`) beides aus, nur das Nachtlicht (`night`); schläft er, weil ein Paket
+ * fehlt, nichts davon
+ */
+function lightOf(world: World, state: State, at: RideAt, riding: boolean, dozing: boolean) {
+  const feast = riding && !!state.ride?.feast;
+  const night = !!at.asleep?.includes(TRAIN.id) && !riding;
+  const off = dozing || night;
+  return {
+    lit: !off && (at.lit || feast || inTunnel(state, world)),
+    warm: !off && (!!at.warm || feast),
+    night,
+  };
 }
 
 /**
@@ -285,7 +304,8 @@ function trainParts(st: BearStation, world: World, state: State, work: number | 
   const riding = state.ride?.id === TRAIN.id;
   const tok = work === undefined ? tokOf(state.packs) !== undefined && !heraldOf(state) : work >= BUILD.board;
   const open = work !== undefined && work >= BUILD.door;
-  const { dozing, gold, nudged, lit } = doorOf(world, state, work, at, riding);
+  const { dozing, gold, nudged, lit, warm, night } = doorOf(world, state, work, at, riding);
+  const pennant = stageOf(state.packs, TRAIN.id) === 'fest';
   const kinds: CarLook['kind'][] = ['loco', 'mid', 'rear'];
   const hidden = (a: number) => work !== undefined && st.portal !== undefined && a + CAR / 2 > st.portal;
   const out = kinds.flatMap((kind, i): RideBody[] => {
@@ -305,16 +325,26 @@ function trainParts(st: BearStation, world: World, state: State, work: number | 
       rider: mid && riding,
       frame: mid && gold ? side : 0,
       lit: kind === 'loco' && lit,
+      warm,
+      night: kind === 'loco' && night,
+      pennant: kind === 'loco' && pennant,
     };
-    const k = `${TRAIN_ID}:${kind}:${+look.tok}${look.door}${+!!look.rider}${look.frame}${+!!look.lit}`;
+    const more = `${look.warm ? 'w' : ''}${look.night ? 'n' : ''}${look.pennant ? 'p' : ''}`;
+    const k = `${TRAIN_ID}:${kind}:${+look.tok}${look.door}${+!!look.rider}${look.frame}${+!!look.lit}${more && `:${more}`}`;
     const seat = mid && riding ? { seat: true as const } : {};
     return [{ id: `${TRAIN_ID}:${kind}`, key: k, x, y, z, dir, parts: model(k, () => carParts(look)), ...seat }];
   });
   const loco = out.find((b) => b.id === `${TRAIN_ID}:loco`);
-  if (loco && !at.reduced && !dozing) {
+  if (loco && !at.reduced && !dozing && !night) {
     const phase = Math.floor(at.now / 400) % 4;
     const k = `${TRAIN_ID}:dampf:${phase}`;
     out.push({ ...loco, id: `${TRAIN_ID}:dampf`, key: k, parts: model(k, () => steamParts(phase)) });
+  }
+  // Laternenfahrt: Glühwürmchen folgen dem letzten Wagen, solange er in der Höhlenwelt ist
+  if (riding && state.ride?.feast) {
+    const tail = place.front + 2 * GAP + CAR + FLIES.behind;
+    const trail = Array.from({ length: FLIES.n }, (_, i) => along(world, place.line, tail + i * FLIES.apart));
+    out.push(...fireflies(trail, world, at.now, at.reduced));
   }
   return out;
 }

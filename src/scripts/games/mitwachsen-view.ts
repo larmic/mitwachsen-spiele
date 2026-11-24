@@ -9,7 +9,7 @@ import type { GateId, RegionId, SpeciesId } from '../../data/games/mitwachsen';
 import type { HeraldEvent } from './mitwachsen-herald';
 import type { Deco } from './mitwachsen-cell';
 import type { PackEvent, RideEvent } from './mitwachsen-pack-types';
-import type { RideAt, RideBody, RideFx } from './mitwachsen-ride-view';
+import type { GoodNight, RideAt, RideBody, RideFx } from './mitwachsen-ride-view';
 import type { Guest } from './mitwachsen-guest-look';
 import { mapColor } from './mitwachsen-map';
 import type { SkyScene } from './mitwachsen-sky';
@@ -150,8 +150,11 @@ export function placeRails(
 export type View2D = {
   /** je Deko-Art, die nur diese Welt hat, ihre Zeichnung */
   decos: Partial<Record<Deco, DrawDeco>>;
-  /** flach auf dem Boden eines Felds (Rutschspur, glänzt bei offenem Tor der Welt), sonst null */
-  ground(c: Cell, x: number, y: number, open: boolean): Box | null;
+  /**
+   * flach auf dem Boden eines Felds (Rutschspur, glänzt bei offenem Tor der Welt; Lichtfleck der Grotte, am Abend
+   * `evening` golden-orange), sonst null
+   */
+  ground(c: Cell, x: number, y: number, open: boolean, evening?: number): Box | null;
   /** Gleis auf Feldern mit Strecke (Paket der Bahn) */
   rails?: DrawRails;
   sky?: Sky;
@@ -203,6 +206,12 @@ export type View2D = {
   bodies?(state: State, world: World, at: RideAt): readonly RideBody[];
   marks?(state: State, world: World): readonly Box[];
   rideFx?(e: RideEvent, state: State): RideFx | undefined;
+  /**
+   * „Gute Nacht, Fahrzeuge“: Schläft die Figur im Bett der Lichtung und steht sein Fahrzeug in Sichtweite (`bedSight` in
+   * mitwachsen-ride-kit.ts), seine Töne dazu (Zug: Pfiff; die Spielseite reiht alle nacheinander, höchstens 4 s, und
+   * macht danach sein Licht aus); sonst undefined. Gefragt einmal beim Einschlafen
+   */
+  goodNight?(state: State, world: World): GoodNight | undefined;
   /**
    * Licht der Szene (1 wie immer): Fährt die Figur durch einen Tunnel (Bahn: Tunnelportal, Einschnitt, Gang), dimmt es
    * auf das 0,7-Fache, nie dunkler als die Dämmerung (`tunnelNight` in mitwachsen-dusk.ts), in 2D und 3D gleich

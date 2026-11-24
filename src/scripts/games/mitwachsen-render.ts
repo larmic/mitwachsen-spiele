@@ -325,7 +325,7 @@ export class Renderer {
       const frontH = world.cell(x, y + 1).h;
       for (let k = Math.max(0, Math.min(c.h - 1, frontH)); k < c.h; k++) box(this.ctx, P, x, y, k, 1, 1, 1, ...flat);
       // Rutschspur zum Schneebett (aus dem Welt-Paket): flach im Boden, unter Kanten und Nebelrand
-      if (c.biome) drawBox(this.ctx, P, this.views.get(c.biome)?.ground(c, x, y, sc.gates.has(c.biome)));
+      if (c.biome) drawBox(this.ctx, P, this.views.get(c.biome)?.ground(c, x, y, sc.gates.has(c.biome), sc.evening));
       this.edges(P, world, x, y, c.h);
       this.plate(P, world, c, x, y, sc);
       return this.haze(P, x, y, c.h, sc);

@@ -27,15 +27,43 @@ export type RideBody = {
   seat?: true;
 };
 
-/** Was die Körper je Bild brauchen: Zeit, Bruchteil des laufenden Takts (0 … 1), reduzierte Bewegung, Abendlicht */
-export type RideAt = { now: number; frac: number; reduced: boolean; lit: boolean };
+/**
+ * Was die Körper je Bild brauchen: Zeit, Bruchteil des laufenden Takts (0 … 1), reduzierte Bewegung, Abendlicht (`lit`:
+ * Laterne und Lampen), warmes Licht (`warm`: ab 20 min Spielzeit und nachts, Fensterband des Zugs), welche Fahrzeuge
+ * nach „Gute Nacht“ ihr Licht aus haben (`asleep`, nur im Schlaf)
+ */
+export type RideAt = {
+  now: number;
+  frac: number;
+  reduced: boolean;
+  lit: boolean;
+  warm?: boolean;
+  asleep?: readonly RideId[];
+};
 
 /**
  * Antwort der Ansicht auf ein Ereignis eines Fahrzeugs: Töne, wer hüpft (`who`: Tier, `player`, sonst niemand), ob er
  * ein Herz bekommt, Funken an der Stelle des Ereignisses (`burst`, nicht bei reduzierter Bewegung), ein Zzz steigt dort
- * auf (`zzz`: ein schlafendes Fahrzeug, nicht bei reduzierter Bewegung)
+ * auf (`zzz`: ein schlafendes Fahrzeug, nicht bei reduzierter Bewegung); `chorus`: Tiere, die kurz danach antworten und
+ * hüpfen (`CHORUS_MS`; ihr Ton steht in `score`)
  */
-export type RideFx = { score: readonly Scored[]; who?: string; heart?: true; burst?: readonly string[]; zzz?: true };
+export type RideFx = {
+  score: readonly Scored[];
+  who?: string;
+  heart?: true;
+  burst?: readonly string[];
+  zzz?: true;
+  chorus?: readonly string[];
+};
+
+/** So viel später (ms) hüpfen die Tiere, die antworten (`RideFx.chorus`: Murmeltiere pfeifen zurück, wenn der Zug tutet) */
+export const CHORUS_MS = 400;
+
+/**
+ * „Gute Nacht“ eines Fahrzeugs (`View2D.goodNight`): seine Töne ab 0 s; die Spielseite reiht die Fahrzeuge in Sichtweite
+ * nacheinander (mitwachsen-bedtime.ts), danach ist sein Licht aus (`RideAt.asleep`)
+ */
+export type GoodNight = { id: RideId; score: readonly Scored[] };
 
 /** Der Körper, in dem die Figur sitzt (nur während der Fahrt) */
 export const seatOf = (rides: readonly RideBody[]) => rides.find((r) => r.seat);

@@ -15,11 +15,12 @@
 // Blick hinein (Entwickler-Schalter).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Fahren)
 
-import { animalId, type Point } from '../../../../data/games/mitwachsen';
+import { REGIONS, animalId, type Point } from '../../../../data/games/mitwachsen';
 import { BESIDE, plateRow } from '../../mitwachsen-bay';
 import { dirTo, freeNear } from '../../mitwachsen-free';
+import { full } from '../../mitwachsen-guide';
 import { heraldOf } from '../../mitwachsen-herald';
-import { tokOf, withRidden } from '../../mitwachsen-ride-save';
+import { stageOf, tokOf, withRidden } from '../../mitwachsen-ride-save';
 import type { End, RideEvents, RideRoute, Rider, Vehicle } from '../../mitwachsen-rider';
 import { standHeight, type World } from '../../mitwachsen-world';
 import { builtOf } from './mitwachsen-built';
@@ -140,12 +141,25 @@ export function landed(s: Rider, world: World, end: End, events: RideEvents) {
   if (end === 'home' && farOf(s)) arrive2(s, world, events);
 }
 
+const CAVE = REGIONS.find((r) => r.id === 'hoehle');
+
+/**
+ * Laternenfahrt (`Vehicle.feast`, Konzept „Fahrregeln“, Schmuck mit Zug): Die erste Fahrt auf die Lichtung, nachdem die
+ * Höhlen-Leiste voll ist (von jeder Höhlen-Art wohnt eines zu Hause, `full`), bei Stufe `offen` (nach dem Hau-ruck),
+ * ist sein Fest, aber erst, wenn die Strecke in die Grotte reicht (`farOf`: Ausbau 2, Tor offen; zu Fuß gefüllt und
+ * vom Prellbock zu Bahnhof Bär gefahren ist es noch keins); danach Stufe `fest`, der Zug trägt den Kristall-Wimpel.
+ * Zierde, nie Bedingung: Nichts wartet darauf
+ */
+export const feast = (s: Rider): boolean =>
+  farOf(s) && stageOf(s.packs, TRAIN.id) === 'offen' && !!CAVE && full(s, CAVE);
+
 /**
  * Der Zug für die Fahr-Engine (`pack.rules.vehicle`): Eintrag, Strecke, nach der ersten Fahrt (`landed`); seine
  * Ziel-Gegend ist die Grotte (`needs`): vorgeladen schon, solange er nur bis zum Prellbock fährt, damit sie da ist, wenn
  * Bau 2 kommt; schlafen (Vorladen, mitwachsen-preload.ts) muss er ohne sie erst ab Ausbau 2, wenn er hineinfährt
  * (`reaches`). Die erste Fahrt wartet nie auf die Grotte. Bau 2 (mitwachsen-build2.ts): beginnt beim Abfahren von
- * Bahnhof Bär nach dem Hau-ruck (`depart`), der Zug hält am Prellbock, bis Tok fertig ist (`hold`)
+ * Bahnhof Bär nach dem Hau-ruck (`depart`), der Zug hält am Prellbock, bis Tok fertig ist (`hold`). Die erste Heimfahrt
+ * nach voller Höhlen-Leiste ist die Laternenfahrt (`feast`)
  */
 export const train: Vehicle = {
   spec: TRAIN,
@@ -153,6 +167,7 @@ export const train: Vehicle = {
   landed,
   depart: depart2,
   hold: hold2,
+  feast,
   needs: ['hoehle'],
   reaches: (s) => builtOf(s.packs) >= 2,
 };

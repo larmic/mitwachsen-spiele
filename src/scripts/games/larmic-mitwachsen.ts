@@ -53,7 +53,8 @@ import { heldTired, restPose, type Pose } from './mitwachsen-tired';
 import { advance, evening, freshDay, late, loadTired, newDay, saveTired, type Tired } from './mitwachsen-tired';
 import type { TiredEvent } from './mitwachsen-tired';
 import type { PackEvent } from './mitwachsen-pack-types';
-import { seatOf, withHop, type RideBody } from './mitwachsen-ride-view';
+import { CHORUS_MS, seatOf, withHop, type RideBody } from './mitwachsen-ride-view';
+import { GoodNights, endsBedtime, rideLight } from './mitwachsen-bedtime';
 import { awayIn, packScore } from './mitwachsen-view';
 import { listenTap } from './mitwachsen-tap';
 import { SLEEP_EVENT, type GameMoment } from './pwa-update';
@@ -112,6 +113,7 @@ class LarmicMitwachsen extends HTMLElement {
   // seit wann die Figur schläft (performance.now): für die Überblendung und App-Updates. Solange ein Welt-Paket lädt,
   // gibt es noch keine Figur: wie eine Welt, die schlafend öffnet (unendlich lange), sonst wartete ein App-Update
   private nightSince = -Infinity;
+  private nights = new GoodNights(); // „Gute Nacht, Fahrzeuge“ (mitwachsen-bedtime.ts)
   private dayAt = 0;
   private resize: ResizeObserver | null = null;
   private readonly reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -356,6 +358,7 @@ class LarmicMitwachsen extends HTMLElement {
     // Abend für die Regeln (Tok kommt dann schon schlafend): aus der Uhr des Kinds, im Blick hinein auch per `&abend=1`
     const dusk = late(this.tired, Date.now()) || devLate(this.glimpse.packs, location.search);
     if (this.state.late !== dusk) this.state = { ...this.state, late: dusk };
+    if (endsBedtime(cmd, this.state.sleeping)) this.nights.end(); // jede Taste beendet „Gute Nacht“ sofort
     const { state, events } = step(this.state, this.world, cmd, this.seen, this.guide, this.packs.loaded);
     this.state = state;
     // Ist die Leiste der Lichtung voll, gelten die Regeln des Pinguins aus dem Paket der Eis-Welt (bis er im Kessel wohnt)
@@ -600,6 +603,7 @@ class LarmicMitwachsen extends HTMLElement {
           persist = true;
           break;
         case 'wake':
+          this.nights.stop();
           this.sfx.wake();
           this.dayAt = now;
           this.hops.set('player', now);
@@ -644,6 +648,7 @@ class LarmicMitwachsen extends HTMLElement {
     this.sfx.score(fx?.score ?? []);
     if (fx?.who) this.hops.set(fx.who, now);
     if (fx?.who && fx.heart) this.float('heart', fx.who, GAME_COLORS.heart, now + 150);
+    for (const id of fx?.chorus ?? []) this.hops.set(id, now + CHORUS_MS); // antworten kurz danach (Pfeif-Gruß)
     if (fx?.burst) this.burst('', fx.burst, 24, { x: e.x, y: e.y, z: this.world.cell(e.x, e.y).h + 0.4 });
     if (fx?.zzz && !this.reduced.matches) {
       const z = this.world.cell(e.x, e.y).h + 1.2; // ein schlafendes Fahrzeug: Zzz über dem Dach (Ort statt Wesen)
@@ -680,8 +685,11 @@ class LarmicMitwachsen extends HTMLElement {
    * Laterne am Abend und in der Nacht
    */
   private rideFrame(t: number, night: number) {
-    const lit = night > 0.3 || (!this.state.sleeping && evening(this.tired) > 0.3);
-    const at = { now: t, frac: Math.min(1, (t - this.tickAt) / TICK_MS), reduced: this.reduced.matches, lit };
+    const asleep = this.state.sleeping ? this.nights.out((t - this.nightSince) / 1000) : []; // nach „Gute Nacht“
+    const frac = Math.min(1, (t - this.tickAt) / TICK_MS);
+    // Laterne und Lampen am Abend und nachts, ab 20 min warmes Licht (Fensterband des Zugs)
+    const { lit, warm } = rideLight(night, evening(this.tired), this.state.sleeping, this.state.late);
+    const at = { now: t, frac, reduced: this.reduced.matches, lit, warm, asleep };
     this.rides = this.renderer.all((v) => v.bodies?.(this.state, this.world, at) ?? []);
   }
 
@@ -700,6 +708,8 @@ class LarmicMitwachsen extends HTMLElement {
     this.story.stop();
     this.sfx.lullaby();
     this.nightSince = now;
+    // die Fahrzeuge in Sichtweite sagen nacheinander gute Nacht und machen ihr Licht aus (`View2D.goodNight`)
+    this.nights.start(this.renderer.all((v) => [v.goodNight?.(this.state, this.world)].filter((g) => g !== undefined)));
     this.tired = freshDay(Date.now());
     this.sitUntil = 0;
     this.bubble.hidden = true;
@@ -866,6 +876,7 @@ class LarmicMitwachsen extends HTMLElement {
   private sounds(t: number) {
     this.storyFrame(t);
     this.ambient(t);
+    if (this.state.sleeping) this.sfx.score(this.nights.tones((t - this.nightSince) / 1000)); // „Gute Nacht“
   }
 
   /** Töne der Umgebung aus den Welt-Paketen (Grotte: „plink“ der Tropfsteine), nur, solange gespielt wird */
@@ -955,7 +966,7 @@ class LarmicMitwachsen extends HTMLElement {
       gates: gates as Scene['gates'],
       // die Grotte bleibt hell wie die Dämmerung; im Tunnel gedimmt, nie dunkler als sie
       night: tunnelNight(nightIn(realm, night), this.dimFrame(dt)),
-      evening: this.state.sleeping ? 0 : evening(this.tired),
+      evening: rideLight(0, evening(this.tired), this.state.sleeping, this.state.late).evening,
       weather,
       aurora: aurora * night,
       glance,

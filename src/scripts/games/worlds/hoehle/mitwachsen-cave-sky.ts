@@ -2,11 +2,13 @@
 // die Figur in der Grotte ist; die 3D-Ansicht reicht ihre eigene Projektion herein): der fallende Tropfen
 // (mitwachsen-drips.ts), der Grottenolm am Steg (mitwachsen-olm-look.ts), die Fledermaus auf ihrer Runde und in 3D der
 // helle Schein einer Säule, die gerade klingt (mitwachsen-chime-look.ts; in 2D leuchtet die Säule selbst), dazu der
-// Lichtkreis um die Figur (mitwachsen-glow.ts; auch im Nebel, er gehört zur Figur). Im Nebel zeigt sich sonst nichts. Bei reduzierter Bewegung kein Tropfen und keine Flugrunde. Wetter gibt es in der Grotte keins.
+// Lichtkreis um die Figur (mitwachsen-glow.ts; auch im Nebel, er gehört zur Figur), am Abend in 3D das golden-orange
+// Licht der Schächte und die Fledermaus-Runden um den Schacht über dem Bett (mitwachsen-dusk-look.ts). Im Nebel zeigt
+// sich sonst nichts. Bei reduzierter Bewegung kein Tropfen und keine Flugrunde. Wetter gibt es in der Grotte keins.
 // Teil des Welt-Pakets der Höhlenwelt.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Schmuck der Grotte“)
 
-import { drawModel, type Projection } from '../../../../lib/games/front';
+import { drawModel, type Dir, type Projection } from '../../../../lib/games/front';
 import { CAVE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
 import { CAVE_SPECIES } from '../../../../data/games/mitwachsen-hoehle';
 import { GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
@@ -19,12 +21,20 @@ import type { Chime } from './mitwachsen-chime-look';
 import type { Drips } from './mitwachsen-drips';
 import { OLM_MS, type Olm } from './mitwachsen-olm-look';
 import { circleOf, drawCircle, type Circle } from './mitwachsen-glow';
+import { drawDusk, type Dusk } from './mitwachsen-dusk-look';
 
 /**
  * Was die Grotte sich fürs Bild merkt: Glockenspiel, Tropfen, Grottenolm; Licht: seit wann die Figur die Laterne trägt
- * (`since`, ms; für das Wachsen des Lichtkreises) und der zuletzt gezeichnete Lichtkreis (`drawn`, für die Tests)
+ * (`since`, ms; für das Wachsen des Lichtkreises) und der zuletzt gezeichnete Lichtkreis (`drawn`, für die Tests); am
+ * Abend, welche Fledermäuse gerade Runden fliegen (`dusk`, mitwachsen-dusk-look.ts)
  */
-export type CaveFx = { chime: Chime; drips: Drips; olm: Olm; light: { since?: number; drawn?: Circle | null } };
+export type CaveFx = {
+  chime: Chime;
+  drips: Drips;
+  olm: Olm;
+  light: { since?: number; drawn?: Circle | null };
+  dusk?: Dusk;
+};
 
 const [WATER, WATER_TOP] = GROTTE_COLORS.water;
 
@@ -34,6 +44,7 @@ const [WATER, WATER_TOP] = GROTTE_COLORS.water;
  */
 type CaveScene = SkyScene & {
   lit3d?: boolean;
+  evening?: number;
   bodies?: ReadonlyMap<string, { x: number; y: number; z: number; hop: number }>;
 };
 
@@ -58,6 +69,10 @@ export function circleNow(
 /** `Sky.weather` der Grotte: alles, was sich in ihrer Luft bewegt, und der Lichtkreis um die Figur */
 export function caveWeather(fx: CaveFx): Sky['weather'] {
   return (ctx, world, sc: CaveScene, P, state) => {
+    // Abend (und Schlaf im Höhlenbett): Fledermäuse fliegen Runden um den Schacht über dem Bett; in 3D Abendlicht
+    const fly = (x: number, y: number, z: number, dir: Dir) =>
+      drawModel(ctx, P, CAVE_MODELS.fledermaus, x, y, z, dir, CAVE_SPECIES.fledermaus.scale);
+    fx.dusk = drawDusk(ctx, world, P, sc, state, fly);
     const me = sc.bodies?.get('player');
     const circle = me ? circleNow(world, state, fx, sc.now, sc.reduced) : null;
     fx.light.drawn = circle;

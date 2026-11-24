@@ -113,6 +113,9 @@ export function rideTicks(spec: Pick<Vehicle['spec'], 'ticks' | 'pace'>, len: nu
   return Math.min(hi, Math.max(lo, Math.round(spec.pace ? len / spec.pace : len * 1.5)));
 }
 
+/** Erste Heimfahrt eines Fahrzeugs, das erst danach auf der Lichtung hält (Schlitten, `spec.out` `'fest'`) */
+const firstHome = (c: Ctx, s: Rider) => stageOf(s.packs, c.id) === 'bereit' && c.v.spec.out === 'fest';
+
 /**
  * Einsteigen: Die Figur setzt sich, folgende Tiere setzen sich auf die Warteplätze des Halts; dort warten sie, bis die
  * Figur wieder nah ist (`bench`) oder schläft
@@ -122,8 +125,8 @@ function board(c: Ctx, s: Rider, world: World, at: Parked, events: RideEvents) {
   const len = c.r.path.length - 1;
   const ticks = rideTicks(c.v.spec, len);
   const to: End = at.end === 'home' ? 'out' : 'home';
-  // erste Heimfahrt eines Fahrzeugs, das erst danach auf der Lichtung hält (Schlitten): sein Fest
-  const feast = to === 'out' && stageOf(s.packs, c.id) === 'bereit' && c.v.spec.out === 'fest';
+  // sein Fest (`Vehicle.feast`; sonst die erste Heimfahrt eines Fahrzeugs, das erst danach auf der Lichtung hält: Schlitten)
+  const feast = to === 'out' && (c.v.feast?.(s, world) ?? firstHome(c, s));
   s.ride = {
     id: c.id,
     phase: 'seated',

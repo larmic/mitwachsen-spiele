@@ -101,6 +101,7 @@ export type Cell = {
   story?: StoryId; // Klangstein dieser Geschichte
   note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz); Kristallgrotte: Ton einer Säule, Teil, Höhe oder Ende des Stegs
   light?: number; // so viel heller (0 … 0,5) ist das Feld in der Grotte: Lichtschacht, Kristall oder Leuchtpilz daneben
+  shaft?: number; // Lichtfleck dieses Lichtschachts der Grotte liegt hier (0 über dem Bett, 1 Kristallhalle, 2 am See): abends golden-orange, Fledermaus-Runden
   dim?: number; // so viel dunkler (0 … 0,3) ist das Feld in der Grotte: Felswand oder Boden nah an ihr (nie auf Wegen, am Bett, im Licht)
   perch?: number; // Sitzplatz zum Hängen so hoch über dem Feld (unter dem Kristallbogen): Tiere mit Ruhehaltung hängen dort (`Species.roost`)
   slide?: true; // Rutschspur vom Eistor zum Schneebett (begehbar; glänzt, sobald das Tor offen ist)

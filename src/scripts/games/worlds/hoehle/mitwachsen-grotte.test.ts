@@ -7,6 +7,7 @@ import { DIRS, type Dir } from '../../../../lib/games/front';
 import { platformsToWake } from '../../mitwachsen-portal';
 import { initialState, step, type State } from '../../mitwachsen-state';
 import { caveBoxes } from './mitwachsen-cave-look';
+import { roundCentre } from './mitwachsen-dusk-look';
 import { DUSK_DAY, DUSK_SKY, dayOf, nightIn, nightMix, sunLevel, type Rgb } from '../../mitwachsen-dusk';
 import { beyondRing, canStep, kesselPlace, type World } from '../../mitwachsen-world';
 import { HOEHLE_PACK, PACKS, REGRESSION_SEEDS, SAMPLE_SEEDS, seedRange, seedsFor, worldOf } from '../../test-worlds';
@@ -215,6 +216,14 @@ describe('Kristallgrotte: Gelände', () => {
     const floor = [...steps.keys()].filter((k) => {
       const [x, y] = k.split(',').map(Number) as [number, number];
       return w.cell(x, y).region === 'hoehle';
+    });
+
+    it(`Seed ${seed}: Abend (Schmuck mit Zug): jeder der drei Schächte hat seinen begehbaren Lichtfleck (\`Cell.shaft\`), die Fledermaus-Runde ihre Mitte über dem Bett`, () => {
+      const lit = placeOf(seed).cells.map((p) => w.cell(...p));
+      const open = new Set(lit.filter((c) => c.shaft !== undefined && !c.solid).map((c) => c.shaft));
+      const centre = roundCentre(w);
+      const near = !!centre && Math.hypot(centre.x - 0.5 - bed[0], centre.y - 0.5 - bed[1]) < 2;
+      expect({ seed, open: [...open].sort(), near }).toEqual({ seed, open: [0, 1, 2], near: true });
     });
 
     it(`Seed ${seed}: etwa 10.000 Felder, jedes begehbare Feld vom Bett aus erreichbar, der Gang bis zum Tor auch`, () => {

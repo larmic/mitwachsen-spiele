@@ -6,7 +6,7 @@
 // künftigen Bahnhof Bär am nächsten liegt, mit „Ju-hu“. Er hüpft zur Figur (Hüpfer, Herz), dann stellt er sich an den
 // künftigen Bahnsteig und ruft dort höchstens alle 4 s. Geht sie vorher weg, beginnt die Wartezeit neu. Am Abend (die
 // Uhr des Kinds hat `BED_AT` erreicht, `late`) kommt er schon schlafend und liegt neben dem Bett („Zzz“); er wacht erst
-// am nächsten echten Spieltag auf (mehr als `BREAK` Pause, `wakeTok` in mitwachsen-ride-save.ts), Schlafen im Spiel
+// am nächsten echten Spieltag auf (mehr als `BREAK` Pause, `wakeRides` in mitwachsen-ride-save.ts), Schlafen im Spiel
 // weckt ihn nicht. Gespeichert wird nur `packs.fahrt.hoehle = { stage: 'faellig', schlaeft? }`, nie wo er steht. Er steht nie
 // im Weg: Läuft die Figur in ihn hinein, während er an seinem Platz steht, beginnt er Bau 1 (mitwachsen-build.ts; nur
 // in einer Welt, in der Bahnhof Bär Platz hat), sonst singt und hüpft er; schläft er, schnarcht er leise. Nach der ersten
@@ -158,7 +158,7 @@ const tokAt = (s: Heralded, [x, y]: Point): Walker => ({
 /**
  * Nach jedem Befehl (`HeraldRules.step`): fällig werden, auftauchen (bzw. am Abend schlafend kommen), zur Figur hüpfen,
  * an seinen Platz gehen, dort rufen; nachts neben dem Bett, morgens ruft er; schläft er seit dem Abend, wacht er auf,
- * sobald der Spielstand es sagt (`wakeTok`)
+ * sobald der Spielstand es sagt (`wakeRides`)
  */
 export function tokStep(
   s: Heralded,

@@ -21,6 +21,8 @@ export const JINGLE_EVERY = 15; // höchstens so oft bimmelt bzw. tutet es (Anst
 export const TAP_REACH = 4; // Antippen wirkt bis zu so vielen Feldern (Schachbrett)
 export const CHEER = 4; // auf der Festfahrt winken Tiere und Schneemänner bis so weit
 export const SNORE_EVERY = 30; // ein schlafendes Fahrzeug (ein Paket fehlt noch) schnarcht so oft, wenn die Figur nah ist
+/** „Gute Nacht, Fahrzeuge“: Ein Fahrzeug, dessen Halt höchstens so weit (Schachbrett) vom Lichtungsbett steht, ist in Sichtweite */
+export const SIGHT = 20;
 const EPS = 1e-6;
 
 export const key = (x: number, y: number) => `${x},${y}`;
@@ -98,4 +100,21 @@ export function trotFrom(r: Pick<RideRoute, 'path'>, world: World, [sx, sy]: Poi
       for (let x = sx - d; x <= sx + d && !best; x++)
         if (cheb(x, y, sx, sy) === d && world.cell(x, y).deco === 'tree') best = [x, y];
   return best ?? r.path[Math.min(8, r.path.length - 1)]!;
+}
+
+/**
+ * „Gute Nacht, Fahrzeuge“ (Konzept „Reisewege“): Schläft die Figur im Bett der Lichtung und steht das Fahrzeug an seinem
+ * Halt in Sichtweite (`SIGHT` Felder vom Bett, der Zug an Bahnhof Bär, der Schlitten auf seinem Platz), wo es steht;
+ * sonst undefined (wach, in einem anderen Bett, unterwegs, zu weit weg oder noch nicht da)
+ */
+export function bedSight(
+  spec: Pick<RideSpec, 'id' | 'out'>,
+  r: RideRoute,
+  s: Pick<Rider, 'packs' | 'ride' | 'player' | 'docked' | 'sleeping'>,
+  world: World,
+): Parked | undefined {
+  const [bx, by] = world.homes.lichtung.bed;
+  if (!s.sleeping || s.player.x !== bx || s.player.y !== by) return undefined;
+  const at = parked(spec, r, s, world);
+  return at && cheb(...at.seat, bx, by) <= SIGHT ? at : undefined;
 }

@@ -112,10 +112,13 @@ export const withTok = (packs: Readonly<Record<string, unknown>>, save: RideEntr
 export const sledHome = (packs: Readonly<Record<string, unknown>>): boolean => stageOf(packs, 'schlitten') === 'fest';
 
 /**
- * Ein neuer echter Spieltag (`WorldPack.dawn`, mehr als `BREAK` Pause): Tok, der am Abend schlafend kam, wacht auf
- * (`schlaeft` fällt weg). Ohne Änderung derselbe Zustand
+ * Ein neuer echter Spieltag (`WorldPack.dawn`, mehr als `BREAK` Pause): Jedes Fahrzeug, dessen Bote am Abend schlafend
+ * kam (heute Tok, `packs.fahrt.hoehle`), wacht auf (`schlaeft` fällt bei allen weg; das Merkmal gilt für jedes Fahrzeug,
+ * Konzept „Reisewege“). Ohne Änderung derselbe Zustand
  */
-export function wakeTok(packs: Readonly<Record<string, unknown>>): Record<string, unknown> {
-  const tok = tokOf(packs);
-  return tok?.schlaeft ? withTok(packs, { ...tok, schlaeft: undefined }) : { ...packs };
+export function wakeRides(packs: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  let out: Record<string, unknown> = { ...packs };
+  for (const [id, e] of Object.entries(rideOf(packs)) as [RideId, RideEntry][])
+    if (e.schlaeft) out = put(out, id, entry(e.stage, undefined, e.gefahren));
+  return out;
 }

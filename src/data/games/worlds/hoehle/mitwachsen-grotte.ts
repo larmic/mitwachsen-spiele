@@ -133,4 +133,6 @@ export const GROTTE_COLORS = {
   shadow: '#2e2848',
   /** Lichtkreis um die Figur: kühles, helles Licht */
   circle: [240, 238, 255],
+  /** Abendlicht in den Lichtschächten (ab 20 min Spielzeit): golden-orange, halb durchsichtig über dem Lichtfleck */
+  dusk: '#ffa65c',
 } as const;

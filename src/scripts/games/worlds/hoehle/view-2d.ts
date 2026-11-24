@@ -4,9 +4,10 @@
 // (Quader aus mitwachsen-cave-look.ts, je Deko-Art an den Haken `drawDeco` des Kerns gehängt), Lichtflecken auf dem
 // Grottenboden, der lila Höhlenhimmel und das Zeichen der Gegend in der Leiste (ein Kristall). Dazu der Schmuck der
 // Grotte: Töne des Säulen-Glockenspiels und „blubb“ des Grottenolms (`score`), „plink“ der Tropfsteine (`ambient`) und
-// in der Luft Tropfen, Grottenolm und die Fledermaus auf ihrer Runde (`sky.weather`, mitwachsen-cave-sky.ts). Licht der
-// Grotte (mitwachsen-glow.ts): Schatten der Ränder auf Boden und Wand (`ground`), der Lichtkreis um die Figur in der
-// Luft; die Kristall-Laterne auf ihrem Sockel als Körper (`bodies`) und ihr Ton beim Nehmen (mitwachsen-lantern.ts). Das
+// in der Luft Tropfen, Grottenolm und die Fledermaus auf ihrer Runde (`sky.weather`, mitwachsen-cave-sky.ts), am Abend
+// golden-orange Lichtschächte (`ground`) und Fledermaus-Runden um den Schacht über dem Bett (mitwachsen-dusk-look.ts).
+// Licht der Grotte (mitwachsen-glow.ts): Schatten der Ränder auf Boden und Wand (`ground`), der Lichtkreis um die Figur
+// in der Luft; die Kristall-Laterne auf ihrem Sockel als Körper (`bodies`) und ihr Ton beim Nehmen (mitwachsen-lantern.ts). Das
 // Hau-ruck am Höhlentor (mitwachsen-heave-look.ts): Hände auf dem Stein, Fledermaus und Glühwürmchen als Körper, der
 // Stein in Dritteln (`ajar`), Töne der Stöße (`score`) und des Öffnens (`sky.gateScore`). Wetter gibt es in der Grotte
 // keins, Polarlicht auch nicht.
@@ -16,11 +17,12 @@ import { GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-g
 import type { RegionId } from '../../../../data/games/mitwachsen';
 import type { DrawDeco, Turn, View2D } from '../../mitwachsen-view';
 import { sprite } from '../../mitwachsen-glyphs';
-import { caveBoxes, columnBoxes, glowOver } from './mitwachsen-cave-look';
+import { caveBoxes, columnBoxes } from './mitwachsen-cave-look';
 import { caveWeather, type CaveFx } from './mitwachsen-cave-sky';
 import { Chime } from './mitwachsen-chime-look';
 import { Drips } from './mitwachsen-drips';
 import { Olm } from './mitwachsen-olm-look';
+import { duskAway, duskGround } from './mitwachsen-dusk-look';
 import { isWall, shadowOver } from './mitwachsen-glow';
 import { lanternBodies, lanternScore } from './mitwachsen-lantern';
 import { heaveAjar, heaveBodies, heaveScore, openScore } from './mitwachsen-heave-look';
@@ -60,11 +62,14 @@ export const fx: CaveFx = { chime: new Chime(), drips: new Drips(), olm: new Olm
 
 /**
  * Boden der Grotte (der Kern ruft das nur auf Grottenboden und Felswand): Lichtfleck unter einem Lichtschacht und neben
- * Kristallen als helles Licht obenauf; Ränder im Dunkel als halb durchsichtiger Schatten, an der Wand über ihren obersten
- * Block, auf dem Boden (auch unter Stalagmit oder Findling) obenauf (mitwachsen-glow.ts)
+ * Kristallen als helles Licht obenauf (am Abend unter den Schächten golden-orange, `duskGround`); Ränder im Dunkel als
+ * halb durchsichtiger Schatten, an der Wand über ihren obersten Block, auf dem Boden (auch unter Stalagmit oder Findling) obenauf (mitwachsen-glow.ts)
  */
-export const ground: View2D['ground'] = (c, x, y) => {
-  if (c.light) return [x, y, c.h, 1, 1, 0.01, glowOver(c.light), glowOver(c.light)];
+export const ground: View2D['ground'] = (c, x, y, _open, evening) => {
+  if (c.light) {
+    const glow = duskGround(c.light, c.shaft, evening); // am Abend unter den Schächten golden-orange
+    return [x, y, c.h, 1, 1, 0.01, glow, glow];
+  }
   if (!c.dim) return null;
   const s = shadowOver(c.dim);
   return isWall(c) ? [x, y, c.h - 1, 1, 1, 1, s, s] : [x, y, c.h, 1, 1, 0.01, s, s];
@@ -114,7 +119,7 @@ export const view: View2D & { fx: CaveFx } = {
   bodies: (state, world, at) => [...lanternBodies(state, world), ...heaveBodies(state, world, at)],
   ajar: (state, reduced) => heaveAjar(state, reduced), // der Rollstein in Dritteln
   // die verschlafene Fledermaus auf ihrer Runde hängt solange nicht an ihrem Sitzplatz
-  away: (x, y, now) => fx.chime.away(x, y, now),
+  away: (x, y, now) => fx.chime.away(x, y, now) || duskAway(fx.dusk, x, y, now), // auch am Abend auf ihren Runden
   // „plink“: höchstens ein Tropfen je 2 s in der Nähe der Figur, nur an Erkundetem
   ambient: (world, state, now, explored) => fx.drips.tick(world, state, now, explored),
   sky: {
