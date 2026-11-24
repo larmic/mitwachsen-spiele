@@ -15,8 +15,12 @@
 // Abend leuchten die Lampen; ab 20 min Spielzeit (und nachts) leuchtet das Fensterband warm; nach „Gute Nacht“ sind
 // Lampen, Fenster und Dampf aus, nur ein kleines Nachtlicht brennt; auf der Laternenfahrt leuchtet alles, und
 // Glühwürmchen folgen ihm, solange er in der Höhlenwelt ist (nicht bei reduzierter Bewegung); danach trägt die Lok den
-// Kristall-Wimpel (Stufe `fest`). Tok sitzt im hinteren Wagen, solange er nicht in der Bucht wartet. Teil des Pakets
-// der Bahn (view-2d.ts).
+// Kristall-Wimpel (Stufe `fest`). Tok sitzt im hinteren Wagen, solange er nicht in der Bucht wartet. Der Zug fährt immer
+// vorwärts: Geparkt behält er die Richtung, mit der er ankam (an Bahnhof Bär die Lok zu Bär, am Prellbock in der Bucht
+// und an Bahnhof Fledermaus zur Höhle); er dreht nur bei der Abfahrt, am Takt, an dem er losfährt (nach den 2 s, in denen
+// die Türen zu sind), hinter einer Dampfkugel je Wagen (`puffOf`; bei reduzierter Bewegung ohne Wolke, er steht einfach
+// richtig herum da). Lampen, Dampf, Tür, Tok im hinteren Wagen und die Glühwürmchen drehen mit. Teil des Pakets der Bahn
+// (view-2d.ts).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 1)
 
 import type { Dir, Part } from '../../../../lib/games/front';
@@ -27,6 +31,7 @@ import {
   ROOF,
   SIGN,
   carParts,
+  puffParts,
   rowParts,
   steamParts,
   type CarLook,
@@ -39,7 +44,8 @@ import type { World } from '../../mitwachsen-world';
 import { hutOf, rowsOf } from './mitwachsen-bear';
 import { builtOf } from './mitwachsen-built';
 import { key } from './mitwachsen-ground';
-import { parked } from '../../mitwachsen-ride-kit';
+import { DEPART, parked } from '../../mitwachsen-ride-kit';
+import type { End } from '../../mitwachsen-rider';
 import { ridden, stageOf, tokOf } from '../../mitwachsen-ride-save';
 import { LETTERS, STEPS } from './mitwachsen-trace';
 import { SEAT, TRAIN, bearEnd, farOf, inTunnel, lineOf, trainRoute } from './mitwachsen-train';
@@ -225,8 +231,49 @@ function stationParts(st: BearStation, world: World, work: number | undefined, r
 /** So viele Takte nach dem Anstoßen steht die Tür des mittleren Wagens einladend offen (1 s) */
 export const OPEN_TICKS = 10;
 
-/** Wo der Zug steht: das Gleis von Bahnhof Bär an und die Stelle der Front der Lok darauf */
-type Place = { line: readonly Point[]; front: number };
+/**
+ * Wo der Zug steht: das Gleis von Bahnhof Bär an, die Stelle des Endes zu Bahnhof Bär darauf (`front`) und wohin die
+ * Lok schaut (`heading`: `out` zu Bahnhof Bär, `home` zur Höhle)
+ */
+type Place = { line: readonly Point[]; front: number; heading: End };
+
+/**
+ * Wohin die Lok während einer Fahrt schaut: bis zur Abfahrt (Phase `seated`, Türen zu) wie angekommen, also zum Halt, an
+ * dem sie steht (die Gegenrichtung von `to`); ab dem Takt, an dem der Zug losfährt, in Fahrtrichtung (`to`). Geparkt
+ * schaut sie zum Halt, an dem sie steht. Der Spielstand weiß davon nichts, es ist nur Bild
+ */
+export function headingOf(ride: Pick<NonNullable<State['ride']>, 'phase' | 'to'>): End {
+  if (ride.phase !== 'seated') return ride.to;
+  return ride.to === 'out' ? 'home' : 'out';
+}
+
+/**
+ * Takte um die Abfahrt (0: der Takt, an dem der Zug losfährt und umdreht), in denen die Dampfkugeln wachsen (`from` bis
+ * `full`), ganz aufgeblüht decken (`full` bis `until`, auch wenn die 3D-Ansicht ein Bild auslässt) und vergehen (bis
+ * `gone`)
+ */
+export const PUFF_T = { from: -8, full: -3, until: 2, gone: 6 } as const;
+/** So viele Größen hat eine Dampfkugel (feste Modelle) */
+const PUFF_STEPS = 4;
+
+/**
+ * Größe der Dampfkugeln in diesem Bild (1 … `PUFF_STEPS`, `PUFF_STEPS` ganz deckend); undefined: keine Wolke (keine
+ * Fahrt des Zugs, er dreht nicht, reduzierte Bewegung, oder es ist vorbei). Die Zeit kommt aus der Fahrt: vor dem
+ * Losfahren aus den Takten seit dem Einsteigen, danach aus dem Weg (so puffert ein Halt vor einem Tier nicht noch einmal)
+ */
+export function puffOf(state: Pick<State, 'ride' | 'tick'>, world: World, at: RideAt): number | undefined {
+  const ride = state.ride?.id === TRAIN.id ? state.ride : undefined;
+  if (!ride || at.reduced || ride.phase === 'arrive') return undefined;
+  if (headingOf({ phase: 'seated', to: ride.to }) === ride.to) return undefined; // er dreht nicht (künftig: aus der Bucht in die Höhle)
+  const t =
+    ride.phase === 'seated'
+      ? state.tick - ride.at + at.frac - DEPART
+      : seatAt(ride, Infinity, world, at) / Math.max(ride.speed, 1e-6);
+  const { from, full, until, gone } = PUFF_T;
+  const size = t < full ? (t - from) / (full - from) : t <= until ? 1 : 1 - (t - until) / (gone - until);
+  const step = Math.ceil(Math.min(1, size) * PUFF_STEPS - 1e-9);
+  return step > 0 ? step : undefined;
+}
 
 /**
  * Fortschritt des Sitzes in diesem Bild: zwischen den Takten gleitend, außer der Zug hält am Prellbock, wo Tok Bau 2
@@ -253,15 +300,15 @@ function placeOf(st: BearStation, world: World, state: State, work: number | und
     const line = lineOf(world, farOf(state));
     const p = seatAt(ride, r.path.length - 1, world, at);
     const q = ride.to === 'out' ? line.length - 1 - SEAT - p : SEAT + p;
-    return { line, front: q - SEAT + PARK };
+    return { line, front: q - SEAT + PARK, heading: headingOf(ride) };
   }
   const end = r && (parked(TRAIN, r, state, world)?.end ?? state.docked?.[TRAIN.id]);
   if (r && end === 'home') {
     const line = lineOf(world, farOf(state));
-    return { line, front: line.length - 1 - 2 * SEAT + PARK };
+    return { line, front: line.length - 1 - 2 * SEAT + PARK, heading: 'home' };
   }
   const front = frontAt(st, state.player, work, at.reduced);
-  return front === undefined ? undefined : { line: st.line, front };
+  return front === undefined ? undefined : { line: st.line, front, heading: 'out' };
 }
 
 /**
@@ -293,10 +340,18 @@ function lightOf(world: World, state: State, at: RideAt, riding: boolean, dozing
   };
 }
 
+/** Blickrichtung eines Wagens, dessen Ende zu Bahnhof Bär an der Stelle `a` steht: wohin die Lok schaut (`heading`) */
+function carDir(world: World, place: Place, a: number): Dir {
+  const [fx, fy] = along(world, place.line, a);
+  const [bx, by] = along(world, place.line, a + CAR);
+  return place.heading === 'home' ? dirTo(bx - fx, by - fy) : dirTo(fx - bx, fy - by);
+}
+
 /**
  * Lok und zwei Wagen am Gleis (beim Bau rollen sie aus dem Tunnelportal heran; ein Wagen, dessen Mitte noch hinter dem
  * Portal ist, ist nicht zu sehen; unterwegs sitzt die Figur im mittleren Wagen, `seat`), Dampf über der Lok (nicht bei
- * reduzierter Bewegung)
+ * reduzierter Bewegung). Die Lok schaut nach `heading`: zu Bahnhof Bär steht sie am Ende zu Bär, zur Höhle am anderen;
+ * der mittlere Wagen bleibt, wo er ist. Dreht der Zug bei der Abfahrt, liegt über jedem Wagen eine Dampfkugel
  */
 function trainParts(st: BearStation, world: World, state: State, work: number | undefined, at: RideAt): RideBody[] {
   const place = placeOf(st, world, state, work, at);
@@ -306,15 +361,14 @@ function trainParts(st: BearStation, world: World, state: State, work: number | 
   const open = work !== undefined && work >= BUILD.door;
   const { dozing, gold, nudged, lit, warm, night } = doorOf(world, state, work, at, riding);
   const pennant = stageOf(state.packs, TRAIN.id) === 'fest';
-  const kinds: CarLook['kind'][] = ['loco', 'mid', 'rear'];
+  const home = place.heading === 'home';
+  const kinds: CarLook['kind'][] = home ? ['rear', 'mid', 'loco'] : ['loco', 'mid', 'rear'];
   const hidden = (a: number) => work !== undefined && st.portal !== undefined && a + CAR / 2 > st.portal;
   const out = kinds.flatMap((kind, i): RideBody[] => {
-    const a = place.front + i * GAP; // Front dieses Wagens
+    const a = place.front + i * GAP; // Ende dieses Wagens zu Bahnhof Bär
     if (hidden(a)) return [];
     const [x, y, z] = along(world, place.line, a + CAR / 2);
-    const [fx, fy] = along(world, place.line, a);
-    const [bx, by] = along(world, place.line, a + CAR);
-    const dir = dirTo(fx - bx, fy - by);
+    const dir = carDir(world, place, a);
     const [rx, ry] = RIGHT[dir];
     const side = rx * st.side[0] + ry * st.side[1] > 0 ? 1 : -1;
     const mid = kind === 'mid';
@@ -334,17 +388,41 @@ function trainParts(st: BearStation, world: World, state: State, work: number | 
     const seat = mid && riding ? { seat: true as const } : {};
     return [{ id: `${TRAIN_ID}:${kind}`, key: k, x, y, z, dir, parts: model(k, () => carParts(look)), ...seat }];
   });
+  // Während der Wolke kein Dampf und keine Glühwürmchen: sie springen beim Umdrehen ans andere Ende, und die Kugeln
+  // decken nur die Wagen; danach tauchen sie an der neuen Lok und hinter dem neuen letzten Wagen auf
+  const step = puffOf(state, world, at);
   const loco = out.find((b) => b.id === `${TRAIN_ID}:loco`);
-  if (loco && !at.reduced && !dozing && !night) {
+  if (loco && !at.reduced && !dozing && !night && step === undefined) {
     const phase = Math.floor(at.now / 400) % 4;
     const k = `${TRAIN_ID}:dampf:${phase}`;
     out.push({ ...loco, id: `${TRAIN_ID}:dampf`, key: k, parts: model(k, () => steamParts(phase)) });
   }
+  out.push(...puffs(place, world, step));
   // Laternenfahrt: Glühwürmchen folgen dem letzten Wagen, solange er in der Höhlenwelt ist
-  if (riding && state.ride?.feast) {
-    const tail = place.front + 2 * GAP + CAR + FLIES.behind;
-    const trail = Array.from({ length: FLIES.n }, (_, i) => along(world, place.line, tail + i * FLIES.apart));
+  if (riding && state.ride?.feast && step === undefined) {
+    const tail = home ? place.front - FLIES.behind : place.front + 2 * GAP + CAR + FLIES.behind;
+    const trail = Array.from({ length: FLIES.n }, (_, i) =>
+      along(world, place.line, tail + (home ? -i : i) * FLIES.apart),
+    );
     out.push(...fireflies(trail, world, at.now, at.reduced));
   }
   return out;
+}
+
+/** Dampfkugeln beim Umdrehen: je Wagen eine über seiner Mitte, so groß, wie `puffOf` sagt (sonst keine) */
+function puffs(place: Place, world: World, step: number | undefined): RideBody[] {
+  if (step === undefined) return [];
+  const k = `${TRAIN_ID}:puff:${step}`;
+  return [0, 1, 2].map((i) => {
+    const [x, y, z] = along(world, place.line, place.front + i * GAP + CAR / 2);
+    return {
+      id: `${TRAIN_ID}:puff:${i}`,
+      key: k,
+      x,
+      y,
+      z,
+      dir: 's',
+      parts: model(k, () => puffParts(step / PUFF_STEPS)),
+    };
+  });
 }

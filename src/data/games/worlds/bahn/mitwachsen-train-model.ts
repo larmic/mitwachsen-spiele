@@ -28,6 +28,7 @@ export const TRAIN_COLORS = {
   night: '#f6dca0', // kleines Nachtlicht nach „Gute Nacht“
   mast: '#8a5a34', // Stange des Kristall-Wimpels
   steam: '#ffffff',
+  puff: ['#e9ecf5', '#ffffff'], // Dampfkugel beim Umdrehen: Seiten leicht schattiert, oben weiß
   crystal: ['#b48cf0', '#6fd6f0', '#f08cc8'], // Raute: lila, türkis, rosa
   bat: { p: '#f2a7b8', g: '#a08c7c', k: '#1d2838', l: '#f2a7b8', w: '#b9b2dc' },
 } as const;
@@ -196,6 +197,25 @@ export const steamParts = (phase: number): Part[] =>
     const s = 0.1 + k * 0.03;
     return [0.4 - k * 0.12, -s / 2 + (i - 1) * 0.08, 1.0 + k * 0.2, s, s, s, TRAIN_COLORS.steam];
   });
+
+/** Durchmesser der Dampfkugel über einem Wagen beim Umdrehen, ganz aufgeblüht (in Feldern; ein Wagen ist 1,6 lang) */
+export const PUFF = 1.8;
+/** Höhe der Mitte der Dampfkugel über dem Gleis: so deckt sie den Wagen samt Kopf der Figur und Wimpel */
+const PUFF_Z = 0.7;
+
+/**
+ * Dampfkugel über einem Wagen, wenn der Zug bei der Abfahrt umdreht (`scale` 0 … 1 von `PUFF`): drei Kreuzbalken und ein
+ * Würfel, zusammen rund, ganz deckend (eigene Voxel-Grafik), nie unter den Boden
+ */
+export const puffParts = (scale: number): Part[] => {
+  const d = PUFF * scale;
+  const cube = (l: number, w: number, h: number): Part => {
+    const z0 = Math.max(0, PUFF_Z - h / 2);
+    return [-l / 2, -w / 2, z0, l, w, PUFF_Z + h / 2 - z0, ...TRAIN_COLORS.puff];
+  };
+  const [a, b] = [d, d * 0.66];
+  return [cube(a, b, b), cube(b, a, b), cube(b, b, a), cube(d * 0.86, d * 0.86, d * 0.86)];
+};
 
 // ---------- Bahnhof Bär ----------
 // Eine Reihe des Bahnsteigs schaut vom Gleis weg (vorn): von −1 (Kante am Gleis) bis +1 (hinten), quer −0,5 … 0,5.
