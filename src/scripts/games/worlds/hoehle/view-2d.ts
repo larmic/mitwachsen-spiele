@@ -17,7 +17,7 @@ import { GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-g
 import type { RegionId } from '../../../../data/games/mitwachsen';
 import type { DrawDeco, Turn, View2D } from '../../mitwachsen-view';
 import { sprite } from '../../mitwachsen-glyphs';
-import { caveBoxes, columnBoxes, patchOf } from './mitwachsen-cave-look';
+import { caveBoxes, columnBoxes, patchOf, waterfallBoxes } from './mitwachsen-cave-look';
 import { caveWeather, type CaveFx } from './mitwachsen-cave-sky';
 import { Chime } from './mitwachsen-chime-look';
 import { Drips } from './mitwachsen-drips';
@@ -79,6 +79,9 @@ export const ground: View2D['ground'] = (c, x, y, _open, evening) => {
   return isWall(c) ? [x, y, c.h - 1, 1, 1, 1, s, s] : [x, y, c.h, 1, 1, 0.01, s, s];
 };
 
+/** Wasserfall am See: helle Streifen gleiten hinunter, bei reduzierter Bewegung stehen sie still */
+const fall: DrawDeco = (_world, c, x, y, { now, reduced }) => waterfallBoxes(c, x, y, reduced ? undefined : now);
+
 /** Kristallsäule: leuchtet kurz heller, nachdem sie geklungen hat */
 const column: DrawDeco = (_world, c, x, y, { now }) => columnBoxes(c, x, y, fx.chime.glow(x, y, now));
 
@@ -105,6 +108,12 @@ export const view: View2D & { fx: CaveFx } = {
     clay: look,
     puddle: look,
     fern: look,
+    // Fülle: Kristallfelder, Adern, Leuchtmoos (flach), der Wasserfall am See (in 2D gleiten helle Streifen hinunter, bei reduzierter
+    // Bewegung stehen sie still)
+    crystalfield: look,
+    vein: look,
+    glowmoss: look,
+    waterfall: fall,
     lantern: look, // Sockel; die Laterne darauf kommt als Körper (`bodies`)
   },
   ground,

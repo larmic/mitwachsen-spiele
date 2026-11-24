@@ -8,9 +8,9 @@ import { SHROOM_COLORS } from '../../../../data/games/mitwachsen-hoehle';
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import type { Cell } from '../../mitwachsen-cell';
 import type { Box } from '../../mitwachsen-view';
-import { caveBoxes, columnBoxes, lighten, patchOf } from './mitwachsen-cave-look';
+import { adornBoxes, caveBoxes, columnBoxes, lighten, patchOf } from './mitwachsen-cave-look';
 import { fromMouth } from './mitwachsen-grotte';
-import { tipOf } from './mitwachsen-fill';
+import { crystalOf, tipOf, veinOf } from './mitwachsen-fill';
 import { FLOOR, brightness, masked, rgbOf, type Rgb } from './mitwachsen-mask';
 import { view } from './view-2d';
 import { view3d } from './view-3d';
@@ -29,8 +29,8 @@ const FLOORS: [string, Rgb][] = [
 ];
 /** Boden unter der vollen Maske (abseits der Figur), auch auf den Flecken */
 const DARK = FLOORS.map(([name, c]): [string, Rgb] => [name, masked(c, GROTTE.dark.mask)]);
-/** Was leuchtet: Kristalle (auch Büsche, Lampen, Bogen, Säulen), Leuchtpilze (auch Beete und Schale) */
-const GLOWING = [...C.crystals, ...SHROOM_COLORS];
+/** Was leuchtet: Kristalle (auch Büsche, Felder, Lampen, Bogen, Säulen), Leuchtpilze (auch Beete und Schale), Leuchtmoos */
+const GLOWING = [...C.crystals, ...SHROOM_COLORS, C.glowmoss[1]];
 
 /** Farbton (0 … 360) und Sättigung (HSL, 0 … 1) */
 function hueSat(hex: string): [number, number] {
@@ -189,5 +189,57 @@ describe('Flecken im Grottenboden (2D) und Boden in 3D', () => {
     expect(view3d.ground(cell(null), [])?.top).toBe(C.floor);
     expect(view3d.ground(cell(null, { shade: -1 }), [])?.top).toBe(C.floor);
     expect(brightness(rgbOf(C.floor))).toBeLessThan(brightness(rgbOf('#e6e2f2')));
+  });
+});
+
+describe('Fülle (Schritt 8): Kristallfelder, Adern, Leuchtmoos', () => {
+  it('Kristalle je Zone in einer Farbe: Halle und Lehmhang lila, Tropfsteingrotte, See und Pilzgarten rosa, nie Türkis', () => {
+    const { garden, hall, drip, clay, lake } = GROTTE;
+    const [lila, , rosa] = C.crystals;
+    expect(crystalOf(...fromMouth([hall.across, hall.out]))).toBe(lila);
+    expect(crystalOf(...fromMouth([drip.across, drip.out]))).toBe(rosa);
+    expect(crystalOf(...fromMouth([lake.across, lake.out]))).toBe(rosa);
+    expect(crystalOf(...fromMouth([drip.across + drip.basin, drip.out]))).toBe(rosa); // am Felsbecken
+    expect(crystalOf(...fromMouth([garden.across, garden.out]))).toBe(rosa);
+    expect(crystalOf(...fromMouth([clay.across, clay.out]))).toBe(lila);
+    // Türkis bleibt dem Wasser: kein Kristall der Füllung, auch kein flaches Kristallfeld, liest sich als Wasser
+    const zones = [garden, hall, drip, clay, lake].map((z) => crystalOf(...fromMouth([z.across, z.out])));
+    expect(zones.filter(watery)).toEqual([]);
+    expect(zones).not.toContain(C.crystals[1]);
+  });
+
+  it('Adern nur Rosa (Tropfsteingrotte) oder Lila (sonst): nie Türkis oder Blau, nie Gold, dunkler als der Boden, aber zu sehen', () => {
+    const { hall, drip, garden, lake } = GROTTE;
+    expect(veinOf(...fromMouth([drip.across, drip.out]))).toBe(C.veins[1]);
+    expect(veinOf(...fromMouth([lake.across, lake.out]))).toBe(C.veins[1]);
+    expect(veinOf(...fromMouth([hall.across, hall.out]))).toBe(C.veins[0]);
+    expect(veinOf(...fromMouth([garden.across, garden.out]))).toBe(C.veins[0]);
+    const hues = C.veins.map((c) => hueSat(c)[0]);
+    expect(hues[0]).toBeGreaterThan(240); // Lila
+    expect(hues[0]).toBeLessThan(290);
+    expect(hues[1]).toBeGreaterThan(300); // Rosa
+    expect([...C.veins].filter(watery)).toEqual([]);
+    expect([...C.veins].filter(goldish)).toEqual([]);
+    for (const v of C.veins)
+      for (const [name, f] of FLOORS) {
+        expect(brightness(rgbOf(v)), `${v} ${name}`).toBeLessThan(brightness(f)); // leuchtet nicht
+        expect(contrast(rgbOf(v), f), `${v} ${name}`).toBeGreaterThanOrEqual(1.4); // ein Streifen, kein Hauch
+      }
+  });
+
+  it('Leuchtmoos hellgrün #86e05a, gegen den Boden unter der Maske mindestens 3 : 1, heller als das Moos der Wiese, nie Gold', () => {
+    expect(C.glowmoss[1]).toBe('#86e05a');
+    for (const m of C.moss) expect(brightness(rgbOf(C.glowmoss[1]))).toBeGreaterThan(brightness(rgbOf(m)));
+    expect([...C.glowmoss].filter(goldish)).toEqual([]);
+    expect([...C.glowmoss].filter(watery)).toEqual([]);
+    // das Polster zeigt die helle Farbe obenauf, an der Wand wächst es hoch (`note` die Seite)
+    const flat = adornBoxes(cell('glowmoss', { solid: false }), 3, 4)!;
+    const wall = adornBoxes(cell('glowmoss', { solid: false, note: 0 }), 3, 4)!;
+    expect(flat.every((b) => b[7] === C.glowmoss[1])).toBe(true);
+    expect(Math.max(...flat.map((b) => b[2] + b[5]))).toBeLessThan(1.15);
+    const climb = wall.reduce((a, b) => (b[5] > a[5] ? b : a));
+    expect(climb[5]).toBeGreaterThan(0.8);
+    expect(climb[3]).toBeGreaterThan(climb[4]); // Norden: an der Wand quer, dünn
+    expect(climb[1]).toBe(4); // an der Nordkante des Felds
   });
 });

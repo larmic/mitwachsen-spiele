@@ -8,7 +8,8 @@
 // Weiche Löcher (`maskHoles`): um die Figur `hole` Felder, mit der Kristall-Laterne `lantern` (wächst wie der Lichtkreis,
 // bei reduzierter Bewegung sofort), im Fahrzeug um den Sitz und an den Lampen vorn; feste Löcher an den drei
 // Lichtschächten, der Wiese am Bett, dem Bahnhof Fledermaus und der Mündung des Gangs; kleine Löcher an Kristallen,
-// Säulen, Lampen, vollen Pilzbeeten, der Tropfquelle und an Tieren, nur nah an der Figur (je Feld der Figur gesucht,
+// Säulen, Lampen, vollen Pilzbeeten, der Tropfquelle, Leuchtmoos, der Mitte eines Kristallfelds, dem Wasserfall und an
+// Tieren, nur nah an der Figur (je Feld der Figur gesucht,
 // zum Rand von `near` hin weich auslaufend, nie ein Sprung). Höchstens `most` Löcher je Bild, die nächsten zuerst. Die
 // Wege (Mündung zum Bett, Bett zum See) sind schwache weiche Bänder, je eine Linie. Die Maske liegt auf den Feldern der
 // Grotte (hinter der Mündung), erkundet oder im Nebel (der Nebel ist heller als der Boden unter der Maske); im Gang
@@ -214,7 +215,10 @@ export function fixedHoles(world: Cave): Hole[] {
   return holes;
 }
 
-/** Was in der Grotte als kleines Licht leuchtet, und wie groß sein Loch ist (Pilzbeete nur voll) */
+/**
+ * Was in der Grotte als kleines Licht leuchtet, und wie groß sein Loch ist (Pilzbeete nur voll, ein Kristallfeld nur in
+ * seiner Mitte, `note` 1: ein Loch je Feld, nicht je Splitter)
+ */
 const SMALL: Partial<Record<NonNullable<Cell['deco']>, number>> = {
   crystal: D.small.crystal,
   crystalbush: D.small.crystal,
@@ -224,6 +228,9 @@ const SMALL: Partial<Record<NonNullable<Cell['deco']>, number>> = {
   cavelamp: D.small.lamp,
   shroombed: D.small.bed,
   dripspring: D.small.spring,
+  glowmoss: D.small.moss,
+  crystalfield: D.small.field,
+  waterfall: D.small.fall,
 };
 
 type Near = { at: string; found: (Hole & { bed?: string })[] };
@@ -241,7 +248,7 @@ export function smallNear(world: Pick<World, 'cell' | 'realm'>, x: number, y: nu
     for (let dx = -REACH; dx <= REACH; dx++) {
       if (dx * dx + dy * dy > REACH * REACH) continue;
       const c = world.cell(x + dx, y + dy);
-      const r = c.deco ? SMALL[c.deco] : undefined;
+      const r = c.deco && (c.deco !== 'crystalfield' || c.note === 1) ? SMALL[c.deco] : undefined;
       if (r === undefined || world.realm(x + dx, y + dy) !== 'hoehle') continue;
       const hole = centre(world, [x + dx, y + dy], r);
       found.push(c.deco === 'shroombed' ? { ...hole, bed: `${x + dx},${y + dy}` } : hole);

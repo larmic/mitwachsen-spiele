@@ -75,6 +75,10 @@ export type Deco =
   | 'mosstop' // Moos auf einer flachen Felsinsel, eine Stufe hoch (begehbar)
   | 'clay' // Lehm am Hang des Dachses neben dem Pilzgarten (begehbar)
   | 'puddle' // kleine türkise Pfütze auf dem Grottenboden (begehbar, nur Zierde)
+  | 'crystalfield' // Kristallfeld: niedrige Splitter in der Farbe der Zone (`color`), `note` 1 in seiner Mitte (begehbar)
+  | 'vein' // Ader im Grottenboden: flacher Streifen in Rosa oder Lila (`color`), `note` seine Richtung (begehbar)
+  | 'glowmoss' // Leuchtmoos am Fuß einer Felswand (`note` die Seite der Wand, 0 n … 3 w) oder unter einem Lichtschacht (begehbar)
+  | 'waterfall' // kleiner Wasserfall am stillen See: Fels, das Wasser fällt nach Süden in den See (fest, nur Zierde)
   | 'lantern' // Sockel der Kristall-Laterne am Höhlenbett: Hineinlaufen nimmt die Laterne (fest; sie selbst zeichnet das Paket als Körper)
   | 'klangstein'; // Stein mit schwebender Note: Hineinlaufen spielt die Geschichte des Ortes
 export type TreeKind =
@@ -99,7 +103,7 @@ export type Cell = {
   shade?: number; // Farbfleck im Boden: −1 dunkler … +1 heller (große, weiche Flecken)
   tint?: string; // Farbe, mit der Gras und Blätter auf der Lichtung getönt sind (Stimmung der Richtung)
   story?: StoryId; // Klangstein dieser Geschichte
-  note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz); Kristallgrotte: Ton einer Säule, Teil, Höhe oder Ende des Stegs
+  note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz); Kristallgrotte: Ton einer Säule, Teil, Höhe oder Ende des Stegs, Mitte eines Kristallfelds, Richtung einer Ader, Seite der Wand am Leuchtmoos
   light?: number; // so viel heller (0 … 0,5) ist das Feld in der Grotte: Lichtschacht, Kristall oder Leuchtpilz daneben
   shaft?: number; // Lichtfleck dieses Lichtschachts der Grotte liegt hier (0 über dem Bett, 1 Kristallhalle, 2 am See): abends golden-orange, Fledermaus-Runden
   dim?: number; // so viel dunkler (0 … 0,3) ist das Feld in der Grotte: Felswand oder Boden nah an ihr (nie auf Wegen, am Bett, im Licht)

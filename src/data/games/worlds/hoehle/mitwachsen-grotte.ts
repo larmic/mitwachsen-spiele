@@ -60,7 +60,7 @@ export const GROTTE = {
    * Boden. Lichtloch um die Figur `hole` Felder, mit Laterne `lantern` (wächst in `circle.grow` ms), im Fahrzeug um den
    * Sitz `seat`, an den Lampen vorn `lamp`. Feste Löcher (`fixed`, Radius in Feldern): Lichtschächte, Wiese am Bett,
    * Bahnhof Fledermaus, Mündung des Gangs. Kleine Löcher (`small`) nur bis `near` Felder um die Figur (die letzten zwei
-   * weich); Wege als Bänder, `band` Felder breit. Höchstens `most` Löcher je Bild. Im Gang blendet sie mit dem Weg aus,
+   * weich; Leuchtmoos `moss`, die Mitte eines Kristallfelds `field`, der Wasserfall `fall`); Wege als Bänder, `band` Felder breit. Höchstens `most` Löcher je Bild. Im Gang blendet sie mit dem Weg aus,
    * `gang` Felder von der Mündung ist sie weg, und nie schneller als in `fade` ms; ist die Nacht bei `night`, ist sie ganz
    * weg (Maske × (1 − Nacht / `night`))
    */
@@ -74,7 +74,7 @@ export const GROTTE = {
     seat: 3.5,
     lamp: 1.2,
     fixed: { shaft: 3.5, meadow: 6, station: 4, mouth: 3 },
-    small: { crystal: 0.8, column: 1, lamp: 1, bed: 1.2, spring: 1.2, animal: 1 },
+    small: { crystal: 0.8, column: 1, lamp: 1, bed: 1.2, spring: 1.2, animal: 1, moss: 0.6, field: 1.1, fall: 1.2 },
     near: 9,
     band: 2.5,
     most: 48,
@@ -128,7 +128,13 @@ export const GROTTE = {
    * `side` sonst). `bush`: niedrige leuchtende Kristallbüsche (fest wie ein Busch), `boulder`: Felsbrocken (fest),
    * `puddle`: kleine türkise Pfützen (begehbar), je als Anteil der freien Felder. `islands`: flache Felsinseln mit Moos
    * obenauf (eine Stufe hoch, begehbar), je Feld eines Rasters von `every` Feldern mit der Chance `chance`. `shade`: Farn
-   * und Moos nur unter den Lichtschächten, bis `r` Felder um ihre Mitte, Farn auf dem Anteil `fern` des Mooses.
+   * und Moos nur unter den Lichtschächten, bis `r` Felder um ihre Mitte, Farn auf dem Anteil `fern` des Mooses, Leuchtmoos
+   * auf dem Anteil `glow` des übrigen.
+   * Fülle (Schritt 8 der Rückmeldung, alles flach und begehbar): `fields` Kristallfelder, je Feld eines Rasters von `every`
+   * Feldern mit der Chance `chance` ein Feld aus 3 bis 6 Feldern niedriger Kristallsplitter in der Farbe der Zone;
+   * `veins` Adern im Boden, je Feld eines Rasters von `every` Feldern mit der Chance `chance` ein flacher Streifen, `long`
+   * Felder lang (von, bis), nur Rosa oder Lila; `moss` Leuchtmoos am Fuß der Felswände auf dem Anteil `wall` der Felder
+   * dort, es wächst an der Wand hoch.
    */
   fill: {
     groups: { every: 7, rim: 1, drip: 1, side: 0.55 },
@@ -136,8 +142,17 @@ export const GROTTE = {
     boulder: 0.012,
     puddle: 0.005,
     islands: { every: 12, chance: 0.5 },
-    shade: { r: 5, fern: 0.3 },
+    shade: { r: 5, fern: 0.3, glow: 0.3 },
+    fields: { every: 9, chance: 0.45 },
+    veins: { every: 8, chance: 0.4, long: [4, 7] },
+    moss: { wall: 0.15 },
   },
+  /**
+   * Ein kleiner Wasserfall am stillen See, das Merkzeichen für „hier gibt es Wasser“: ein Fels am Nordufer (von der Kamera
+   * aus hinten), das Wasser fällt nach vorn in den See. Gesucht von der Mitte des Sees `side` Felder seitlich (sonst auf
+   * der anderen Seite), damit er nie auf Steg oder Kristallinsel trifft; `h` so hoch über dem Ufer fällt es
+   */
+  waterfall: { side: 4, h: 2.2 },
 } as const;
 
 /**
@@ -194,4 +209,14 @@ export const GROTTE_COLORS = {
   circle: [240, 238, 255],
   /** Abendlicht in den Lichtschächten (ab 20 min Spielzeit): golden-orange, halb durchsichtig über dem Lichtfleck */
   dusk: '#ffa65c',
+  /**
+   * Leuchtmoos (Fülle): Polster und Tupfen, hellgrün #86e05a, leuchtet in der Dunkelmaske schwach (kleines Loch); der
+   * Fuß dunkler, damit es auf hellem Boden Kontur hat
+   */
+  glowmoss: ['#4f9a34', '#86e05a'],
+  /**
+   * Adern im Boden (Fülle): flache Streifen, nur Lila (Kristallhalle und sonst) und Rosa (Tropfsteingrotte), nie Türkis
+   * oder Blau (das läse sich neben Wasser als Wasser, und Wasser füllt die Kanne); etwas dunkler als der Boden, leuchten nicht
+   */
+  veins: ['#a68ee0', '#d98ab8'],
 } as const;

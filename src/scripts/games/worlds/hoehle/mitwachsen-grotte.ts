@@ -10,7 +10,8 @@
 // Tropfquelle und Tropfmoos, hinten der stille See mit Steg zur Kristallinsel (dritter Lichtschacht), daneben der
 // Geröllhang in drei Stufen und ganz am Ende die Plattform des Portals `hoehlensee` (schläft noch), ihr Gegenstück im
 // Kreis um das Bett. Dazwischen die Füllung (mitwachsen-fill.ts): Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken,
-// Felsinseln mit Moos, Pfützen, unter den Schächten Moos und Farn; frei bleiben die Mitte, die Wege und die Spur des
+// Felsinseln mit Moos, Pfützen, unter den Schächten Moos, Farn und Leuchtmoos, danach die Fülle: Kristallfelder, Adern im
+// Boden, Leuchtmoos an den Wänden und ein kleiner Wasserfall am See; frei bleiben die Mitte, die Wege und die Spur des
 // künftigen Gleises von der Mündung zum Platz des Bahnhofs.
 // Licht ohne Punktlichter: Unter den Schächten und neben Kristallen und Leuchtpilzen ist der Boden heller (`Cell.light`),
 // an den Felswänden dunkler, außer auf den Wegen (`Cell.dim`, mitwachsen-glow.ts). Rechts vorn am Bett steht der Sockel
@@ -34,7 +35,7 @@ import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from '../../mitw
 import { findSpawns } from '../../mitwachsen-spawns';
 import { OBSTACLE_GAP } from '../../mitwachsen-world';
 import { caveHaunts } from './mitwachsen-cave-haunts';
-import { corridorAt, fillGrotte, shadeGrotte, tipOf } from './mitwachsen-fill';
+import { adornGrotte, corridorAt, crystalOf, fillGrotte, shadeGrotte, tipOf } from './mitwachsen-fill';
 import { dimGrotte } from './mitwachsen-glow';
 import { siteOf, type Site } from './mitwachsen-site';
 
@@ -135,6 +136,7 @@ export function buildGrotte(
   fillGrotte(seed, site, free, map); // Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken, Felsinseln, Pfützen
   scatter(seed, site, free, map);
   shadeGrotte(seed, site, (u, v) => Math.abs(u) <= 3 || nearStation(u, v), map); // Moos und Farn unter den Schächten
+  adornGrotte(seed, site, free, map); // Fülle: Kristallfelder, Adern, Leuchtmoos an den Wänden, Wasserfall am See
   level(realm, map);
   const reach = reachOf(home.wake, map);
   for (const k of realm) {
@@ -401,7 +403,7 @@ function platforms(site: Site, bed: Point, ring: Point, map: Map<string, Cell>):
 }
 
 /**
- * Dinge auf dem freien Boden (etwa 5 je 100 Felder, die Mitte bleibt licht): Kristalle in drei Farben, Stalagmiten in
+ * Dinge auf dem freien Boden (etwa 5 je 100 Felder, die Mitte bleibt licht): Kristalle in der Farbe ihrer Zone, Stalagmiten in
  * drei Höhen (in der Tropfsteingrotte dichter, Spitze in der Farbe der Zone), kleine Leuchtpilze (im Pilzgarten
  * dichter, begehbar). Feste Dinge stehen einzeln: im Umkreis von `OBSTACLE_GAP` Feldern kein anderes, so bleibt jeder Weg frei.
  */
@@ -436,7 +438,7 @@ function scatter(seed: number, site: Site, free: (u: number, v: number) => boole
         map.set(
           key(x, y),
           roll < crystal
-            ? { ...c, deco: 'crystal', solid: true, color: GROTTE_COLORS.crystals[pick % 3] }
+            ? { ...c, deco: 'crystal', solid: true, color: crystalOf(u, v) }
             : { ...c, deco: 'stalagmite', solid: true, note: pick % 3, color: tipOf(u, v) },
         );
       } else if (roll < crystal + stalagmite + things.shroom)

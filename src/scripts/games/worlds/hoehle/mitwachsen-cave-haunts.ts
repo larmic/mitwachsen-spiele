@@ -10,13 +10,16 @@ import type { Cell } from '../../mitwachsen-cell';
 
 /** Gehört ein Feld der Grotte zum Thema? Nur Felder, auf denen man stehen kann (das Tier wohnt auf dem Feld selbst) */
 export const HAUNTS: Record<CaveHaunt, (c: Cell) => boolean> = {
-  floor: (c) => c.ground === 'grotto' && !c.deco,
+  floor: (c) => c.ground === 'grotto' && (!c.deco || FLAT.has(c.deco)),
   shrooms: (c) => c.deco === 'glowshroom' && c.ground === 'grass',
   clay: (c) => c.deco === 'clay',
   jetty: (c) => c.ground === 'path',
   scree: (c) => c.ground === 'stone',
   arch: (c) => c.perch !== undefined,
 };
+
+/** Flache Fülle auf dem Grottenboden (Kristallfeld, Ader, Leuchtmoos): zählt wie freier Boden, so bleiben die Fundorte */
+const FLAT: ReadonlySet<Cell['deco']> = new Set<Cell['deco']>(['crystalfield', 'vein', 'glowmoss']);
 
 const HOEHLE = REGIONS.find((r) => r.id === 'hoehle')!; // die Höhlenwelt steht fest in REGIONS
 

@@ -50,6 +50,11 @@ export const view3d: View3D = {
     clay: look,
     puddle: look,
     fern: look,
+    // Fülle: Kristallfelder, Adern, Leuchtmoos (flach), der Wasserfall am See (steht still)
+    crystalfield: look,
+    vein: look,
+    glowmoss: look,
+    waterfall: look,
     lantern: look, // Sockel; die Laterne darauf kommt als Körper (wie in 2D)
   },
   ground(c) {

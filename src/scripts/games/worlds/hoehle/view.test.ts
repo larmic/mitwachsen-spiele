@@ -5,7 +5,7 @@ import { ARCH_PERCH } from '../../../../data/games/worlds/hoehle/mitwachsen-cave
 import type { Cell } from '../../mitwachsen-cell';
 import { drawDeco, type DecoAt, type Turn } from '../../mitwachsen-view';
 import { HOEHLE_PACK, worldOf } from '../../test-worlds';
-import { SHED_H, band, caveBoxes, glowOver } from './mitwachsen-cave-look';
+import { FALL_MS, SHED_H, band, caveBoxes, glowOver, waterfallBoxes } from './mitwachsen-cave-look';
 import { TURN_MS, view } from './view-2d';
 import { view3d } from './view-3d';
 import { openScore } from './mitwachsen-heave-look';
@@ -41,6 +41,9 @@ describe('Dinge der Kristallgrotte, gleich für 2D und 3D', () => {
       'clay',
       'puddle',
       'fern',
+      'crystalfield',
+      'vein',
+      'glowmoss',
     ] as const) {
       const c = cell(deco, { note: 2, color: '#6fd6f0' });
       const boxes = caveBoxes(w, c, 5, 7)!;
@@ -142,6 +145,57 @@ describe('Füllung der Grotte', () => {
         deco,
       ).toEqual([]);
     }
+  });
+
+  it('Fülle: Kristallfeld, Ader und Leuchtmoos flach (niedriger als ein Leuchtpilz, die Ader ein Hauch), das Feld in seiner Farbe und in der Mitte voller; nirgends Gold; draußen nichts', () => {
+    const top = (boxes: readonly (readonly unknown[])[]) =>
+      Math.max(...boxes.map((b) => (b[2] as number) + (b[5] as number)));
+    const color = GROTTE_COLORS.crystals[2];
+    const edge = caveBoxes(w, cell('crystalfield', { solid: false, note: 0, color }), 3, 4)!;
+    const mid = caveBoxes(w, cell('crystalfield', { solid: false, note: 1, color }), 3, 4)!;
+    expect(top(mid)).toBeLessThan(1.4);
+    expect(mid.length).toBeGreaterThan(edge.length);
+    expect(top(mid)).toBeGreaterThan(top(edge));
+    expect(mid.every((b) => b[6] === color)).toBe(true);
+    for (const note of [0, 1, 2, 3]) {
+      const vein = caveBoxes(w, cell('vein', { solid: false, note, color: GROTTE_COLORS.veins[0] }), 3, 4)!;
+      expect(top(vein), `Ader ${note}`).toBeLessThan(1.03);
+      expect(vein.every((b) => b[6] === GROTTE_COLORS.veins[0] && b[0] >= 3 && b[0] + b[3] <= 4.001)).toBe(true);
+    }
+    for (const note of [undefined, 0, 1, 2, 3]) {
+      const moss = caveBoxes(w, cell('glowmoss', { solid: false, note }), 3, 4)!;
+      expect(top(moss), `Leuchtmoos ${note}`).toBeLessThan(note === undefined ? 1.15 : 2);
+      expect(moss.every((b) => b[0] >= 3 && b[0] + b[3] <= 4.001 && b[1] >= 4 && b[1] + b[4] <= 5.001)).toBe(true);
+    }
+    const gold: unknown[] = Object.values(GOLD);
+    for (const deco of ['crystalfield', 'vein', 'glowmoss', 'waterfall'] as const) {
+      const colors = caveBoxes(w, cell(deco, { note: 1 }), 3, 4)!.flatMap((b) => [b[6], b[7]]);
+      expect(
+        colors.filter((x) => gold.includes(x)),
+        deco,
+      ).toEqual([]);
+      expect(caveBoxes(w, cell(deco, { region: 'wild' }), 3, 4), deco).toBeNull();
+    }
+  });
+
+  it('Wasserfall am See: Fels mit türkisem Wasser an der Südseite bis auf den See (0,8), Schaum unten; in 2D gleiten helle Streifen hinunter, bei reduzierter Bewegung und in 3D stehen sie still', () => {
+    const c = cell('waterfall');
+    const still = caveBoxes(w, c, 3, 4)!;
+    expect(still).toEqual(waterfallBoxes(c, 3, 4));
+    expect(drawDeco(view3d, w, c, 3, 4, at)).toEqual(still);
+    expect(drawDeco(view, w, c, 3, 4, { ...at, reduced: true, now: 1234 })).toEqual(still);
+    const stream = still.find((b) => b[6] === GROTTE_COLORS.water[0])!;
+    expect(stream[2]).toBe(0.8); // bis auf das Wasser des Sees
+    expect(stream[1] + stream[4]).toBeGreaterThan(4.9); // an der Südseite, zur Kamera hin
+    expect(stream[1] + stream[4]).toBeLessThanOrEqual(5); // im eigenen Feld: der See bleibt, wie er ist
+    expect(Math.max(...still.map((b) => b[2] + b[5]))).toBeGreaterThan(3); // ein Merkzeichen, höher als die Figur
+    const a = drawDeco(view, w, c, 3, 4, { ...at, now: 0 })!;
+    const b = drawDeco(view, w, c, 3, 4, { ...at, now: FALL_MS / 4 })!;
+    expect(a).not.toEqual(b);
+    // die Streifen fallen (z sinkt) und bleiben am Wasserfall
+    const glint = (boxes: readonly (readonly unknown[])[]) => boxes.filter((g) => g[6] === '#ffffff');
+    expect(glint(b)[0]![2] as number).toBeLessThan(glint(a)[0]![2] as number);
+    for (const g of [...glint(a), ...glint(b)]) expect(g[2] as number).toBeGreaterThanOrEqual(0.8);
   });
 
   it('Wasser in der Grotte türkis, in 2D und 3D; nie die Farbe der Probe im Bundle-Gate', () => {

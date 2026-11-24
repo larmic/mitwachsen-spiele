@@ -233,17 +233,31 @@ describe('Dunkelmaske: Löcher', () => {
     expect(d.every((v, i) => i === 0 || v >= d[i - 1]!)).toBe(true);
   });
 
-  it('kleine Löcher an Kristallen, Säulen, Lampen, vollen Pilzbeeten, der Tropfquelle und an Tieren, nur nah an der Figur', () => {
-    const kinds = ['shroombed', 'column', 'dripspring', 'cavelamp'] as const;
+  it('kleine Löcher an Kristallen, Säulen, Lampen, vollen Pilzbeeten, der Tropfquelle, Leuchtmoos, Kristallfeldern (nur ihrer Mitte), dem Wasserfall und an Tieren, nur nah an der Figur', () => {
+    const kinds = ['shroombed', 'column', 'dripspring', 'cavelamp', 'glowmoss', 'crystalfield', 'waterfall'] as const;
     const found = new Map<string, Point>();
+    let edge: Point | undefined; // ein Splitter am Rand eines Kristallfelds
     for (let o = 0; o <= GROTTE.portal[1]; o++)
       for (let u = -GROTTE.shape.rx; u <= GROTTE.shape.rx; u++) {
         const p = frame.at(u, o);
-        const deco = w.cell(...p).deco;
-        if (deco && (kinds as readonly string[]).includes(deco) && !found.has(deco)) found.set(deco, p);
+        const c = w.cell(...p);
+        if (c.deco === 'crystalfield' && c.note === 0) edge ??= p;
+        if (c.deco === 'crystalfield' && c.note !== 1) continue;
+        if (c.deco && (kinds as readonly string[]).includes(c.deco) && !found.has(c.deco)) found.set(c.deco, p);
       }
     expect([...found.keys()].sort()).toEqual([...kinds].sort());
-    const R = { shroombed: D.small.bed, column: D.small.column, dripspring: D.small.spring, cavelamp: D.small.lamp };
+    const [ex, ey] = edge!;
+    const near = maskHoles(w, lit([ex + 2, ey]), at);
+    expect(near.some((h) => h.x === ex + 0.5 && h.y === ey + 0.5)).toBe(false);
+    const R = {
+      shroombed: D.small.bed,
+      column: D.small.column,
+      dripspring: D.small.spring,
+      cavelamp: D.small.lamp,
+      glowmoss: D.small.moss,
+      crystalfield: D.small.field,
+      waterfall: D.small.fall,
+    };
     for (const [deco, [tx, ty]] of found) {
       // die Figur zwei Felder daneben: das kleine Loch liegt auf dem Ding
       const holes = maskHoles(w, lit([tx + 2, ty]), at);

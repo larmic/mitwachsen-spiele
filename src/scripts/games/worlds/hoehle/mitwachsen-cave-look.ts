@@ -2,7 +2,8 @@
 // Unterstand mit der Kristallwand, Kristall-Lampen, Kristallsäulen (leuchten kurz heller, wenn sie klingen), Kristallbogen,
 // Leuchtpilze, Pilzbeete (voll und leer), Tropfquelle, Tropfmoos, Stalagmiten in drei Höhen (dunkler Fuß, Spitze in der
 // Farbe ihrer Zone), der Holzsteg, der Sockel der Kristall-Laterne und die Füllung (Kristallbüsche, Felsbrocken, Moos auf
-// Felsinseln, Lehm, Pfützen, Farn); dazu Boden und Klippen in den Schichten des Höhlentors, Flecken im Boden in 2D
+// Felsinseln, Lehm, Pfützen, Farn) samt der Fülle (Kristallfelder, Adern im Boden, Leuchtmoos, der Wasserfall am See,
+// `adornBoxes`, `waterfallBoxes`); dazu Boden und Klippen in den Schichten des Höhlentors, Flecken im Boden in 2D
 // (`patchOf`) und die Lichtflecken. Eigene Voxel-Grafik: keine Drusen, keine Loren, kein Tropfstein mit Kessel. Rein (ohne
 // DOM und Three.js): liefert Quader in Feldern, die beide Ansichten zeichnen. Teil des Welt-Pakets der Höhlenwelt: 2D über
 // view-2d.ts, 3D über den 3D-Teil view-3d.ts.
@@ -98,12 +99,16 @@ const C_HEIGHTS = GROTTE.hall.columns;
 const SUPPLIES: readonly Cell['deco'][] = ['shroombowl', 'stonetrough', 'dripspring', 'dripmoss'];
 /** Füllung der Grotte (mitwachsen-fill.ts); Farn und Felsbrocken gibt es auch in der Landschaft */
 const FILL: readonly Cell['deco'][] = ['crystalbush', 'boulder', 'mosstop', 'clay', 'puddle', 'fern'];
+/** Fülle der Grotte (mitwachsen-fill.ts, `adornGrotte`): flach und begehbar */
+const ADORN: readonly Cell['deco'][] = ['crystalfield', 'vein', 'glowmoss'];
 /** Wer die Quader dieser Dinge baut */
 const OWN = new Map<Cell['deco'], (c: Cell, x: number, y: number) => Box[] | null>([
   ...SUPPLIES.map((d) => [d, supplyBoxes] as const),
   ...FILL.map((d) => [d, fillBoxes] as const),
   ['lantern', post],
   ['stalagmite', stalagmite],
+  ...ADORN.map((d) => [d, adornBoxes] as const),
+  ['waterfall', (c: Cell, x: number, y: number) => (c.region === 'hoehle' ? waterfallBoxes(c, x, y) : null)],
 ]);
 
 /**
@@ -291,3 +296,93 @@ export const band = (h: number) => C.bands[h % C.bands.length]!;
 
 /** Farbe heller machen um `l` (0,35: um 35 %), für den Lichtfleck in 2D als halb durchsichtiges Licht obenauf */
 export const glowOver = (l: number) => `rgba(255, 246, 220, ${Math.min(0.45, l).toFixed(2)})`;
+
+/** Splitter eines Kristallfelds: Lage, Breite, Höhe; in der Mitte (`note` 1) einer mehr und höher */
+const SHARDS = [
+  [0.22, 0.3, 0.12, 0.22],
+  [0.58, 0.24, 0.1, 0.16],
+  [0.4, 0.58, 0.12, 0.26],
+  [0.7, 0.62, 0.1, 0.14],
+] as const;
+/** Streifen einer Ader je Richtung (`note`): Stücke [dx, dy, Breite, Tiefe]; schräg als Treppe aus drei Stücken */
+const VEIN: readonly (readonly (readonly [number, number, number, number])[])[] = [
+  [[0, 0.44, 1, 0.12]],
+  [[0.44, 0, 0.12, 1]],
+  [
+    [0, 0.06, 0.36, 0.14],
+    [0.32, 0.43, 0.36, 0.14],
+    [0.64, 0.8, 0.36, 0.14],
+  ],
+  [
+    [0, 0.8, 0.36, 0.14],
+    [0.32, 0.43, 0.36, 0.14],
+    [0.64, 0.06, 0.36, 0.14],
+  ],
+];
+/** Leuchtmoos an der Wand je Seite (`note`, wie `SIDES` in mitwachsen-fill.ts): [dx, dy, Breite, Tiefe] des Polsters, das hochwächst */
+const CLIMB: readonly (readonly [number, number, number, number])[] = [
+  [0.14, 0, 0.72, 0.1],
+  [0.9, 0.14, 0.1, 0.72],
+  [0.14, 0.9, 0.72, 0.1],
+  [0, 0.14, 0.1, 0.72],
+];
+
+/**
+ * Fülle der Grotte, flach und begehbar: Kristallfeld (niedrige Splitter in der Farbe der Zone, `Cell.color`, niedriger
+ * als ein Leuchtpilz), Ader (flacher Streifen in Rosa oder Lila, leuchtet nicht), Leuchtmoos (flaches Polster mit hellen
+ * Tupfen, am Fuß einer Felswand wächst es an ihr hoch: `note` die Seite)
+ */
+export function adornBoxes(c: Cell, x: number, y: number): Box[] | null {
+  if (c.region !== 'hoehle') return null;
+  const h = c.h;
+  if (c.deco === 'crystalfield') {
+    const k = c.color ?? KR;
+    const l = lighten(k, 0.35);
+    const shards = c.note === 1 ? SHARDS : SHARDS.slice(0, 3);
+    const turn = hash(9, x, y) % 2 ? -1 : 1; // gespiegelt je Feld
+    return shards.map(([dx, dy, w, hh]): Box => {
+      const sx = turn > 0 ? dx : 1 - dx - w;
+      return [x + sx, y + dy, h, w, w, hh * (c.note === 1 ? 1.25 : 1), k, l];
+    });
+  }
+  if (c.deco === 'vein') {
+    const k = c.color ?? C.veins[0];
+    return (VEIN[c.note ?? 0] ?? VEIN[0]!).map(([dx, dy, w, d]): Box => [x + dx, y + dy, h, w, d, 0.015, k, k]);
+  }
+  // Leuchtmoos
+  const [foot, glow] = C.glowmoss;
+  const out: Box[] = [
+    [x + 0.14, y + 0.2, h, 0.72, 0.62, 0.05, foot, glow],
+    [x + 0.3, y + 0.34, h + 0.05, 0.1, 0.1, 0.04, glow, glow],
+    [x + 0.58, y + 0.5, h + 0.05, 0.1, 0.1, 0.04, glow, glow],
+  ];
+  const climb = c.note === undefined ? undefined : CLIMB[c.note];
+  if (climb) out.push([x + climb[0], y + climb[1], h, climb[2], climb[3], 0.9, glow, glow]);
+  return out;
+}
+
+/** So oft fällt ein heller Streifen den Wasserfall hinunter (ms) */
+export const FALL_MS = 900;
+
+/**
+ * Kleiner Wasserfall am stillen See (mitwachsen-fill.ts): ein bemooster Fels, an seiner Südseite fällt türkises Wasser
+ * bis auf den See (Höhe 0,8 wie das Wasser in 2D), unten Schaum. `now`: zwei helle Streifen gleiten hinunter (2D); ohne
+ * (3D, reduzierte Bewegung) stehen sie still
+ */
+export function waterfallBoxes(c: Cell, x: number, y: number, now?: number): Box[] {
+  const h = c.h;
+  const top = h + GROTTE.waterfall.h;
+  const [deep, light] = C.water;
+  const fall = top - 0.8;
+  const glints = [0, 0.5].map((i): Box => {
+    const p = now === undefined ? i + 0.25 : (now / FALL_MS + i) % 1;
+    return [x + 0.34, y + 0.99, top - 0.25 - p * (fall - 0.3), 0.32, 0.02, 0.18, '#ffffff', light];
+  });
+  return [
+    [x + 0.06, y + 0.1, h, 0.88, 0.76, GROTTE.waterfall.h, ...C.rock],
+    [x + 0.06, y + 0.1, top, 0.88, 0.76, 0.08, ...C.glowmoss],
+    [x + 0.3, y + 0.86, 0.8, 0.4, 0.12, fall + 0.04, deep, light],
+    ...glints,
+    [x + 0.18, y + 0.84, 0.8, 0.64, 0.16, 0.08, light, '#ffffff'],
+  ];
+}

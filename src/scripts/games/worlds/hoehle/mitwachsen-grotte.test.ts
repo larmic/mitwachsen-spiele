@@ -12,7 +12,7 @@ import { DUSK_DAY, DUSK_SKY, dayOf, nightIn, nightMix, sunLevel, type Rgb } from
 import { beyondRing, canStep, kesselPlace, type World } from '../../mitwachsen-world';
 import { HOEHLE_PACK, PACKS, REGRESSION_SEEDS, SAMPLE_SEEDS, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import { GROTTE_ROOM, bedSpots, fromMouth, shedAt, shedStoneAt, stationAt } from './mitwachsen-grotte';
-import { corridorAt, fillZone, tipOf, type FillZone } from './mitwachsen-fill';
+import { SIDES, corridorAt, crystalOf, fillZone, tipOf, veinOf, type FillZone } from './mitwachsen-fill';
 import type { Site } from './mitwachsen-site';
 import type { Cell } from '../../mitwachsen-cell';
 
@@ -122,6 +122,80 @@ function scoopProblems(w: World, site: Site, steps: ReadonlyMap<string, number>,
   const shore = all.find((q) => inLake(q) && beside(steps, q.p));
   const fill = shore && walkInto(w, steps, shore.p);
   if (fill?.events[0]?.type !== 'fill') bad.push('am See füllt sich die Kanne nicht');
+  return bad;
+}
+
+/** Ein Feld der Grotte samt (u, v) von der Mitte und Lage von der Mündung aus */
+type Spot = { p: Point; c: Cell; uv: Point; m: Point };
+const decoOf = (all: readonly Spot[], deco: Cell['deco']) =>
+  all.filter(({ c }) => c.region === 'hoehle' && c.deco === deco);
+
+/** Fülle: genug von allem, flach und begehbar, nie auf Wegen, Mitte, Gleisspur, Bahnhof, Lokschuppen oder am Bett */
+function adornProblems(w: World, steps: ReadonlyMap<string, number>, all: readonly Spot[]): string[] {
+  const bad: string[] = [];
+  const [fields, veins, moss] = [decoOf(all, 'crystalfield'), decoOf(all, 'vein'), decoOf(all, 'glowmoss')];
+  const centres = fields.filter(({ c }) => c.note === 1);
+  if (centres.length < 15) bad.push(`nur ${centres.length} Kristallfelder`);
+  if (veins.length < 50) bad.push(`nur ${veins.length} Felder Adern`);
+  const onWall = moss.filter(({ c }) => c.note !== undefined);
+  if (onWall.length < 20) bad.push(`nur ${onWall.length} Leuchtmoos an Wänden`);
+  if (moss.length - onWall.length < 2) bad.push('kein Leuchtmoos unter den Schächten');
+  for (const { p, c, uv, m } of [...fields, ...veins, ...moss]) {
+    const at = `${c.deco} ${key(p)}`;
+    if (c.solid || !steps.has(key(p))) bad.push(`${at}: nicht begehbar`);
+    if (Math.abs(uv[0]) <= 3 || corridorAt(...uv) || c.stop || c.shed || c.stone || c.garden) bad.push(`${at}: frei`);
+    if (Math.hypot(m[0], m[1] - GROTTE.bed) <= GROTTE.flat + 3) bad.push(`${at}: am Bett`);
+  }
+  // Kristallfelder: jedes aus 3 bis 6 Feldern um seine Mitte in einer Farbe, kein Splitter ohne Mitte daneben
+  for (const { p, c } of centres) {
+    const own = AROUND.filter(([dx, dy]) => {
+      const n = w.cell(p[0] + dx, p[1] + dy);
+      return n.deco === 'crystalfield' && n.note === 0 && n.color === c.color;
+    });
+    if (own.length < 2) bad.push(`Kristallfeld ${key(p)}: nur ${own.length + 1} Felder`);
+  }
+  for (const { p } of fields)
+    if (![[0, 0] as const, ...AROUND].some(([dx, dy]) => w.cell(p[0] + dx, p[1] + dy).note === 1))
+      bad.push(`Kristallfeld ${key(p)}: ohne Mitte`);
+  return bad;
+}
+
+/** Farben der Fülle: Kristallfelder und -büsche in der Farbe ihrer Zone, nie Türkis (Wasser), Adern nur Rosa oder Lila */
+function colorProblems(_w: World, all: readonly Spot[]): string[] {
+  const bad: string[] = [];
+  const water = GROTTE_COLORS.crystals[1];
+  for (const { p, c, uv } of decoOf(all, 'crystalfield')) {
+    if (c.note === 1 && c.color !== crystalOf(...uv)) bad.push(`Kristallfeld ${key(p)}: Farbe`);
+    if (c.color === water) bad.push(`Kristallfeld ${key(p)}: türkis wie Wasser`);
+  }
+  for (const { p, c } of decoOf(all, 'crystalbush'))
+    if (c.color === water) bad.push(`Kristallbusch ${key(p)}: türkis wie Wasser`);
+  for (const { p, uv, c } of decoOf(all, 'crystalbush'))
+    if (c.color !== crystalOf(...uv)) bad.push(`Kristallbusch ${key(p)}: nicht in der Farbe seiner Zone`);
+  // Adern: je Ader die Farbe der Zone, in der sie beginnt (fast immer die des Felds selbst)
+  const veins = decoOf(all, 'vein');
+  const tones: unknown[] = [...GROTTE_COLORS.veins];
+  for (const { p, c } of veins) if (!tones.includes(c.color)) bad.push(`Ader ${key(p)}: Farbe ${c.color}`);
+  const own = veins.filter(({ c, uv }) => c.color === veinOf(...uv)).length / veins.length;
+  if (own < 0.9) bad.push(`Adern nur zu ${own.toFixed(2)} in der Farbe ihrer Zone`);
+  if (new Set(veins.map(({ c }) => c.color)).size !== 2) bad.push('Adern nicht in beiden Farben');
+  return bad;
+}
+
+/** Leuchtmoos an der Wand: auf seiner Seite (`note`) steht eine Felsklippe; ohne Wand nur unter den Schächten auf Moos */
+function mossProblems(w: World, all: readonly Spot[]): string[] {
+  const bad: string[] = [];
+  const underShaft = (m: Point) =>
+    GROTTE.shafts.some(([a, o]) => Math.hypot(m[0] - a, m[1] - o) <= GROTTE.fill.shade.r);
+  for (const { p, c, m } of decoOf(all, 'glowmoss')) {
+    const side = c.note === undefined ? undefined : SIDES[c.note];
+    if (!side) {
+      if (c.ground !== 'grass' || !underShaft(m)) bad.push(`Leuchtmoos ${key(p)}: nicht unter einem Schacht`);
+      continue;
+    }
+    const n = w.cell(p[0] + side[0], p[1] + side[1]);
+    if (!n.solid || n.deco !== 'rock') bad.push(`Leuchtmoos ${key(p)}: keine Wand`);
+  }
   return bad;
 }
 
@@ -449,6 +523,38 @@ describe('Kristallgrotte: Gelände', () => {
         zones: true,
       });
       expect([...tips].filter((t) => !Object.values(GROTTE_COLORS.tips).includes(t as never))).toEqual([]);
+    });
+
+    it(`Seed ${seed}: Fülle: Kristallfelder je Zone in einer Farbe, Adern nur Rosa oder Lila, Leuchtmoos an Wänden und unter den Schächten, alles flach und begehbar, nie auf Wegen, Mitte oder Gleisspur`, () => {
+      const all = placeOf(seed).cells.map((p) => ({ p, c: w.cell(...p), uv: site.uv(...p), m: mouthOf(site, p) }));
+      const bad = [...adornProblems(w, steps, all), ...colorProblems(w, all), ...mossProblems(w, all)];
+      expect(bad.slice(0, 5), `Seed ${seed}`).toEqual([]);
+    });
+
+    it(`Seed ${seed}: ein kleiner Wasserfall am See: fest, selbst kein Wasser, das Wasser fällt nach Süden in den See, man kommt an ihn heran`, () => {
+      const falls = placeOf(seed)
+        .cells.map((p) => ({ p, c: w.cell(...p) }))
+        .filter(({ c }) => c.deco === 'waterfall');
+      expect(falls.length, `Seed ${seed}`).toBe(1);
+      const { p, c } = falls[0]!;
+      const [a, o] = mouthOf(site, p);
+      const { lake } = GROTTE;
+      const south = w.cell(p[0], p[1] + 1);
+      expect({
+        seed,
+        solid: c.solid,
+        ground: c.ground,
+        south: south.ground,
+        // am Ufer des Sees, nicht auf dem Steg und nicht auf der Spur des Gleises
+        shore: ((a - lake.across) / (lake.rx + 1.5)) ** 2 + ((o - lake.out) / (lake.ry + 1.5)) ** 2 < 1,
+        free: !corridorAt(...site.uv(...p)) && !c.ride && !c.rail,
+        near: Object.values(DIRS).some(([dx, dy]) => steps.has(key([p[0] + dx, p[1] + dy]))),
+        // schneidet nichts ab: jeder begehbare Nachbar (außer dem Wasser im Süden) bleibt vom Bett aus erreichbar
+        cut: Object.values(DIRS).filter(([dx, dy]) => {
+          const n = w.cell(p[0] + dx, p[1] + dy);
+          return !n.solid && n.ground !== 'water' && !steps.has(key([p[0] + dx, p[1] + dy]));
+        }).length,
+      }).toEqual({ seed, solid: true, ground: 'grotto', south: 'water', shore: true, free: true, near: true, cut: 0 });
     });
 
     it(`Seed ${seed}: Flecken im Grottenboden (2D): beide Farben, auf etwa einem Fünftel des freien Bodens`, () => {

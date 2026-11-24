@@ -77,7 +77,8 @@ export const RULES: Rule[] = [
     parts: [
       // Kristallgrotte (Lage, Gelände, Zuhause, Licht, Portal am See, Fundorte der Höhlen-Tiere, Pilzbeete, Tropfquelle,
       // Tropfmoos), ihr Schmuck (Säulen-Glockenspiel mit Fledermaus-Runde, Grottenolm am Steg, Tropfsteine), ihre Füllung
-      // (Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken, Felsinseln, Pfützen, Moos und Farn, Lehmhang), ihr Licht
+      // (Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken, Felsinseln, Pfützen, Moos und Farn, Lehmhang) und Fülle
+      // (Kristallfelder, Adern, Leuchtmoos, Wasserfall am See), ihr Licht
       // (Ränder im Dunkel, Lichtkreis, Kristall-Laterne, Dunkelmaske), Zeichenteile der 2D-Ansicht und Modelle der Höhlen-Tiere; geholt
       // nah am Höhlentor, mit offenem Tor oder vor einem Halt des Zugs; dazu das Hau-ruck am
       // Höhlentor (Regeln, Hände auf dem Stein, Fledermaus, Glühwürmchen, Töne)
@@ -85,8 +86,8 @@ export const RULES: Rule[] = [
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Welt
       { chunks: /\/welt-hoehle-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-hoehle)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 47,4 KB (mit der Dunkelmaske)
-    budget: 52 * 1024,
+    // Gemessen 52,5 KB (mit Farben und Fülle der Grotte)
+    budget: 58 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {
