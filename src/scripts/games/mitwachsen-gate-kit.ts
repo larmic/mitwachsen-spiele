@@ -29,13 +29,24 @@ export type Wing = { parts: Parts; hinge: readonly [number, number]; angle: numb
  * der Zugang im Westen, Osten oder Süden der Lichtung, sieht sie ihn von der Seite oder von hinten. Steht die Figur in
  * seiner Bucht, dreht die Kamera zur Front (mitwachsen-turn-3d.ts): Dann ist der Zugang mit `all` gebaut (alle
  * Flächen, die Kamera kann von jeder Seite kommen), erst mit `cam` wie im Süden und, sobald sie mehr als halb gedreht
- * ist, mit `cam` [0, 1] (mitwachsen-gatehouses-3d.ts). `all` fügt nur hinzu, es übermalt nichts.
+ * ist, mit `cam` [0, 1] und `home` wie im Süden (mitwachsen-gatehouses-3d.ts): Der Körper bleibt, nur das Schild dreht. `all` fügt nur hinzu, es übermalt nichts.
  */
 export type GateCtx = {
   open: number;
   outline: boolean;
   lit: number;
   cam: readonly [number, number];
+  /**
+   * Richtung zur Kamera in Ruhe (im Süden), wie `cam`: Sie legt den Körper des Zugangs fest (wo der Glutbaum steht,
+   * auf welcher Seite das Wasser fließt, wo die Wolke ihr Gesicht hat). Dreht die Kamera zur Front, bleibt `home`, und
+   * nur `cam` wechselt: Dann ändert sich am Zugang nur das Schild. Fehlt sie, gilt `cam`
+   */
+  home?: readonly [number, number];
+  /**
+   * Wie weit die Kamera von `home` zur Front gedreht ist (0 … 1, in Stufen, mitwachsen-gatehouses-3d.ts); nur für
+   * Zugänge, die sich mitdrehen (`TURN_STEPS` in mitwachsen-gates-3d.ts: die Wolke dreht den Kopf mit)
+   */
+  turn?: number;
   /** alle Flächen, auch die von `cam` weg (Zugang vor der Torplatte, solange die Kamera zur Front dreht) */
   all?: boolean;
   /** Was das Welt-Paket hinter diesem Tor zum Zugang beiträgt (Eis-Welt: Tür, Eiszapfen); fehlt, solange es lädt */
@@ -54,6 +65,8 @@ export type GateLook = {
   icicle: (x: number, lit: number) => string;
   plate?: PlateLook;
 };
+/** Richtung, die den Körper eines Zugangs festlegt: `home`, sonst `cam` */
+export const homeOf = (g: Pick<GateCtx, 'cam' | 'home'>) => g.home ?? g.cam;
 /** Bauplan eines Zugangs: legt Geometrie in `p` an und liefert Türflügel, falls er welche hat */
 export type GateBuild = (p: Parts, g: GateCtx) => Wing[];
 

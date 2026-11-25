@@ -10,7 +10,18 @@
 // liegen auf Achteln, die Voxel-Flächen rücken um LIFT nach außen: So liegt nichts deckungsgleich (kein Flackern).
 
 import type { Geo } from './mitwachsen-geo';
-import { VOX, Vox, ease, hash3, seg, type GateBuild, type GateCtx, type Part, type Parts } from './mitwachsen-gate-kit';
+import {
+  VOX,
+  Vox,
+  ease,
+  hash3,
+  homeOf,
+  seg,
+  type GateBuild,
+  type GateCtx,
+  type Part,
+  type Parts,
+} from './mitwachsen-gate-kit';
 import type { PlateLook } from './mitwachsen-plate';
 
 const FRONT = 0.375; // Vorderseite der Felswand (davor bis 0,5 nur Simse, Moos, Kristalle)
@@ -262,8 +273,11 @@ function stonePaint(lx: number, ly: number, lz: number): [string, Part] {
   return ['#a5a2b5', 'solid'];
 }
 
-/** Hülle des Steins; die Rückseite (von der Kamera weg) bleibt weg, die sieht man nie */
-function stone(v: Vox, t: number, cam: readonly [number, number]) {
+/**
+ * Hülle des Steins; die Rückseite (von der Kamera in Ruhe weg) bleibt weg, die sieht man nie. Zur Front gebaut (`all`)
+ * die ganze Hülle: Die Kamera kommt dann von jeder Seite, und beim Drehen ändert sich am Stein nichts
+ */
+function stone(v: Vox, t: number, cam: readonly [number, number], all = false) {
   const x = stoneX(t);
   const [ci, ck] = [Math.round(x * VOX), Math.round(STONE_Z * VOX)];
   const phi = ci / VOX / R; // rollt nach rechts: dreht sich im Uhrzeigersinn
@@ -275,7 +289,7 @@ function stone(v: Vox, t: number, cam: readonly [number, number]) {
         const [dx, dy, dz] = [i + 0.5, j + 0.5, k + 0.5];
         const d = Math.hypot(dx, dy, dz);
         if (d > R8 || d < R8 - 1.7) continue;
-        if ((dx * view[0] + dy * view[1] + dz * view[2]) / d < -0.25) continue;
+        if (!all && (dx * view[0] + dy * view[1] + dz * view[2]) / d < -0.25) continue;
         const [color, part] = stonePaint((c * dx - s * dy) / d, (s * dx + c * dy) / d, dz / d);
         v.set(ci + i, R8 + j, ck + k, color, part);
       }
@@ -398,7 +412,7 @@ export function hoehleVox(g: GateCtx): Vox {
   cracks(v);
   stalactites(v);
   ferns(v);
-  stone(v, g.open, g.cam);
+  stone(v, g.open, homeOf(g), g.all);
   gravel(v, g.open);
   lamps(v, g.open);
   sign(v, g.cam);

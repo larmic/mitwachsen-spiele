@@ -7,7 +7,7 @@
 // Wolken sind Bausche (Superellipsoide) in einem Raster; gesetzt werden nur Voxel, die man von der Kamera aus sehen
 // kann (Oberseite, zur Kamera, zu den Seiten), damit die große Wolke unter der Grenze von etwa 6000 Voxeln bleibt.
 
-import { Vox, ease, hash3, seg, VOX, type GateBuild, type GateCtx } from './mitwachsen-gate-kit';
+import { Vox, ease, hash3, homeOf, seg, VOX, type GateBuild, type GateCtx } from './mitwachsen-gate-kit';
 import type { PlateLook } from './mitwachsen-plate';
 
 /** Ein Bausch: Mitte (x, y, z), Halbachsen (rx, ry, rz) in Feldern, p Rundung (2 rund, 4–5 kissenförmig) */
@@ -39,6 +39,22 @@ function sleepFace(cam: Cam): Puff {
   return cam[1] < 0 ? [0, 3.9, -1.3, 2.3, 1.55, 1.25, 2] : [0, 3.9, -0.9, 2.3, 1.55, 1.25, 2];
 }
 
+/** Richtung zur Kamera an der Front des Zugangs */
+const AHEAD: Cam = [0, 1];
+/**
+ * Wie weit die Wolke ihren Kopf von der Ruhe-Kamera (`home`) zur Front gedreht hat (0 … 1, `GateCtx.turn`): Steht die
+ * Figur auf der Torplatte und dreht die Kamera zur Front, gleitet der Gesichtsbausch in Stufen mit, statt in einem Bild
+ * umzuspringen. Ohne `turn`: ganz bei der Kamera, die gemeint ist (`cam`)
+ */
+const turnOf = (g: GateCtx) => g.turn ?? (homeOf(g).join() === g.cam.join() ? 0 : 1);
+/** Bausch zwischen zwei Lagen: Mitte und Größe gleiten von `a` nach `b` */
+const mix = (a: Puff, b: Puff, t: number): Puff => {
+  const at = (k: number) => (a[k] ?? 0) + ((b[k] ?? 0) - (a[k] ?? 0)) * t;
+  return [at(0), at(1), at(2), at(3), at(4), at(5), at(6)];
+};
+/** Gesichtsbausch der schlafenden Wolke, so weit zur Front gedreht wie die Kamera */
+const faceAt = (g: GateCtx): Puff => mix(sleepFace(homeOf(g)), sleepFace(AHEAD), turnOf(g));
+
 /**
  * Regenbogen: Außenradius, Unterkante (3 Felder über dem Durchgang) und Mitte (x, z) seiner Ebene; von hinten gesehen
  * steht er weiter vorn, damit seine Füße den Kopf der Wolke nicht verdecken
@@ -59,7 +75,8 @@ function bowFoot(cam: Cam, side: number): Puff {
 /**
  * Die wache Wolke (offen), Bausch für Bausch zu SLEEP: Kopf und Körper liegen in der linken Nische, die Treppe steigt in
  * der rechten Nische nach hinten auf den Ring, zwei Kuppeln tragen den Regenbogen. Alles bleibt außerhalb von |x| ≤ 2,5
- * oder über 3 Feldern Höhe. Schaut die Kamera von hinten, liegt der Kopf hinten, damit man sein Gesicht sieht.
+ * oder über 3 Feldern Höhe. Schaut die Kamera von hinten (`cam`, die Richtung, die den Körper festlegt), liegt der
+ * Kopf hinten, damit man sein Gesicht sieht; die Füße des Regenbogens stehen für diese Kamera
  */
 function wake(cam: Cam): Puff[] {
   const [head, body, tail] = cam[1] < 0 ? [-2.3, -1.2, -0.25] : [-0.35, -1.45, -2.35];
@@ -84,11 +101,14 @@ function phases(open: number) {
 /** Bausche für den Öffnungsgrad: von der Schlafform zur Treppe; beim Kitzeln hüpfen sie nacheinander */
 export function puffs(g: GateCtx): Puff[] {
   const { tickle, m } = phases(g.open);
-  const awake = wake(g.cam);
+  const [from, to, turn] = [wake(homeOf(g)), wake(AHEAD), turnOf(g)];
+  // Kopf, Körper und die Füße des Regenbogens drehen mit zur Front; der Regenbogen selbst steht wie ein Schild zur
+  // Kamera und wechselt bei halber Drehung (`voxels`)
+  const awake = from.map((p, n) => mix(p, to[n] ?? p, turn));
   const lerp = (a: number, b: number) => a + (b - a) * m;
   const wiggle = Math.sin(Math.PI * tickle) * 0.09;
   const list = SLEEP.map((s, n): Puff => {
-    const a = n === 3 ? sleepFace(g.cam) : s;
+    const a = n === 3 ? faceAt(g) : s;
     const b = awake[n] ?? a;
     const q = a.map((v, k) => lerp(v, b[k] ?? v));
     const at = (k: number) => q[k] ?? 0;
@@ -100,13 +120,17 @@ export function puffs(g: GateCtx): Puff[] {
 /** Schnarchwölkchen schräg über dem Gesicht (nur im Schlaf), rechts aus Sicht der Kamera */
 function snore(g: GateCtx): Puff[] {
   if (g.open > 0) return [];
-  const f = sleepFace(g.cam);
-  const [rx, rz] = [g.cam[1], -g.cam[0]];
-  return [0.17, 0.24, 0.32].map((r, n): Puff => {
-    const u = 1.7 + n * 0.55;
-    const z = Math.min(0.45 - r, f[2] + rz * u + g.cam[1] * 0.6);
-    return [f[0] + rx * u, 5.9 + n * 0.6, z, r, r * 0.85, r, 2];
-  });
+  const at = (cam: Cam) => {
+    const f = sleepFace(cam);
+    const [rx, rz] = [cam[1], -cam[0]];
+    return [0.17, 0.24, 0.32].map((r, n): Puff => {
+      const u = 1.7 + n * 0.55;
+      const z = Math.min(0.45 - r, f[2] + rz * u + cam[1] * 0.6);
+      return [f[0] + rx * u, 5.9 + n * 0.6, z, r, r * 0.85, r, 2];
+    });
+  };
+  const [from, to, turn] = [at(homeOf(g)), at(AHEAD), turnOf(g)];
+  return from.map((p, n) => mix(p, to[n] ?? p, turn)); // sie ziehen mit dem Gesicht zur Front
 }
 
 type Box = readonly [i0: number, i1: number, j0: number, j1: number, k0: number, k1: number];
