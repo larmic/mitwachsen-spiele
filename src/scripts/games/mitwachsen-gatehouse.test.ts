@@ -413,8 +413,8 @@ describe('Zugang vor der Torplatte zur Front gebaut (mitwachsen-gatehouses-3d.ts
   });
 
   it('beim Betreten der Bucht springt nichts um: Fassung 1 hat jeden Voxel der Fassung für den Süden, gleich gefärbt', () => {
-    // Schild, Flocke, Wasserwand, Glutbaum und Wolkengesicht richten sich weiter nach der Kamera im Süden; erst mehr als
-    // halb gedreht kommt die Fassung zur Front (cam [0, 1])
+    // das Schild richtet sich weiter nach der Kamera im Süden; erst mehr als halb gedreht kommt die Fassung zur Front
+    // (cam [0, 1]), und auch dort bleibt der Körper (alle Zugänge: mitwachsen-gate-turn.test.ts)
     for (const cam of [
       [0, -1],
       [1, 0],
