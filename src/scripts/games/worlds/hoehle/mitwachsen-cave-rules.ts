@@ -4,7 +4,8 @@
 // Das Ereignis nennt den nächsten Sitzplatz im Kristallbogen, an dem gerade eine Fledermaus hängt (`perch`): Sie ist
 // die verschlafene Fledermaus, die nach je vier Tönen eine Runde dreht; hängt keine mehr, fliegt keine.
 // Stiller See: Betritt sie das Ende des Holzstegs (`'jetty'` mit `note` 1, an der Kristallinsel), taucht der
-// Grottenolm daneben auf (Ereignis `olm`), und sie läuft weiter. Was man sieht und hört (Leuchten, Echo, die
+// Grottenolm daneben auf (Ereignis `olm`), und sie läuft weiter. Läuft sie gegen das Netz einer Tupfspinne (`'web'`), klingt
+// es wie eine Harfe (Ereignis `web`), und sie bleibt stehen, ohne anzustoßen (mitwachsen-spider.ts). Was man sieht und hört (Leuchten, Echo, die
 // Fledermaus nach je vier Tönen, „blubb“), steht in mitwachsen-chime-look.ts und mitwachsen-olm-look.ts. Dazu nimmt die
 // Figur die Kristall-Laterne von ihrem Sockel am Bett (`takeLantern`, mitwachsen-lantern.ts). Die Regel
 // bekommt `step` als `pack.rules` (index.ts).
@@ -38,6 +39,10 @@ const bump: WorldRules['bump'] = (s, c, x, y, events, { walks, cell }) => {
     const perch = sleeperNear(s, cell, x, y);
     events.push({ type: 'column', x, y, note: c.note, ...(perch && { perch }) });
     return true; // sie bleibt stehen, kein „boing“
+  }
+  if (c.deco === 'web') {
+    events.push({ type: 'web', x, y });
+    return true; // Netz der Tupfspinne: die Harfe klingt, sie bleibt stehen, kein „boing“; es hält sie nie fest
   }
   if (c.deco === 'jetty' && c.note === 1 && walks) events.push({ type: 'olm', x, y });
   return false;

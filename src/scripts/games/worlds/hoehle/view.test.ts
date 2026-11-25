@@ -45,6 +45,7 @@ describe('Dinge der Kristallgrotte, gleich für 2D und 3D', () => {
       'vein',
       'glowmoss',
       'shore',
+      'web',
     ] as const) {
       const c = cell(deco, { note: 2, color: '#6fd6f0' });
       // Pilzschale und Steintrog sind leer, bis die Figur sie füllt (`picked`); alles andere wie es steht

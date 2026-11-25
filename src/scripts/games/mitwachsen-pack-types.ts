@@ -53,7 +53,7 @@ export type Kessel = {
  * des Glockenspiels klingt mit seiner Tonhöhe `note`, 0 tief. Höhlenwelt: eine Kristallsäule des Säulen-Glockenspiels
  * klingt mit ihrem Ton `note`, 0 = C5, `perch`: Sitzplatz im Kristallbogen nahe der Säule, an dem gerade eine Fledermaus
  * hängt (die verschlafene Fledermaus, die nach je vier Tönen eine Runde dreht), keiner: fehlt; der Grottenolm taucht am
- * Ende des Stegs auf (x, y: die Planke); die Figur nimmt die Kristall-Laterne von ihrem Sockel (x, y: der Sockel);
+ * Ende des Stegs auf (x, y: die Planke); die Figur läuft gegen das Netz einer Tupfspinne (x, y: das Netz); die Figur nimmt die Kristall-Laterne von ihrem Sockel (x, y: der Sockel);
  * Hau-ruck am Höhlentor: das Hau-ruck beginnt (`n` 0) bzw. ein Stoß rollt den Stein (`n` 1 bis 3; x, y: Mitte der Tür;
  * `who`: Tok, er lehnt sich mit an den Stein))
  */
@@ -62,6 +62,7 @@ export type PackEvent =
   | { type: 'icicle'; x: number; y: number; note: number }
   | { type: 'column'; x: number; y: number; note: number; perch?: Point }
   | { type: 'olm'; x: number; y: number }
+  | { type: 'web'; x: number; y: number }
   | { type: 'lantern'; x: number; y: number }
   | { type: 'heave'; x: number; y: number; n: number; who?: string };
 

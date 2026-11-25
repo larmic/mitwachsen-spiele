@@ -14,6 +14,7 @@ import { HOEHLE_PACK, PACKS, REGRESSION_SEEDS, SAMPLE_SEEDS, seedRange, seedsFor
 import { GROTTE_ROOM, bedSpots, fromMouth, shedAt, shedStoneAt, stationAt } from './mitwachsen-grotte';
 import { SIDES, corridorAt, crystalOf, fillZone, tipOf, veinOf, type FillZone } from './mitwachsen-fill';
 import type { Site } from './mitwachsen-site';
+import { webs as websOfWorld } from './mitwachsen-spider';
 import type { Cell } from '../../mitwachsen-cell';
 
 const CAVE = [HOEHLE_PACK];
@@ -35,8 +36,12 @@ function beside(steps: ReadonlyMap<string, number>, p: Point): { at: Point; dir:
   return null;
 }
 
-/** Die Figur steht neben `p` (allein, wach, mit `hands`) und läuft hinein: Ereignisse und neuer Zustand */
-function walkInto(w: World, steps: ReadonlyMap<string, number>, p: Point, hands: Partial<State> = {}) {
+/**
+ * Die Figur steht neben `p` (allein, wach, mit `hands`) und läuft hinein: Ereignisse und neuer Zustand; `packs`: mit den
+ * Regeln des Höhlen-Pakets (Schmuck der Grotte). Nur dieses, wie die Welt (`CAVE`): Mit der Eis-Welt und der Fahr-Engine
+ * zusammen (`PACKS`) kostet der erste Schritt je Welt gut 50 ms, im tiefen Lauf über 20 Seeds spürbar
+ */
+function walkInto(w: World, steps: ReadonlyMap<string, number>, p: Point, hands: Partial<State> = {}, packs = false) {
   const from = beside(steps, p);
   if (!from) return null;
   const s: State = {
@@ -47,7 +52,9 @@ function walkInto(w: World, steps: ReadonlyMap<string, number>, p: Point, hands:
     ...hands,
     player: { x: from.at[0], y: from.at[1], dir: from.dir },
   };
-  const r = step(s, w, { type: 'move', dir: from.dir });
+  const r = packs
+    ? step(s, w, { type: 'move', dir: from.dir }, undefined, undefined, CAVE)
+    : step(s, w, { type: 'move', dir: from.dir });
   return { events: r.events, state: r.state };
 }
 
@@ -203,6 +210,38 @@ function mossProblems(w: World, all: readonly Spot[]): string[] {
     }
     const n = w.cell(p[0] + side[0], p[1] + side[1]);
     if (!n.solid || n.deco !== 'rock') bad.push(`Leuchtmoos ${key(p)}: keine Wand`);
+  }
+  return bad;
+}
+
+/**
+ * Was an den Netzen der Tupfspinnen nicht stimmt (Schritt 12 der Rückmeldung): drei bis vier, fest, im Licht und nie im
+ * Randschatten, mindestens 8 Felder von Bett, Bahnhof Fledermaus und dem Weg durch die Mitte, weit auseinander, ein
+ * erreichbares Nachbarfeld; hineinlaufen: Ereignis `web`, die Figur bleibt stehen, kein „boing“
+ */
+function webProblems(w: World, site: Site, steps: ReadonlyMap<string, number>, cells: readonly Point[]): string[] {
+  const W = GROTTE.web;
+  const webs = cells.filter((p) => w.cell(...p).deco === 'web');
+  const bad: string[] = webs.length < W.least || webs.length > W.most ? [`${webs.length} Netze`] : [];
+  // Spinne, Perlenglanz und Lichtloch hängen an webs(); es muss genau die Netze der Welt finden
+  const sorted = [...webs].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (websOfWorld(w).map(key).join(' ') !== sorted.map(key).join(' ')) bad.push('webs() ≠ Netze der Welt');
+  const station = cells.filter((p) => stationAt(...site.uv(...p))).map((p) => site.uv(...p));
+  const bed = site.uv(...w.homes.hoehle.bed);
+  for (const p of webs) {
+    const c = w.cell(...p);
+    const [u, v] = site.uv(...p);
+    if (!c.solid || c.region !== 'hoehle' || c.ground !== 'grotto') bad.push(`${key(p)}: kein festes Ding der Grotte`);
+    if (!((c.light ?? 0) > 0) || c.dim) bad.push(`${key(p)}: nicht im Licht`);
+    if (Math.hypot(u - bed[0], v - bed[1]) < W.away) bad.push(`${key(p)}: nah am Bett`);
+    if (station.some(([a, b]) => Math.hypot(u - a, v - b) < W.away)) bad.push(`${key(p)}: nah am Bahnhof`);
+    if (Math.abs(u) - 3 < W.away) bad.push(`${key(p)}: nah am Weg durch die Mitte`);
+    if (webs.some((q) => q !== p && Math.hypot(q[0] - p[0], q[1] - p[1]) < W.apart)) bad.push(`${key(p)}: zu nah`);
+    const r = walkInto(w, steps, p, {}, true);
+    if (!r) bad.push(`${key(p)}: kein erreichbares Nachbarfeld`);
+    else if (r.events.some((e) => e.type === 'bump') || !r.events.some((e) => e.type === 'web'))
+      bad.push(`${key(p)}: ${r.events.map((e) => e.type).join(',')} statt Harfe`);
+    else if (key([r.state.player.x, r.state.player.y]) === key(p)) bad.push(`${key(p)}: Figur im Netz`);
   }
   return bad;
 }
@@ -583,6 +622,10 @@ describe('Kristallgrotte: Gelände', () => {
           return !n.solid && n.ground !== 'water' && !steps.has(key([p[0] + dx, p[1] + dy]));
         }).length,
       }).toEqual({ seed, solid: true, ground: 'grotto', south: 'water', shore: true, free: true, near: true, cut: 0 });
+    });
+
+    it(`Seed ${seed}: drei bis vier Netze der Tupfspinnen: je ein Feld statt eines Stalagmiten, im Licht, fern von Bett, Bahnhof und Wegen, man läuft hinein und hört die Harfe`, () => {
+      expect(webProblems(w, site, steps, placeOf(seed).cells), `Seed ${seed}`).toEqual([]);
     });
 
     it(`Seed ${seed}: Flecken im Grottenboden (2D): beide Farben, auf etwa einem Fünftel des freien Bodens`, () => {

@@ -257,7 +257,9 @@ describe('Licht der Grotte: Kristall-Laterne', () => {
     expect(body!.parts.some((p) => GOLDS.includes(p[6]))).toBe(true);
     expect(lanternBodies({ ...s, lamp: 'hoehle' }, w)).toEqual([]);
     expect(lanternBodies(s, worldOf(1, [EIS_PACK]))).toEqual([]); // ohne Paket kein Sockel, keine Laterne
-    expect(view.bodies!(s, w, { now: 0, frac: 0, reduced: false, lit: false })).toEqual([body]);
+    // dazu die Tupfspinnen vor ihren Netzen (mitwachsen-spider.test.ts)
+    const all = view.bodies!(s, w, { now: 0, frac: 0, reduced: false, lit: false });
+    expect(all.filter((b) => !b.id.startsWith('spider:'))).toEqual([body]);
     // in der Hand: kein Gold, eigener Schlüssel, zusammen mit Kanne und Netz
     expect(LANTERN_PARTS.flatMap((p) => [p[6], p[7]]).filter((c) => GOLDS.includes(c))).toEqual([]);
     const none = { basket: false, shrooms: false, bucket: false, fish: false };

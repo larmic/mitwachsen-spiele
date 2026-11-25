@@ -16,7 +16,7 @@ import type { Point } from '../../../../data/games/mitwachsen';
 import { GROTTE } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import type { World } from '../../mitwachsen-world';
 import type { Scored } from '../../sfx';
-import { caveFrame } from './mitwachsen-mask';
+import { caveFrame } from './mitwachsen-frame';
 
 const G = GROTTE.ghost;
 

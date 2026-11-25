@@ -460,6 +460,68 @@ test('Spiel: kleine Lichtgeister per Entwickler-Schalter mit Laterne, im Licht z
   expect(errors).toEqual([]);
 });
 
+// Tupfspinne am Netz per Entwickler-Schalter (2D): Die Figur steht neben einem Netz und läuft hinein: Sie bleibt stehen,
+// die Spinne seilt sich ab, winkt und hängt danach wieder still an ihrem Platz
+test('Spiel: Tupfspinne per Entwickler-Schalter, Netz klingt, die Spinne grüßt und bleibt an ihrem Platz, ohne Fehler', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  const game = await openGame(page, { clock: true, dev: 'hoehle' });
+  type Body = { id: string; key: string; x: number; y: number };
+  type Game = {
+    world: { cell(x: number, y: number): { solid?: boolean; ground: string; deco: string | null } };
+    state: { player: { x: number; y: number; dir: string }; wokeAt: number };
+    rides: Body[];
+    apply(cmd: { type: 'move'; dir: string }): void;
+  };
+  await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+  await ticks(page, 10);
+  await render(page, 2);
+  const spiders = () =>
+    game.evaluate((node) => (node as unknown as Game).rides.filter((b) => b.id.startsWith('spider:')));
+  const all = await spiders();
+  expect(all.length).toBeGreaterThanOrEqual(GROTTE.web.least);
+  expect(all.every((b) => b.key === `spider-rest-${GROTTE.web.rest}`)).toBe(true);
+  // die Figur neben das erste Netz stellen, Blick zu ihm hin
+  const dir = await game.evaluate(
+    (node, [x, y]) => {
+      const el = node as unknown as Game;
+      const sides = [
+        ['n', 0, 1],
+        ['s', 0, -1],
+        ['e', -1, 0],
+        ['w', 1, 0],
+      ] as const;
+      for (const [d, dx, dy] of sides) {
+        const c = el.world.cell(x + dx, y + dy);
+        if (c.solid || c.ground === 'water') continue;
+        el.state = { ...el.state, wokeAt: -1e6, player: { x: x + dx, y: y + dy, dir: d } };
+        return d;
+      }
+      return null;
+    },
+    [all[0]!.x, all[0]!.y] as const,
+  );
+  expect(dir).not.toBeNull();
+  await arrive(page);
+  const before = await game.evaluate((node) => ({ ...(node as unknown as Game).state.player }));
+  await game.evaluate((node, d) => (node as unknown as Game).apply({ type: 'move', dir: d }), dir!);
+  await ticks(page, 1);
+  const keys = new Set<string>();
+  for (let i = 0; i < 50; i++) {
+    await render(page, 1);
+    keys.add((await spiders())[0]!.key);
+  }
+  expect([...keys].some((k) => k.includes('wave'))).toBe(true); // sie winkt
+  expect([...keys].some((k) => k !== `spider-rest-${GROTTE.web.rest}` && k.startsWith('spider-rest'))).toBe(true); // abgeseilt
+  const after = await spiders();
+  expect(after.map((b) => [b.x, b.y])).toEqual(all.map((b) => [b.x, b.y])); // keine Spinne läuft weg oder heran
+  expect(after[0]!.key).toBe(`spider-rest-${GROTTE.web.rest}`); // wieder still oben
+  const player = await game.evaluate((node) => (node as unknown as Game).state.player);
+  expect([player.x, player.y]).toEqual([before.x, before.y]); // das Netz hält sie nicht fest, sie läuft nicht hinein
+  expect(errors).toEqual([]);
+});
+
 // Dunkelmaske der Grotte (Pixelprobe am fertigen Bild, als Bildschirmfoto: in 2D und in 3D mit der Ebene über WebGL;
 // @3d, damit der beleuchtete Boden in 3D mitgeprüft wird): mitten in der Grotte, fern von Bett und Schächten, liegt um
 // die Figur ein Lichtloch (nie dunkler als die Dämmerung, fast so hell wie mit „Höhle hell“), außerhalb ist es

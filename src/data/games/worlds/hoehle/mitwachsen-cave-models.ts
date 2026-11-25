@@ -173,3 +173,55 @@ export const GHOST_MODEL: readonly Part[] = ((c) => {
     s(-0.025, 0.152, -0.118, 0.05, 0.014, 0.006, SMILE), // lächelt
   ];
 })(GROTTE_COLORS.ghost);
+
+/** Haltung der Tupfspinne: still, winkt (zwei Bilder im Wechsel) oder schläft (Augen zu) */
+export type SpiderPose = 'rest' | 'wave1' | 'wave2' | 'asleep';
+
+/**
+ * Die Tupfspinne (Schritt 12 der Rückmeldung; kein Tier der Leiste): ein runder Körper, fast eine Kugel, vorn ein
+ * kleinerer runder Kopf, je Seite vier kurze Stummelbeine ohne Knick und ohne Haare, dunkles Grün mit cremefarbenen
+ * Tupfen, zwei große Augen mit Glanzpunkt (nicht acht), rosa Wangen und ein Lächeln. Keine Mundwerkzeuge, keine Zähne.
+ * Sie hängt vor ihrem Netz und schaut zur Kamera (z = 0 ist ihre Unterkante, alles liegt vor der Mitte des Felds, das Netz
+ * dahinter). Beim Winken hebt sie die beiden vorderen Beine, im Wechsel steil und schräg; schlafend sind die Augen zu
+ */
+export const SPIDER_MODELS: Record<SpiderPose, readonly Part[]> = ((c) => {
+  const legs = (front: boolean): Part[] =>
+    [-0.27, -0.21, -0.15, -0.09]
+      .filter((z) => front || z !== -0.27)
+      .flatMap((z) => [s(-0.25, 0.05, z, 0.09, 0.05, 0.04, c.leg), s(0.16, 0.05, z, 0.09, 0.05, 0.04, c.leg)]);
+  const body: Part[] = [
+    s(-0.16, 0.02, -0.2, 0.32, 0.24, 0.2, c.body, c.top), // runder Körper
+    s(-0.12, 0.26, -0.17, 0.24, 0.04, 0.14, c.body, c.top), // oben gewölbt
+    s(-0.19, 0.06, -0.17, 0.03, 0.16, 0.14, c.body), // an den Seiten gewölbt
+    s(0.16, 0.06, -0.17, 0.03, 0.16, 0.14, c.body),
+    s(-0.07, 0.301, -0.12, 0.05, 0.004, 0.04, c.dot), // Tupfen obenauf und vorn
+    s(0.04, 0.301, -0.08, 0.04, 0.004, 0.04, c.dot),
+    s(-0.13, 0.2, -0.205, 0.04, 0.04, 0.005, c.dot),
+    s(0.08, 0.21, -0.205, 0.04, 0.04, 0.005, c.dot),
+    s(-0.02, 0.235, -0.205, 0.04, 0.035, 0.005, c.dot),
+    s(-0.11, 0.03, -0.3, 0.22, 0.17, 0.1, c.body, c.top), // kleinerer Kopf vorn
+    s(-0.105, 0.055, -0.306, 0.035, 0.022, 0.004, c.cheek), // Wangen
+    s(0.07, 0.055, -0.306, 0.035, 0.022, 0.004, c.cheek),
+    s(-0.03, 0.05, -0.307, 0.06, 0.012, 0.004, SMILE), // lächelt
+  ];
+  const open = (x: number): Part[] => [
+    s(x, 0.09, -0.305, 0.075, 0.075, 0.005, c.eye), // groß und rund
+    s(x + 0.015, 0.095, -0.31, 0.05, 0.055, 0.005, c.pupil),
+    s(x + 0.03, 0.13, -0.313, 0.018, 0.018, 0.003, c.eye), // Glanzpunkt
+  ];
+  const shut = (x: number): Part[] => [
+    s(x + 0.01, 0.125, -0.306, 0.055, 0.014, 0.004, c.pupil), // Bogen
+    s(x, 0.11, -0.306, 0.014, 0.02, 0.004, c.pupil),
+    s(x + 0.061, 0.11, -0.306, 0.014, 0.02, 0.004, c.pupil),
+  ];
+  const eyes = [...open(-0.09), ...open(0.015)];
+  // die beiden vorderen Beine gehoben: steil oder schräg nach außen
+  const up = [s(-0.23, 0.1, -0.29, 0.05, 0.14, 0.04, c.leg), s(0.18, 0.1, -0.29, 0.05, 0.14, 0.04, c.leg)];
+  const out = [s(-0.29, 0.12, -0.29, 0.1, 0.05, 0.04, c.leg), s(0.19, 0.12, -0.29, 0.1, 0.05, 0.04, c.leg)];
+  return {
+    rest: [...legs(true), ...body, ...eyes],
+    wave1: [...legs(false), ...up, ...body, ...eyes],
+    wave2: [...legs(false), ...out, ...body, ...eyes],
+    asleep: [...legs(true), ...body, ...shut(-0.09), ...shut(0.015)],
+  };
+})(GROTTE_COLORS.spider);

@@ -80,6 +80,7 @@ export type Deco =
   | 'shore' // helle Steine am Ufer des stillen Sees in der Grotte (begehbar, nur Zierde)
   | 'glowmoss' // Leuchtmoos am Fuß einer Felswand (`note` die Seite der Wand, 0 n … 3 w) oder unter einem Lichtschacht (begehbar)
   | 'waterfall' // kleiner Wasserfall am stillen See: Fels, das Wasser fällt nach Süden in den See (fest, nur Zierde)
+  | 'web' // Netz der Tupfspinne zwischen zwei Felsnasen statt eines Stalagmiten: Hineinlaufen spielt seine Perlen wie eine Harfe (fest)
   | 'lantern' // Sockel der Kristall-Laterne am Höhlenbett: Hineinlaufen nimmt die Laterne (fest; sie selbst zeichnet das Paket als Körper)
   | 'klangstein'; // Stein mit schwebender Note: Hineinlaufen spielt die Geschichte des Ortes
 export type TreeKind =

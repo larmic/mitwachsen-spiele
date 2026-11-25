@@ -39,6 +39,7 @@ import {
   type MaskCanvas,
   type MaskFx,
 } from './mitwachsen-mask';
+import { webs } from './mitwachsen-spider';
 import { Olm } from './mitwachsen-olm-look';
 import { flatColors } from '../../mitwachsen-ground-2d';
 import { CAVE_KEY, caveBright, toggleCave } from '../../mitwachsen-menu';
@@ -213,7 +214,7 @@ describe('Dunkelmaske: Löcher', () => {
     expect(pathBands(bare)).toEqual([]);
   });
 
-  it('zuerst das Loch um die Figur (mit Laterne größer), dann die nächsten; feste Löcher an Schächten, Wiese, Bahnhof, Mündung', () => {
+  it('zuerst das Loch um die Figur (mit Laterne größer), dann die nächsten; feste Löcher an Schächten, Wiese, Bahnhof, Mündung und Netzen', () => {
     const holes = maskHoles(w, lit(bed), at);
     expect(holes[0]).toMatchObject({ x: bed[0] + 0.5, y: bed[1] + 0.5, r: D.hole, open: 1 });
     expect(maskHoles(w, lit(bed, { lamp: 'hoehle' }), at)[0]!.r).toBe(D.lantern);
@@ -225,7 +226,10 @@ describe('Dunkelmaske: Löcher', () => {
       D.fixed.meadow,
       D.fixed.station,
       D.fixed.mouth,
+      ...webs(w).map(() => D.fixed.web), // je Netz der Tupfspinnen eins: die Spinne lebt nur im Licht
     ]);
+    expect(webs(w).length).toBeGreaterThanOrEqual(GROTTE.web.least);
+    expect(fixed.slice(6).map((h) => [h.x - 0.5, h.y - 0.5])).toEqual(webs(w));
     expect(fixed[3]).toMatchObject({ x: bed[0] + 0.5, y: bed[1] + 0.5 });
     expect(fixed.every((h) => holes.some((g) => g.x === h.x && g.y === h.y && g.r === h.r))).toBe(true);
     // nach dem ersten nach Abstand (bis zum Rand des Lochs)

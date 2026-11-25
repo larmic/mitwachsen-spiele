@@ -12,7 +12,8 @@
 // Kreis um das Bett. Dazwischen die Füllung (mitwachsen-fill.ts): Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken,
 // Felsinseln mit Moos, Pfützen, unter den Schächten Moos, Farn und Leuchtmoos, danach die Fülle: Kristallfelder, Adern im
 // Boden, Leuchtmoos an den Wänden und ein kleiner Wasserfall am See; frei bleiben die Mitte, die Wege und die Spur des
-// künftigen Gleises von der Mündung zum Platz des Bahnhofs.
+// künftigen Gleises von der Mündung zum Platz des Bahnhofs. Drei bis vier Stalagmiten fern aller Wege werden Netze der
+// Tupfspinnen (mitwachsen-spider.ts), die leuchten wie Kristalle.
 // Licht ohne Punktlichter: Unter den Schächten und neben Kristallen und Leuchtpilzen ist der Boden heller (`Cell.light`),
 // an den Felswänden dunkler, außer auf den Wegen (`Cell.dim`, mitwachsen-glow.ts). Rechts vorn am Bett steht der Sockel
 // der Kristall-Laterne (mitwachsen-lantern.ts).
@@ -38,6 +39,7 @@ import { caveHaunts } from './mitwachsen-cave-haunts';
 import { adornGrotte, corridorAt, crystalOf, fillGrotte, shadeGrotte, tipOf } from './mitwachsen-fill';
 import { dimGrotte } from './mitwachsen-glow';
 import { siteOf, type Site } from './mitwachsen-site';
+import { spinWebs } from './mitwachsen-spider';
 
 const { rx, ry } = GROTTE.shape;
 const OUTER = { rx: rx + GROTTE.cliff, ry: ry + GROTTE.cliff }; // fester Außenrand der Klippen
@@ -145,9 +147,10 @@ export function buildGrotte(
     if (c && c.region === 'hoehle' && !c.solid && c.ground !== 'water' && !reach.has(k))
       map.set(k, { ...cliff(Math.max(2, c.h + 1)), region: 'hoehle' });
   }
+  const path = pathsOf(site, bed, ringHome);
+  spinWebs(seed, (u, v) => site.at(u, v), path, fromMouth([0, GROTTE.bed]), map); // Netze der Tupfspinnen statt einiger Stalagmiten
   light(realm, at, map);
   markStation(realm, site, map);
-  const path = pathsOf(site, bed, ringHome);
   dimGrotte(realm, (x, y) => path(...site.uv(x, y)), map); // Ränder im Dunkel, Wege und Licht bleiben hell
   const stone: Point = [bed[0] + CAVE_STONE[0], bed[1] + CAVE_STONE[1]]; // Klangstein `hoehle-offen` (homeGround)
   const spots = spotsOf(site, reach, map);
@@ -520,7 +523,7 @@ function reachOf(wake: readonly Point[], map: ReadonlyMap<string, Cell>): Set<st
 
 /**
  * Licht ohne Punktlichter: unter den drei Lichtschächten ein Lichtfleck (Radius `GROTTE.shaft.r`, in der Mitte bis 35 %
- * heller; welcher Schacht, steht in `Cell.shaft`), Kristalle, Kristallbüsche, Leuchtpilze, Säulen und Lampen machen ihr
+ * heller; welcher Schacht, steht in `Cell.shaft`), Kristalle, Kristallbüsche, Leuchtpilze, Säulen, Lampen und Netze machen ihr
  * Feld und die acht Nachbarn um `GROTTE.glow` heller. Höchstens 0,5: Hell wird es, nie grell.
  */
 function light(realm: ReadonlySet<string>, at: (p: readonly [number, number]) => Point, map: Map<string, Cell>) {
@@ -533,7 +536,8 @@ function light(realm: ReadonlySet<string>, at: (p: readonly [number, number]) =>
     c.deco === 'shroombed' ||
     c.deco === 'column' ||
     c.deco === 'cavelamp' ||
-    c.deco === 'crystalbush';
+    c.deco === 'crystalbush' ||
+    c.deco === 'web';
   for (const k of realm) {
     const c = map.get(k);
     if (!c) continue;

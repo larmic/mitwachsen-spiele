@@ -3,7 +3,8 @@
 // Licht, Portal am stillen See, Fundorte der acht Höhlen-Tiere, Pilzbeete, Tropfquelle und Tropfmoos zum Sammeln) und
 // die Zeichenteile der 2D-Ansicht samt den Modellen der Höhlen-Tiere (die Fledermaus auch kopfüber), dazu ihr Schmuck:
 // Säulen-Glockenspiel, Grottenolm am Steg und Tropfsteine (Regeln in mitwachsen-cave-rules.ts, Bild und Ton in
-// view-2d.ts), die kleinen Lichtgeister in der Kristallhalle samt Klangstein (mitwachsen-ghost.ts, mitwachsen-ghost-look.ts), ihre Füllung (mitwachsen-fill.ts) und ihr Licht: Ränder im Dunkel, Lichtkreis um die Figur und die
+// view-2d.ts), die kleinen Lichtgeister in der Kristallhalle samt Klangstein (mitwachsen-ghost.ts, mitwachsen-ghost-look.ts), die
+// Tupfspinnen an ihren Netzen, die wie eine Harfe klingen (mitwachsen-spider.ts, mitwachsen-spider-look.ts), ihre Füllung (mitwachsen-fill.ts) und ihr Licht: Ränder im Dunkel, Lichtkreis um die Figur und die
 // Kristall-Laterne am Bett (mitwachsen-glow.ts, mitwachsen-lantern.ts; die Regel der Laterne ist Teil von `rules`). Die
 // Regeln des Sammelns stehen bei den Handgriffen im Kern (mitwachsen-chores.ts). Dazu das Hau-ruck am Höhlentor: Tok
 // (aus dem Paket der Bahn) und die Figur schieben den Rollstein in drei Stößen in seine Nische (`rules.ritual`,
@@ -32,7 +33,7 @@ export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules
   gate: 'hoehle',
   build: buildGrotte,
   place: placeGrotte,
-  rules: { ...rules, ritual: HEAVE }, // Säulen-Glockenspiel, Grottenolm am Steg, Kristall-Laterne; Hau-ruck am Höhlentor
+  rules: { ...rules, ritual: HEAVE }, // Säulen-Glockenspiel, Grottenolm am Steg, Netze der Tupfspinnen, Kristall-Laterne; Hau-ruck am Höhlentor
   view,
   view3d: () => import('./view-3d').then((m) => m.view3d),
   models: CAVE_MODELS,

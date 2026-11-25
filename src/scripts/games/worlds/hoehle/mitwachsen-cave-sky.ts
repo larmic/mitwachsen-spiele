@@ -6,7 +6,7 @@
 // Lichtgeister in der Kristallhalle, nur im Licht der Laterne, sonst ihre Glimmerpünktchen (mitwachsen-ghost-look.ts), dazu der
 // Lichtkreis um die Figur (mitwachsen-glow.ts; auch im Nebel, er gehört zur Figur), am Abend in 3D das golden-orange
 // Licht der Schächte und die Fledermaus-Runden um den Schacht über dem Bett (mitwachsen-dusk-look.ts). Im Nebel zeigt
-// sich sonst nichts. Bei reduzierter Bewegung kein Tropfen und keine Flugrunde. Wetter gibt es in der Grotte keins.
+// sich sonst nichts. Über der Maske leuchten auch die Perlen der Netze der Tupfspinnen (mitwachsen-spider-look.ts). Bei reduzierter Bewegung kein Tropfen und keine Flugrunde. Wetter gibt es in der Grotte keins.
 // Reihenfolge: erst was zur Welt gehört (Abend, Tropfen, Grottenolm, Fledermaus), dann die Dunkelmaske
 // (mitwachsen-mask.ts), dann das Leuchten obendrauf (Lichtkreis, in 3D die klingende Säule, Glitzern, Funke, Lichtgeister); Zeichen, Herzen,
 // Sprechblasen und Leiste zeichnet der Kern danach.
@@ -28,11 +28,13 @@ import { OLM_MS, type Olm } from './mitwachsen-olm-look';
 import { circleOf, drawCircle, type Circle } from './mitwachsen-glow';
 import { drawDusk, type Dusk } from './mitwachsen-dusk-look';
 import { caveMask, type MaskFx } from './mitwachsen-mask';
+import { webs } from './mitwachsen-spider';
 import { Spark, drawSpark, oneGlitter } from './mitwachsen-spark';
 import { GhostFx, drawGhosts } from './mitwachsen-ghost-look';
+import { SpiderFx, drawBeads } from './mitwachsen-spider-look';
 
 /**
- * Was die Grotte sich fürs Bild merkt: Glockenspiel, Tropfen, Grottenolm; Licht: seit wann die Figur die Laterne trägt
+ * Was die Grotte sich fürs Bild merkt: Glockenspiel, Tropfen, Grottenolm, Tupfspinnen (`spider`, mitwachsen-spider-look.ts, in der Ansicht angelegt); Licht: seit wann die Figur die Laterne trägt
  * (`since`, ms; für das Wachsen des Lichtkreises) und der zuletzt gezeichnete Lichtkreis (`drawn`, für die Tests); am
  * Abend, welche Fledermäuse gerade Runden fliegen (`dusk`, mitwachsen-dusk-look.ts); die Dunkelmaske (`mask`,
  * mitwachsen-mask.ts, beim ersten Bild angelegt); der Funke über den Sammelstellen (`spark`, mitwachsen-spark.ts, beim ersten Bild angelegt);
@@ -42,6 +44,7 @@ export type CaveFx = {
   chime: Chime;
   drips: Drips;
   olm: Olm;
+  spider?: SpiderFx;
   light: { since?: number; drawn?: Circle | null };
   dusk?: Dusk;
   mask?: MaskFx;
@@ -107,6 +110,8 @@ export function caveWeather(fx: CaveFx): Sky['weather'] {
     );
     if (lit.far) glint(ctx, P, lit.far);
     drawSpark(ctx, P, lit.spark);
+    // die Perlen der Netze leuchten mit ihrem Ton und glitzern mit der Laterne (mitwachsen-spider-look.ts)
+    drawBeads(ctx, P, world, webs(world), (fx.spider ??= new SpiderFx()), state, sc.now, sc.reduced, seen);
     // die kleinen Lichtgeister leuchten als Ganzes: über der Maske; abends schlafen sie (mitwachsen-ghost-look.ts)
     const ghosts = (fx.ghost ??= new GhostFx()).frame(world, state, sc.now, !((sc.evening ?? 0) > 0), sc.reduced);
     drawGhosts(ctx, P, ghosts, sc.reduced, seen);

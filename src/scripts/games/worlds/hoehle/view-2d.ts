@@ -3,7 +3,8 @@
 // Kristallbogen, Leuchtpilze, Pilzbeete (voll oder abgeerntet), Tropfquelle, Tropfmoos, Stalagmiten und Holzsteg
 // (Quader aus mitwachsen-cave-look.ts, je Deko-Art an den Haken `drawDeco` des Kerns gehängt), Lichtflecken auf dem
 // Grottenboden, der lila Höhlenhimmel und das Zeichen der Gegend in der Leiste (ein Kristall). Dazu der Schmuck der
-// Grotte: Töne des Säulen-Glockenspiels und „blubb“ des Grottenolms (`score`), „plink“ der Tropfsteine (`ambient`) und
+// Grotte: Töne des Säulen-Glockenspiels, „blubb“ des Grottenolms und die Harfe am Netz der Tupfspinne (`score`; die Spinne
+// selbst als Körper, `bodies`, mitwachsen-spider-look.ts), „plink“ der Tropfsteine (`ambient`) und
 // in der Luft Tropfen, Grottenolm und die Fledermaus auf ihrer Runde, die kleinen Lichtgeister samt Kichern (`sky.weather`,
 // `ambient`; mitwachsen-cave-sky.ts, mitwachsen-ghost-look.ts), am Abend
 // golden-orange Lichtschächte (`ground`) und Fledermaus-Runden um den Schacht über dem Bett (mitwachsen-dusk-look.ts).
@@ -27,6 +28,8 @@ import { duskAway, duskGround } from './mitwachsen-dusk-look';
 import { isWall, shadowOver } from './mitwachsen-glow';
 import { lanternBodies, lanternScore } from './mitwachsen-lantern';
 import { heaveAjar, heaveBodies, heaveScore, openScore } from './mitwachsen-heave-look';
+import { webs } from './mitwachsen-spider';
+import { SpiderFx } from './mitwachsen-spider-look';
 
 /** Dinge der Grotte: Quader wie in 3D */
 const look: DrawDeco = (world, c, x, y) => caveBoxes(world, c, x, y);
@@ -61,7 +64,8 @@ export function turnAlbum(t: Turn, realm: RegionId, now: number, reduced: boolea
 const none = () => {};
 
 /** Was die Grotte sich fürs Bild merkt (nur Bild, kein Spielstand) */
-export const fx: CaveFx = { chime: new Chime(), drips: new Drips(), olm: new Olm(), light: {} };
+const spider = new SpiderFx();
+export const fx: CaveFx = { chime: new Chime(), drips: new Drips(), olm: new Olm(), spider, light: {} };
 
 /**
  * Boden der Grotte (der Kern ruft das nur auf Grottenboden und Felswand): Lichtfleck unter einem Lichtschacht und neben
@@ -119,6 +123,7 @@ export const view: View2D & { fx: CaveFx } = {
     shore: look, // helle Steine am Seeufer (Sammelstellen, Schritt 9)
     waterfall: fall,
     lantern: look, // Sockel; die Laterne darauf kommt als Körper (`bodies`)
+    web: look, // Netz der Tupfspinne; die Spinne davor kommt als Körper (`bodies`)
   },
   ground,
   // Säule klingt (mit Echo; nach je vier Tönen zirpt die Fledermaus und fliegt), Grottenolm macht „blubb“, die Figur
@@ -126,14 +131,19 @@ export const view: View2D & { fx: CaveFx } = {
   score: (e) => {
     if (e.type === 'column') return fx.chime.ring(e.x, e.y, e.note, performance.now(), e.perch);
     if (e.type === 'olm') return fx.olm.surface(e.x, e.y, performance.now());
+    if (e.type === 'web') return spider.pluck(e.x, e.y, performance.now()); // Harfe, die Spinne grüßt
     if (e.type === 'heave') return heaveScore(e.n); // Hau-ruck: Trommel, Geröll
     if (e.type !== 'lantern') return undefined; // die anderen Ereignisse gehören anderen Welten
     fx.light.since = performance.now();
     return lanternScore();
   },
   // die Kristall-Laterne auf ihrem Sockel am Bett, solange die Figur sie nicht trägt; beim Hau-ruck die Hände auf dem
-  // Stein, danach Fledermaus und Glühwürmchen
-  bodies: (state, world, at) => [...lanternBodies(state, world), ...heaveBodies(state, world, at)],
+  // Stein, danach Fledermaus und Glühwürmchen; die Tupfspinnen vor ihren Netzen (abends und im Schlaf schlafen sie)
+  bodies: (state, world, at) => [
+    ...lanternBodies(state, world),
+    ...heaveBodies(state, world, at),
+    ...spider.bodies(world, webs, at.now, at.reduced, !!at.warm || state.sleeping),
+  ],
   ajar: (state, reduced) => heaveAjar(state, reduced), // der Rollstein in Dritteln
   // die verschlafene Fledermaus auf ihrer Runde hängt solange nicht an ihrem Sitzplatz
   away: (x, y, now) => fx.chime.away(x, y, now) || duskAway(fx.dusk, x, y, now), // auch am Abend auf ihren Runden

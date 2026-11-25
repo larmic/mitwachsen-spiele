@@ -823,7 +823,7 @@ class LarmicMitwachsen extends HTMLElement {
    * Beeren gepflückt, Fische gefangen, nachgewachsen, Eimer geschöpft; Beeren, Fische oder Wasser in den Trog; ein
    * Schneehaufen wächst um eine Kugel (es ploppt, Töne aus dem Welt-Paket, und gleich gespeichert: der Schneemann
    * bleibt); ein Eiszapfen klingt (Ton aus dem Welt-Paket) und glitzert, die Figur läuft weiter; eine Kristallsäule
-   * klingt, der Grottenolm taucht am Steg auf (Bild und Ton aus dem Paket der Höhlenwelt); die Figur nimmt die
+   * klingt, der Grottenolm taucht am Steg auf, das Netz einer Tupfspinne klingt wie eine Harfe (Bild und Ton aus dem Paket der Höhlenwelt); die Figur nimmt die
    * Kristall-Laterne (Ton aus dem Paket, sie hüpft, es glitzert)
    */
   private chore(e: ChoreEvent | Extract<GameEvent, { type: PackEvent['type'] | 'bob' }>, now: number) {
@@ -834,11 +834,12 @@ class LarmicMitwachsen extends HTMLElement {
       e.type === 'icicle' ||
       e.type === 'column' ||
       e.type === 'olm' ||
+      e.type === 'web' ||
       e.type === 'lantern' ||
       e.type === 'heave'
     )
       this.sfx.score(packScore(this.renderer.views.values(), e)); // Töne aus dem Paket der Welt des Ereignisses
-    if (e.type === 'column' || e.type === 'olm') return; // Säule und Grottenolm: Bild und Ton aus dem Paket
+    if (e.type === 'column' || e.type === 'olm' || e.type === 'web') return; // Säule, Grottenolm, Netz: Bild und Ton aus dem Paket
     if (e.type === 'heave') {
       // Hau-ruck am Höhlentor: Figur und Tok lehnen sich an den Stein (Bild und Ton aus dem Paket der Höhlenwelt)
       if (e.n > 0) this.hops.set('player', now);

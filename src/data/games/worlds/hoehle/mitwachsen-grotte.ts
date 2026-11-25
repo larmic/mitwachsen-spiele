@@ -59,7 +59,7 @@ export const GROTTE = {
    * für ein tiefes Nachtlila, unter dem Fels und Nebel unter 0,08 fielen; die hellere Farbe braucht 0,87 für denselben
    * Boden. Lichtloch um die Figur `hole` Felder, mit Laterne `lantern` (wächst in `circle.grow` ms), im Fahrzeug um den
    * Sitz `seat`, an den Lampen vorn `lamp`. Feste Löcher (`fixed`, Radius in Feldern): Lichtschächte, Wiese am Bett,
-   * Bahnhof Fledermaus, Mündung des Gangs. Kleine Löcher (`small`) nur bis `near` Felder um die Figur (die letzten zwei
+   * Bahnhof Fledermaus, Mündung des Gangs, jedes Netz der Tupfspinnen (`web`). Kleine Löcher (`small`) nur bis `near` Felder um die Figur (die letzten zwei
    * weich; Leuchtmoos `moss`, die Mitte eines Kristallfelds `field`, der Wasserfall `fall`); Wege als Bänder, `band` Felder breit. Höchstens `most` Löcher je Bild. Im Gang blendet sie mit dem Weg aus,
    * `gang` Felder von der Mündung ist sie weg, und nie schneller als in `fade` ms; ist die Nacht bei `night`, ist sie ganz
    * weg (Maske × (1 − Nacht / `night`))
@@ -73,7 +73,7 @@ export const GROTTE = {
     lantern: 6.5,
     seat: 3.5,
     lamp: 1.2,
-    fixed: { shaft: 3.5, meadow: 6, station: 4, mouth: 3 },
+    fixed: { shaft: 3.5, meadow: 6, station: 4, mouth: 3, web: 2 },
     small: { crystal: 0.8, column: 1, lamp: 1, bed: 1.2, spring: 1.2, animal: 1, moss: 0.6, field: 1.1, fall: 1.2 },
     near: 9,
     band: 2.5,
@@ -138,6 +138,30 @@ export const GROTTE = {
     joy: 1600,
     gap: 1200,
     stone: [18, 52],
+  },
+  /**
+   * Tupfspinnen (Schritt 12 der Rückmeldung, Regeln in mitwachsen-spider.ts): `least` bis `most` Netze je Welt, jedes ein
+   * Ding auf einem Feld an Stelle eines Stalagmiten der Füllung, mindestens `away` Felder von Bett, Bahnhof Fledermaus und
+   * Wegen, `apart` Felder voneinander, mit eigenem festen Lichtloch (`dark.fixed.web`). Die Spinne hängt `rest` über dem
+   * Boden; läuft das Kind gegen das Netz, seilt sie sich in `down` ms um `drop` ab, winkt `wave` ms (die Beine wechseln
+   * alle `beat` ms) und klettert in `up` ms zurück; die Harfe klingt höchstens alle `gap` ms. Mit der Laterne bis `lamp`
+   * Felder glitzern die Perlen reihum, je Perle `twinkle` ms; beim Harfen leuchtet jede Perle `flash` ms mit ihrem Ton
+   */
+  web: {
+    least: 3,
+    most: 4,
+    away: 8,
+    apart: 14,
+    rest: 0.85,
+    drop: 0.35,
+    down: 500,
+    wave: 1000,
+    beat: 150,
+    up: 600,
+    gap: 500,
+    lamp: 4.5,
+    twinkle: 180,
+    flash: 300,
   },
   /**
    * Tropfsteingrotte in der Mitte: Stalagmiten in drei Höhen, dazu ein Felsbecken 3 × 2 mit Moosrand (`basin`: seine Mitte,
@@ -281,5 +305,28 @@ export const GROTTE_COLORS = {
     eye: '#6b4034',
     glimmer: '#fff3e8',
     stars: ['#ffffff', '#ffd6ec', '#e3d6ff'],
+  },
+  /**
+   * Tupfspinne: dunkles Grün (ein helles Mint hätte auf dem Boden nur 1,07 : 1), oben etwas heller, Beine noch dunkler,
+   * cremefarbene Tupfen, rosa Wangen, große Augen mit Pupille und Glanzpunkt. Kein Rot, kein Schwarz mit roten Augen
+   */
+  spider: {
+    body: '#2f7a5a',
+    top: '#3b8c69',
+    leg: '#1c5038',
+    dot: '#fff4dc',
+    cheek: '#f08a96',
+    eye: '#ffffff',
+    pupil: '#1d2233',
+  },
+  /**
+   * Netz der Tupfspinne, kein weißes Gitter: dicke, gestufte Fäden in Creme mit dunklem Rand, zwei Felsnasen in den Farben
+   * der Stalagmiten, darauf fünf Perlen aus Tau in Rosa, Türkis, Lila, Hellgrün und Weiß-Blau (von unten nach oben, je
+   * ein Ton der Harfe; kein Gold)
+   */
+  web: {
+    thread: '#f1e6d0',
+    rim: '#4a3f6b',
+    beads: ['#ff9cd4', '#6fd6f0', '#cbacff', '#86e05a', '#cfe8ff'],
   },
 } as const;

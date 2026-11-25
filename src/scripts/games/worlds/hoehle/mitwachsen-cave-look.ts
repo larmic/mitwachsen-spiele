@@ -4,7 +4,7 @@
 // mit Wasserstreifen), Tropfmoos, helle Steine am Seeufer, Stalagmiten in drei Höhen (dunkler Fuß, Spitze in der
 // Farbe ihrer Zone), der Holzsteg, der Sockel der Kristall-Laterne und die Füllung (Kristallbüsche, Felsbrocken, Moos auf
 // Felsinseln, Lehm, Pfützen, Farn) samt der Fülle (Kristallfelder, Adern im Boden, Leuchtmoos, der Wasserfall am See,
-// `adornBoxes`, `waterfallBoxes`); dazu Boden und Klippen in den Schichten des Höhlentors, Flecken im Boden in 2D
+// `adornBoxes`, `waterfallBoxes`) und das Netz der Tupfspinne (`webBoxes`, mitwachsen-spider-look.ts); dazu Boden und Klippen in den Schichten des Höhlentors, Flecken im Boden in 2D
 // (`patchOf`) und die Lichtflecken. Eigene Voxel-Grafik: keine Drusen, keine Loren, kein Tropfstein mit Kessel. Rein (ohne
 // DOM und Three.js): liefert Quader in Feldern, die beide Ansichten zeichnen. Teil des Welt-Pakets der Höhlenwelt: 2D über
 // view-2d.ts, 3D über den 3D-Teil view-3d.ts.
@@ -17,6 +17,7 @@ import type { Cell } from '../../mitwachsen-cell';
 import type { Realms } from '../../mitwachsen-home';
 import type { Box } from '../../mitwachsen-view';
 import { POST_H } from './mitwachsen-lantern';
+import { webBoxes } from './mitwachsen-spider-look';
 
 const C = GROTTE_COLORS;
 const [KR, KT] = C.crystals;
@@ -115,6 +116,7 @@ const OWN = new Map<Cell['deco'], (c: Cell, x: number, y: number) => Box[] | nul
   ['stalagmite', stalagmite],
   ...ADORN.map((d) => [d, adornBoxes] as const),
   ['waterfall', (c: Cell, x: number, y: number) => (c.region === 'hoehle' ? waterfallBoxes(c, x, y) : null)],
+  ['web', webBoxes], // Netz der Tupfspinne (mitwachsen-spider-look.ts)
 ]);
 
 /**

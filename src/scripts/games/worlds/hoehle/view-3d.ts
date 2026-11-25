@@ -59,6 +59,7 @@ export const view3d: View3D = {
     shore: look, // helle Steine am Seeufer (Sammelstellen, Schritt 9)
     waterfall: look,
     lantern: look, // Sockel; die Laterne darauf kommt als Körper (wie in 2D)
+    web: look, // Netz der Tupfspinne; die Spinne davor kommt als Körper (wie in 2D)
   },
   ground(c) {
     if (c.biome !== 'hoehle' || c.region === 'wild') return null;
