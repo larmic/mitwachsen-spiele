@@ -364,6 +364,16 @@ describe('Dunkelmaske: Löcher', () => {
     expect(maskHoles(w, lit(bed), { ...at, rides: [far] }).some((h) => h.x === bx + 41)).toBe(false);
   });
 
+  it('was selbst glimmt (der Erdhügel, `beacon`): kleines Loch mitten auf ihm, ganz offen, auch weit weg von der Figur', () => {
+    const [bx, by] = bed;
+    const mound = { id: 'grube-erde', x: bx + 40, y: by, z: 1, dir: 's' as const, glow: true as const };
+    const hole = (h: { x: number; y: number; r: number }) => h.x === bx + 40.5 && h.y === by + 0.5;
+    const on = maskHoles(w, lit(bed), { ...at, rides: [{ ...mound, beacon: true as const }] });
+    expect(on.filter(hole)).toEqual([{ x: bx + 40.5, y: by + 0.5, z: 1, r: D.small.crystal, open: 1 }]);
+    expect(on.indexOf(on.find(hole)!)).toBe(1); // gleich nach dem Loch der Figur: nie über `most` hinaus abgeschnitten
+    expect(maskHoles(w, lit(bed), { ...at, rides: [mound] }).some(hole)).toBe(false);
+  });
+
   it('Wege als Bänder: von der Mündung zum Bett und vom Bett zum Portal am See', () => {
     const [toBed, toLake] = pathBands(w);
     expect([toBed![0].x, toBed![0].y]).toEqual(frame.at(0, 0).map((v) => v + 0.5));

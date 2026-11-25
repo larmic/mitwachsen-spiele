@@ -22,10 +22,12 @@ export type Heralded = Guided & {
   late: boolean;
   heraldDue: number;
   work?: Work;
+  dig?: Work;
 };
 
 /**
- * Arbeit eines Boten (Tok baut: Bau 1 und Bau 2), von Takt `from` bis vor Takt `to` (`to` Infinity: Sie wartet noch,
+ * Arbeit eines Boten (Tok baut: Bau 1 und Bau 2 in `work`; der Maulwurf gräbt den Glitzergang der Grubenbahn in `dig`,
+ * worlds/grube/mitwachsen-dig.ts; zwei Felder, damit keiner die Arbeit des anderen für seine hält), von Takt `from` bis vor Takt `to` (`to` Infinity: Sie wartet noch,
  * Fortschritt 0; Bau 2 wartet auf den Zug am Prellbock); solange hüpft die Figur auf jeden Pfeil nur
  * (nicht gespeichert: Wer mitten im Bau neu lädt, findet ihn fertig, denn sein Ergebnis ist schon gespeichert).
  * `laid`: Was er baut, steht schon in der Welt (sie wurde neu gebaut, `relay`)
@@ -43,12 +45,27 @@ export const workOf = (s: { tick: number; work?: Work }): number | undefined =>
  * nächsten echten Spieltag auf (`wake`, Ruf und Hüpfer), beginnt zu bauen (`build`: Läuft die Figur in den wachen Boten
  * und gibt es einen nächsten Bau, Tok: Bau 1), beginnt Bau 2 am Prellbock in der Bucht (`sink`: Er klopft, der
  * Prellbock versinkt), was er baut, ploppt auf (`pop`, die Welt wird neu gebaut) und er steigt am Ende des Baus in den
- * Zug (`board`). `persist`: gleich speichern; `relay`: Der Spielstand der Pakete, nach dem ein
+ * Zug (`board`). Der Maulwurf, Bote der Grubenbahn (worlds/grube/mitwachsen-dig.ts): Er klopft am Grubenhalt und die
+ * Erdwelle läuft (`dig`), der Glitzergang ist gegraben (`dug`, die Welt wird neu gebaut, gleich gespeichert), Funkel ist
+ * aus dem Gang an den Halt gerollt (`rolled`). `persist`: gleich speichern; `relay`: Der Spielstand der Pakete, nach dem ein
  * Paket ohne eigene Welt legt, hat sich geändert, die Welt wird neu gebaut (`World.relay`)
  */
 export type HeraldEvent = {
   type: 'herald';
-  what: 'appear' | 'arrive' | 'call' | 'nap' | 'snore' | 'wake' | 'build' | 'sink' | 'pop' | 'board';
+  what:
+    | 'appear'
+    | 'arrive'
+    | 'call'
+    | 'nap'
+    | 'snore'
+    | 'wake'
+    | 'build'
+    | 'sink'
+    | 'pop'
+    | 'board'
+    | 'dig'
+    | 'dug'
+    | 'rolled';
   id: string;
   x: number;
   y: number;
@@ -70,7 +87,8 @@ export type HeraldEvents = { readonly type: string }[] & {
  * Haken eines Boten in `step` (aus dem Welt-Paket als `WorldRules.herald`). `step`: nach jedem Befehl (fällig,
  * auftauchen, ankommen, warten, rufen, schlafen). `meet`: vor dem Schritt der Figur; true, wenn der Zug damit erledigt
  * ist (in den schlafenden Boten gelaufen: Er schnarcht, die Figur bleibt stehen; in den wachen: Er beginnt den nächsten
- * Bau; solange er baut, hüpft die Figur nur)
+ * Bau; solange er baut, hüpft die Figur nur). `hold`: vor allem anderen, auch vor dem Ritual und den Fahrzeugen; true,
+ * solange er arbeitet und die Figur nur hüpft (der Maulwurf gräbt: Niemand steigt dabei in ein Fahrzeug)
  */
 export type HeraldRules = {
   step(
@@ -81,13 +99,14 @@ export type HeraldRules = {
     explored: (x: number, y: number) => boolean,
   ): void;
   meet(s: Heralded, world: World, cmd: MoveCmd, events: HeraldEvents): boolean;
+  hold?(s: Heralded, cmd: MoveCmd, events: HeraldEvents): boolean;
 };
 
 /** Der Bote, wenn er da ist (ein Wesen mit `mode: 'herald'`) */
 export const heraldOf = <A extends { mode: string }>(s: { animals: readonly A[] }): A | undefined =>
   s.animals.find((a) => a.mode === 'herald');
 
-/** Ohne Boten (sein Paket fehlt): Er tut nichts */
+/** Ohne Ritual am Tor (sein Paket fehlt): Es tut nichts */
 const NONE: HeraldRules = { step: () => {}, meet: () => false };
 
 type Hooks = { rules?: { ride?: RideEngine; vehicle?: Vehicle; herald?: HeraldRules; ritual?: HeraldRules } };
@@ -109,20 +128,27 @@ function ridesOf(rules: readonly Hooks[]): RideRules | undefined {
 
 /**
  * Die Haken aus den geladenen Paketen für `step`: Fahrzeuge (`ride`: die Fahr-Engine aus dem Paket der Fahrzeuge mit den
- * Fahrzeugen der Pakete, Schlitten und Zug; ohne Engine oder ohne Fahrzeug keine), Bote (`herald`, Tok; ohne Paket einer,
- * der nichts tut; danach das Ritual am Tor einer Welt, `ritual`, das Hau-ruck aus dem Paket der Höhlenwelt) und was vor
- * dem Schritt der Figur kommt (`meet`: beim Hau-ruck ein Stoß; am Fahrzeug einsteigen, anstoßen, winken; in den
- * schlafenden Boten laufen); true, wenn der Zug damit erledigt ist
+ * Fahrzeugen der Pakete, Schlitten, Zug und Funkel; ohne Engine oder ohne Fahrzeug keine), Boten (`herald`: alle aus den
+ * Paketen in ihrer Reihe, Tok aus dem Paket der Bahn und der Maulwurf aus dem Paket der Grubenbahn; ohne Paket keiner;
+ * danach das Ritual am Tor einer Welt, `ritual`, das Hau-ruck aus dem Paket der Höhlenwelt) und was vor dem Schritt der
+ * Figur kommt (`meet`: zuerst, ob ein Bote arbeitet und sie nur hüpft, `hold`; beim Hau-ruck ein Stoß; am Fahrzeug
+ * einsteigen, anstoßen, winken; in den schlafenden Boten laufen); true, wenn der Zug damit erledigt ist
  */
 export function hooksOf(rules: readonly Hooks[]) {
   const ride = ridesOf(rules);
-  const one = rules.find((r) => r.rules?.herald)?.rules?.herald ?? NONE;
+  const heralds = rules.flatMap((r) => (r.rules?.herald ? [r.rules.herald] : []));
   const ritual = rules.find((r) => r.rules?.ritual)?.rules?.ritual ?? NONE;
   const herald: HeraldRules = {
-    step: (...a) => (one.step(...a), ritual.step(...a)),
-    meet: (...a) => ritual.meet(...a) || one.meet(...a),
+    step: (...a) => {
+      for (const h of heralds) h.step(...a);
+      ritual.step(...a);
+    },
+    meet: (...a) => ritual.meet(...a) || heralds.some((h) => h.meet(...a)),
   };
   const meet = (s: Rider & Heralded, world: World, cmd: MoveCmd, events: RideEvents & HeraldEvents) =>
-    ritual.meet(s, world, cmd, events) || !!ride?.move(s, world, cmd, events) || one.meet(s, world, cmd, events);
+    heralds.some((h) => h.hold?.(s, cmd, events)) ||
+    ritual.meet(s, world, cmd, events) ||
+    !!ride?.move(s, world, cmd, events) ||
+    heralds.some((h) => h.meet(s, world, cmd, events));
   return { ride, herald, meet };
 }

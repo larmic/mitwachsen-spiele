@@ -389,6 +389,6 @@ describe('Bau 1: Töne', () => {
     expect(Math.max(...score.map((n) => n[5]))).toBeLessThan((BUILD.ticks * 100) / 1000);
     const e = { type: 'herald', what: 'build', id: TOK, x: 0, y: 0 } as const;
     expect(heraldFx(e)).toMatchObject({ who: TOK, score });
-    expect(heraldFx({ ...e, what: 'board' }).score.length).toBe(3); // „Ju-hu“
+    expect(heraldFx({ ...e, what: 'board' })!.score.length).toBe(3); // „Ju-hu“
   });
 });

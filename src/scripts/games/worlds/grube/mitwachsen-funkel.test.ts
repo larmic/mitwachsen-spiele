@@ -14,6 +14,7 @@ import { initialState, step, type Cmd, type GameEvent, type State } from '../../
 import { canStep, createWorld, type World } from '../../mitwachsen-world';
 import { DUG, FAHRT_PACK, GRUBE_PACK, HOEHLE_PACK, reachable, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import { FUNKEL, SEAT, dug, funkel, funkelExit, funkelRoute } from './mitwachsen-funkel';
+import { digSpot, haltOf as haltOfDig } from './mitwachsen-dig';
 import { gangOf } from './mitwachsen-gang';
 import { pack } from './index';
 
@@ -115,7 +116,7 @@ describe('Grubenbähnchen Funkel', () => {
   }
 
   /** Zu Fuß: nie in den Gang, aber an den Bahnsteig; Enden des Gangs und Zaun fest, Gang sonst gegraben */
-  function feetOf(w: World, r: RideRoute, exits: readonly Point[], bad: Bad) {
+  function feetOf(w: World, r: RideRoute, exits: readonly Point[], bad: Bad): ReadonlySet<string> {
     const [hx, hy] = w.homes.hoehle.bed; // das Bett ist fest: von einem freien Nachbarfeld aus
     const start = Object.values(DIRS)
       .map(([dx, dy]): Point => [hx + dx, hy + dy])
@@ -131,6 +132,7 @@ describe('Grubenbähnchen Funkel', () => {
     for (let y = hy - 90; y <= hy + 90; y++)
       for (let x = hx - 90; x <= hx + 90; x++) cellOf(w.cell(x, y), keyOf([x, y]), feet, gates, bad);
     gatesOf(w, r, feet, bad);
+    return feet;
   }
 
   /** Ein Feld rings um die Schleife: Zaun fest, Nachbarn des Gangs nie zu Fuß, kein Wasser, Klingeltore nur an den Enden */
@@ -199,6 +201,30 @@ describe('Grubenbähnchen Funkel', () => {
     }
     const trapped = w.spotsOf('hoehle').filter((p) => !seen.has(keyOf(p)));
     if (trapped.length) bad(`${trapped.length} Wohnplätze nur über das Gleis, etwa ${keyOf(trapped[0]!)}`);
+    // wo der Maulwurf zum Graben klopft (Schritt 17): draußen vor der Schleife, nah am Sitz, nicht auf dem Bahnsteig
+    const mole = digSpot({ sleeping: true, player: { x: 0, y: 0 }, animals: [], openGates: [] }, w);
+    const seat = haltOfDig(w)!;
+    if (!mole) bad('kein Feld für den Maulwurf am Halt');
+    else if (!seen.has(keyOf(mole)) || w.cell(...mole).stop || w.cell(...mole).lane)
+      bad(`Maulwurf klopft in der Schleife bei ${keyOf(mole)}`);
+    else if (Math.max(Math.abs(mole[0] - seat[0]), Math.abs(mole[1] - seat[1])) > 4)
+      bad(`Maulwurf klopft weit weg vom Halt bei ${keyOf(mole)}`);
+  }
+
+  /**
+   * Klangstein am Grubenhalt (kommt mit dem Graben, Schritt 17): auf dem Bahnsteig, fest, Geschichte `grube`, hinter den
+   * Warteplätzen und weg vom Aussteigen, ringsum frei; von einem Nachbarfeld aus zu Fuß zu erreichen
+   */
+  function stoneOf(w: World, r: RideRoute, exits: readonly Point[], feet: ReadonlySet<string>, bad: Bad) {
+    const p = w.stones.get('grube');
+    if (!p) return void bad('kein Klangstein am Grubenhalt');
+    const c = w.cell(...p);
+    if (c.deco !== 'klangstein' || c.story !== 'grube' || !c.solid || c.stop !== 'grube')
+      bad('Klangstein nicht am Bahnsteig');
+    if (r.seats.home.some((q) => keyOf(q) === keyOf(p)) || exits.some((q) => keyOf(q) === keyOf(p)))
+      bad('Stein auf einem Warteplatz');
+    if (!Object.values(DIRS).some(([dx, dy]) => feet.has(keyOf([p[0] + dx, p[1] + dy]))))
+      bad('Klangstein nicht zu erreichen');
   }
 
   /** Was an der Strecke und den Feldern eines Seeds nicht stimmt */
@@ -209,12 +235,13 @@ describe('Grubenbähnchen Funkel', () => {
     const out: string[] = [];
     const bad = (m: string) => out.push(`Seed ${seed}: ${m}`);
     shapeOf(w, r, bad);
-    feetOf(w, r, haltOf(w, r, bad), bad);
+    const exits = haltOf(w, r, bad);
+    stoneOf(w, r, exits, feetOf(w, r, exits, bad), bad);
     pawsOf(w, bad);
     return out;
   }
 
-  it('Strecke über die Seeds: geschlossene Runde vom Sitz zum Sitz, 15–20 s, Gleis mit Richtungen, Halt am Bahnsteig, Gang nur für Züge, kein Wohnplatz in der Schleife', () => {
+  it('Strecke über die Seeds: geschlossene Runde vom Sitz zum Sitz, 15–20 s, Gleis mit Richtungen, Halt am Bahnsteig, Gang nur für Züge, Klangstein am Bahnsteig, kein Wohnplatz in der Schleife, der Maulwurf klopft draußen', () => {
     expect(seedsFor(seedRange(1, 20)).flatMap(problems)).toEqual([]);
   });
 

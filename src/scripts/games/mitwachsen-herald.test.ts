@@ -47,4 +47,31 @@ describe('Haken der Pakete (hooksOf)', () => {
     hooks.herald.step({} as never, {} as never, 'tick', [] as never, () => true);
     expect(order).toEqual(['herald', 'ritual']);
   });
+
+  it('mehrere Boten (Tok aus der Bahn, der Maulwurf aus der Grubenbahn): `step` aller in ihrer Reihe; `hold` vor allem anderen', () => {
+    const order: string[] = [];
+    const tok = { step: () => void order.push('tok'), meet: () => (order.push('tok'), false) };
+    let digging = false;
+    const mole = {
+      step: () => void order.push('mole'),
+      meet: () => (order.push('mole'), false),
+      hold: () => (order.push('hold'), digging),
+    };
+    const ritual = { step: () => void order.push('ritual'), meet: () => (order.push('ritual'), false) };
+    const engine: RideEngine = () => ({ ...RULES, move: () => (order.push('ride'), false) });
+    const hooks = hooksOf([
+      { rules: { herald: tok, vehicle: train, ride: engine } },
+      { rules: { herald: mole } },
+      { rules: { ritual } },
+    ]);
+    hooks.herald.step({} as never, {} as never, 'tick', [] as never, () => true);
+    expect(order).toEqual(['tok', 'mole', 'ritual']);
+    order.length = 0;
+    expect(hooks.meet({} as never, {} as never, { type: 'move', dir: 'n' }, [] as never)).toBe(false);
+    expect(order).toEqual(['hold', 'ritual', 'ride', 'tok', 'mole']);
+    order.length = 0;
+    digging = true; // der Maulwurf gräbt: Die Figur hüpft nur, kein Ritual, kein Fahrzeug, kein Bote
+    expect(hooks.meet({} as never, {} as never, { type: 'move', dir: 'n' }, [] as never)).toBe(true);
+    expect(order).toEqual(['hold']);
+  });
 });

@@ -2,14 +2,16 @@
 // Fassung der Eis-Geschichte, „Wenn das Tor offen ist“), am Höhlenbett (die zweite Fassung der Höhlen-Geschichte) und
 // in der Kristallhalle bei den kleinen Lichtgeistern (`lichtgeister`, setzt die Grotte selbst);
 // dazu die Steine der Bahn, die erst mit ihr kommen (Paket der Bahn): am Bahnhof Bär ab Bau 1 und am
-// Lokschuppen ab Bau 2 (worlds/bahn/mitwachsen-stones.ts). Läuft die Figur hinein, erklingt die
+// Lokschuppen ab Bau 2 (worlds/bahn/mitwachsen-stones.ts), und der Stein am Grubenhalt, den der Maulwurf mit dem
+// Glitzergang bringt (`grube`, Paket der Grubenbahn, worlds/grube/mitwachsen-funkel.ts). Läuft die Figur hinein, erklingt die
 // Melodie des Ortes, später danach die eingesprochene Geschichte. Titel und Texte stehen in mitwachsen-story-texts.ts
 // (nicht im Spiel, das nur Melodie und Aufnahme spielt).
 // Aufnahmen: public/games/mitwachsen/stimme/<id>.m4a ablegen und hier bei `voice` eintragen (ein Test prüft die Datei).
 
 import type { GateId, Point } from './mitwachsen';
 
-export type StoryId = 'bett' | GateId | 'eis-offen' | 'hoehle-offen' | 'lichtgeister' | 'lokschuppen' | 'bahnhof';
+export type StoryId =
+  'bett' | GateId | 'eis-offen' | 'hoehle-offen' | 'lichtgeister' | 'lokschuppen' | 'bahnhof' | 'grube';
 
 /** Melodie: Töne [Hz, Länge in s, Lautstärke?] nacheinander, alle aus der Pentatonik C–D–E–G–A */
 export type Melody = {
@@ -211,6 +213,23 @@ export const STORIES: Record<StoryId, Story> = {
         [C4, 0.12, 0.2],
         [E4, 0.12, 0.2],
         [G4, 0.5],
+      ],
+    },
+  },
+  grube: {
+    // dreimal klopft der Maulwurf leise, dann singt das Klingeltor hinauf wie beim Durchfahren
+    melody: {
+      wave: 'triangle',
+      gap: 0.06,
+      notes: [
+        [A5, 0.06, 0.1],
+        [A5, 0.06, 0.1],
+        [A5, 0.06, 0.1],
+        [D5, 0.2],
+        [E5, 0.2],
+        [G5, 0.2],
+        [A5, 0.2],
+        [C6, 0.6],
       ],
     },
   },

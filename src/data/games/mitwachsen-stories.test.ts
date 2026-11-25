@@ -5,9 +5,18 @@ import { STORIES, melodyLength } from './mitwachsen-stories';
 import { STORY_TEXTS } from './mitwachsen-story-texts';
 
 describe('Geschichten der Klangsteine', () => {
-  it('gibt es am Bett, für jedes große Tor, am Schneebett und am Höhlenbett (zweite Fassungen), bei den Lichtgeistern und an der Bahn', () => {
+  it('gibt es am Bett, für jedes große Tor, am Schneebett und am Höhlenbett (zweite Fassungen), bei den Lichtgeistern, an der Bahn und am Grubenhalt', () => {
     expect(Object.keys(STORIES).sort()).toEqual(
-      ['bett', ...GATES.map((g) => g.id), 'eis-offen', 'hoehle-offen', 'lichtgeister', 'lokschuppen', 'bahnhof'].sort(),
+      [
+        'bett',
+        ...GATES.map((g) => g.id),
+        'eis-offen',
+        'hoehle-offen',
+        'lichtgeister',
+        'lokschuppen',
+        'bahnhof',
+        'grube',
+      ].sort(),
     );
     expect(Object.keys(STORY_TEXTS).sort()).toEqual(Object.keys(STORIES).sort());
     // beide Fassungen der Eis-Geschichte beginnen gleich und klingen gleich
@@ -37,6 +46,17 @@ describe('Geschichten der Klangsteine', () => {
     // ohne Aufnahme spielt die Melodie allein, darum hat jede genug Töne
     for (const id of ['lokschuppen', 'bahnhof'] as const)
       expect(STORIES[id].melody.notes.length, id).toBeGreaterThan(4);
+  });
+
+  it('die Geschichte am Grubenhalt: wortgleich von der Konzeptseite, ohne das Wort „Gefahr“, mit eigener Melodie', () => {
+    // Konzeptseite „Höhle nach dem ersten Spielen“, Punkt 7 (Antwort des Vaters vom 24.11.2026: „zu eng für Füße, nur für
+    // Züge“, das Wort „Gefahr“ kommt in der Geschichte des Spiels nicht vor)
+    expect(STORY_TEXTS.grube).toEqual({
+      title: 'Am Grubenhalt',
+      text: 'Der Maulwurf hat einen ganz schmalen Glitzergang gegraben. Der ist so eng, da passen keine Füße hinein, nur das kleine Bähnchen. Vorne und hinten steht ein Klingeltor. Kommt das Bähnchen, singt es. Drinnen funkeln die Kristalle, und ein kleiner Wasserfall rauscht. Nur für Züge! Steig ein, dann fahren wir zusammen durch.',
+    });
+    for (const s of Object.values(STORY_TEXTS)) expect(s.text, s.title).not.toMatch(/Gefahr/i);
+    expect(STORIES.grube.melody.notes.length).toBeGreaterThan(4);
   });
 
   it('stehen wortgleich in der Doku (docs/games/mitwachsen.md), zum Vorlesen und Einsprechen', () => {

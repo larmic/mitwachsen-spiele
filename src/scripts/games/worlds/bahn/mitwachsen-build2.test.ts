@@ -202,7 +202,7 @@ describe('Bau 2: bei der nächsten Fahrt nach dem Hau-ruck (mitwachsen-build2.ts
     const near = seen.flatMap((x) => (x.tokAt ? [x.tokAt] : [])).at(-1)!;
     expect(Math.max(Math.abs(near[0] - buffer[0]), Math.abs(near[1] - buffer[1]))).toBeLessThanOrEqual(2);
     expect(W1.cell(...near).ride).toBeUndefined();
-    expect(heraldFx({ type: 'herald', what: 'sink', id: TOK, x: 0, y: 0 }).score.length).toBeGreaterThan(
+    expect(heraldFx({ type: 'herald', what: 'sink', id: TOK, x: 0, y: 0 })!.score.length).toBeGreaterThan(
       BUILD2.taps * 2,
     );
     // angekommen am Bahnhof Fledermaus in der Grotte

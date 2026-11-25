@@ -95,6 +95,7 @@ export type State = Omit<Progress, 'position'> & {
   alighted?: { id: RideId; at: number }; // Fahrzeug, aus dem die Figur zuletzt ausstieg, und wann (Bild: Tür kurz offen; nicht gespeichert)
   heraldDue: number; // Bote einer Welt (Tok): Takt, ab dem er auftaucht bzw. aufgetaucht ist (-1: nicht fällig; nicht gespeichert, mitwachsen-herald.ts)
   work?: Work; // Bote einer Welt baut (Tok: Bau 1), von Takt bis Takt; solange hüpft die Figur nur (nicht gespeichert, mitwachsen-herald.ts)
+  dig?: Work; // der Maulwurf gräbt den Glitzergang der Grubenbahn, von Takt bis Takt; solange hüpft die Figur nur (nicht gespeichert, worlds/grube/mitwachsen-dig.ts)
   late: boolean; // Abend: Die Uhr des Kinds hat `BED_AT` erreicht (die Komponente setzt es, mitwachsen-tired.ts; nicht gespeichert)
 };
 

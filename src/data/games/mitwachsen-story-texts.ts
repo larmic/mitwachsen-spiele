@@ -49,6 +49,10 @@ export const STORY_TEXTS: Record<StoryId, { title: string; text: string }> = {
     title: 'Am Bahnhof Bär',
     text: 'Hier ist der Bahnhof beim Bären. Hörst du, wie es pfeift? Die kleine lila Bahn fährt unter die Erde, zu den Kristallen. Lauf einfach hinein.',
   },
+  grube: {
+    title: 'Am Grubenhalt',
+    text: 'Der Maulwurf hat einen ganz schmalen Glitzergang gegraben. Der ist so eng, da passen keine Füße hinein, nur das kleine Bähnchen. Vorne und hinten steht ein Klingeltor. Kommt das Bähnchen, singt es. Drinnen funkeln die Kristalle, und ein kleiner Wasserfall rauscht. Nur für Züge! Steig ein, dann fahren wir zusammen durch.',
+  },
   wald: {
     title: 'Tor zum Wald',
     text: 'Hinter diesem Tor stehen so viele Bäume, dass die Sonne nur in kleinen Flecken bis auf den Boden kommt. Dort wohnen ein Reh und ein Specht, der den ganzen Tag an die Bäume klopft: tock, tock, tock. Das Tor ist noch zu. Aber der Specht klopft schon mal an, damit es bald aufgeht.',

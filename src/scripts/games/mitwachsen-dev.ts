@@ -24,7 +24,9 @@
 // Figur im Höhlenbett die Kristall-Laterne in die Hand (`devLamp`): So sind die kleinen Lichtgeister gleich zu sehen.
 // Die Grubenbahn (`grube`; für das Kind gräbt der Maulwurf ihren Gang erst später) holt die Grotte und die Fahr-Engine
 // mit, die Figur wacht im Höhlenbett auf, und das Grubenbähnchen Funkel steht an seinem Halt (Stufe `bereit`, `withFunkel`):
-// Gleis und Gang liegen, die Figur kann einsteigen und eine Runde fahren.
+// Gleis und Gang liegen, die Figur kann einsteigen und eine Runde fahren. Mit `&graben=1` ist der Gang noch Fels, der
+// erste Maulwurf wohnt zu Hause und das Graben ist fällig (Stufe `faellig`, `withDig`): Geht die Figur zum Grubenhalt,
+// gräbt er ihn.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Die Kristallgrotte“, Entwickler-Schalter, und „Tok und die Bahn“)
 
 import { REGIONS, animalId, type RegionId } from '../../data/games/mitwachsen';
@@ -67,6 +69,11 @@ export const DEV_ICE = 'eis';
  * Figur wacht mit ihr auf, so sind die kleinen Lichtgeister in der Kristallhalle gleich zu sehen
  */
 export const DEV_LAMP = 'laterne';
+/**
+ * Das Graben vorspielen (`&graben=1`, mit `?entwickler=grube`): Der Gang ist noch Fels, der erste Maulwurf wohnt am
+ * Höhlenbett, das Graben ist fällig (Stufe `faellig`); kommt die Figur zum Grubenhalt, gräbt er den Glitzergang
+ */
+export const DEV_DIG = 'graben';
 /** Pakete, die ein Paket im Blick hinein mitbringt: die Bahn die Grotte (dort endet ihr Gleis) und die Fahr-Engine (der Zug fährt) */
 const WITH: Partial<Record<PackId, readonly PackId[]>> = { bahn: ['hoehle', 'fahrt'], grube: ['hoehle', 'fahrt'] };
 /** Bett, in dem die Figur mit diesem Paket aufwacht: die Grubenbahn im Höhlenbett, die Pakete ohne Welt in keinem eigenen */
@@ -108,7 +115,7 @@ export function glimpse(search: string, ids: readonly PackId[]): Glimpse {
 
 /**
  * Was der Schalter dem Spielstand vorspielt (nur im Arbeitsspeicher, `sandbox`): mit der Grubenbahn Funkel an seinem
- * Halt (`withFunkel`); mit der Bahn ihren Ausbau
+ * Halt (`withFunkel`), mit `&graben=1` statt dessen das fällige Graben (`withDig`); mit der Bahn ihren Ausbau
  * (`packs.bahn.built`, aus `&bau=`: 0, 1 oder 2, sonst 2), ab 1 den Zug am Bahnhof (`packs.fahrt.hoehle`, Stufe
  * `bereit`, wenn dort noch nichts steht; mit `&bucht=1` die erste Fahrt gemacht, `gefahren`); bei 2 dazu das offene
  * Höhlentor (Stufe `offen`: Bau 2 kommt erst nach dem Hau-ruck; nicht mit `&vorladen=1`, sonst käme die Grotte schon
@@ -120,7 +127,8 @@ export function glimpse(search: string, ids: readonly PackId[]): Glimpse {
  * der Spielstand, wie er ist
  */
 export function devProgress(dev: readonly PackId[], search: string, given: Progress): Progress {
-  const p = dev.includes('grube') ? withFunkel(given) : given;
+  const digging = new URLSearchParams(search).get(DEV_DIG) === '1';
+  const p = dev.includes('grube') ? (digging ? withDig(given) : withFunkel(given)) : given;
   if (!dev.includes('bahn')) return p;
   const built = builtIn(search);
   const packs = { ...p.packs, bahn: { built } };
@@ -150,6 +158,21 @@ function withFunkel(p: Progress): Progress {
   const stage = was?.stage === 'offen' || was?.stage === 'fest' ? was.stage : 'bereit';
   const grube = { stage, ...(was?.gefahren === true && { gefahren: true }) };
   return { ...p, packs: { ...p.packs, fahrt: { ...fahrt, grube } } };
+}
+
+/**
+ * Mit der Grubenbahn und `&graben=1`: Der erste Maulwurf wohnt zu Hause, das Graben ist fällig (`packs.fahrt.grube`,
+ * Stufe `faellig`, wie am nächsten echten Spieltag nach seinem Einzug); der Gang ist noch Fels
+ */
+function withDig(p: Progress): Progress {
+  const fahrt = typeof p.packs.fahrt === 'object' && p.packs.fahrt !== null ? p.packs.fahrt : {};
+  const met = p.met.includes(FIRST_MOLE) ? p.met : [...p.met, FIRST_MOLE]; // er ist schon gefunden (kein Fragezeichen)
+  return {
+    ...p,
+    met,
+    garden: withMole(p.garden),
+    packs: { ...p.packs, fahrt: { ...fahrt, grube: { stage: 'faellig' } } },
+  };
 }
 
 /**

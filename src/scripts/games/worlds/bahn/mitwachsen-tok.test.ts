@@ -307,7 +307,7 @@ describe('Tok erscheint: am Abend schlafend', () => {
     expect(tokIn(r.s)?.nap).toBe(true);
     expect(heralds(r.events)).toEqual([]); // still: Er lag schon da
     // ein neuer echter Spieltag (`WorldPack.dawn`, mitwachsen-tired.ts `newDay`)
-    const packs = dawnOf([BAHN_PACK], r.s.packs);
+    const packs = dawnOf([BAHN_PACK], r.s.packs, r.s.garden);
     expect(tokOf(packs)).toEqual({ stage: 'faellig' });
     r = play({ ...r.s, packs }, world, [TICK]);
     expect(tokIn(r.s)?.nap).toBeUndefined();
@@ -426,7 +426,7 @@ describe('Tok erscheint: nach dem Laden und anderswo', () => {
   it('nach dem Laden schläft die Figur: Er wartet wach neben dem Bett, morgens ruft er einmal und geht an seinen Platz', () => {
     // so auch am ersten Start nach langer Pause: `dawn` hat `schlaeft` schon vor dem Bau der Welt gestrichen
     const start = ready(world, {
-      packs: dawnOf([BAHN_PACK], withTok(SLED_HOME, { stage: 'faellig', schlaeft: true })),
+      packs: dawnOf([BAHN_PACK], withTok(SLED_HOME, { stage: 'faellig', schlaeft: true }), []),
     });
     let r = play(start, world, [TICK]);
     const t = tokIn(r.s)!;
@@ -518,8 +518,10 @@ describe('Tok: Bild, Ton, Leiste, Hinweis', () => {
     expect(pink().slice(0, 4)).toEqual([1318.51, 0.05, 'triangle', 0.05]);
     const PENTA = [0, 2, 4, 7, 9];
     const fx = (['appear', 'arrive', 'call', 'nap', 'snore', 'wake'] as const).map((what) =>
-      heraldFx({ type: 'herald', what, id: TOK, x: 0, y: 0 }),
+      heraldFx({ type: 'herald', what, id: TOK, x: 0, y: 0 })!,
     );
+    // der Maulwurf der Grubenbahn ist nicht Tok: darauf antwortet er nicht
+    expect(heraldFx({ type: 'herald', what: 'dig', id: TOK, x: 0, y: 0 })).toBeUndefined();
     const notes = fx.flatMap((f) => f.score).flatMap(([f, , , , slide]) => [f, f * slide]);
     const off = notes.filter((hz) => {
       const semis = 12 * Math.log2(hz / 261.63);

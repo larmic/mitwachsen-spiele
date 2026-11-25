@@ -90,9 +90,10 @@ export function build2Score(): Scored[] {
  * Bild und Ton zu einem Ereignis von Tok: auftauchen (es klopft pink-pink, Steinkrümel stieben, „Ju-hu“, Hüpfer),
  * ankommen (Ruf, Hüpfer, Herz), rufen und aufwachen (Ruf, Hüpfer), schlafend kommen und schnarchen (leises „Zzz“), Bau 1
  * beginnen (die Töne des ganzen Baus, Hüpfer, Steinkrümel), Bau 2 am Prellbock (pink-pink, der Prellbock versinkt,
- * „klonk“, Hüpfer, Steinkrümel), in den Zug steigen („Ju-hu“)
+ * „klonk“, Hüpfer, Steinkrümel), in den Zug steigen („Ju-hu“); Ereignisse eines anderen Boten (der Maulwurf der
+ * Grubenbahn): undefined
  */
-export function heraldFx(e: HeraldEvent): RideFx {
+export function heraldFx(e: HeraldEvent): RideFx | undefined {
   switch (e.what) {
     case 'build':
       return { score: buildScore(), who: e.id, burst: TOK_CRUMBS };
@@ -112,6 +113,8 @@ export function heraldFx(e: HeraldEvent): RideFx {
     case 'nap':
     case 'snore':
       return { score: [ZZZ] };
+    default: // der Maulwurf gräbt (Paket der Grubenbahn): nicht Tok
+      return undefined;
   }
 }
 

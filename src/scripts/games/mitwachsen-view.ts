@@ -223,8 +223,11 @@ export type View2D = {
    * gefragt, gilt in 2D, 3D und auf der Postkarte; bei reduzierter Bewegung springt es
    */
   ajar?(state: State, reduced: boolean): readonly [GateId, number] | null;
-  /** Bote dieser Welt (Bahn: Tok, worlds/bahn/mitwachsen-tok-look.ts): Ton, Hüpfer, Herz und Funken zu seinen Ereignissen */
-  heraldFx?(e: HeraldEvent, state: State): RideFx;
+  /**
+   * Bote dieser Welt (Bahn: Tok, worlds/bahn/mitwachsen-tok-look.ts; Grubenbahn: der Maulwurf gräbt,
+   * worlds/grube/mitwachsen-dig-look.ts): Ton, Hüpfer, Herz und Funken zu seinen Ereignissen (eines anderen: undefined)
+   */
+  heraldFx?(e: HeraldEvent, state: State): RideFx | undefined;
   /**
    * Was dem Tor `gate` als nächster Schritt fehlt, wenn es eines ist, das nie aufgeht (Bahn: am Höhlentor Tok, solange
    * nichts gebaut ist): „noch nicht“ zeigt dann seinen Umriss statt des Zeichens der Welt (mitwachsen-hint-look.ts)

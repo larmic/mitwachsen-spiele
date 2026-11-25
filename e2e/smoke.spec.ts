@@ -3481,6 +3481,157 @@ test(
   },
 );
 
+// Der Maulwurf gräbt den Glitzergang (Schritt 17, `?entwickler=grube&graben=1`, fester Seed 1; @3d, weil die Welt mitten
+// im Spiel neu gebaut wird und Erdwelle, Gang und Bähnchen auch in 3D gezeichnet werden): Der erste Maulwurf wohnt zu
+// Hause, das Graben ist fällig, der Gang ist noch Fels und Funkel nicht da. Die Figur geht an den Grubenhalt: Der Maulwurf
+// hüpft neben den Halt, die Erdwelle läuft, die Figur hüpft dabei nur; dann sind Gang, Gleis und der Klangstein `grube`
+// da (Stufe `bereit`), und Funkel steht an seinem Halt. Danach eine ganze Runde vom Bahnsteig zum Bahnsteig, alles über
+// die Test-Uhr. Gespeichert wird im Blick hinein nichts
+test(
+  'Spiel: Der Maulwurf gräbt den Glitzergang: Erdwelle, Gang und Klangstein, Funkel rollt an den Halt, dann eine ganze Runde, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    type Cell = { ride?: string; stop?: string; deco?: string; story?: string; lane?: { at?: number } };
+    type Game = {
+      world: {
+        homes: Record<string, { bed: [number, number] }>;
+        stones: Map<string, [number, number]>;
+        cell(x: number, y: number): Cell;
+      };
+      state: {
+        tick: number;
+        player: { x: number; y: number; dir: string };
+        animals: { id: string; species: string; mode: string; x: number; y: number }[];
+        packs: Record<string, unknown>;
+        ride?: { id: string; pos: number };
+        dig?: { from: number; to: number; laid?: true };
+      };
+      rides: { id: string; x: number; y: number }[];
+      apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+    };
+    await page.addInitScript(() => {
+      const real = crypto.getRandomValues.bind(crypto);
+      const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+        a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+      Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    });
+    const game = await openGame(page, { clock: true, dev: 'grube&graben=1' });
+    await expectView(page);
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    await ticks(page, 5);
+    await render(page, 2);
+    // an den Bahnsteig neben dem künftigen Sitz (der Gang ist noch Fels, das Gleis fehlt), nur der Maulwurf bleibt
+    const before = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const [bx, by] = el.world.homes.hoehle!.bed;
+      let seat: [number, number] | undefined;
+      for (let y = by - 30; y <= by + 30 && !seat; y++)
+        for (let x = bx - 30; x <= bx + 30 && !seat; x++) if (el.world.cell(x, y).lane?.at === 5) seat = [x, y];
+      const dirs: [string, number, number][] = [
+        ['e', 1, 0],
+        ['w', -1, 0],
+        ['s', 0, 1],
+        ['n', 0, -1],
+      ];
+      const [, dx, dy] = dirs.find(([, dx, dy]) => el.world.cell(seat![0] - dx, seat![1] - dy).stop === 'grube')!;
+      const mole = el.state.animals.filter((a) => a.species === 'maulwurf' && a.mode === 'home');
+      el.state = { ...el.state, animals: mole, player: { x: seat![0] - dx, y: seat![1] - dy, dir: 's' } };
+      return {
+        seat,
+        mole: mole.length,
+        ride: el.world.cell(...seat!).ride ?? null,
+        grube: (el.state.packs.fahrt as { grube?: unknown }).grube,
+        funkel: el.rides.filter((r) => r.id.startsWith('ride:grube:')).length,
+      };
+    });
+    expect(before).toMatchObject({ mole: 1, ride: null, grube: { stage: 'faellig' }, funkel: 0 });
+    // der nächste Takt: Es klopft, der Maulwurf hüpft neben den Halt, die Erdwelle läuft
+    await ticks(page, 1);
+    const started = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const mole = el.state.animals.find((a) => a.species === 'maulwurf')!;
+      const at = [el.state.player.x, el.state.player.y];
+      el.apply({ type: 'move', dir: 'n', fresh: true }); // die Figur hüpft nur
+      return {
+        dig: !!el.state.dig,
+        mole: [mole.x, mole.y],
+        moved: at.join() !== `${el.state.player.x},${el.state.player.y}`,
+      };
+    });
+    expect(started.dig).toBe(true);
+    expect(started.moved).toBe(false);
+    expect(
+      Math.max(Math.abs(started.mole[0]! - before.seat![0]), Math.abs(started.mole[1]! - before.seat![1])),
+    ).toBeLessThanOrEqual(3);
+    const seen = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      await ticks(page, 5);
+      await render(page, 1);
+      const now = await game.evaluate((node) => {
+        const el = node as unknown as Game;
+        return { dig: !!el.state.dig, ids: el.rides.map((r) => r.id) };
+      });
+      now.ids.forEach((id) => seen.add(id));
+      if (!now.dig) break;
+    }
+    expect(seen.has('grube-erde')).toBe(true); // die Erdwelle war zu sehen
+    const dug = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const stone = el.world.stones.get('grube');
+      const seat = el.rides.find((r) => r.id === 'ride:grube:seat');
+      return {
+        dig: el.state.dig ?? null,
+        grube: (el.state.packs.fahrt as { grube?: unknown }).grube,
+        stone: stone ? [el.world.cell(...stone).deco, el.world.cell(...stone).story] : null,
+        seat: seat ? [Math.round(seat.x), Math.round(seat.y)] : null,
+      };
+    });
+    expect(dug).toEqual({
+      dig: null,
+      grube: { stage: 'bereit' },
+      stone: ['klangstein', 'grube'],
+      seat: before.seat,
+    });
+    // eine ganze Runde vom Bahnsteig aus
+    const boarded = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const dirs: [string, number, number][] = [
+        ['e', 1, 0],
+        ['w', -1, 0],
+        ['s', 0, 1],
+        ['n', 0, -1],
+      ];
+      const [sx, sy] = [el.state.player.x, el.state.player.y];
+      const seat = el.rides.find((r) => r.id === 'ride:grube:seat')!;
+      const [dir] = dirs.find(([, dx, dy]) => sx + dx === Math.round(seat.x) && sy + dy === Math.round(seat.y))!;
+      el.state = { ...el.state, animals: [] };
+      el.apply({ type: 'move', dir, fresh: true });
+      return el.state.ride?.id;
+    });
+    expect(boarded).toBe('grube');
+    for (let i = 0; i < 30; i++) {
+      if (!(await game.evaluate((node) => !!(node as unknown as Game).state.ride))) break;
+      await ticks(page, 10);
+      await render(page, 1);
+    }
+    const done = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      return {
+        ride: el.state.ride?.id ?? null,
+        stop: el.world.cell(el.state.player.x, el.state.player.y).stop ?? null,
+        grube: (el.state.packs.fahrt as { grube?: unknown }).grube,
+      };
+    });
+    expect(done).toEqual({ ride: null, stop: 'grube', grube: { stage: 'bereit', gefahren: true } });
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
+      [],
+    );
+    expect(errors).toEqual([]);
+  },
+);
+
 // Klingeltore und Glitzergang der Grubenbahn (Schritt 16, `?entwickler=grube`, fester Seed 1, in 2D): Zu Fuß gegen das
 // Tor am Ausgang gelaufen klingt es, die Figur bleibt davor stehen, und Funkel am Halt blinkt; danach eine ganze Runde
 // durch den Glitzergang: Die Tore heben ihre Scheibe, die Röhren singen, in der Mitte tutet Funkel mit Echo. Gezählt

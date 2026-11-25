@@ -7,14 +7,15 @@
 // für Füße bleiben die beiden Enden des Gangs (die Klingeltore, `Cell.chimeGate`: Läuft die Figur dagegen, klingt das Tor,
 // `ringGate`), die Nachbarn neben offenem Gleis (ihre Pfosten) und die Zaunkristalle zur Höhle hin. So kommt man zu Fuß
 // nie in den Gang, nur mit dem Bähnchen; gesperrt ist dabei nichts, was zählt (keine Tiere, nichts zum Sammeln).
-// Funkel erscheint nie von selbst (der Maulwurf gräbt den Gang, später); fahren tut es zuerst niemand, die Lampe ist sein
-// Gesicht. Lok und zwei Wagen belegen am Halt drei Felder des Gleises, die Figur sitzt im ersten Wagen hinter der Lok.
+// Funkel erscheint nie von selbst: Der Maulwurf gräbt den Gang (mitwachsen-dig.ts), mit ihm kommt der Klangstein `grube`
+// am Ende des Bahnsteigs (`grubeStone`); fahren tut es zuerst niemand, die Lampe ist sein Gesicht. Lok und zwei Wagen belegen am Halt drei Felder des Gleises, die Figur sitzt im ersten Wagen hinter der Lok.
 // Eine Runde fährt immer vorwärts und kommt am selben Halt wieder an (`RideRoute.loop`); ausgestiegen wird auf den
 // Bahnsteig an der Tür. Nach der ersten Fahrt hat die Tür keinen goldenen Rahmen mehr (`gefahren`, gespeichert).
 // Spezifikation: docs/specs/mitwachsen.md („Die Grubenbahn Funkel“)
 
 import type { Point } from '../../../../data/games/mitwachsen';
 import { RIDES } from '../../../../data/games/mitwachsen-rides';
+import type { StoryId } from '../../../../data/games/mitwachsen-stories';
 import { FENCE_CRYSTAL } from '../../../../data/games/worlds/grube/mitwachsen-funkel-model';
 import type { Cell } from '../../mitwachsen-cell';
 import type { Laid, WorldRules } from '../../mitwachsen-pack-types';
@@ -50,15 +51,15 @@ const dirOf = (a: Point, b: Point) => STEPS.find(([, dx, dy]) => a[0] + dx === b
 
 /**
  * Das Gleis der Grubenbahn legen (`WorldPack.lay`): erst, wenn der Gang gegraben ist (`dug`); vorher bleibt alles, wie
- * die Grotte es gebaut hat. Liefert keine Klangsteine (der Klangstein am Grubenhalt kommt mit dem Graben)
+ * die Grotte es gebaut hat. Liefert den Klangstein am Grubenhalt (`grube`, kommt mit dem Graben; `grubeStone`)
  */
-export function layGrube(laid: Laid): void {
-  if (!dug(laid.packs)) return;
+export function layGrube(laid: Laid): [StoryId, Point][] {
+  if (!dug(laid.packs)) return [];
   const lane: [Point, Cell][] = [];
   for (const [k, c] of laid.map)
     if (c.lane?.ride === FUNKEL.id) lane.push([k.split(',').map(Number) as unknown as Point, c]);
   const track = lane.filter(([, c]) => c.lane!.at !== undefined).sort(([, a], [, b]) => a.lane!.at! - b.lane!.at!);
-  if (track.length < 3) return;
+  if (track.length < 3) return [];
   const onTrack = new Map(track.map(([p, c]) => [key(...p), c.lane!.part]));
   const gang = track.filter(([, c]) => c.lane!.part === 'gang');
   // die beiden Enden des Gangs sind die Klingeltore: am Eingang (`in`, zuerst gefahren) und am Ausgang (`out`)
@@ -80,14 +81,62 @@ export function layGrube(laid: Laid): void {
     else if (c.lane!.part === 'side' && !near8(...p).some((q) => onTrack.get(key(...q)) === 'open'))
       laid.map.set(key(...p), floor(c, false));
   }
+  const stone = grubeStone(laid.map, track[SEAT]?.[0]);
+  if (!stone) return [];
+  laid.map.set(key(...stone), {
+    ...laid.map.get(key(...stone))!,
+    deco: 'klangstein',
+    solid: true,
+    story: 'grube',
+    tufts: undefined,
+  });
+  return [['grube', stone]];
 }
 
-/** Das Gleis der Runde in Reihe, ab dem ersten Feld des Halts (`Lane.at` 0), aus den Feldern der Welt; leer ohne Gleis */
-function trackOf(world: World): Point[] {
+/** So weit (Felder) steht der Klangstein am Grubenhalt mindestens vom Sitz: hinter den Warteplätzen, am Ende des Bahnsteigs */
+export const STONE_FROM_SEAT = 4;
+/** Kann man auf dem Feld stehen (frei, kein Wasser, kein Tor)? */
+const standable = (c: Cell | undefined): c is Cell => !!c && !c.solid && c.ground !== 'water' && !c.gate;
+
+/**
+ * Platz des Klangsteins am Grubenhalt: auf dem Bahnsteig (`Cell.stop` `'grube'`; dort wohnt kein Tier, so nimmt er
+ * keinem einen Wohnplatz) in seiner äußeren Reihe (kein Gleis unter den acht Nachbarn), mindestens `STONE_FROM_SEAT`
+ * Felder vom Sitz (die Warteplätze und das Aussteigen bleiben frei), ringsum alle acht Nachbarn frei und auf derselben
+ * Höhe (man kommt immer um ihn herum, er schneidet keinen Weg ab), nichts Gemiedenes (Plattform, Wiese, Torplatte,
+ * Klangstein) näher als zwei Felder; davon das am Ende des Bahnsteigs, am weitesten vom Sitz. Undefined, wenn keins passt
+ */
+export function grubeStone(map: ReadonlyMap<string, Cell>, seat: Point | undefined): Point | undefined {
+  if (!seat) return undefined;
+  const kept = (c: Cell | undefined) => !!c && (!!c.portal || !!c.garden || !!c.plate || c.deco === 'klangstein');
+  const fits = ([x, y]: Point) => {
+    const c = map.get(key(x, y));
+    if (!standable(c) || c.deco || c.ride || c.region !== 'hoehle') return false;
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        const n = map.get(key(x + dx, y + dy));
+        if (kept(n)) return false;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) > 1 || (!dx && !dy)) continue;
+        if (!standable(n) || n.ride || n.h !== c.h) return false;
+      }
+    return true;
+  };
+  const far = ([x, y]: Point) => Math.hypot(x - seat[0], y - seat[1]);
+  const platform: Point[] = [];
+  for (const [k, c] of map) if (c.stop === FUNKEL.id) platform.push(k.split(',').map(Number) as unknown as Point);
+  return platform
+    .filter((p) => far(p) >= STONE_FROM_SEAT && fits(p))
+    .sort((a, b) => far(b) - far(a) || a[0] - b[0] || a[1] - b[1])[0];
+}
+
+/**
+ * Das Gleis der Runde in Reihe, ab dem ersten Feld des Halts (`Lane.at` 0), aus den Feldern der Welt; leer ohne Gleis.
+ * `laid` false: die künftige Runde, wie die Grotte sie markiert, auch vor dem Graben (für die Erdwelle, mitwachsen-dig.ts)
+ */
+function trackOf(world: World, laid = true): Point[] {
   const [bx, by] = world.homes.hoehle.bed;
   const laidAt = (x: number, y: number, at: number) => {
     const c = world.cell(x, y);
-    return c.ride === FUNKEL.id && c.lane?.at === at;
+    return (!laid || c.ride === FUNKEL.id) && c.lane?.ride === FUNKEL.id && c.lane.at === at;
   };
   let start: Point | undefined;
   for (let y = by - SEARCH; y <= by + SEARCH && !start; y++)
@@ -112,6 +161,18 @@ function platformNear(world: World, [sx, sy]: Point): Point[] {
       if (c.stop === FUNKEL.id && !c.solid && !c.ride) out.push({ p, d: Math.hypot(dx, dy) });
     }
   return out.sort((a, b) => a.d - b.d).map((o) => o.p);
+}
+
+const lanes = new WeakMap<World, readonly Point[]>();
+/**
+ * Die künftige Runde in Reihe (vom ersten Feld des Halts an), auch vor dem Graben, wie die Grotte sie markiert
+ * (`Cell.lane` mit `at`); leer ohne Grotte. Je Welt einmal
+ */
+export function laneOf(world: World): readonly Point[] {
+  if (!world.spotsOf('hoehle').length) return [];
+  let found = lanes.get(world);
+  if (!found) lanes.set(world, (found = trackOf(world, false)));
+  return found;
 }
 
 const routes = new WeakMap<World, RideRoute | null>();

@@ -8,7 +8,8 @@
 // Weiche Löcher (`maskHoles`): um die Figur `hole` Felder, mit der Kristall-Laterne `lantern` (wächst wie der Lichtkreis,
 // bei reduzierter Bewegung sofort), im Fahrzeug um den Sitz und an den Lampen vorn; feste Löcher an den drei
 // Lichtschächten, der Wiese am Bett, dem Bahnhof Fledermaus, der Mündung des Gangs und jedem Netz der Tupfspinnen;
-// kleine Löcher an Kristallen, Säulen, Lampen (auch an der leuchtenden Lampe eines stehenden Fahrzeugs, `glow`), vollen
+// ein kleines Loch mitten auf allem, was selbst glimmt (`beacon`: der Erdhügel, wenn der Maulwurf gräbt), ohne Grenze
+// der Entfernung; kleine Löcher an Kristallen, Säulen, Lampen (auch an der leuchtenden Lampe eines stehenden Fahrzeugs, `glow`), vollen
 // Pilzbeeten, der Tropfquelle, Leuchtmoos, der Mitte eines Kristallfelds, dem Wasserfall und an Tieren, nur nah an der
 // Figur (je Feld der Figur gesucht, zum Rand von `near` hin weich auslaufend, nie ein Sprung). Höchstens `most` Löcher je Bild, die nächsten zuerst. Die
 // Wege (Mündung zum Bett, Bett zum See) sind schwache weiche Bänder, je eine Linie. Die Maske liegt auf den Feldern der
@@ -236,7 +237,7 @@ export function smallNear(world: Pick<World, 'cell' | 'realm'>, x: number, y: nu
 
 /** Körper, wie die Löcher sie lesen: Figur und Tiere (`bodies`), Fahrzeuge (`rides`, der Wagen mit der Figur hat `seat`) */
 type Spot = { x: number; y: number; z: number; hop?: number };
-type RideSpot = Spot & { id: string; dir: Dir; seat?: true; glow?: true };
+type RideSpot = Spot & { id: string; dir: Dir; seat?: true; glow?: true; beacon?: true };
 /** Zustand, wie die Löcher ihn lesen */
 export type Lit = {
   player: { x: number; y: number };
@@ -319,12 +320,16 @@ export function maskHoles(world: Cave & Pick<World, 'realm'>, s: Lit, at: HoleAt
     const open = nearOpen(Math.hypot(x - mx - 0.5, y - my - 0.5));
     return open > 0 ? [{ x, y, z: r.z + 0.5, r: D.small.lamp, open }] : [];
   });
+  // was selbst glimmt (der Erdhügel, wenn der Maulwurf gräbt): kleines Loch mitten auf ihm, wie weit die Figur auch weg ist
+  const beacons = (at.rides ?? []).flatMap((r): Hole[] =>
+    r.beacon ? [{ x: r.x + 0.5, y: r.y + 0.5, z: r.z, r: D.small.crystal, open: 1 }] : [],
+  );
   const [cx, cy] = [first[0]!.x, first[0]!.y];
   const rest = [...fixedHoles(world), ...lights, ...lamps, ...animals]
     .map((h) => ({ h, d: Math.hypot(h.x - cx, h.y - cy) - h.r }))
     .sort((a, b) => a.d - b.d)
     .map(({ h }) => ({ x: h.x, y: h.y, z: h.z, r: h.r, open: h.open }));
-  return [...first, ...rest].slice(0, D.most);
+  return [...first, ...beacons, ...rest].slice(0, D.most);
 }
 
 const bandsOf = new WeakMap<object, [Spot, Spot][]>();

@@ -4,6 +4,7 @@ import {
   DEV_BUILT,
   DEV_EVENING,
   DEV_FEAST,
+  DEV_DIG,
   DEV_ICE,
   DEV_LAMP,
   DEV_OPEN,
@@ -186,6 +187,18 @@ describe('Entwickler-Schalter', () => {
     const both = devProgress(['grube', 'bahn', 'hoehle', 'fahrt'], '?entwickler=grube,bahn', saved).packs.fahrt;
     expect(both).toMatchObject({ grube: { stage: 'bereit' }, hoehle: { stage: 'offen' } });
     expect(devProgress(['hoehle'], '?entwickler=hoehle', saved)).toBe(saved); // ohne Grubenbahn nichts
+  });
+
+  it('die Grubenbahn mit `&graben=1`: der Gang noch Fels, der erste Maulwurf zu Hause, das Graben fällig', () => {
+    expect(DEV_DIG).toBe('graben');
+    const dev: PackId[] = ['grube', 'hoehle', 'fahrt'];
+    const p = devProgress(dev, '?entwickler=grube&graben=1', saved);
+    expect(p.packs.fahrt).toEqual({ ...(saved.packs.fahrt as object), grube: { stage: 'faellig' } });
+    expect(p.garden.filter((a) => a.id === FIRST_MOLE)).toEqual([{ id: FIRST_MOLE, species: 'maulwurf' }]);
+    expect(p.met).toContain(FIRST_MOLE);
+    expect(saved.garden.some((a) => a.id === FIRST_MOLE)).toBe(false); // nur im Arbeitsspeicher
+    const again = devProgress(dev, '?entwickler=grube&graben=1', p); // schon zu Hause: nicht doppelt
+    expect(again.garden.filter((a) => a.id === FIRST_MOLE)).toHaveLength(1);
   });
 
   it('`&abend=1`: Abend für die Regeln, nur im Blick hinein', () => {

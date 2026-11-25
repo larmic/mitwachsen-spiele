@@ -127,10 +127,11 @@ export const RULES: Rule[] = [
     // Das Grubenbähnchen Funkel in der Grotte: sein schmales Gleis (legen und zeichnen, für 2D und 3D dieselben Quader,
     // darum kein eigener 3D-Teil), seine Strecke als Schleife, Modell, Körper und Töne; samt dem, was es mit den anderen
     // Fahrzeugen teilt (Spielstand packs.fahrt); dazu der Glitzergang mit den zwei Klingeltoren (Tore, Scheibe,
-    // Wandkristalle, Wasserfall, Töne beim Durchfahren und zu Fuß, Licht im Gang). Kommt mit der Grotte
+    // Wandkristalle, Wasserfall, Töne beim Durchfahren und zu Fuß, Licht im Gang) und der Maulwurf, der den Gang gräbt
+    // (Regel, Erdwelle, Töne, Klangstein am Halt). Kommt mit der Grotte
     chunks: /\/welt-grube\.[\w-]+\.js$/,
-    // Gemessen 12,9 KB
-    budget: 14.2 * 1024,
+    // Gemessen 17,7 KB
+    budget: 18.9 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

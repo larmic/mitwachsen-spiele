@@ -23,6 +23,8 @@ import type { State } from '../../mitwachsen-state';
 import type { Box, DrawRails } from '../../mitwachsen-view';
 import type { World } from '../../mitwachsen-world';
 import type { Scored } from '../../sfx';
+import { DIG } from '../../../../data/games/worlds/grube/mitwachsen-dig-model';
+import { digAt } from './mitwachsen-dig';
 import { FUNKEL, funkelRoute } from './mitwachsen-funkel';
 import { frameOf, gangOf } from './mitwachsen-gang';
 
@@ -63,14 +65,30 @@ function along(r: Pick<RideRoute, 'path'>, p: number, world: World): Spot {
 
 /**
  * Wo der erste Wagen (der Sitz) gerade ist, als Index der Runde: am Halt 0, unterwegs zwischen den Takten weiter, bei
- * reduzierter Bewegung das feste Bild (`frameOf`: Halt, Klingeltor ein, Mitte des Gangs, Klingeltor aus, Halt)
+ * reduzierter Bewegung das feste Bild (`frameOf`: Halt, Klingeltor ein, Mitte des Gangs, Klingeltor aus, Halt). Hat der
+ * Maulwurf den Gang eben gegraben (`State.dig`, ab `DIG.pop`), wartet Funkel am Klingeltor des Ausgangs und rollt dann aus
+ * dem Gang an den Halt (`DIG.roll`); bei reduzierter Bewegung steht es gleich am Halt
  */
 export function funkelAt(r: RideRoute, state: State, at: Pick<RideAt, 'frac' | 'reduced'>, world: World): number {
   const ride = state.ride?.id === FUNKEL.id ? state.ride : undefined;
-  if (!ride) return 0;
+  if (!ride) return rollAt(r, state, at, world);
   const p = ride.phase === 'go' ? Math.max(0, ride.pos - ride.speed * (1 - at.frac)) : ride.pos;
   return at.reduced ? frameOf(gangOf(world, r), p, r.path.length - 1) : p;
 }
+
+/** Rollt Funkel nach dem Graben gerade aus dem Gang an den Halt? Wo der Sitz ist (Index der Runde), sonst 0 (am Halt) */
+function rollAt(r: RideRoute, state: State, at: Pick<RideAt, 'frac' | 'reduced'>, world: World): number {
+  const w = state.dig?.laid ? digAt(state, at.frac) : undefined;
+  if (w === undefined || at.reduced) return 0;
+  const n = r.path.length - 1;
+  const out = gangOf(world, r)?.gates.out ?? Math.max(0, n - 8);
+  const [from, to] = DIG.roll;
+  const f = Math.min(1, Math.max(0, (w - from) / (to - from)));
+  return f >= 1 ? 0 : out + (n - out) * f;
+}
+
+/** Rollt Funkel nach dem Graben noch an seinen Halt (Lampe an, keine Tür, kein Gold)? */
+const rolling = (state: State) => !!state.dig?.laid;
 
 /** Seite der Tür zum Bahnsteig für einen Wagen mit Blick `dir` an der Stelle `x, y` (+1 rechts, −1 links) */
 function sideOf(world: World, spot: Spot): 1 | -1 {
@@ -96,10 +114,10 @@ export function funkelBodies(state: State, world: World, at: RideAt, rang = -Inf
   const open = !riding && Math.min(ago(state.nudged), ago(state.alighted)) < OPEN_TICKS;
   // goldener Rahmen bis zur ersten Fahrt, nur wenn das Kind einsteigen kann (wie beim Zug): nicht, wenn es schläft,
   // und nicht während einer Fahrt, auch nicht der eigenen
-  const gold = !ridden(state.packs, FUNKEL.id) && !dozing && !state.ride;
+  const gold = !ridden(state.packs, FUNKEL.id) && !dozing && !state.ride && !state.dig;
   const since = at.now - rang;
   const blink = !riding && since >= 0 && since < BLINK_MS && (at.reduced || Math.floor(since / BLINK_STEP) % 2 === 0);
-  const lit = riding || at.lit || blink;
+  const lit = riding || at.lit || blink || rolling(state);
   const kinds = [
     ['loco', p + 1],
     ['seat', p],
