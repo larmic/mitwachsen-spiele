@@ -1,0 +1,167 @@
+// Das Grubenbähnchen Funkel – rein, ohne DOM: was das Paket der Grubenbahn in die Grotte legt (`layGrube`,
+// `WorldPack.lay`) und was die Fahr-Engine (Paket der Fahrzeuge, worlds/fahrt/) über das Bähnchen wissen muss (`funkel`,
+// `WorldRules.vehicle`). Die Grotte hält seine Schleife frei und markiert sie (`Cell.lane`, worlds/hoehle/mitwachsen-lane.ts);
+// dieses Paket rechnet nur aus diesen Feldern und importiert das Paket der Höhle nicht. Vor dem Graben (kein Eintrag
+// `packs.fahrt.grube`) legt es nichts: Gang und Nachbarn bleiben Fels. Ist der Gang gegraben (Stufe `bereit`), liegt das
+// schmale Gleis auf der ganzen Runde (`Cell.ride`, Richtungen in `Lane.to`), Gang und Nachbarn sind Grottenboden; fest
+// für Füße bleiben die beiden Enden des Gangs (dort kommen die Klingeltore hin), die Nachbarn neben offenem Gleis (ihre
+// Pfosten) und die Zaunkristalle zur Höhle hin. So kommt man zu Fuß nie in den Gang, nur mit dem Bähnchen.
+// Funkel erscheint nie von selbst (der Maulwurf gräbt den Gang, später); fahren tut es zuerst niemand, die Lampe ist sein
+// Gesicht. Lok und zwei Wagen belegen am Halt drei Felder des Gleises, die Figur sitzt im ersten Wagen hinter der Lok.
+// Eine Runde fährt immer vorwärts und kommt am selben Halt wieder an (`RideRoute.loop`); ausgestiegen wird auf den
+// Bahnsteig an der Tür. Nach der ersten Fahrt hat die Tür keinen goldenen Rahmen mehr (`gefahren`, gespeichert).
+// Spezifikation: docs/specs/mitwachsen.md („Die Grubenbahn Funkel“)
+
+import type { Point } from '../../../../data/games/mitwachsen';
+import { RIDES } from '../../../../data/games/mitwachsen-rides';
+import { FENCE_CRYSTAL } from '../../../../data/games/worlds/grube/mitwachsen-funkel-model';
+import type { Cell } from '../../mitwachsen-cell';
+import type { Laid } from '../../mitwachsen-pack-types';
+import { rank, stageOf, withRidden } from '../../mitwachsen-ride-save';
+import type { RideRoute, Rider, Vehicle } from '../../mitwachsen-rider';
+import type { World } from '../../mitwachsen-world';
+
+/** Funkel in `RIDES` */
+export const FUNKEL = RIDES.find((r) => r.id === 'grube')!;
+/** Feld des Sitzes auf dem Gleis des Halts, vom ersten Feld in Fahrtrichtung an (der hintere Wagen steht eins davor) */
+export const SEAT = 5;
+/** So viele Warteplätze auf dem Bahnsteig für folgende Tiere */
+const WAIT = 8;
+/** So weit ums Höhlenbett wird nach dem Halt gesucht (er liegt etwa 16 Felder weg) */
+const SEARCH = 30;
+/** Richtungen des Gleises: Buchstabe und Schritt */
+const STEPS: readonly (readonly [string, number, number])[] = [
+  ['n', 0, -1],
+  ['e', 1, 0],
+  ['s', 0, 1],
+  ['w', -1, 0],
+];
+
+const key = (x: number, y: number) => `${x},${y}`;
+const near8 = (x: number, y: number) =>
+  [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx): Point => [x + dx, y + dy])).filter(([a, b]) => a !== x || b !== y);
+
+/** Ist der Gang gegraben (Funkel ist da, ab Stufe `bereit`)? */
+export const dug = (packs: Readonly<Record<string, unknown>>) => rank(stageOf(packs, FUNKEL.id)) >= rank('bereit');
+
+/** Richtung von `a` zum Nachbarfeld `b` als Buchstabe */
+const dirOf = (a: Point, b: Point) => STEPS.find(([, dx, dy]) => a[0] + dx === b[0] && a[1] + dy === b[1])?.[0] ?? '';
+
+/**
+ * Das Gleis der Grubenbahn legen (`WorldPack.lay`): erst, wenn der Gang gegraben ist (`dug`); vorher bleibt alles, wie
+ * die Grotte es gebaut hat. Liefert keine Klangsteine (der Klangstein am Grubenhalt kommt mit dem Graben)
+ */
+export function layGrube(laid: Laid): void {
+  if (!dug(laid.packs)) return;
+  const lane: [Point, Cell][] = [];
+  for (const [k, c] of laid.map)
+    if (c.lane?.ride === FUNKEL.id) lane.push([k.split(',').map(Number) as unknown as Point, c]);
+  const track = lane.filter(([, c]) => c.lane!.at !== undefined).sort(([, a], [, b]) => a.lane!.at! - b.lane!.at!);
+  if (track.length < 3) return;
+  const onTrack = new Map(track.map(([p, c]) => [key(...p), c.lane!.part]));
+  const gang = track.filter(([, c]) => c.lane!.part === 'gang');
+  const ends = new Set([gang[0], gang.at(-1)].flatMap((e) => (e ? [key(...e[0])] : [])));
+  const floor = (c: Cell, solid: boolean): Cell => ({ ...c, h: 1, deco: null, region: 'hoehle', solid });
+  track.forEach(([p, c], i) => {
+    const [prev, next] = [track[(i + track.length - 1) % track.length]![0], track[(i + 1) % track.length]![0]];
+    const to = dirOf(p, prev) + dirOf(p, next);
+    const base = c.lane!.part === 'gang' ? floor(c, ends.has(key(...p))) : c;
+    laid.map.set(key(...p), { ...base, ride: FUNKEL.id, lane: { ...c.lane!, to } });
+  });
+  for (const [p, c] of lane) {
+    if (c.lane!.part === 'fence')
+      laid.map.set(key(...p), { ...c, deco: 'crystalbush', solid: true, color: FENCE_CRYSTAL });
+    // Nachbarn des Gangs werden Boden, neben offenem Gleis bleiben sie als Pfosten der Tore stehen
+    else if (c.lane!.part === 'side' && !near8(...p).some((q) => onTrack.get(key(...q)) === 'open'))
+      laid.map.set(key(...p), floor(c, false));
+  }
+}
+
+/** Das Gleis der Runde in Reihe, ab dem ersten Feld des Halts (`Lane.at` 0), aus den Feldern der Welt; leer ohne Gleis */
+function trackOf(world: World): Point[] {
+  const [bx, by] = world.homes.hoehle.bed;
+  const laidAt = (x: number, y: number, at: number) => {
+    const c = world.cell(x, y);
+    return c.ride === FUNKEL.id && c.lane?.at === at;
+  };
+  let start: Point | undefined;
+  for (let y = by - SEARCH; y <= by + SEARCH && !start; y++)
+    for (let x = bx - SEARCH; x <= bx + SEARCH && !start; x++) if (laidAt(x, y, 0)) start = [x, y];
+  const track: Point[] = [];
+  for (let p = start; p && track.length < 1000;) {
+    track.push(p);
+    const [x, y] = p;
+    const i = track.length;
+    p = STEPS.map(([, dx, dy]): Point => [x + dx, y + dy]).find(([a, b]) => laidAt(a, b, i));
+  }
+  return track;
+}
+
+/** Warteplätze auf dem Bahnsteig (`Cell.stop` `'grube'`), die nächsten zum Sitz zuerst */
+function platformNear(world: World, [sx, sy]: Point): Point[] {
+  const out: { p: Point; d: number }[] = [];
+  for (let dy = -4; dy <= 4; dy++)
+    for (let dx = -4; dx <= 4; dx++) {
+      const p: Point = [sx + dx, sy + dy];
+      const c = world.cell(...p);
+      if (c.stop === FUNKEL.id && !c.solid && !c.ride) out.push({ p, d: Math.hypot(dx, dy) });
+    }
+  return out.sort((a, b) => a.d - b.d).map((o) => o.p);
+}
+
+const routes = new WeakMap<World, RideRoute | null>();
+
+/** Die Runde schließt sich: Das letzte Feld liegt neben dem ersten */
+const closed = (t: readonly Point[]) => {
+  const [a, b] = [t[0], t.at(-1)];
+  return !!a && !!b && Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) === 1;
+};
+
+/**
+ * Strecke von Funkel in einer Welt (`Vehicle.route`, eine Schleife, `RideRoute.loop`): `path` vom Sitz (`SEAT` Felder
+ * ins Gleis des Halts) einmal ganz herum zurück zum Sitz; am Halt Lok (davor), erster Wagen (Sitz) und zweiter Wagen
+ * (dahinter) als `cars`, Warteplätze auf dem Bahnsteig. Undefined, solange der Gang nicht gegraben ist oder die Grotte
+ * fehlt. Je Welt einmal
+ */
+export function funkelRoute(world: World, s: Pick<Rider, 'packs'>): RideRoute | undefined {
+  if (!dug(s.packs) || !world.spotsOf('hoehle').length) return undefined;
+  if (!routes.has(world)) routes.set(world, build(world));
+  return routes.get(world) ?? undefined;
+}
+
+function build(world: World): RideRoute | null {
+  const track = trackOf(world);
+  if (track.length <= SEAT + 2 || !closed(track)) return null;
+  const path = [...track.slice(SEAT), ...track.slice(0, SEAT), track[SEAT]!];
+  const seat = path[0]!;
+  const cars = [path[1]!, seat, path.at(-2)!];
+  const seats = platformNear(world, seat).slice(0, WAIT);
+  return {
+    path,
+    stops: { home: seat, out: seat },
+    shed: [],
+    seats: { home: seats, out: seats },
+    on: new Set(track.map((p) => key(...p))),
+    cars: { home: cars, out: cars },
+    ahead: 2,
+    loop: true,
+  };
+}
+
+/** Aussteigen auf den Bahnsteig an der Tür: Felder des Bahnsteigs neben dem Sitz, die nächsten zuerst */
+export function funkelExit(world: World, s: Pick<Rider, 'packs'>): Point[] {
+  const r = funkelRoute(world, s);
+  return r
+    ? platformNear(world, r.stops.home).filter(([x, y]) => Math.hypot(x - r.stops.home[0], y - r.stops.home[1]) < 2.5)
+    : [];
+}
+
+/** Funkel für die Fahr-Engine (`pack.rules.vehicle`): Eintrag, Strecke, Aussteigen am Bahnsteig, nach der ersten Fahrt `gefahren` */
+export const funkel: Vehicle = {
+  spec: FUNKEL,
+  route: funkelRoute,
+  exit: (s, world) => funkelExit(world, s),
+  landed(s) {
+    s.packs = withRidden(s.packs, FUNKEL.id); // kein goldener Rahmen mehr an der Tür
+  },
+};

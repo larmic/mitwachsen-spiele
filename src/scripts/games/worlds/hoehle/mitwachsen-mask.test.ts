@@ -340,6 +340,30 @@ describe('Dunkelmaske: Löcher', () => {
     expect(maskHoles(w, lit(bed, { ride: {} }), { ...at, rides: back })[1]!.x).toBeCloseTo(9.6);
   });
 
+  it('im Grubenbähnchen die Lampen an seiner eigenen Lok, nie an einem anderen Fahrzeug weiter vorn (dem haltenden Zug)', () => {
+    const rides = [
+      { id: 'ride:grube:rear', x: 10, y: 5, z: 1, dir: 'e' as const },
+      { id: 'ride:grube:seat', x: 11, y: 5, z: 1, dir: 'e' as const, seat: true as const },
+      { id: 'ride:grube:loco', x: 12, y: 5, z: 1, dir: 'e' as const },
+      { id: 'ride:hoehle:loco', x: 20, y: 5, z: 1, dir: 'w' as const }, // der Zug am Bahnhof Fledermaus
+    ];
+    const holes = maskHoles(w, lit(bed, { ride: {} }), { ...at, rides });
+    expect(holes[0]).toMatchObject({ x: 11.5, y: 5.5, r: D.seat });
+    expect(holes[1]!.x).toBeCloseTo(13.4);
+  });
+
+  it('stehender Funkel mit leuchtender Lampe (am Abend): kleines Loch vor der Lok, nur nah an der Figur; ohne Licht keins', () => {
+    const [bx, by] = bed;
+    const loco = { id: 'ride:grube:loco', x: bx + 2, y: by, z: 1, dir: 'e' as const };
+    const lamp = (h: { x: number; y: number; r: number }) => h.x === bx + 3 && h.y === by + 0.5 && h.r === D.small.lamp;
+    const on = maskHoles(w, lit(bed), { ...at, rides: [{ ...loco, glow: true as const }] });
+    expect(on.filter(lamp)).toHaveLength(1);
+    expect(on.find(lamp)!.open).toBe(1);
+    expect(maskHoles(w, lit(bed), { ...at, rides: [loco] }).some(lamp)).toBe(false);
+    const far = { ...loco, x: bx + 40, glow: true as const };
+    expect(maskHoles(w, lit(bed), { ...at, rides: [far] }).some((h) => h.x === bx + 41)).toBe(false);
+  });
+
   it('Wege als Bänder: von der Mündung zum Bett und vom Bett zum Portal am See', () => {
     const [toBed, toLake] = pathBands(w);
     expect([toBed![0].x, toBed![0].y]).toEqual(frame.at(0, 0).map((v) => v + 0.5));

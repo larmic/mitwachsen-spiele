@@ -155,7 +155,13 @@ export function buildGrotte(
   markStation(realm, site, map);
   dimGrotte(realm, (x, y) => path(...site.uv(x, y)), map); // Ränder im Dunkel, Wege und Licht bleiben hell
   const stone: Point = [bed[0] + CAVE_STONE[0], bed[1] + CAVE_STONE[1]]; // Klangstein `hoehle-offen` (homeGround)
-  const spots = spotsOf(site, reach, map);
+  // Tiere wohnen nur, wo sie zu Fuß hinkommen, ohne die Schleife der Grubenbahn zu queren: Ist der Gang gegraben, sperrt
+  // die Fahr-Engine umherlaufenden Tieren das Gleis; was die Schleife einschließt, bleibt so den Kindern
+  const spots = spotsOf(
+    site,
+    reachOf(home.wake, map, (c) => !c.lane),
+    map,
+  );
   // Wohnorte der Höhlen-Tiere: das erste je Art an seinem Fundort, die anderen verteilt über die Grotte
   const spawns = findSpawns(seed, caveHaunts(spots, map, at, bed, side), spots, bed);
   const ghosts = at(GROTTE.ghost.stone); // Klangstein „lichtgeister“ in der Kristallhalle (hallOf)
@@ -533,10 +539,14 @@ function level(cells: ReadonlySet<string>, map: Map<string, Cell>) {
 
 const stand = (c: Cell | undefined) => !!c && !c.solid && !c.gate && c.ground !== 'water';
 
-/** Felder, die vom Bett aus zu Fuß erreichbar sind (eine Stufe hinauf, herunter immer), als "x,y" */
-function reachOf(wake: readonly Point[], map: ReadonlyMap<string, Cell>): Set<string> {
+/**
+ * Felder, die vom Bett aus zu Fuß erreichbar sind (eine Stufe hinauf, herunter immer), als "x,y"; mit `pass` nur über
+ * Felder, die es durchlässt
+ */
+function reachOf(wake: readonly Point[], map: ReadonlyMap<string, Cell>, pass: (c: Cell) => boolean = () => true) {
   const seen = new Set<string>();
-  const queue = wake.filter(([x, y]) => stand(map.get(key(x, y))));
+  const ok = (c: Cell | undefined) => stand(c) && pass(c!);
+  const queue = wake.filter(([x, y]) => ok(map.get(key(x, y))));
   for (const [x, y] of queue) seen.add(key(x, y));
   for (let i = 0; i < queue.length; i++) {
     const [x, y] = queue[i]!;
@@ -544,7 +554,7 @@ function reachOf(wake: readonly Point[], map: ReadonlyMap<string, Cell>): Set<st
     for (const [dx, dy] of NEIGHBOURS) {
       const k = key(x + dx, y + dy);
       const n = map.get(k);
-      if (seen.has(k) || !stand(n) || n!.h - c.h > 1) continue;
+      if (seen.has(k) || !ok(n) || n!.h - c.h > 1) continue;
       seen.add(k);
       queue.push([x + dx, y + dy]);
     }
@@ -598,7 +608,8 @@ function light(realm: ReadonlySet<string>, at: (p: readonly [number, number]) =>
 }
 
 /**
- * Wohnplätze der Höhlen-Tiere: vom Bett aus erreichbare Felder der Grotte außerhalb der Mooswiese
+ * Wohnplätze der Höhlen-Tiere: vom Bett aus erreichbare Felder der Grotte (`reach`: ohne die Schleife der Grubenbahn
+ * zu queren, also nicht in dem, was sie einschließt) außerhalb der Mooswiese
  * und der Plattformen, nicht in der Mündung (zwei Felder Abstand zum Gang), nicht auf dem Platz von Bahnhof und Lokschuppen
  * und nicht auf der Schleife der Grubenbahn samt Zaun und Bahnsteig
  */

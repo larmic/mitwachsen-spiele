@@ -7,10 +7,10 @@
 // der Dämmerung von heute, um die Figur, auf dem Weg zum Bett und an allem, was leuchtet, nie darunter (`GROTTE.dark.dusk`).
 // Weiche Löcher (`maskHoles`): um die Figur `hole` Felder, mit der Kristall-Laterne `lantern` (wächst wie der Lichtkreis,
 // bei reduzierter Bewegung sofort), im Fahrzeug um den Sitz und an den Lampen vorn; feste Löcher an den drei
-// Lichtschächten, der Wiese am Bett, dem Bahnhof Fledermaus, der Mündung des Gangs und jedem Netz der Tupfspinnen; kleine Löcher an Kristallen,
-// Säulen, Lampen, vollen Pilzbeeten, der Tropfquelle, Leuchtmoos, der Mitte eines Kristallfelds, dem Wasserfall und an
-// Tieren, nur nah an der Figur (je Feld der Figur gesucht,
-// zum Rand von `near` hin weich auslaufend, nie ein Sprung). Höchstens `most` Löcher je Bild, die nächsten zuerst. Die
+// Lichtschächten, der Wiese am Bett, dem Bahnhof Fledermaus, der Mündung des Gangs und jedem Netz der Tupfspinnen;
+// kleine Löcher an Kristallen, Säulen, Lampen (auch an der leuchtenden Lampe eines stehenden Fahrzeugs, `glow`), vollen
+// Pilzbeeten, der Tropfquelle, Leuchtmoos, der Mitte eines Kristallfelds, dem Wasserfall und an Tieren, nur nah an der
+// Figur (je Feld der Figur gesucht, zum Rand von `near` hin weich auslaufend, nie ein Sprung). Höchstens `most` Löcher je Bild, die nächsten zuerst. Die
 // Wege (Mündung zum Bett, Bett zum See) sind schwache weiche Bänder, je eine Linie. Die Maske liegt auf den Feldern der
 // Grotte (hinter der Mündung), erkundet oder im Nebel (der Nebel ist heller als der Boden unter der Maske); im Gang
 // blendet sie mit dem Weg aus (`gang` Felder hinter der Mündung ist sie weg, vor der Grenze der Höhlenwelt) und dazu
@@ -236,7 +236,7 @@ export function smallNear(world: Pick<World, 'cell' | 'realm'>, x: number, y: nu
 
 /** Körper, wie die Löcher sie lesen: Figur und Tiere (`bodies`), Fahrzeuge (`rides`, der Wagen mit der Figur hat `seat`) */
 type Spot = { x: number; y: number; z: number; hop?: number };
-type RideSpot = Spot & { id: string; dir: Dir; seat?: true };
+type RideSpot = Spot & { id: string; dir: Dir; seat?: true; glow?: true };
 /** Zustand, wie die Löcher ihn lesen */
 export type Lit = {
   player: { x: number; y: number };
@@ -264,10 +264,11 @@ export function holeRadius(lamp: boolean, since: number | undefined, now: number
 function rideHoles(rides: readonly RideSpot[]): Hole[] {
   const seat = rides.find((r) => r.seat);
   if (!seat) return [];
-  const own = seat.id.split(':')[0];
+  const owner = (id: string) => id.split(':').slice(0, 2).join(':'); // `ride:<Fahrzeug>`: nicht ein anderes Fahrzeug
+  const own = owner(seat.id);
   const [dx, dy] = DIRS[seat.dir];
   const front = rides
-    .filter((r) => r.id.split(':')[0] === own)
+    .filter((r) => owner(r.id) === own)
     .reduce((a, b) => (b.x * dx + b.y * dy > a.x * dx + a.y * dy ? b : a), seat);
   return [
     { x: seat.x + 0.5, y: seat.y + 0.5, z: seat.z, r: D.seat, open: 1 },
@@ -310,8 +311,16 @@ export function maskHoles(world: Cave & Pick<World, 'realm'>, s: Lit, at: HoleAt
     const open = nearOpen(Math.hypot(b.x - mx, b.y - my));
     return open > 0 ? [{ x: b.x + 0.5, y: b.y + 0.5, z: b.z, r: D.small.animal, open }] : [];
   });
+  // leuchtende Lampen stehender Fahrzeuge (Funkel am Halt, am Abend): kleines Loch vor dem Körper, nur nah an der Figur
+  const lamps = (at.rides ?? []).flatMap((r): Hole[] => {
+    if (!r.glow || r.seat) return [];
+    const [dx, dy] = DIRS[r.dir];
+    const [x, y] = [r.x + 0.5 + dx * 0.5, r.y + 0.5 + dy * 0.5];
+    const open = nearOpen(Math.hypot(x - mx - 0.5, y - my - 0.5));
+    return open > 0 ? [{ x, y, z: r.z + 0.5, r: D.small.lamp, open }] : [];
+  });
   const [cx, cy] = [first[0]!.x, first[0]!.y];
-  const rest = [...fixedHoles(world), ...lights, ...animals]
+  const rest = [...fixedHoles(world), ...lights, ...lamps, ...animals]
     .map((h) => ({ h, d: Math.hypot(h.x - cx, h.y - cy) - h.r }))
     .sort((a, b) => a.d - b.d)
     .map(({ h }) => ({ x: h.x, y: h.y, z: h.z, r: h.r, open: h.open }));

@@ -1,0 +1,236 @@
+// Aussehen und Klang des Grubenbähnchens Funkel, gleich für 2D und 3D (Haken `View2D.bodies`, `rails` und `rideFx`,
+// mitwachsen-ride-view.ts) – rein, ohne DOM und Three.js. Körper: Lok und zwei Bankwagen (Modelle in
+// src/data/games/worlds/grube/mitwachsen-funkel-model.ts) am Halt der Grotte, solange die Figur in der Grotte ist, oder
+// unterwegs auf der Runde: Sie gleiten zwischen den Takten weiter (bei reduzierter Bewegung in ruhigen Sprüngen alle
+// `JUMP` Felder), jeder Wagen schaut in seine Fahrtrichtung. Die Tür des ersten Wagens geht zum Bahnsteig auf, wenn
+// das Kind anstößt oder aussteigt, und hat bis zur ersten Fahrt einen goldenen Rahmen, solange das Kind einsteigen kann
+// (nicht während einer Fahrt); die runde Lampe leuchtet während der Fahrt und am Abend (dann auch am Halt, mit einem
+// kleinen Loch der Dunkelmaske, `RideBody.glow`). Gleis: ein eigenes, schmales Gleisbild (Schiefer und dunkle Schienen, gerade oder in einer
+// rechtwinkligen Kurve), nicht das der Höhlenbahn. Töne: sein Signal D5 → A5 (`RIDES`), Ankunft A5 → D5.
+// Spezifikation: docs/specs/mitwachsen.md („Die Grubenbahn Funkel“)
+
+import type { Dir } from '../../../../lib/games/front';
+import type { Point } from '../../../../data/games/mitwachsen';
+import { GRUBE_RAIL, funkelParts, type FunkelLook } from '../../../../data/games/worlds/grube/mitwachsen-funkel-model';
+import { dirTo } from '../../mitwachsen-free';
+import type { Cell } from '../../mitwachsen-cell';
+import type { RideEvent } from '../../mitwachsen-pack-types';
+import { ridden } from '../../mitwachsen-ride-save';
+import type { RideAt, RideBody, RideFx } from '../../mitwachsen-ride-view';
+import type { RideRoute } from '../../mitwachsen-rider';
+import type { State } from '../../mitwachsen-state';
+import type { Box, DrawRails } from '../../mitwachsen-view';
+import type { World } from '../../mitwachsen-world';
+import type { Scored } from '../../sfx';
+import { FUNKEL, funkelRoute } from './mitwachsen-funkel';
+
+/** Kennung der Körper (`ride:` trifft das Antippen) */
+export const FUNKEL_ID = `ride:${FUNKEL.id}`;
+/** Bei reduzierter Bewegung rückt Funkel in Sprüngen so vieler Felder vor */
+export const JUMP = 3;
+/** So viele Takte nach dem Anstoßen oder Aussteigen steht die Tür offen (1 s) */
+export const OPEN_TICKS = 10;
+/** Rechte Hand, wenn ein Wagen in Richtung d schaut (wie in front.ts) */
+const RIGHT: Record<Dir, Point> = { e: [0, 1], w: [0, -1], s: [-1, 0], n: [1, 0] };
+
+type Spot = { x: number; y: number; z: number; dir: Dir };
+
+const memo = new Map<string, ReturnType<typeof funkelParts>>();
+/** Teile einer Variante, je Schlüssel einmal (die 3D-Ansicht baut jede Form nur einmal) */
+const model = (key: string, look: FunkelLook) => memo.get(key) ?? (memo.set(key, funkelParts(look)), memo.get(key)!);
+
+/** Feld `i` der Runde (beliebig über das Ende hinaus oder davor: die Runde schließt sich) */
+function cellAt(r: Pick<RideRoute, 'path'>, i: number): Point {
+  const n = r.path.length - 1; // das letzte Feld ist wieder das erste
+  return r.path[((Math.floor(i) % n) + n) % n]!;
+}
+
+/** Punkt bei Fortschritt `p` auf der Runde, zwischen den Feldern gleitend, mit der Richtung dieses Stücks */
+function along(r: Pick<RideRoute, 'path'>, p: number, world: World): Spot {
+  const [a, b] = [cellAt(r, p), cellAt(r, p + 1)];
+  const f = p - Math.floor(p);
+  const [ha, hb] = [world.cell(...a).h, world.cell(...b).h];
+  return {
+    x: a[0] + (b[0] - a[0]) * f,
+    y: a[1] + (b[1] - a[1]) * f,
+    z: ha + (hb - ha) * f,
+    dir: dirTo(b[0] - a[0], b[1] - a[1]),
+  };
+}
+
+/** Wo der erste Wagen (der Sitz) gerade ist: am Halt 0, unterwegs zwischen den Takten weiter, bei reduzierter Bewegung in Sprüngen */
+function progress(r: RideRoute, state: State, at: RideAt): number {
+  const ride = state.ride?.id === FUNKEL.id ? state.ride : undefined;
+  if (!ride) return 0;
+  const len = r.path.length - 1;
+  let p = ride.phase === 'go' ? Math.max(0, ride.pos - ride.speed * (1 - at.frac)) : ride.pos;
+  if (at.reduced && p < len) p = Math.floor(p / JUMP) * JUMP;
+  return p;
+}
+
+/** Seite der Tür zum Bahnsteig für einen Wagen mit Blick `dir` an der Stelle `x, y` (+1 rechts, −1 links) */
+function sideOf(world: World, spot: Spot): 1 | -1 {
+  const [rx, ry] = RIGHT[spot.dir];
+  const [x, y] = [Math.round(spot.x), Math.round(spot.y)];
+  return world.cell(x + rx, y + ry).stop === FUNKEL.id ? 1 : -1;
+}
+
+/**
+ * Körper von Funkel je Bild: Lok, erster Wagen (mit der Figur während seiner Fahrt), zweiter Wagen; am Halt, solange die
+ * Figur in der Grotte ist, oder unterwegs. Leer, solange der Gang nicht gegraben ist oder die Figur woanders ist. Nur
+ * seine eigene Fahrt bewegt ihn und setzt die Figur hinein
+ */
+export function funkelBodies(state: State, world: World, at: RideAt): readonly RideBody[] {
+  const r = funkelRoute(world, state);
+  if (!r) return [];
+  const riding = state.ride?.id === FUNKEL.id;
+  if (!riding && world.realm(state.player.x, state.player.y) !== world.realm(...r.stops.home)) return [];
+  const p = progress(r, state, at);
+  const dozing = !!state.dozing?.includes(FUNKEL.id);
+  const since = (t: { id: string; at: number } | undefined) => (t?.id === FUNKEL.id ? state.tick - t.at : Infinity);
+  const open = !riding && Math.min(since(state.nudged), since(state.alighted)) < OPEN_TICKS;
+  // goldener Rahmen bis zur ersten Fahrt, nur wenn das Kind einsteigen kann (wie beim Zug): nicht, wenn es schläft,
+  // und nicht während einer Fahrt, auch nicht der eigenen
+  const gold = !ridden(state.packs, FUNKEL.id) && !dozing && !state.ride;
+  const lit = riding || at.lit;
+  const kinds = [
+    ['loco', p + 1],
+    ['seat', p],
+    ['rear', p - 1],
+  ] as const;
+  return kinds.map(([kind, q]): RideBody => {
+    const spot = along(r, q, world);
+    const side = sideOf(world, spot);
+    const look: FunkelLook =
+      kind === 'loco'
+        ? { kind, lit }
+        : kind === 'seat'
+          ? { kind, rider: riding, door: open ? side : 0, frame: gold ? side : 0 }
+          : { kind };
+    const k = `${FUNKEL_ID}:${kind}:${+!!look.lit}${+!!look.rider}${look.door ?? 0}${look.frame ?? 0}`;
+    const seat = kind === 'seat' && riding ? { seat: true as const } : {};
+    // die Lampe leuchtet am Halt (am Abend): die Dunkelmaske öffnet dort ein kleines Loch (mitwachsen-mask.ts)
+    const glow = kind === 'loco' && lit && !riding ? { glow: true as const } : {};
+    return { id: `${FUNKEL_ID}:${kind}`, key: k, ...spot, parts: model(k, look), ...seat, ...glow };
+  });
+}
+
+// ---------- Gleis ----------
+
+/** Quader in einem Feld, ohne Lage: x, y (nach vorn), z über dem Boden, Breite, Tiefe, Höhe, Seite, oben */
+type Local = readonly [number, number, number, number, number, number, string, string];
+const [G1, G2, W, Z] = [0.32, 0.62, 0.06, 0.04]; // schmale Spur: Schienen links und rechts, Breite, auf den Schwellen
+const sleeper = (x: number, y: number, w: number, d: number): Local => [x, y, 0, w, d, Z, ...GRUBE_RAIL.sleeper];
+const bar = (x: number, y: number, w: number, d: number): Local => [x, y, Z, w, d, 0.05, ...GRUBE_RAIL.rail];
+/** Gerade von oben nach unten */
+const STRAIGHT: readonly Local[] = [
+  sleeper(0.18, 0.12, 0.64, 0.16),
+  sleeper(0.18, 0.62, 0.64, 0.16),
+  bar(G1, 0, W, 1),
+  bar(G2, 0, W, 1),
+];
+/** Kurve von oben nach rechts: innen treffen sich die Schienen bei (G2, G1), außen bei (G1, G2) */
+const CURVE: readonly Local[] = [
+  sleeper(0.18, 0.06, 0.64, 0.16),
+  sleeper(0.78, 0.18, 0.16, 0.64),
+  bar(G2, 0, W, G1 + W),
+  bar(G1, 0, W, G2 + W),
+  bar(G2, G1, 1 - G2, W),
+  bar(G1, G2, 1 - G1, W),
+];
+/** Ein Quader um eine Vierteldrehung im Uhrzeigersinn um die Mitte des Felds (oben wird rechts) */
+const turn = ([x, y, z, w, d, ...rest]: Local): Local => [1 - y - d, x, z, d, w, ...rest];
+/** Form und Vierteldrehungen je Paar von Richtungen (sortiert) */
+const SHAPES: Record<string, readonly [readonly Local[], number]> = {
+  ns: [STRAIGHT, 0],
+  ew: [STRAIGHT, 1],
+  en: [CURVE, 0],
+  es: [CURVE, 1],
+  sw: [CURVE, 2],
+  nw: [CURVE, 3],
+};
+const shaped = new Map<string, readonly Local[]>();
+/** Die Quader des Gleises für die Richtungen `to` (zwei Buchstaben, gleich in welcher Reihe) */
+export function railShape(to: string): readonly Local[] | undefined {
+  const k = [...to].sort().join('');
+  const known = shaped.get(k);
+  if (known) return known;
+  const s = SHAPES[k];
+  if (!s) return undefined;
+  let out = s[0];
+  for (let i = 0; i < s[1]; i++) out = out.map(turn);
+  shaped.set(k, out);
+  return out;
+}
+
+/** Gleis der Grubenbahn auf einem Feld (`DrawRails`): nur auf ihrem gebauten Gleis (`Cell.ride` und `Lane.to`), sonst null */
+export const grubeRails: DrawRails = (c: Cell, x: number, y: number) => {
+  const shape = c.ride === FUNKEL.id && c.lane?.to ? railShape(c.lane.to) : undefined;
+  return shape
+    ? shape.map(([bx, by, bz, w, d, h, side, top]): Box => [x + bx, y + by, c.h + bz, w, d, h, side, top])
+    : null;
+};
+
+// ---------- Töne ----------
+
+const [D5, A5] = FUNKEL.signal as readonly [number, number];
+/** Sein Signal D5 → A5, weich im Dreieck, ab `at` s */
+export const signal = (at = 0, gain = 0.05): Scored[] => [
+  [D5, 0.14, 'triangle', gain, 1, at],
+  [A5, 0.22, 'triangle', gain, 1, at + 0.16],
+];
+
+/** Töne zu einem Ereignis von Funkel */
+export function funkelScores(e: RideEvent): Scored[] {
+  switch (e.what) {
+    case 'nudge': // die Tür geht einladend auf
+    case 'go':
+      return signal();
+    case 'stop': // vor einem Tier: freundlich, zweimal
+      return [...signal(), ...signal(0.45)];
+    case 'board':
+      return [
+        [659.25, 0.1, 'sine', 0.04, 1, 0],
+        [A5, 0.16, 'sine', 0.04, 1, 0.1],
+      ];
+    case 'arrive': // angekommen: das Signal abwärts
+      return [
+        [A5, 0.14, 'triangle', 0.05, 1, 0],
+        [D5, 0.3, 'triangle', 0.05, 1, 0.16],
+      ];
+    case 'leave':
+      return [[659.25, 0.1, 'sine', 0.05, 0.8, 0]];
+    case 'wave': // gedrosselt das Signal, sonst ein leiser Ton: Jeder Druck hört etwas
+      return e.ring ? signal(0, 0.04) : [[A5, 0.08, 'sine', 0.03, 1, 0]];
+    case 'alight':
+      return [
+        [A5, 0.12, 'triangle', 0.06, 1, 0],
+        [1174.66, 0.24, 'triangle', 0.06, 1, 0.1],
+      ];
+    case 'snore': // es schläft, bis sein Paket da ist: ganz leise, gleitet hinab
+      return [[D5, 0.5, 'sine', 0.02, 0.9, 0]];
+    default: // ein Tier hüpft beiseite: das zeigt das Bild
+      return [];
+  }
+}
+
+/**
+ * Was die Ansicht zu einem Ereignis von Funkel zeigt (ein Ereignis eines anderen Fahrzeugs: undefined): Töne, die Figur
+ * hüpft beim Winken und Aussteigen (mit Herz), das Tier, das beiseite hüpft; schläft es, steigt ein Zzz auf
+ */
+export function funkelFx(e: RideEvent): RideFx | undefined {
+  if (e.id !== FUNKEL.id) return undefined;
+  const score = funkelScores(e);
+  switch (e.what) {
+    case 'alight':
+      return { score, who: 'player', heart: true };
+    case 'wave':
+      return { score, who: 'player' };
+    case 'shoo':
+      return { score, who: e.who };
+    case 'snore':
+      return { score, zzz: true };
+    default:
+      return { score };
+  }
+}

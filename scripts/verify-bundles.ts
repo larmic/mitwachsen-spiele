@@ -122,6 +122,17 @@ export const RULES: Rule[] = [
     forbidden: /WebGLRenderer|three\.module/,
   },
   {
+    name: 'Welt-Paket Grubenbahn',
+    pages: /^spielen\/index\.html$/,
+    // Das Grubenbähnchen Funkel in der Grotte: sein schmales Gleis (legen und zeichnen, für 2D und 3D dieselben Quader,
+    // darum kein eigener 3D-Teil), seine Strecke als Schleife, Modell, Körper und Töne; samt dem, was es mit den anderen
+    // Fahrzeugen teilt (Spielstand packs.fahrt). Kommt mit der Grotte
+    chunks: /\/welt-grube\.[\w-]+\.js$/,
+    // Gemessen 8,1 KB
+    budget: 9.0 * 1024,
+    forbidden: /WebGLRenderer|three\.module/,
+  },
+  {
     name: 'Nachgeladen vom Kern',
     pages: /^spielen\/index\.html$/,
     // Seltenes, das der Kern erst bei Bedarf holt: „noch nicht“ an den Toren (Bild, Ton, Live-Region), Inhalt des

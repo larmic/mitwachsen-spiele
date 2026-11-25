@@ -25,6 +25,7 @@ export type RideBody = {
   dir: Dir;
   parts: readonly Part[];
   seat?: true;
+  glow?: true; // eine Lampe vorn leuchtet, ohne dass die Figur darin sitzt (die Dunkelmaske der Grotte öffnet dort ein kleines Loch)
 };
 
 /**

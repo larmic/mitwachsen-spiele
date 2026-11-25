@@ -1,9 +1,10 @@
 // Fahrzeuge von Mitwachsen („Reisewege“): je Welt eines, das zwischen einem Halt nahe ihrem Bett und einem Halt auf der
 // Lichtung pendelt. Heute der Schlitten der Eis-Welt und die Höhlenbahn; jedes weitere Fahrzeug kommt als Eintrag in
 // `RIDES` dazu. Ausnahme (Rückmeldung zur Höhle, 24.11.2026): ein zweites Fahrzeug innerhalb einer Welt, das eine
-// Schleife fährt (`loop`, die Grubenbahn `'grube'` in der Grotte, kommt später mit ihrem Paket): Start und Ziel sind
+// Schleife fährt (`loop`, das Grubenbähnchen Funkel `'grube'` in der Grotte, Paket worlds/grube/): Start und Ziel sind
 // derselbe Halt, es hält nie auf der Lichtung, hat keinen Wimpel und kein Fest. Die Fahrregeln aller Fahrzeuge bringt das Paket der Fahrzeuge mit (worlds/fahrt/), Strecke und Bild das
-// Paket des Fahrzeugs (Schlitten: worlds/eis/mitwachsen-sled*.ts; Zug: worlds/bahn/mitwachsen-train*.ts). Die Liste steht
+// Paket des Fahrzeugs (Schlitten: worlds/eis/mitwachsen-sled*.ts; Zug: worlds/bahn/mitwachsen-train*.ts; Funkel:
+// worlds/grube/mitwachsen-funkel*.ts). Die Liste steht
 // hier, weil die Pakete einander nicht importieren und jedes seinen Eintrag braucht; der Kern kennt nur die Typen
 // (`RideId`). Die Höhlenbahn (`'hoehle'`, Paket worlds/bahn/) kommt mit Tok nach der ersten Heimfahrt mit dem
 // Schlitten (Bau 1).
@@ -13,7 +14,7 @@ import type { GateId } from './mitwachsen';
 
 /**
  * Fahrzeuge: der Schlitten der Eis-Welt, die Höhlenbahn (`'hoehle'`, das Gleis von der Lichtung in die Grotte), die
- * Grubenbahn (`'grube'`, eine Schleife in der Grotte; ihr Eintrag in `RIDES` kommt mit ihrem Paket)
+ * Grubenbahn Funkel (`'grube'`, eine Schleife in der Grotte)
  */
 export type RideId = 'schlitten' | 'hoehle' | 'grube';
 
@@ -83,5 +84,17 @@ export const RIDES: readonly [RideSpec, ...RideSpec[]] = [
     color: '#a07cff',
     pennant: 'kristall',
     out: 'bereit',
+  },
+  // Grubenbähnchen Funkel: kastenförmige Lok in Petrol mit großer runder Lampe, zwei geschlossene Bankwagen mit Cremedach;
+  // eine Schleife in der Grotte (gut 160 Felder, mit 8 Feldern je s höchstens 20 s); Signal D5 → A5 (über 500 Hz, nicht
+  // G4 wie „Uh-uh“, Toks Zzz und die Torplatte der Höhle)
+  {
+    id: 'grube',
+    gate: 'hoehle',
+    ticks: [150, 200],
+    pace: 0.8,
+    signal: [587.33, 880],
+    color: '#2f8f83',
+    loop: true,
   },
 ];

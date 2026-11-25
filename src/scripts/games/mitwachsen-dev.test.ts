@@ -53,6 +53,16 @@ describe('Entwickler-Schalter', () => {
     });
   });
 
+  it('die Grubenbahn: holt Grotte und Fahr-Engine mit, die Figur wacht im Höhlenbett auf', () => {
+    expect(glimpse('?entwickler=grube', PACK_IDS)).toEqual({ packs: ['grube', 'hoehle', 'fahrt'], home: 'hoehle' });
+    expect(glimpse('?entwickler=grube,bahn', PACK_IDS)).toEqual({
+      packs: ['grube', 'bahn', 'hoehle', 'fahrt'],
+      home: 'hoehle',
+    });
+    expect(glimpse('?entwickler=bahn,grube', PACK_IDS).home).toBe('hoehle'); // die Bahn hat kein eigenes Bett
+    expect(glimpse('?entwickler=grube', ['eis'])).toEqual({ packs: [], home: null }); // Paket fehlt
+  });
+
   const saved: Progress = {
     met: [],
     garden: [{ id: 'lichtung:hase', species: 'hase' }],
@@ -160,6 +170,24 @@ describe('Entwickler-Schalter', () => {
     expect(glimpse('?entwickler=hoehle,bahn&vorladen=1', PACK_IDS).packs).toContain('hoehle');
   });
 
+  it('die Grubenbahn: Funkel steht an seinem Halt (Stufe bereit, der Gang ist gegraben); ein weiterer Stand bleibt', () => {
+    const dev: PackId[] = ['grube', 'hoehle', 'fahrt'];
+    const p = devProgress(dev, '?entwickler=grube', saved);
+    expect(p.packs.fahrt).toEqual({ ...(saved.packs.fahrt as object), grube: { stage: 'bereit' } });
+    expect(p.garden).toEqual(saved.garden); // sonst bleibt der Spielstand, wie er ist
+    expect(p.openGates).toEqual(saved.openGates);
+    expect(saved.packs.fahrt).not.toHaveProperty('grube'); // nur im Arbeitsspeicher
+    const ridden = {
+      ...saved,
+      packs: { fahrt: { grube: { stage: 'bereit', gefahren: true }, schlitten: { stage: 'fest' } } },
+    };
+    expect(devProgress(dev, '?entwickler=grube', ridden).packs.fahrt).toEqual(ridden.packs.fahrt);
+    // mit der Bahn: beides
+    const both = devProgress(['grube', 'bahn', 'hoehle', 'fahrt'], '?entwickler=grube,bahn', saved).packs.fahrt;
+    expect(both).toMatchObject({ grube: { stage: 'bereit' }, hoehle: { stage: 'offen' } });
+    expect(devProgress(['hoehle'], '?entwickler=hoehle', saved)).toBe(saved); // ohne Grubenbahn nichts
+  });
+
   it('`&abend=1`: Abend für die Regeln, nur im Blick hinein', () => {
     expect(DEV_EVENING).toBe('abend');
     expect(devLate(['bahn'], '?entwickler=bahn&bau=0&abend=1')).toBe(true);
@@ -227,7 +255,7 @@ describe('Entwickler-Schalter', () => {
   });
 
   it('Höhlenpaket und Bahn gibt es (Lader); das Höhlentor hat seinen Schlüssel Tok, mit und ohne Schalter', () => {
-    expect(PACK_IDS).toEqual(['eis', 'hoehle', 'bahn', 'fahrt']);
+    expect(PACK_IDS).toEqual(['eis', 'hoehle', 'bahn', 'fahrt', 'grube']);
     expect(GATES.find((g) => g.id === 'hoehle')?.opens).toEqual({ key: 'tok', after: 'eis' });
     expect(keyOf('hoehle')).toBe('tok');
     expect(keyOf('eis')).toBe('pinguin');

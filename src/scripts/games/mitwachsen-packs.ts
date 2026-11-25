@@ -37,15 +37,19 @@ export const RETRY_MS = 30_000;
  * kein Paket: Hinter ihrem Tor baut die Welt dann, was ohne Paket dort steht (mitwachsen-behind.ts). Das Paket der
  * Höhlenwelt (die Kristallgrotte) wie jede Welt hinter einem Tor mit Schlüssel (`needsPack`) oder vor einem Halt des
  * Zugs (`preloadOf`); das Paket der Bahn (Tok, Gleis, Zug), sobald das Eistor offen ist (`bahnWanted`); das Paket der
- * Fahrzeuge (die Fahr-Engine), sobald es ein Fahrzeug geben kann (`fahrtWanted`). Der Entwickler-Schalter holt seine
- * Pakete auch ohne Bedarf (`Packs.extra`).
+ * Fahrzeuge (die Fahr-Engine), sobald es ein Fahrzeug geben kann (`fahrtWanted`); das Paket der Grubenbahn (Gleis und
+ * Bähnchen Funkel in der Grotte) mit der Grotte (`ALONG`). Der Entwickler-Schalter holt seine Pakete auch ohne Bedarf
+ * (`Packs.extra`).
  */
 const LOADERS: Partial<Record<PackId, () => Promise<LoadedPack>>> = {
   eis: () => import('./worlds/eis').then((m) => m.pack),
   hoehle: () => import('./worlds/hoehle').then((m) => m.pack),
   bahn: () => import('./worlds/bahn').then((m) => m.pack),
   fahrt: () => import('./worlds/fahrt').then((m) => m.pack),
+  grube: () => import('./worlds/grube').then((m) => m.pack),
 };
+/** Pakete, die immer mit einem anderen kommen: die Grubenbahn mit der Grotte (dort liegt ihre Schleife) */
+export const ALONG: Partial<Record<PackId, PackId>> = { grube: 'hoehle' };
 /** Die Pakete, die es gibt (je Lader eines) */
 export const PACK_IDS = Object.keys(LOADERS) as PackId[];
 /** Ein Paket holen; ohne Lader scheitert es (wie ein Netzfehler) */
@@ -110,17 +114,22 @@ export class Packs {
   /**
    * Braucht der Spielstand ein Paket und fehlt es noch, wird es geholt; erfüllt, sobald alle nötigen da sind (oder
    * scheiterten). Jedes Paket für sich: sein Tor (`behind` seiner Gegend; ohne eigenes Tor die Bahn: `bahnWanted`, die
-   * Fahrzeuge: `fahrtWanted`) oder ein Halt in der Nähe (`need.ride`, Vorladen: `preloadOf`), sein Laden, sein Neuversuch
+   * Fahrzeuge: `fahrtWanted`; die Grubenbahn, wann immer die Grotte gewollt ist, `ALONG`) oder ein Halt in der Nähe
+   * (`need.ride`, Vorladen: `preloadOf`), sein Laden, sein Neuversuch
    */
   want(need: Need, gates: ReadonlyMap<GateId, GateAt>, now = performance.now()): Promise<void> {
     return Promise.all(this.ids.map((id) => this.wantOne(id, need, gates, now))).then(noop);
   }
 
   private wantOne(id: PackId, need: Need, gates: ReadonlyMap<GateId, GateAt>, now: number) {
-    const gate = REGIONS.find((r) => r.id === id)?.behind;
-    const own = id === 'bahn' ? bahnWanted(need) : id === 'fahrt' && fahrtWanted(need);
+    const as = ALONG[id] ?? id; // gewollt wie das Paket, mit dem es kommt
+    const gate = REGIONS.find((r) => r.id === as)?.behind;
+    const own = as === 'bahn' ? bahnWanted(need) : as === 'fahrt' && fahrtWanted(need);
     const wanted =
-      this.extra.includes(id) || !!need.ride?.includes(id) || (gate ? needsPack(need, gates, beyondRing, gate) : own);
+      this.extra.includes(id) ||
+      this.extra.includes(as) ||
+      !!need.ride?.includes(as) ||
+      (gate ? needsPack(need, gates, beyondRing, gate) : own);
     if (this.get(id) || !wanted) return Promise.resolve();
     if (!this.loading.has(id) && now - (this.failedAt.get(id) ?? -Infinity) >= RETRY_MS)
       this.loading.set(

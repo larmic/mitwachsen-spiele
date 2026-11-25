@@ -17,6 +17,9 @@ import {
   withTok,
 } from './mitwachsen-ride-save';
 import { stageAt } from './worlds/eis/mitwachsen-snowman';
+import { plateHz, plateTones } from './sfx';
+import { ZZZ, dingDong } from './worlds/bahn/mitwachsen-tok-look';
+import { UH_UH } from './worlds/bahn/mitwachsen-train-look';
 
 const [SLED, TRAIN] = RIDES;
 const semis = (hz: number) => ((Math.round(12 * Math.log2(hz / 261.63)) % 12) + 12) % 12;
@@ -43,6 +46,41 @@ describe('Spielstand der Fahrzeuge (packs.fahrt)', () => {
     const calls = new Set(Object.values(SPECIES).map((sp) => sig(sp.tone.notes)));
     expect(signals.filter((x) => calls.has(x))).toEqual([]);
     expect(SLED.out).toBe('fest'); // der Schlitten hält erst nach seinem Fest auf der Lichtung
+  });
+
+  it('das Grubenbähnchen Funkel ist das dritte Fahrzeug: eigenes Signal D5 → A5 über 500 Hz, nicht mit G4 am Anfang', () => {
+    const FUNKEL = RIDES.find((r) => r.id === 'grube')!;
+    expect(FUNKEL).toMatchObject({ gate: 'hoehle', loop: true, signal: [587.33, 880] });
+    expect(FUNKEL.signal.map(semis).every((n) => [0, 2, 4, 7, 9].includes(n))).toBe(true);
+    expect(FUNKEL.signal.every((f) => f > 500)).toBe(true); // Tablets spielen tiefere Töne zu leise
+    // G4 ist schon „Uh-uh“, Toks Zzz und die Torplatte der Höhle: Funkel beginnt nicht damit
+    const g4 = [UH_UH[0]![0], ZZZ[0], plateHz('hoehle', 0)].map(Math.round); // Grundton der Torplatte
+    expect(new Set(g4)).toEqual(new Set([392]));
+    expect(Math.round(FUNKEL.signal[0]!)).not.toBe(392);
+    // und gleicht weder „Uh-uh“ noch dem Ding-Dong der Türen noch den Tönen der Torplatte der Höhle
+    const sig = (f: readonly number[]) => [...f].map(Math.round).sort().join();
+    const others = [UH_UH, dingDong(), plateTones('hoehle', 0), plateTones('hoehle', 1)].map((x) =>
+      sig(x.map(([f]) => f)),
+    );
+    expect(others).not.toContain(sig(FUNKEL.signal));
+    // und keinem Fahrzeug, in welcher Reihenfolge auch immer
+    expect(RIDES.filter((r) => r !== FUNKEL).map((r) => sig(r.signal))).not.toContain(sig(FUNKEL.signal));
+  });
+
+  it('Funkel im Spielstand (packs.fahrt.grube): bereit, nach der ersten Fahrt gefahren; die anderen Fahrzeuge bleiben', () => {
+    const before = withTok(withRide({}, 'schlitten', 'fest'), { stage: 'offen' });
+    const dug = withRide(before, 'grube', 'bereit');
+    expect(rideOf(dug)).toEqual({
+      schlitten: { stage: 'fest' },
+      hoehle: { stage: 'offen' },
+      grube: { stage: 'bereit' },
+    });
+    expect(ridden(dug, 'grube')).toBe(false);
+    const rode = withRidden(dug, 'grube');
+    expect(rideOf(rode).grube).toEqual({ stage: 'bereit', gefahren: true });
+    expect(ridden(rode, 'grube')).toBe(true);
+    expect(rideOf(JSON.parse(JSON.stringify(rode)) as Record<string, unknown>)).toEqual(rideOf(rode)); // übersteht Speichern
+    expect(rideOf(wakeRides(rode))).toEqual(rideOf(rode));
   });
 
   it('Stufen in ihrer Reihenfolge: faellig, bereit, offen, fest', () => {

@@ -1584,11 +1584,12 @@ test('Spiel: Bahn und Höhle für das Kind – Tok, Bau 1, erste Fahrt, Hau-ruck
   expect(await board()).toBe('hoehle');
   await rideOut();
   expect(await look()).toMatchObject({ ride: false, tok: 'herald', fahrt: { stage: 'bereit', gefahren: true } });
-  // die Grotte kommt vor dem Hau-ruck (Vorladen am Halt, nah am Höhlentor)
+  // die Grotte kommt vor dem Hau-ruck (Vorladen am Halt, nah am Höhlentor), mit ihr die Grubenbahn
   await expect
     .poll(async () => {
       await ticks(page, 1);
-      return (await loaded()).includes('hoehle');
+      const now = await loaded();
+      return now.includes('hoehle') && now.includes('grube');
     })
     .toBe(true);
 
@@ -1613,7 +1614,7 @@ test('Spiel: Bahn und Höhle für das Kind – Tok, Bau 1, erste Fahrt, Hau-ruck
   // 5. Neu laden: alles steht im Spielstand, die Figur wacht im Bett der Lichtung auf, der Zug steht an Bahnhof Bär
   await page.evaluate(() => dispatchEvent(new Event('pagehide')));
   await reloadGame(page);
-  expect(await loaded()).toEqual(['bahn', 'eis', 'fahrt', 'hoehle']);
+  expect(await loaded()).toEqual(['bahn', 'eis', 'fahrt', 'grube', 'hoehle']);
   expect(await look()).toMatchObject({ open: ['eis', 'hoehle'], built: 1, realm: 'lichtung', ride: false });
   await wake();
   await render(page);
@@ -1883,10 +1884,17 @@ test(
             free.push([x, y]);
         }
       const ice = el.state.animals.filter((a) => a.realm === 'eis');
+      // Wer keinen Platz auf der Wiese bekommt, geht zurück an seinen eigenen Platz und ruht nicht mehr: Die Reihe zum
+      // Zeichnen (oben, `rest: 999`) stünde sonst bei manchen Seeds als Wand vor dem Iglu, keiner käme mehr hinein
       const animals = el.state.animals.map((a) => {
         const i = ice.indexOf(a);
         const at = free[i * 3];
-        return i < 0 || !at ? a : { ...a, x: at[0], y: at[1], spawn: at, mode: 'home', home: { kind: 'garden' } };
+        if (i < 0) return a;
+        if (!at) {
+          const [x, y] = (a as typeof a & { spawn: [number, number] }).spawn;
+          return { ...a, x, y, rest: 0 };
+        }
+        return { ...a, x: at[0], y: at[1], spawn: at, mode: 'home', home: { kind: 'garden' } };
       });
       // mit dem Pinguin, der heimgefunden hat: erst dann weht Pustewind (nicht am Tag seines Einzugs)
       const garden = [...ice, { id: 'eis:pinguin', species: 'pinguin' }].map((a) => ({ id: a.id, species: a.species }));
@@ -3384,6 +3392,91 @@ test(
     expect(await shown()).toEqual({ sled: true, player: !webgl });
     if (webgl) await drawEvery(page, 1);
     await render(page);
+    expect(errors).toEqual([]);
+  },
+);
+
+// Das Grubenbähnchen Funkel per Entwickler-Schalter (`?entwickler=grube`, fester Seed 1; @3d, weil sein schmales Gleis
+// und seine Wagen auch in 3D gezeichnet werden): Die Figur wacht im Höhlenbett auf, Funkel steht an seinem Halt; vom
+// Bahnsteig aus eingestiegen fährt es eine ganze Runde (immer vorwärts, durch den Glitzergang) und hält wieder am selben
+// Halt, die Figur steigt auf den Bahnsteig aus, die erste Fahrt ist gemerkt. Gespeichert wird im Blick hinein nichts
+test(
+  'Spiel: Grubenbähnchen Funkel per Entwickler-Schalter: eine ganze Runde vom Bahnsteig zum Bahnsteig, speichert nichts, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    type Cell = { ride?: string; stop?: string; lane?: { at?: number } };
+    type Game = {
+      world: { seed: number; homes: Record<string, { bed: [number, number] }>; cell(x: number, y: number): Cell };
+      state: {
+        player: { x: number; y: number; dir: string };
+        animals: { x: number; y: number }[];
+        packs: Record<string, unknown>;
+        ride?: { id: string; pos: number };
+      };
+      rides: { id: string; seat?: true }[];
+      apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+    };
+    await page.addInitScript(() => {
+      const real = crypto.getRandomValues.bind(crypto);
+      const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+        a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+      Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    });
+    const game = await openGame(page, { clock: true, dev: 'grube' });
+    await expectView(page);
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    await ticks(page, 5);
+    await render(page, 2);
+    const boarded = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const [bx, by] = el.world.homes.hoehle!.bed;
+      let seat: [number, number] | undefined;
+      for (let y = by - 30; y <= by + 30 && !seat; y++)
+        for (let x = bx - 30; x <= bx + 30 && !seat; x++) {
+          const c = el.world.cell(x, y);
+          if (c.ride === 'grube' && c.lane?.at === 5) seat = [x, y];
+        }
+      const dirs: [string, number, number][] = [
+        ['e', 1, 0],
+        ['w', -1, 0],
+        ['s', 0, 1],
+        ['n', 0, -1],
+      ];
+      const [dir, dx, dy] = dirs.find(([, dx, dy]) => el.world.cell(seat![0] - dx, seat![1] - dy).stop === 'grube')!;
+      el.state = { ...el.state, animals: [], player: { x: seat![0] - dx, y: seat![1] - dy, dir: 's' } };
+      const parked = el.rides.filter((r) => r.id.startsWith('ride:grube:')).map((r) => r.id);
+      el.apply({ type: 'move', dir, fresh: true });
+      return { ride: el.state.ride?.id, parked };
+    });
+    expect(boarded.ride).toBe('grube');
+    await ticks(page, 60);
+    await render(page, 2);
+    const riding = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      return { pos: el.state.ride?.pos ?? -1, seat: el.rides.filter((r) => r.seat).map((r) => r.id) };
+    });
+    expect(riding.pos).toBeGreaterThan(10);
+    expect(riding.seat).toEqual(['ride:grube:seat']);
+    for (let i = 0; i < 30; i++) {
+      if (!(await game.evaluate((node) => !!(node as unknown as Game).state.ride))) break;
+      await ticks(page, 10);
+      await render(page, 1);
+    }
+    const done = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      return {
+        ride: el.state.ride?.id ?? null,
+        stop: el.world.cell(el.state.player.x, el.state.player.y).stop ?? null,
+        grube: (el.state.packs.fahrt as { grube?: unknown }).grube,
+      };
+    });
+    expect(done).toEqual({ ride: null, stop: 'grube', grube: { stage: 'bereit', gefahren: true } });
+    expect(boarded.parked).toEqual(['ride:grube:loco', 'ride:grube:seat', 'ride:grube:rear']);
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
+      [],
+    );
     expect(errors).toEqual([]);
   },
 );

@@ -15,11 +15,12 @@ import type { Portal, PortalId } from './mitwachsen-portal';
 /**
  * Kennung eines Welt-Pakets: die Gegend hinter einem Tor, deren Welt es baut (Eis-Welt, Höhlenwelt), oder ein Paket, das
  * keine eigene Welt hat: `'bahn'` legt etwas in die gebauten Welten (das Gleis der Höhlenbahn auf Lichtung und Grotte,
- * `WorldPack.lay`), `'fahrt'` bringt nur Regeln (die Fahr-Engine aller Fahrzeuge, `WorldRules.ride`). Unter ihr steht
+ * `WorldPack.lay`), `'fahrt'` bringt nur Regeln (die Fahr-Engine aller Fahrzeuge, `WorldRules.ride`), `'grube'` legt
+ * das Gleis des Grubenbähnchens Funkel in die Grotte und bringt das Bähnchen (`WorldRules.vehicle`). Unter ihr steht
  * auch sein Zustand in `State.packs` (`packs.fahrt`: der Spielstand der Fahrzeuge); je Kennung ein Lader in
  * mitwachsen-packs.ts
  */
-export type PackId = Exclude<RegionId, 'lichtung'> | 'bahn' | 'fahrt';
+export type PackId = Exclude<RegionId, 'lichtung'> | 'bahn' | 'fahrt' | 'grube';
 
 /** Gang hinter einem Tor, in Koordinaten u (entlang des Tors) und t (nach außen) */
 export type Gang = {
@@ -231,6 +232,12 @@ export type WorldPack<
   ): Kessel;
   place?(seed: number, gang: Gang, beyond: Beyond): KesselPlace;
   lay?(laid: Laid): readonly [StoryId, Point][] | void;
+  /**
+   * Nur für ein Paket ohne eigene Welt: Legt `lay` nach dem Spielstand `packs` überhaupt etwas (Grubenbahn: erst, wenn
+   * der Gang gegraben ist)? Wenn nicht, baut `World.attach` die Welt nicht neu, merkt sich das Paket aber für `relay`.
+   * Dann darf es nach diesem Spielstand auch keine Tiere fortschicken (`away`) und keine Klangsteine setzen
+   */
+  lays?(packs: Readonly<Record<string, unknown>>): boolean;
   lead?: Rules;
   rules?: WorldRules<Ride, Herald, Vehicle>;
   dawn?(packs: Readonly<Record<string, unknown>>): Record<string, unknown>;

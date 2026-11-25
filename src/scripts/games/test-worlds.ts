@@ -11,6 +11,7 @@ import { pack as eis } from './worlds/eis';
 import { pack as hoehle } from './worlds/hoehle';
 import { pack as bahn } from './worlds/bahn';
 import { pack as fahrt } from './worlds/fahrt';
+import { pack as grube } from './worlds/grube';
 import { DIRS } from '../../lib/games/front';
 import type { GateId } from '../../data/games/mitwachsen';
 import { canStep, createWorld, type World } from './mitwachsen-world';
@@ -35,10 +36,28 @@ export const FAHRT_PACK = fahrt;
  * Ausbau (`worldOf(seed, [HOEHLE_PACK, BAHN_PACK], BUILT)`; ohne Ausbau legt es nichts)
  */
 export const BAHN_PACK = bahn;
+/**
+ * Das Paket der Grubenbahn (Gleis und Bähnchen Funkel in der Grotte): nicht in `PACKS`; Tests der Grubenbahn reichen es
+ * mit der Grotte herein, mit gegrabenem Gang (`worldOf(seed, [HOEHLE_PACK, GRUBE_PACK], DUG)`; ohne legt es nichts)
+ */
+export const GRUBE_PACK = grube;
+/** Spielstand der Pakete mit gegrabenem Gang der Grubenbahn (`packs.fahrt.grube`, Stufe `bereit`), für `worldOf` */
+export const DUG: Readonly<Record<string, unknown>> = { fahrt: { grube: { stage: 'bereit' } } };
 /** Spielstand der Pakete mit ganz gebautem Gleis (`packs.bahn.built` 2), für `worldOf` */
 export const BUILT: Readonly<Record<string, unknown>> = { bahn: { built: 2 } };
 
 const worlds = new Map<string, World>();
+
+/**
+ * Die Welt unter `key` aus `cache`, sonst gebaut; zuletzt gebraucht ans Ende gestellt (die Reihenfolge der Map), damit
+ * `forgetWorlds` die am längsten nicht gebrauchten zuerst vergisst
+ */
+function recent<K>(cache: Map<K, World>, key: K, make: () => World): World {
+  const w = cache.get(key) ?? make();
+  cache.delete(key);
+  cache.set(key, w);
+  return w;
+}
 /**
  * Die Welt eines Seeds mit den Paketen `packs`, je Seed und Paketen einmal gebaut. Ohne `packs` mit allen, wie im
  * Spiel (für Tests, die das Zusammenspiel prüfen); Tests einer Welt reichen nur ihr Paket herein, dann baut ein neues
@@ -50,9 +69,7 @@ export function worldOf(
   saved: Readonly<Record<string, unknown>> = {},
 ): World {
   const key = `${seed}:${packs.map((p) => p.id).join(',')}:${JSON.stringify(saved)}`;
-  let w = worlds.get(key);
-  if (!w) worlds.set(key, (w = createWorld(seed, packs, saved)));
-  return w;
+  return recent(worlds, key, () => createWorld(seed, packs, saved));
 }
 
 /** Tiefer Lauf (`MITWACHSEN_DEEP=1`, `npm run test:deep`): Eigenschafts-Tests über ihre vollen Seed-Bereiche */
@@ -110,16 +127,16 @@ const bare = new Map<number, World>();
  * die sie lesen (auch `attach` lässt sie, wie sie ist); wer sie für einen Vergleich frisch braucht, baut selbst
  */
 export function bareOf(seed: number): World {
-  let w = bare.get(seed);
-  if (!w) bare.set(seed, (w = createWorld(seed, [])));
-  return w;
+  return recent(bare, seed, () => createWorld(seed, []));
 }
 
 /**
- * Gebaute Welten vergessen (`worldOf`, `bareOf`): Der tiefe Lauf teilt die Module eines Workers über alle seine Dateien
- * (`isolate` in vitest.config.ts) und ruft dies nach jeder Datei (test-deep-setup.ts), sonst wüchse der Speicher
+ * Gebaute Welten vergessen (`worldOf`, `bareOf`) bis auf die `keep` zuletzt gebrauchten je Sorte: Der tiefe Lauf teilt
+ * die Module eines Workers über alle seine Dateien (`isolate` in vitest.config.ts) und ruft dies nach jeder Datei
+ * (test-deep-setup.ts). Ganz ohne Vergessen wüchse der Speicher; was bleibt, baut die nächste Datei derselben Welt nicht
+ * noch einmal (die Dateien laufen nach Ordnern sortiert, also die einer Welt nacheinander)
  */
-export function forgetWorlds(): void {
-  worlds.clear();
-  bare.clear();
+export function forgetWorlds(keep = 0): void {
+  for (const cache of [worlds, bare] as Map<unknown, World>[])
+    for (const key of [...cache.keys()].slice(0, Math.max(0, cache.size - keep))) cache.delete(key);
 }

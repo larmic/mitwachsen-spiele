@@ -22,6 +22,9 @@
 // die Eis-Welt mit und spielt dazu vor, was das Kind vor der Bahn schon hat (Eistor offen, Eis-Leiste voll, der
 // Schlitten nach der ersten Heimfahrt), wie im echten Spielstand: Schlitten und Zug in einem Spiel. `&laterne=1` gibt der
 // Figur im Höhlenbett die Kristall-Laterne in die Hand (`devLamp`): So sind die kleinen Lichtgeister gleich zu sehen.
+// Die Grubenbahn (`grube`; für das Kind gräbt der Maulwurf ihren Gang erst später) holt die Grotte und die Fahr-Engine
+// mit, die Figur wacht im Höhlenbett auf, und das Grubenbähnchen Funkel steht an seinem Halt (Stufe `bereit`, `withFunkel`):
+// Gleis und Gang liegen, die Figur kann einsteigen und eine Runde fahren.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Die Kristallgrotte“, Entwickler-Schalter, und „Tok und die Bahn“)
 
 import { REGIONS, animalId, type RegionId } from '../../data/games/mitwachsen';
@@ -65,7 +68,9 @@ export const DEV_ICE = 'eis';
  */
 export const DEV_LAMP = 'laterne';
 /** Pakete, die ein Paket im Blick hinein mitbringt: die Bahn die Grotte (dort endet ihr Gleis) und die Fahr-Engine (der Zug fährt) */
-const WITH: Partial<Record<PackId, readonly PackId[]>> = { bahn: ['hoehle', 'fahrt'] };
+const WITH: Partial<Record<PackId, readonly PackId[]>> = { bahn: ['hoehle', 'fahrt'], grube: ['hoehle', 'fahrt'] };
+/** Bett, in dem die Figur mit diesem Paket aufwacht: die Grubenbahn im Höhlenbett, die Pakete ohne Welt in keinem eigenen */
+const BED: Partial<Record<PackId, RegionId | null>> = { bahn: null, fahrt: null, grube: 'hoehle' };
 
 /** Was der Entwickler-Schalter will: welche Pakete er holt (leer: kein Schalter) und in welchem Bett die Figur aufwacht */
 export type Glimpse = { packs: PackId[]; home: RegionId | null };
@@ -80,7 +85,7 @@ const builtIn = (search: string): 0 | 1 | 2 => {
  * Pakete, in die der Entwickler-Schalter blicken lässt (`?entwickler=<welt>[,<welt>…]` in `search`, der Adresse ab
  * „?“), soweit es sie gibt (`ids`), in der genannten Reihe, dazu was sie mitbringen (`WITH`; die Bahn mit `&bau=0`
  * auch die Eis-Welt, deren Tor dann offen ist, ebenso mit `&eis=1`; mit `&vorladen=1` ohne die Grotte, die holt dann das Vorladen am Halt);
- * `home`: die erste genannte Welt mit Bett, mit der Bahn allein die
+ * `home`: die erste genannte Welt mit Bett (die Grubenbahn: das Höhlenbett), mit der Bahn allein die
  * Lichtung (mit `&fest=1` bei Ausbau 2 ohne `&vorladen=1` das Höhlenbett; null: kein Schalter). Kein Schalter oder nichts Bekanntes: keine Pakete
  */
 export function glimpse(search: string, ids: readonly PackId[]): Glimpse {
@@ -96,15 +101,14 @@ export function glimpse(search: string, ids: readonly PackId[]): Glimpse {
   const q = new URLSearchParams(search);
   const feasting = own.includes('bahn') && q.get(DEV_FEAST) === '1' && builtIn(search) === 2;
   const feast = feasting && q.get(DEV_PRELOAD) !== '1' ? 'hoehle' : null;
-  const home =
-    own.find((id): id is Exclude<PackId, 'bahn' | 'fahrt'> => id !== 'bahn' && id !== 'fahrt') ??
-    feast ??
-    (own.length ? 'lichtung' : null);
+  const beds = own.map((id) => (id in BED ? (BED[id] ?? null) : (id as RegionId)));
+  const home = beds.find((r) => r !== null) ?? feast ?? (own.length ? 'lichtung' : null);
   return { packs, home };
 }
 
 /**
- * Was der Schalter dem Spielstand vorspielt (nur im Arbeitsspeicher, `sandbox`): mit der Bahn ihren Ausbau
+ * Was der Schalter dem Spielstand vorspielt (nur im Arbeitsspeicher, `sandbox`): mit der Grubenbahn Funkel an seinem
+ * Halt (`withFunkel`); mit der Bahn ihren Ausbau
  * (`packs.bahn.built`, aus `&bau=`: 0, 1 oder 2, sonst 2), ab 1 den Zug am Bahnhof (`packs.fahrt.hoehle`, Stufe
  * `bereit`, wenn dort noch nichts steht; mit `&bucht=1` die erste Fahrt gemacht, `gefahren`); bei 2 dazu das offene
  * Höhlentor (Stufe `offen`: Bau 2 kommt erst nach dem Hau-ruck; nicht mit `&vorladen=1`, sonst käme die Grotte schon
@@ -115,7 +119,8 @@ export function glimpse(search: string, ids: readonly PackId[]): Glimpse {
  * (`packs.fahrt.schlitten`, Stufe `fest`); diesen Stand der Eis-Welt bei 1 und 2 auch mit `&eis=1`. Ohne Bahn bleibt
  * der Spielstand, wie er ist
  */
-export function devProgress(dev: readonly PackId[], search: string, p: Progress): Progress {
+export function devProgress(dev: readonly PackId[], search: string, given: Progress): Progress {
+  const p = dev.includes('grube') ? withFunkel(given) : given;
   if (!dev.includes('bahn')) return p;
   const built = builtIn(search);
   const packs = { ...p.packs, bahn: { built } };
@@ -133,6 +138,18 @@ export function devProgress(dev: readonly PackId[], search: string, p: Progress)
   if (!built) return withIce({ ...p, packs: { ...packs, fahrt } });
   const laid = { ...p, openGates: open, garden, packs: { ...packs, fahrt: { ...fahrt, hoehle: train } } };
   return q.get(DEV_ICE) === '1' ? withIce(laid) : laid;
+}
+
+/**
+ * Mit der Grubenbahn: Funkel steht an seinem Halt in der Grotte (`packs.fahrt.grube`, Stufe `bereit`, sein Gang ist
+ * gegraben), außer der Spielstand ist schon weiter; ob er schon gefahren ist (`gefahren`), bleibt
+ */
+function withFunkel(p: Progress): Progress {
+  const fahrt = typeof p.packs.fahrt === 'object' && p.packs.fahrt !== null ? p.packs.fahrt : {};
+  const was = (fahrt as { grube?: { stage?: unknown; gefahren?: unknown } }).grube;
+  const stage = was?.stage === 'offen' || was?.stage === 'fest' ? was.stage : 'bereit';
+  const grube = { stage, ...(was?.gefahren === true && { gefahren: true }) };
+  return { ...p, packs: { ...p.packs, fahrt: { ...fahrt, grube } } };
 }
 
 /**

@@ -752,7 +752,21 @@ function build(
   });
   const chunks = from ? changedChunks(from.regions, regions) : new Set<string>(); // feste Karte vor und nach dem Einbau
   if (from) cache.adopt(from.cache, chunks);
-  const world: World = {
+  // Ein Paket nur mit Regeln (Fahrzeuge) baut nichts, eins, das nach diesem Spielstand nichts legt (`lays`, Grubenbahn
+  // vor dem Graben), auch nicht: dieselbe Welt, es kommt nur in die Liste (`relay` legt, sobald es etwas zu legen gibt)
+  const withPacks = (packs: readonly WorldPack[]): World => {
+    const has = (pack: WorldPack) => packs.some((p) => p.id === pack.id);
+    const w: World = {
+      ...base,
+      attach: (pack) =>
+        has(pack) || (!pack.build && !(pack.lay && (pack.lays?.(saved) ?? true)))
+          ? { world: has(pack) || !pack.lay ? w : withPacks([...packs, pack]), chunks: [] }
+          : build(seed, [...packs, pack], saved, { regions, cache }),
+      relay: (next) => build(seed, packs, next, { regions, cache }),
+    };
+    return w;
+  };
+  const base: Omit<World, 'attach' | 'relay'> = {
     seed,
     cell: (x, y) => cache.get(x, y),
     ...realms,
@@ -767,13 +781,8 @@ function build(
       const gate = REGIONS.find((r) => r.id === realms.realm(x, y))?.behind;
       return gate ? { id: gate, strength: 1 } : climateOf(seed, places, x, y);
     },
-    attach: (pack) =>
-      built.some((p) => p.id === pack.id) || (!pack.build && !pack.lay) // ein Paket nur mit Regeln (Fahrzeuge): nichts zu bauen
-        ? { world, chunks: [] }
-        : build(seed, [...built, pack], saved, { regions, cache }),
-    relay: (next) => build(seed, built, next, { regions, cache }),
   };
-  return { world, chunks: [...chunks] };
+  return { world: withPacks(built), chunks: [...chunks] };
 }
 
 /** Höhe, auf der man auf einem Feld steht – null, wenn man dort nicht stehen kann */

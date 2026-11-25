@@ -124,9 +124,10 @@ export type Cell = {
  * Feld der künftigen Schleife eines Fahrzeugs in seiner Welt (`RideRoute.loop`, die Grubenbahn in der Grotte): `part`
  * offenes Gleis (`open`, begehbar), Gleis im Glitzergang (`gang`), Nachbarn des Gangs (`side`; beide bis zum Graben fester
  * Fels), Zaunkristalle zur Höhle hin (`fence`, bis dahin freier Boden); `at` Platz des Gleises in der Runde (0 am Anfang
- * des Halts, dann in Fahrtrichtung)
+ * des Halts, dann in Fahrtrichtung); `to` die Richtungen, in die das gebaute Gleis weiterführt (`n`, `e`, `s`, `w`, zwei;
+ * setzt das Paket der Grubenbahn, sobald es baut, für sein Gleisbild)
  */
-export type Lane = { ride: RideId; part: 'open' | 'gang' | 'side' | 'fence'; at?: number };
+export type Lane = { ride: RideId; part: 'open' | 'gang' | 'side' | 'fence'; at?: number; to?: string };
 
 /**
  * Ein Stück Gleis (Paket der Bahn): `to` die Richtungen, in die es weiterführt (`n` oben, `e` rechts, `s` unten, `w`

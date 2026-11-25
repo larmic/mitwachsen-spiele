@@ -1,6 +1,7 @@
 // Schlitten und Zug in einem Spiel (Fehler vom 24.11.2026: Beim Einsteigen in den Zug kam das Bild des Schlittens):
 // Mit beiden Paketen, in beiden Reihenfolgen, antwortet jedes Fahrzeug nur auf seine eigene Fahrt – Körper, Sitz der
-// Figur, Spur am Boden, Ton und Freude. Im Kern, weil ein Welt-Paket kein anderes importiert (world-packs-stay-apart)
+// Figur, Spur am Boden, Ton und Freude. Ebenso Zug und Grubenbähnchen Funkel in der Grotte, samt ihren Gleisen. Im Kern,
+// weil ein Welt-Paket kein anderes importiert (world-packs-stay-apart)
 import { describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../lib/games/front';
 import type { Point } from '../../data/games/mitwachsen';
@@ -10,7 +11,14 @@ import { ownSeat, rideOfBody, seatOf, type RideAt, type RideBody, type RideFx } 
 import { initialState, step, type Cmd, type GameEvent, type State } from './mitwachsen-state';
 import type { View2D } from './mitwachsen-view';
 import type { World } from './mitwachsen-world';
-import { BAHN_PACK, EIS_PACK, FAHRT_PACK, HOEHLE_PACK, worldOf } from './test-worlds';
+import { BAHN_PACK, BUILT, DUG, EIS_PACK, FAHRT_PACK, GRUBE_PACK, HOEHLE_PACK, worldOf } from './test-worlds';
+import { RAIL_COLORS } from '../../data/games/worlds/bahn/mitwachsen-bahn';
+import { GRUBE_RAIL } from '../../data/games/worlds/grube/mitwachsen-funkel-model';
+import { railBoxes } from './worlds/bahn/mitwachsen-rail-look';
+import { stationBodies } from './worlds/bahn/mitwachsen-station-look';
+import { trainRoute } from './worlds/bahn/mitwachsen-train';
+import { funkelRoute } from './worlds/grube/mitwachsen-funkel';
+import { funkelBodies, funkelFx, grubeRails } from './worlds/grube/mitwachsen-funkel-look';
 import { withBuilt } from './worlds/bahn/mitwachsen-built';
 import { stationOf } from './worlds/bahn/mitwachsen-station-look';
 import { SEAT } from './worlds/bahn/mitwachsen-train';
@@ -161,4 +169,68 @@ describe('Schlitten und Zug in einem Spiel: jedes Fahrzeug antwortet nur auf sei
     const list = [own];
     expect(ownSeat(list, 'hoehle')).toBe(list); // nichts zu tun: dieselbe Liste
   });
+});
+
+describe('Zug und Grubenbähnchen Funkel in der Grotte: zwei Gleise, jedes Fahrzeug antwortet nur auf seine Fahrt', () => {
+  /** Grotte mit ganzem Gleis der Höhlenbahn (Ausbau 2) und gegrabenem Gang der Grubenbahn */
+  const SAVED = { ...BUILT, fahrt: { grube: { stage: 'bereit' }, hoehle: { stage: 'offen' } } };
+  const G = worldOf(1, [HOEHLE_PACK, BAHN_PACK, GRUBE_PACK], SAVED);
+  const f = funkelRoute(G, { packs: SAVED })!;
+  const t = trainRoute(G, { packs: SAVED, openGates: ['hoehle'] })!;
+  const ORDERS2 = [
+    ['Bahn zuerst', [BAHN_PACK, GRUBE_PACK]],
+    ['Grube zuerst', [GRUBE_PACK, BAHN_PACK]],
+  ] as const;
+
+  it('beide Strecken liegen, kein Feld gehört beiden; jedes Gleisbild zeichnet nur sein Gleis, in eigenen Farben', () => {
+    expect(f).toBeDefined();
+    expect(t).toBeDefined();
+    expect(DUG).toEqual({ fahrt: { grube: { stage: 'bereit' } } });
+    const both = f.path.filter(([x, y]) => t.on.has(`${x},${y}`));
+    expect(both).toEqual([]);
+    const draw = { packs: SAVED, reduced: false };
+    expect(f.path.filter((p) => railBoxes(G.cell(...p), ...p, draw))).toEqual([]);
+    expect(t.path.filter((p) => grubeRails(G.cell(...p), ...p, draw))).toEqual([]);
+    expect(t.path.filter((p) => G.realm(...p) === 'hoehle').some((p) => railBoxes(G.cell(...p), ...p, draw))).toBe(
+      true,
+    );
+    const own = new Set<string>([...GRUBE_RAIL.sleeper, ...GRUBE_RAIL.rail]);
+    expect(
+      Object.values(RAIL_COLORS)
+        .flat()
+        .filter((c) => own.has(c)),
+    ).toEqual([]);
+  });
+
+  it.each(ORDERS2)(
+    '%s: in Funkel gestiegen sitzt die Figur in Funkel, der Zug am Bahnhof Fledermaus hat keinen Sitz',
+    (_, packs) => {
+      const views = viewsOf(packs);
+      const seat = f.stops.home;
+      const [p, dir] = (Object.entries(DIRS) as [Dir, readonly [number, number]][])
+        .map(([d, [dx, dy]]): [Point, Dir] => [[seat[0] - dx, seat[1] - dy], d])
+        .find(([q]) => G.cell(...q).stop === 'grube')!;
+      const s0 = initialState(G, { packs: SAVED, openGates: ['eis', 'hoehle'] });
+      let s: State = { ...s0, sleeping: false, wokeAt: -100, player: { x: p[0], y: p[1], dir }, animals: [] };
+      const events: GameEvent[] = [];
+      for (const c of [{ type: 'move', dir, fresh: true } as Cmd, ...Array.from({ length: 30 }, () => TICK)]) {
+        const r = step(s, G, c, undefined, undefined, [...packs, FAHRT_PACK]);
+        s = r.state;
+        events.push(...r.events);
+      }
+      expect(s.ride?.id).toBe('grube');
+      const all = bodiesOf(views, s, G);
+      expect(all.filter((b) => b.seat).map((b) => rideOfBody(b.id))).toEqual(['grube']);
+      expect(stationBodies(s, G, AT).some((b) => b.seat)).toBe(false);
+      const board = rideEvents(events).find((e) => e.what === 'board')!;
+      expect(board.id).toBe('grube');
+      expect(fxOf(views, board, s)).toEqual(funkelFx(board));
+      expect(trainFx(board, s)).toBeUndefined();
+      const trainBoard: RideEvent = { ...board, id: 'hoehle' };
+      expect(funkelFx(trainBoard)).toBeUndefined();
+      // im Zug sitzt die Figur nie in Funkel
+      const inTrain = { ...s, ride: { ...s.ride!, id: 'hoehle' as const } };
+      expect(funkelBodies(inTrain, G, AT).some((b) => b.seat)).toBe(false);
+    },
+  );
 });

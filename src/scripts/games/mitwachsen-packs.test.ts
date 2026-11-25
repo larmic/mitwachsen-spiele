@@ -121,8 +121,8 @@ describe('Welt-Pakete laden (Packs)', () => {
     SPECIES.robbe.parts = robbe;
   });
 
-  it('je Paket ein Lader (Eis-Welt, Höhlenwelt, Bahn, Fahrzeuge); jedes Paket lädt für sich, nur wenn sein Tor es braucht', async () => {
-    expect(PACK_IDS).toEqual(['eis', 'hoehle', 'bahn', 'fahrt']);
+  it('je Paket ein Lader (Eis-Welt, Höhlenwelt, Bahn, Fahrzeuge, Grubenbahn); jedes Paket lädt für sich, nur wenn sein Tor es braucht', async () => {
+    expect(PACK_IDS).toEqual(['eis', 'hoehle', 'bahn', 'fahrt', 'grube']);
     const asked: string[] = [];
     const hoehle = { ...pack, id: 'hoehle', gate: 'hoehle' } as LoadedPack;
     const packs = new Packs(
@@ -151,7 +151,12 @@ describe('Welt-Pakete laden (Packs)', () => {
     const hoehle = { ...pack, id: 'hoehle', gate: 'hoehle' } as LoadedPack;
     const packs = new Packs(
       () => {},
-      (id) => (asked.push(id), Promise.resolve({ eis: pack, hoehle, bahn, fahrt: { id: 'fahrt' } as LoadedPack }[id])),
+      (id) => (
+        asked.push(id),
+        Promise.resolve(
+          { eis: pack, hoehle, bahn, fahrt: { id: 'fahrt' } as LoadedPack, grube: { id: 'grube' } as LoadedPack }[id],
+        )
+      ),
     );
     await packs.want(bed, gates); // Eistor zu: keine Bahn
     expect(asked).not.toContain('bahn');
@@ -163,7 +168,12 @@ describe('Welt-Pakete laden (Packs)', () => {
     asked.length = 0;
     const dev = new Packs(
       () => {},
-      (id) => (asked.push(id), Promise.resolve({ eis: pack, hoehle, bahn, fahrt: { id: 'fahrt' } as LoadedPack }[id])),
+      (id) => (
+        asked.push(id),
+        Promise.resolve(
+          { eis: pack, hoehle, bahn, fahrt: { id: 'fahrt' } as LoadedPack, grube: { id: 'grube' } as LoadedPack }[id],
+        )
+      ),
     );
     dev.extra = ['bahn']; // der Entwickler-Schalter holt es auch ohne Bedarf
     await dev.want(bed, gates);
@@ -191,6 +201,34 @@ describe('Welt-Pakete laden (Packs)', () => {
     dev.extra = ['fahrt']; // der Entwickler-Schalter der Bahn bringt sie mit (mitwachsen-dev.ts)
     await dev.want(bed, gates);
     expect(asked).toEqual(['fahrt']);
+  });
+
+  it('das Paket der Grubenbahn kommt immer mit der Grotte: an ihrem Tor, vor einem Halt, mit dem Schalter', async () => {
+    const asked: string[] = [];
+    const hoehle = { ...pack, id: 'hoehle', gate: 'hoehle' } as LoadedPack;
+    const grube = { id: 'grube' } as LoadedPack;
+    const make = () =>
+      new Packs(
+        () => {},
+        (id) => (asked.push(id), Promise.resolve({ eis: pack, hoehle, grube }[id as 'eis'])),
+        ['eis', 'hoehle', 'grube'],
+      );
+    await make().want(open, gates); // nur das Eistor offen: weder Grotte noch Grubenbahn
+    expect(asked).toEqual(['eis']);
+    asked.length = 0;
+    const packs = make();
+    await packs.want({ ...bed, openGates: ['hoehle'] }, gates); // das Höhlentor ist offen: beide
+    expect(asked).toEqual(['hoehle', 'grube']);
+    expect(packs.at('hoehle')).toBe(hoehle); // hinter dem Höhlentor bleibt die Grotte
+    expect(packs.get('grube')).toBe(grube);
+    asked.length = 0;
+    await make().want({ ...bed, ride: ['hoehle'] }, gates); // Vorladen am Halt des Zugs holt die Grotte: beide
+    expect(asked).toEqual(['hoehle', 'grube']);
+    asked.length = 0;
+    const dev = make();
+    dev.extra = ['hoehle']; // ?entwickler=hoehle: die Grubenbahn kommt mit
+    await dev.want(bed, gates);
+    expect(asked).toEqual(['hoehle', 'grube']);
   });
 
   it('ohne eigenen Lader kommt das echte Paket der Fahrzeuge (import()): nur Regeln, die Fahr-Engine', async () => {

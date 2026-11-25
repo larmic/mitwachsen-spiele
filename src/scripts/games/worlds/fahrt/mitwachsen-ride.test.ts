@@ -39,7 +39,7 @@ describe('Dauer einer Fahrt (rideTicks)', () => {
 
 const W = bareOf(1);
 const keyOf = ([x, y]: Point) => `${x},${y}`;
-/** Ein Fahrzeug, das eine Schleife fährt (wie die Grubenbahn; ihr Eintrag in `RIDES` kommt mit ihrem Paket) */
+/** Ein Fahrzeug, das eine Schleife fährt (wie die Grubenbahn Funkel, deren Strecke ihr Paket aus der Grotte rechnet) */
 const LOOP: LoopSpec = {
   id: 'grube',
   gate: 'hoehle',
@@ -127,7 +127,9 @@ describe('Schleife (RideRoute.loop, die Grubenbahn)', () => {
     expect(loop.loop).toBe(true);
     expect(loop.out).toBeUndefined();
     expect(loop.pennant).toBeUndefined();
-    expect(RIDES.every((r) => !r.loop && !!r.out && !!r.pennant)).toBe(true);
+    // Schlitten und Zug pendeln, nur Funkel (die Grubenbahn) fährt eine Schleife
+    expect(RIDES.filter((r) => r.id !== 'grube').every((r) => !r.loop && !!r.out && !!r.pennant)).toBe(true);
+    expect(RIDES.filter((r) => r.loop).map((r) => [r.id, r.out, r.pennant])).toEqual([['grube', undefined, undefined]]);
   });
 
   it('stopsOf: beide Enden sind derselbe Halt, Sitz auf dem ersten Feld, Zugtier auf dem zweiten', () => {
