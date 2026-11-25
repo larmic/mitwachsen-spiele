@@ -30,6 +30,7 @@ type Moving = {
   open: number;
   cam: readonly [number, number];
   all: boolean;
+  home?: readonly [number, number];
   beats: Group;
   built: Map<number, Mesh[]>;
   shown: number;
@@ -56,10 +57,20 @@ export class MovingGates {
     this.wings.push([id, group, w.angle, Math.sign(w.hinge[0])]);
   }
 
-  /** Zugang `id` bewegt sich: liefert die Gruppe für seine Takte, die der Aufrufer ins Torhaus hängt (`all`: wie `gate`) */
-  add(id: GateId, at: readonly [number, number], open: number, cam: readonly [number, number], all = false) {
+  /**
+   * Zugang `id` bewegt sich: liefert die Gruppe für seine Takte, die der Aufrufer ins Torhaus hängt (`all` und `home`:
+   * wie `gate`)
+   */
+  add(
+    id: GateId,
+    at: readonly [number, number],
+    open: number,
+    cam: readonly [number, number],
+    all = false,
+    home?: readonly [number, number],
+  ) {
     const beats = new Group();
-    this.list.push({ id, at, open, cam, all, beats, built: new Map(), shown: -1 });
+    this.list.push({ id, at, open, cam, all, home, beats, built: new Map(), shown: -1 });
     return beats;
   }
 
@@ -74,7 +85,7 @@ export class MovingGates {
     let shown = m.built.get(beat);
     if (!shown) {
       const p = parts();
-      this.draw(p, m.id, beat, m.open, m.cam, m.all);
+      this.draw(p, m.id, beat, m.open, m.cam, m.all, m.home);
       shown = meshes(p);
       m.built.set(beat, shown);
       if (shown.length) m.beats.add(...shown);

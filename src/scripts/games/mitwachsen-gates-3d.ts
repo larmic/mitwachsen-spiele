@@ -46,11 +46,19 @@ export const openStep = (theme: GateTheme, open: number) => {
 export const plate = (theme: GateTheme): PlateLook | undefined => PLATE[theme];
 
 /**
+ * Zugänge, die sich mit der Kamera zur Front drehen, statt in einem Bild umzuschalten: so viele Stufen zwischen der
+ * Fassung für den Süden und der Fassung zur Front (`GateCtx.turn` 0 … 1). Die Wolke dreht ihren Kopf mit; alle anderen
+ * wechseln nur das Schild, einmal bei halber Drehung (eine Stufe)
+ */
+export const TURN_STEPS: Partial<Record<GateTheme, number>> = { wolken: 6 };
+
+/**
  * Ein Zugang: Geometrie in `p`, dazu seine Türflügel (nur das Eistor hat welche). `open` 0 zu … 1 offen, `outline` der
  * Umriss des verlaufenen Tiers, `lit` wie weit dessen Ritual leuchtet, `cam` die Richtung zur Kamera in
  * Torhaus-Koordinaten (x, z): Danach richtet jeder Zugang sein Schild aus. `look`: was das Welt-Paket hinter dem Tor
  * beiträgt (Eis-Welt: Tür, Eiszapfen), solange es lädt nichts. `all`: alle Flächen, auch die von der Kamera weg
- * (Zugang vor der Torplatte, solange die Kamera zur Front dreht)
+ * (Zugang vor der Torplatte, solange die Kamera zur Front dreht). `home`: Richtung zur Kamera in Ruhe, sie legt den
+ * Körper fest (fehlt sie: `cam`); `turn`: wie weit die Kamera zur Front gedreht ist (`TURN_STEPS`)
  */
 export function gate(
   p: Parts,
@@ -61,14 +69,16 @@ export function gate(
   cam: readonly [number, number] = [0, 1],
   look?: GateLook,
   all = false,
+  home?: readonly [number, number],
+  turn?: number,
 ): Wing[] {
-  return BUILD[theme](p, { open, outline, lit, cam, look, all });
+  return BUILD[theme](p, { open, outline, lit, cam, look, all, home, turn });
 }
 
 /** Ob ein Zugang bewegte Teile hat (dann zeichnet `motion` sie je Takt) */
 export const moves = (theme: GateTheme) => theme in MOTION;
 
-/** Bewegte Teile eines Zugangs im Takt `beat` in `p` (gleiche Bedeutung von `open`, `cam` und `all` wie bei `gate`) */
+/** Bewegte Teile eines Zugangs im Takt `beat` in `p` (gleiche Bedeutung von `open`, `cam`, `all` und `home` wie bei `gate`) */
 export function motion(
   p: Parts,
   theme: GateTheme,
@@ -76,6 +86,7 @@ export function motion(
   open = 0,
   cam: readonly [number, number] = [0, 1],
   all = false,
+  home?: readonly [number, number],
 ) {
-  MOTION[theme]?.(p, { open, outline: false, lit: 0, cam, all }, beat);
+  MOTION[theme]?.(p, { open, outline: false, lit: 0, cam, all, home }, beat);
 }

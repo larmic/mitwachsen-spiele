@@ -13,6 +13,7 @@ import {
   VOX,
   ease,
   hash3,
+  homeOf,
   seg,
   type GateBuild,
   type GateCtx,
@@ -256,9 +257,10 @@ const basalt = (b: Body) =>
 type Tree = { x: number; z: number; y: number; h: number; k: number };
 /**
  * Lage des Baums: neben dem Gang auf dem Säulenbasalt, auf Höhe des Teichs (Stamm bei |x| ≥ 3, die Krone erst ab
- * gut 4 Feldern Höhe). Ein Zugang sieht die Kamera aus der Richtung `cam` (meist von Süden; vor der Torplatte zur
- * Front gebaut, [0, 1]): Liegt er hinten, steht der Baum links (rechts oben im Bild liegt die Karte), sonst rechts, wo
- * ihn die Kamera ganz im Bild hat.
+ * gut 4 Feldern Höhe). Ein Zugang sieht die Kamera in Ruhe aus der Richtung `cam` (`GateCtx.home`, meist von Süden):
+ * Liegt er hinten, steht der Baum links (rechts oben im Bild liegt die Karte), sonst rechts, wo ihn die Kamera ganz im
+ * Bild hat. Dreht die Kamera auf der Torplatte zur Front, bleibt er dort stehen (entschieden am 25.11.2026: lieber von
+ * vorn zum Teil unter der Karte als ein Baum, der beim Drehen die Seite wechselt).
  */
 export const treeAt = (cam: readonly [number, number]): Tree => ({
   x: cam[1] > 0 ? -3 : 3,
@@ -347,7 +349,7 @@ export function voxels(g: GateCtx): Vox {
   b.emit(vox);
   saum(vox, f);
   const lit = 0.75 + 0.25 * ease(seg(g.open, 0.7, 1));
-  const tree = treeAt(g.cam);
+  const tree = treeAt(homeOf(g)); // der Baum bleibt, wo er aus der Ruhe-Kamera steht; nur sein Schild dreht
   trunk(vox, tree, lit);
   crown(vox, tree, lit);
   sign(vox, tree, g.cam);

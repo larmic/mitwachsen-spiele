@@ -4,7 +4,17 @@
 // `motion`), unten schäumt sie in ein flaches Becken. Beim Öffnen sinkt die Wand als Ganzes ins Becken zurück; offen
 // liegen Bretter über dem Becken und der Bogen ist frei. Gehört zur 3D-Ansicht und wird nur mit ihr nachgeladen (Three.js).
 
-import { type GateBuild, type GateCtx, type GateMotion, Vox, VOX, ease, hash3, seg } from './mitwachsen-gate-kit';
+import {
+  type GateBuild,
+  type GateCtx,
+  type GateMotion,
+  Vox,
+  VOX,
+  ease,
+  hash3,
+  homeOf,
+  seg,
+} from './mitwachsen-gate-kit';
 import type { PlateLook } from './mitwachsen-plate';
 
 const C = {
@@ -234,10 +244,10 @@ function wall(v: Vox, g: GateCtx) {
       for (const [k, what] of wallRow(i, j, top)) {
         if (what === 'foam') v.set(i, j, k, foam(j, k, top), 'bright');
         else if (what === 'still') v.set(i, j, k, BAND[Math.min(BAND.length - 1, j >> 3)]!, 'bright');
-        else if (!flowing(k, g.cam)) v.set(i, j, k, flow(i, j, 0), 'bright');
+        else if (!flowing(k, homeOf(g))) v.set(i, j, k, flow(i, j, 0), 'bright');
       }
     // Schaum auf dem Becken hinter der Wand, wenn die Rückseite still ist (vorn wäre schon die Bucht)
-    if (flowSide(g.cam) === FRONT && surf(i, 0) > 0.35) v.set(i, 0, BACK - bulge(0) - 1, C.weiss, 'bright');
+    if (flowSide(homeOf(g)) === FRONT && surf(i, 0) > 0.35) v.set(i, 0, BACK - bulge(0) - 1, C.weiss, 'bright');
   }
 }
 
@@ -306,7 +316,7 @@ const fixed = new Map<string, Vox>();
 
 /** Das feste Raster je Öffnung und Lage, einmal gebaut (die bewegten Teile prüfen jeden Takt dagegen) */
 function fixedModel(g: GateCtx) {
-  const at = `${g.open},${g.cam[0]},${g.cam[1]}`;
+  const at = `${g.open},${g.cam[0]},${g.cam[1]},${homeOf(g).join()}`;
   let v = fixed.get(at);
   if (!v) {
     if (fixed.size > 32) fixed.clear();
@@ -327,7 +337,7 @@ export function moving(g: GateCtx, beat: number): Cell[] {
   const lvl = level(g.open);
   if (lvl <= 0) return [];
   const solid = fixedModel(g);
-  const k = flowSide(g.cam);
+  const k = flowSide(homeOf(g)); // die fließende Seite bleibt, wo sie aus der Ruhe-Kamera ist, auch zur Front gedreht
   const b = ((beat % PERIOD) + PERIOD) % PERIOD;
   const cells: Cell[] = [];
   const put = (i: number, j: number, kk: number, c: string) => {
@@ -339,7 +349,7 @@ export function moving(g: GateCtx, beat: number): Cell[] {
     const w = surf(i, b);
     for (let j = 2; j < top; j++)
       for (const [kk, what] of wallRow(i, j, top))
-        if (what === 'flow' && flowing(kk, g.cam)) put(i, j, kk, footFoam(i, j, w) ?? flow(i, j, b));
+        if (what === 'flow' && flowing(kk, homeOf(g))) put(i, j, kk, footFoam(i, j, w) ?? flow(i, j, b));
     if (k === BACK && w > 0.35) put(i, 0, BACK - bulge(0) - 1, C.weiss);
   }
   return cells;
