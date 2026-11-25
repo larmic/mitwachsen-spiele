@@ -15,6 +15,7 @@ import { GROTTE_ROOM, bedSpots, fromMouth, shedAt, shedStoneAt, stationAt } from
 import { SIDES, corridorAt, crystalOf, fillZone, tipOf, veinOf, type FillZone } from './mitwachsen-fill';
 import type { Site } from './mitwachsen-site';
 import { webs as websOfWorld } from './mitwachsen-spider';
+import { clayOf, laneSide } from './mitwachsen-lane';
 import type { Cell } from '../../mitwachsen-cell';
 
 const CAVE = [HOEHLE_PACK];
@@ -175,23 +176,26 @@ function adornProblems(w: World, steps: ReadonlyMap<string, number>, all: readon
   return bad;
 }
 
-/** Farben der Fülle: Kristallfelder und -büsche in der Farbe ihrer Zone, nie Türkis (Wasser), Adern nur Rosa oder Lila */
-function colorProblems(_w: World, all: readonly Spot[]): string[] {
+/**
+ * Farben der Fülle: Kristallfelder und -büsche in der Farbe ihrer Zone, nie Türkis (Wasser), Adern nur Rosa oder Lila;
+ * `side` die Seite der Schleife der Grubenbahn (der Lehmhang liegt ihr gegenüber)
+ */
+function colorProblems(side: 1 | -1, all: readonly Spot[]): string[] {
   const bad: string[] = [];
   const water = GROTTE_COLORS.crystals[1];
   for (const { p, c, uv } of decoOf(all, 'crystalfield')) {
-    if (c.note === 1 && c.color !== crystalOf(...uv)) bad.push(`Kristallfeld ${key(p)}: Farbe`);
+    if (c.note === 1 && c.color !== crystalOf(...uv, side)) bad.push(`Kristallfeld ${key(p)}: Farbe`);
     if (c.color === water) bad.push(`Kristallfeld ${key(p)}: türkis wie Wasser`);
   }
   for (const { p, c } of decoOf(all, 'crystalbush'))
     if (c.color === water) bad.push(`Kristallbusch ${key(p)}: türkis wie Wasser`);
   for (const { p, uv, c } of decoOf(all, 'crystalbush'))
-    if (c.color !== crystalOf(...uv)) bad.push(`Kristallbusch ${key(p)}: nicht in der Farbe seiner Zone`);
+    if (c.color !== crystalOf(...uv, side)) bad.push(`Kristallbusch ${key(p)}: nicht in der Farbe seiner Zone`);
   // Adern: je Ader die Farbe der Zone, in der sie beginnt (fast immer die des Felds selbst)
   const veins = decoOf(all, 'vein');
   const tones: unknown[] = [...GROTTE_COLORS.veins];
   for (const { p, c } of veins) if (!tones.includes(c.color)) bad.push(`Ader ${key(p)}: Farbe ${c.color}`);
-  const own = veins.filter(({ c, uv }) => c.color === veinOf(...uv)).length / veins.length;
+  const own = veins.filter(({ c, uv }) => c.color === veinOf(...uv, side)).length / veins.length;
   if (own < 0.9) bad.push(`Adern nur zu ${own.toFixed(2)} in der Farbe ihrer Zone`);
   if (new Set(veins.map(({ c }) => c.color)).size !== 2) bad.push('Adern nicht in beiden Farben');
   return bad;
@@ -244,6 +248,143 @@ function webProblems(w: World, site: Site, steps: ReadonlyMap<string, number>, c
     else if (key([r.state.player.x, r.state.player.y]) === key(p)) bad.push(`${key(p)}: Figur im Netz`);
   }
   return bad;
+}
+
+/**
+ * Was an der Schleife der Grubenbahn nicht stimmt (Schritt 14 der Rückmeldung, vor dem Graben): ein geschlossenes Gleis in
+ * Reihe (je Schritt ein Feld, nie schräg) mit dem Halt am Anfang, etwa 145 bis 170 Felder; der Gang ein Stück am Stück,
+ * das `open` Felder vor dem Halt endet, samt Nachbarn fester Fels; offenes Gleis, Zaun und Bahnsteig frei, eben und
+ * erreichbar; nichts davon berührt Weg, Bett, Wiese, Hauptgleis, Bahnsteig, Lokschuppen, Klangstein oder Portal; der
+ * Gang liegt nie auf der Seite zur Kamera (`laneSouthProblems`); nach dem Graben (Gang und Nachbarn frei, Zaun, Tore und
+ * die Pfosten neben ihnen fest) kommt man zu Fuß nicht hinein
+ */
+function laneProblems(w: World, site: Site, steps: ReadonlyMap<string, number>, all: readonly Spot[]): string[] {
+  const lane = all.filter(({ c }) => c.lane);
+  const track = lane.filter(({ c }) => c.lane!.at !== undefined).sort((a, b) => a.c.lane!.at! - b.c.lane!.at!);
+  const L: LaneOf = {
+    lane,
+    track,
+    part: (name) => lane.filter(({ c }) => c.lane!.part === name),
+    platform: all.filter(({ c }) => c.stop === 'grube'),
+    gang: track.flatMap(({ c }, i) => (c.lane!.part === 'gang' ? [i] : [])),
+  };
+  return [
+    ...trackProblems(L),
+    ...laneGroundProblems(L, steps),
+    ...laneTouchProblems(w, site, L),
+    ...laneSouthProblems(site, L),
+    ...laneClosedProblems(L, steps),
+  ];
+}
+
+/** Die Felder der Schleife einer Welt: alle, das Gleis in Reihe, je Teil, Bahnsteig, Plätze des Gangs im Gleis */
+type LaneOf = {
+  lane: Spot[];
+  track: Spot[];
+  part: (name: NonNullable<Cell['lane']>['part']) => Spot[];
+  platform: Spot[];
+  gang: number[];
+};
+
+/** Gleis geschlossen in Reihe, je Schritt ein Feld, Halt am Anfang, der Gang am Stück und `open` Felder vor dem Halt zu Ende */
+function trackProblems({ lane, track, gang }: LaneOf): string[] {
+  const bad: string[] = [];
+  const { stop, open: before } = GROTTE.grube;
+  const n = track.length;
+  if (n < 140 || n > 170) bad.push(`${n} Felder Gleis`);
+  if (track.some(({ c }, i) => c.lane!.at !== i)) bad.push('Plätze in der Runde nicht lückenlos');
+  track.forEach(({ p }, i) => {
+    const q = track[(i + 1) % n]!.p;
+    if (Math.abs(p[0] - q[0]) + Math.abs(p[1] - q[1]) !== 1) bad.push(`Gleis springt bei ${i}`);
+  });
+  const side = Math.sign(track[0]?.uv[0] ?? 0);
+  if (lane.some(({ uv }) => Math.sign(uv[0]) !== side)) bad.push('Schleife auf beiden Seiten');
+  for (let i = 0; i < stop.long; i++) {
+    const m = track[i]?.m;
+    if (!m || m[0] !== side * stop.across || m[1] !== stop.out + i) bad.push(`Halt ${i} nicht bei quer ${stop.across}`);
+  }
+  const [g0, g1] = [gang[0] ?? -1, gang.at(-1) ?? -1];
+  if (g1 - g0 + 1 !== gang.length || g0 <= stop.long || g1 !== n - 1 - before) bad.push(`Gang von ${g0} bis ${g1}`);
+  return bad;
+}
+
+/** Vor dem Graben: Gang und Nachbarn Fels; offenes Gleis, Zaun und Bahnsteig frei, eben und erreichbar */
+function laneGroundProblems({ part, platform, gang }: LaneOf, steps: ReadonlyMap<string, number>): string[] {
+  const bad: string[] = [];
+  const { stop } = GROTTE.grube;
+  for (const { p, c } of [...part('gang'), ...part('side')])
+    if (!c.solid || c.deco !== 'rock' || c.region !== 'border') bad.push(`${key(p)}: vor dem Graben kein Fels`);
+  if (platform.length !== stop.long * stop.wide) bad.push(`${platform.length} Felder Bahnsteig`);
+  if (part('fence').length < gang.length) bad.push(`nur ${part('fence').length} Felder Zaun`); // eine Reihe am ganzen Gang
+  for (const { p, c } of [...part('open'), ...part('fence'), ...platform])
+    if (c.solid || c.deco || c.h !== 1 || c.ground !== 'grotto' || !steps.has(key(p)))
+      bad.push(`${key(p)}: nicht frei`);
+  return bad;
+}
+
+/** Kein Feld davon und keins daneben ist Weg, Wiese, Bett, Hauptgleis, Bahnsteig, Schuppen, Klangstein oder Portal */
+function laneTouchProblems(w: World, site: Site, { lane, platform }: LaneOf): string[] {
+  const bad: string[] = [];
+  for (const { p } of [...lane, ...platform])
+    for (const [dx, dy] of [[0, 0] as const, ...AROUND]) {
+      const q: Point = [p[0] + dx, p[1] + dy];
+      const c = w.cell(...q);
+      const uv = site.uv(...q);
+      const way = Math.abs(uv[0]) <= 3 || c.garden || c.deco === 'bed' || corridorAt(...uv) || c.stop === 'hoehle';
+      if (way || stationAt(...uv) || shedAt(...uv) || c.shed || c.stone || c.portal)
+        bad.push(`${key(p)} berührt ${key(q)}`);
+    }
+  return bad;
+}
+
+/**
+ * Der Gang nie auf der Seite zur Kamera, in Weltkoordinaten: Die Wand hinter ihm (quer nach außen) zeigt nie nach Süden
+ * (+y), sonst verdeckten ihn die Klippen vorn. Läuft quer nord-südlich (Wand im Norden), ist eine Reihe vom Tor weg eine
+ * Spalte der Welt: Dort liegt kein Feld des Gangs südlich vom offenen Gleis derselben Reihe. Läuft quer west-östlich, liegt
+ * der Gang an einer Seitenwand; dann liegen das Querstück zum Halt (Reihe `near`) und, wo die Wand sich krümmt, Teile des
+ * Gangs in derselben Spalte südlich vom Hinweg, ohne dass eine Klippe vor ihnen steht (Abweichung von der Seite)
+ */
+function laneSouthProblems(site: Site, { track }: LaneOf): string[] {
+  const out = Math.sign(track[0]?.uv[0] ?? 0) * (site.at(1, 0)[1] - site.at(0, 0)[1]); // Wand des Gangs in Welt-y
+  if (out > 0) return ['Wand des Gangs zur Kamera'];
+  if (out === 0) return [];
+  const rows = new Map<number, { gang: number[]; open: number[] }>();
+  for (const { p, c, m } of track) {
+    const row = rows.get(m[1]) ?? { gang: [], open: [] };
+    row[c.lane!.part === 'gang' ? 'gang' : 'open'].push(p[1]);
+    rows.set(m[1], row);
+  }
+  return [...rows].flatMap(([o, { gang, open }]) =>
+    gang.length && open.length && Math.max(...gang) > Math.min(...open) ? [`Reihe ${o}: Gang südlich vom Hinweg`] : [],
+  );
+}
+
+/** Nach dem Graben (Gang und Nachbarn frei; Zaun, beide Tore und die Pfosten neben ihnen fest) kommt man zu Fuß nicht hinein */
+function laneClosedProblems({ part, track, gang }: LaneOf, steps: ReadonlyMap<string, number>): string[] {
+  const openKeys = new Set(part('open').map(({ p }) => key(p)));
+  const post = ({ p }: Spot) => Object.values(DIRS).some(([dx, dy]) => openKeys.has(key([p[0] + dx, p[1] + dy])));
+  const gates = [track[gang[0] ?? -1], track[gang.at(-1) ?? -1]].flatMap((t) => (t ? [key(t.p)] : []));
+  const fixed = new Set([
+    ...part('fence').map(({ p }) => key(p)),
+    ...gates,
+    ...part('side')
+      .filter(post)
+      .map(({ p }) => key(p)),
+  ]);
+  const dug = new Set([...part('gang'), ...part('side')].map(({ p }) => key(p)).filter((k) => !fixed.has(k)));
+  const seen = new Set(openKeys);
+  const queue = part('open').map(({ p }) => p);
+  for (let i = 0; i < queue.length; i++) {
+    const [x, y] = queue[i]!;
+    for (const [dx, dy] of Object.values(DIRS)) {
+      const k = key([x + dx, y + dy]);
+      if (seen.has(k) || fixed.has(k) || (!steps.has(k) && !dug.has(k))) continue;
+      seen.add(k);
+      queue.push([x + dx, y + dy]);
+    }
+  }
+  const inside = [...dug].filter((k) => seen.has(k));
+  return inside.length ? [`nach dem Graben zu Fuß im Gang: ${inside.slice(0, 3).join(' ')}`] : [];
 }
 
 /** Schritte vom Bett zu jedem erreichbaren Feld der Welt (Breitensuche, das Höhlentor zu) */
@@ -319,6 +460,18 @@ describe('Kristallgrotte: Lage', () => {
     expect(bad.slice(0, 5)).toEqual([]);
     expect(turned).toBeGreaterThan(0);
     for (const seed of TURNED) expect(placeOf(seed).site.turn, `Seed ${seed}`).toBe(true);
+  });
+
+  it('die Seeds der Eigenschafts-Tests decken alle vier Drehungen ab; zeigt u+ zur Kamera, liegt die Schleife der Grubenbahn auf u−', () => {
+    const turns = new Map<string, 1 | -1>();
+    for (const seed of SEEDS) {
+      const { site } = placeOf(seed);
+      const [o, a, f] = [site.at(0, 0), site.at(1, 0), site.at(0, 1)];
+      expect(laneSide(site), `Seed ${seed}`).toBe(a[1] > o[1] ? -1 : 1); // Kamera in Ruhe im Süden (+y)
+      turns.set(`${f[0] - o[0]},${f[1] - o[1]}`, laneSide(site));
+    }
+    expect([...turns.keys()].sort()).toEqual(['-1,0', '0,-1', '0,1', '1,0']);
+    expect(new Set(turns.values())).toEqual(new Set([1, -1]));
   });
 
   it('der Weg vom Felsring bis an die Klippen bleibt kurz (gerade meist ganz kurz, um die Ecke kürzer als 100 Felder)', () => {
@@ -581,7 +734,8 @@ describe('Kristallgrotte: Gelände', () => {
       const things = placeOf(seed)
         .cells.map((p) => ({ p, c: w.cell(...p) }))
         .filter(({ c }) => c.region === 'hoehle' && (c.deco === 'stalagmite' || c.deco === 'boulder'));
-      const wrong = things.filter(({ p, c }) => c.color !== tipOf(...site.uv(...p))).map(({ p }) => key(p));
+      const side = laneSide(site); // der Lehmhang liegt gegenüber der Schleife der Grubenbahn
+      const wrong = things.filter(({ p, c }) => c.color !== tipOf(...site.uv(...p), side)).map(({ p }) => key(p));
       const tips = new Set(things.map(({ c }) => c.color));
       expect({ seed, wrong: wrong.slice(0, 3), many: things.length > 200, zones: tips.size >= 3 }).toEqual({
         seed,
@@ -592,10 +746,12 @@ describe('Kristallgrotte: Gelände', () => {
       expect([...tips].filter((t) => !Object.values(GROTTE_COLORS.tips).includes(t as never))).toEqual([]);
     });
 
-    it(`Seed ${seed}: Fülle: Kristallfelder je Zone in einer Farbe, Adern nur Rosa oder Lila, Leuchtmoos an Wänden und unter den Schächten, alles flach und begehbar, nie auf Wegen, Mitte oder Gleisspur`, () => {
+    // ein Test für beide, die Felder der Grotte werden nur einmal gesammelt (Laufzeit von test:deep)
+    it(`Seed ${seed}: Fülle: Kristallfelder je Zone in einer Farbe, Adern nur Rosa oder Lila, Leuchtmoos an Wänden und unter den Schächten, alles flach und begehbar, nie auf Wegen, Mitte oder Gleisspur; Schleife der Grubenbahn vor dem Graben: geschlossen, Gang als Fels, frei und eben, berührt weder Weg noch Bett, Hauptgleis, Bahnsteig oder Schuppen, der Gang nie auf der Seite zur Kamera`, () => {
       const all = placeOf(seed).cells.map((p) => ({ p, c: w.cell(...p), uv: site.uv(...p), m: mouthOf(site, p) }));
-      const bad = [...adornProblems(w, steps, all), ...colorProblems(w, all), ...mossProblems(w, all)];
+      const bad = [...adornProblems(w, steps, all), ...colorProblems(laneSide(site), all), ...mossProblems(w, all)];
       expect(bad.slice(0, 5), `Seed ${seed}`).toEqual([]);
+      expect(laneProblems(w, site, steps, all), `Seed ${seed}`).toEqual([]);
     });
 
     it(`Seed ${seed}: ein kleiner Wasserfall am See: fest, selbst kein Wasser, das Wasser fällt nach Süden in den See, man kommt an ihn heran`, () => {
@@ -671,12 +827,18 @@ describe('Kristallgrotte: Gelände', () => {
         ).length < 10
       )
         bad.push('kein Moos unter dem Schacht der Kristallhalle');
-      // Lehmhang: zwei Stufen Lehm (Höhe 2 und 3), begehbar und erreichbar, links neben dem Pilzgarten
+      // Lehmhang: zwei Stufen Lehm (Höhe 2 und 3), begehbar und erreichbar, links neben dem Pilzgarten; liegt dort die
+      // Schleife der Grubenbahn, auf derselben Seite hinter ihrer Umkehr, nie auf die Seite zur Kamera (in der Welt +y)
+      const side = laneSide(site);
+      const at = clayOf(side);
+      const middle = site.at(0, 0)[1]; // Mitte der Grotte in der Welt (y)
       const bank = all.filter(({ c }) => c.deco === 'clay');
       if (bank.length < clay.long * 2) bad.push(`nur ${bank.length} Felder Lehm`);
       for (const { p, c, m } of bank) {
         if (c.solid || !steps.has(key(p)) || c.h < 2 || c.h > 3) bad.push(`Lehm ${key(p)}`);
-        if (m[0] > clay.across || Math.abs(m[1] - clay.out) > clay.long) bad.push(`Lehm ${key(p)} nicht am Hang`);
+        if (m[0] > at.across || Math.abs(m[1] - at.out) > clay.long) bad.push(`Lehm ${key(p)} nicht am Hang`);
+        // zeigt rechts (u+) zur Kamera, bleibt er links, in der Welt in der Hälfte der Grotte fern der Kamera
+        if (side === -1 && p[1] >= middle) bad.push(`Lehm ${key(p)} auf der Seite zur Kamera`);
       }
       if (new Set(bank.map(({ c }) => c.h)).size !== 2) bad.push('Lehmhang nicht in zwei Stufen');
       expect(bad.slice(0, 5), `Seed ${seed}`).toEqual([]);

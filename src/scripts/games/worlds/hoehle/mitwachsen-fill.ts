@@ -17,6 +17,7 @@ import type { Point } from '../../../../data/games/mitwachsen';
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import type { Cell } from '../../mitwachsen-cell';
 import { GATE_HALF, OBSTACLE_GAP } from '../../mitwachsen-world';
+import { clayOf, laneSide } from './mitwachsen-lane';
 import type { Site } from './mitwachsen-site';
 
 const { rx, ry } = GROTTE.shape;
@@ -47,9 +48,16 @@ export function fillZone(u: number, v: number): FillZone {
   return (u / rx) ** 2 + (v / ry) ** 2 > 0.6 ? 'rim' : 'side';
 }
 
-/** Zonen mit eigener Farbe der Spitzen: Mitte (u, v von der Mitte der Grotte) und Radius */
-const TIP_ZONES: readonly (readonly [keyof typeof GROTTE_COLORS.tips, number, number, number])[] = (() => {
+/** Seite der Schleife der Grubenbahn (mitwachsen-lane.ts): Mit ihr rückt der Lehmhang (`clayOf`) */
+type Side = 1 | -1;
+
+/**
+ * Zonen mit eigener Farbe der Spitzen: Mitte (u, v von der Mitte der Grotte) und Radius; der Lehmhang dort, wohin er mit
+ * der Schleife der Grubenbahn rückt (`side` −1: gespiegelt, hinter ihre Umkehr)
+ */
+const tipZones = (side: Side): readonly (readonly [keyof typeof GROTTE_COLORS.tips, number, number, number])[] => {
   const { garden, hall, drip, clay } = GROTTE;
+  const bank = clayOf(side);
   return [
     ['garden', garden.across, garden.out - ry, garden.r],
     ['hall', hall.across, hall.out - ry, hall.r],
@@ -58,20 +66,22 @@ const TIP_ZONES: readonly (readonly [keyof typeof GROTTE_COLORS.tips, number, nu
     // ihn baut: von `out - long/2` an)
     [
       'clay',
-      clay.across - clay.step + 0.5,
-      clay.out - (clay.long >> 1) + (clay.long - 1) / 2 - ry,
+      bank.across - clay.step + 0.5,
+      bank.out - (clay.long >> 1) + (clay.long - 1) / 2 - ry,
       clay.step + clay.long / 2,
     ],
   ];
-})();
+};
+const TIP_ZONES = { [1]: tipZones(1), [-1]: tipZones(-1) } as const;
 
 type TipZone = keyof typeof GROTTE_COLORS.tips;
 
 /** Die nächste Zone für (u, v) von der Mitte (Abstand zu ihrem Rand) */
-function zoneOf(u: number, v: number): TipZone {
-  let best = TIP_ZONES[0]!;
+function zoneOf(u: number, v: number, side: Side): TipZone {
+  const zones = TIP_ZONES[side];
+  let best = zones[0]!;
   let near = Infinity;
-  for (const z of TIP_ZONES) {
+  for (const z of zones) {
     const d = Math.hypot(u - z[1], v - z[2]) - z[3];
     if (d < near) [best, near] = [z, d];
   }
@@ -81,9 +91,9 @@ function zoneOf(u: number, v: number): TipZone {
 /**
  * Farbe der Spitze eines Stalagmiten oder Felsbrockens bei (u, v) von der Mitte: die der nächsten Zone (Abstand zu ihrem
  * Rand), so hat jede Zone ihre Farbe und die Grotte keine Lücke; der See hat keine (Türkis bleibt dem Wasser), dort und am
- * Ende gilt die Tropfsteingrotte. Nur Rechnen, keine Suche
+ * Ende gilt die Tropfsteingrotte. Nur Rechnen, keine Suche; `side` die Seite der Schleife der Grubenbahn
  */
-export const tipOf = (u: number, v: number): string => GROTTE_COLORS.tips[zoneOf(u, v)];
+export const tipOf = (u: number, v: number, side: Side = 1): string => GROTTE_COLORS.tips[zoneOf(u, v, side)];
 
 /**
  * Kristallfarbe je Zone: Kristallhalle lila, Tropfsteingrotte (auch am See) rosa, Pilzgarten rosa (zu den bunten Beeten),
@@ -98,10 +108,11 @@ const CRYSTAL_OF: Record<TipZone, string> = (() => {
  * Farbe der Kristalle der Füllung bei (u, v) von der Mitte (Kristallfelder, Kristallbüsche, verstreute Kristalle): eine
  * je Zone, das hilft beim Orientieren; nie Türkis (ein Kristallfeld liegt flach am Boden und läse sich als Wasser)
  */
-export const crystalOf = (u: number, v: number): string => CRYSTAL_OF[zoneOf(u, v)];
+export const crystalOf = (u: number, v: number, side: Side = 1): string => CRYSTAL_OF[zoneOf(u, v, side)];
 
 /** Farbe der Adern im Boden bei (u, v) von der Mitte: in der Tropfsteingrotte rosa, sonst lila; nie Türkis oder Blau */
-export const veinOf = (u: number, v: number): string => GROTTE_COLORS.veins[zoneOf(u, v) === 'drip' ? 1 : 0];
+export const veinOf = (u: number, v: number, side: Side = 1): string =>
+  GROTTE_COLORS.veins[zoneOf(u, v, side) === 'drip' ? 1 : 0];
 
 /** Grottenboden ohne alles: hier darf etwas hin */
 const plain = (c: Cell | undefined): c is Cell =>
@@ -143,9 +154,10 @@ export function fillGrotte(seed: number, site: Site, free: Keep, map: Map<string
       }
     return true;
   };
+  const side = laneSide(site);
   islands(seed, open, at, map);
-  groups(seed, open, at, clear, map);
-  singles(seed, open, at, clear, map);
+  groups(seed, open, at, clear, side, map);
+  singles(seed, open, at, clear, side, map);
 }
 
 type Open = (u: number, v: number) => Cell | null;
@@ -193,6 +205,7 @@ function groups(
   open: Open,
   at: At,
   clear: (x: number, y: number, own?: ReadonlySet<string>) => boolean,
+  side: Side,
   map: Map<string, Cell>,
 ) {
   const { every, ...chance } = GROTTE.fill.groups;
@@ -212,14 +225,21 @@ function groups(
     if (own.length < 3) continue;
     own.forEach((p, i) => {
       const [x, y] = at(...p);
-      const color = tipOf(...p);
+      const color = tipOf(...p, side);
       map.set(key(x, y), { ...map.get(key(x, y))!, deco: 'stalagmite', solid: true, note: (i + turn) % 3, color });
     });
   }
 }
 
 /** Kristallbüsche und Felsbrocken (fest, einzeln) und kleine türkise Pfützen (begehbar, ein oder zwei Felder) */
-function singles(seed: number, open: Open, at: At, clear: (x: number, y: number) => boolean, map: Map<string, Cell>) {
+function singles(
+  seed: number,
+  open: Open,
+  at: At,
+  clear: (x: number, y: number) => boolean,
+  side: Side,
+  map: Map<string, Cell>,
+) {
   const { bush, boulder, puddle } = GROTTE.fill;
   const weight = { rim: [1, 1.6, 0.8], drip: [0.6, 1, 2.5], side: [1, 0.6, 1] } as const;
   for (let v = -ry; v <= ry; v++)
@@ -236,8 +256,8 @@ function singles(seed: number, open: Open, at: At, clear: (x: number, y: number)
         map.set(
           key(x, y),
           crystal
-            ? { ...c, deco: 'crystalbush', solid: true, color: crystalOf(u, v) }
-            : { ...c, deco: 'boulder', solid: true, color: tipOf(u, v) },
+            ? { ...c, deco: 'crystalbush', solid: true, color: crystalOf(u, v, side) }
+            : { ...c, deco: 'boulder', solid: true, color: tipOf(u, v, side) },
         );
       } else if (roll < bush * wb + boulder * wr + puddle * wp && c.h === 1) {
         map.set(key(x, y), { ...c, deco: 'puddle' });
@@ -293,8 +313,9 @@ export function adornGrotte(seed: number, site: Site, free: Keep, map: Map<strin
     const c = map.get(key(...at(u, v)));
     return plain(c) && !free(u, v) ? c : null;
   };
-  fields(seed, open, at, map);
-  veins(seed, open, at, map);
+  const side = laneSide(site);
+  fields(seed, open, at, side, map);
+  veins(seed, open, at, side, map);
   wallMoss(seed, open, at, map);
   waterfall(site, map);
   shore(seed, site, map);
@@ -317,12 +338,12 @@ function shore(seed: number, site: Site, map: Map<string, Cell>) {
 }
 
 /** Kristallfelder: je Feld des Rasters ein Feld aus 3 bis 6 Feldern niedriger Splitter in der Farbe der Zone, Mitte `note` 1 */
-function fields(seed: number, open: Open, at: At, map: Map<string, Cell>) {
+function fields(seed: number, open: Open, at: At, side: Side, map: Map<string, Cell>) {
   const { every, chance } = GROTTE.fill.fields;
   for (const [u, v] of grid(seed, every, 110)) {
     const mid = open(u, v);
     if (!mid || rand01(seed, u, v, 112) >= chance) continue;
-    const color = crystalOf(u, v);
+    const color = crystalOf(u, v, side);
     const want = 3 + (hash(seed, u, v, 113) % 4);
     const turn = hash(seed, u, v, 114);
     const cells: Point[] = [];
@@ -351,11 +372,11 @@ const RING1: readonly Point[] = [
  * Adern im Boden: je Feld des Rasters ein flacher Streifen von `long` Feldern, gerade oder schräg, hier und da um ein
  * Feld versetzt; `note` die Richtung in der Welt (0 waagrecht, 1 senkrecht, 2 fallend, 3 steigend), Farbe nach der Zone
  */
-function veins(seed: number, open: Open, at: At, map: Map<string, Cell>) {
+function veins(seed: number, open: Open, at: At, side: Side, map: Map<string, Cell>) {
   const { every, chance, long } = GROTTE.fill.veins;
   for (const [u0, v0] of grid(seed, every, 120)) {
     if (!open(u0, v0) || rand01(seed, u0, v0, 122) >= chance) continue;
-    const color = veinOf(u0, v0);
+    const color = veinOf(u0, v0, side);
     const [du, dv] = RING1[hash(seed, u0, v0, 123) % 8]!;
     const length = long[0] + (hash(seed, u0, v0, 124) % (long[1] - long[0] + 1));
     let [u, v] = [u0, v0];

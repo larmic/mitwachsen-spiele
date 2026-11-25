@@ -18,6 +18,7 @@ import { kesselPlace } from '../../mitwachsen-world';
 import { bareOf, HOEHLE_PACK, SAMPLE_SEEDS, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import { HAUNTS } from './mitwachsen-cave-haunts';
 import { fromMouth } from './mitwachsen-grotte';
+import { laneSide, onClay } from './mitwachsen-lane';
 import type { Site } from './mitwachsen-site';
 
 const CAVE = [HOEHLE_PACK];
@@ -55,9 +56,9 @@ describe('Höhlen-Tiere: Wohnorte in der Grotte', () => {
     for (const seed of SEEDS) {
       const w = worldOf(seed, CAVE);
       const { site } = kesselPlace(seed, HOEHLE_PACK) as KesselPlace & { site: Site };
-      for (const { species, at } of CAVE_ANIMALS) {
+      for (const { species, near, at } of CAVE_ANIMALS) {
         const spawn = w.spawns.get(animalId('hoehle', species))!;
-        const want = site.at(...fromMouth(at));
+        const want = site.at(...fromMouth(near === 'clay' ? onClay(at, laneSide(site)) : at)); // Lehmhang rückt mit
         const d = cheb(spawn[0], spawn[1], want[0], want[1]);
         if (d > 6) bad.push(`${seed} ${species}: ${d} Felder vom Wunschort`);
       }

@@ -38,6 +38,7 @@ import { OBSTACLE_GAP } from '../../mitwachsen-world';
 import { caveHaunts } from './mitwachsen-cave-haunts';
 import { adornGrotte, corridorAt, crystalOf, fillGrotte, shadeGrotte, tipOf } from './mitwachsen-fill';
 import { dimGrotte } from './mitwachsen-glow';
+import { clayOf, laneMarks, lanePlan, laneSide, type LaneMarks } from './mitwachsen-lane';
 import { siteOf, type Site } from './mitwachsen-site';
 import { spinWebs } from './mitwachsen-spider';
 
@@ -121,22 +122,23 @@ export function buildGrotte(
   const at = (p: readonly [number, number]) => site.at(...fromMouth(p));
   const home = placeHome('hoehle', bed);
   const ringHome = ringSpots([angleTo(bed, gang.at(0, gang.depth))], HOMES.hoehle.portalRing, bed)[0]!;
-  const free = keepFree(site, bed, ringHome);
-  // Klippen und Boden
+  const side = laneSide(site);
+  const lane = laneMarks(lanePlan(side, (u, v) => zone(seed, u, v) === 'floor'));
+  const free = keepFree(site, bed, ringHome, side, lane.keep);
+  // Klippen und Boden; der Glitzergang der Grubenbahn ist bis zum Graben Fels
   for (let v = -OUTER.ry; v <= OUTER.ry; v++)
     for (let u = -OUTER.rx; u <= OUTER.rx; u++) {
       const z = zone(seed, u, v);
       if (!z) continue;
       const [x, y] = site.at(u, v);
       realm.add(key(x, y));
-      if (z === 'cliff') set(x, y, v < 0 && Math.abs(u) <= gang.half ? floor() : cliffCell(seed, u, v));
-      else set(x, y, ground(seed, u, v, free(u, v)));
+      set(x, y, terrain(seed, u, v, z, { half: gang.half, free, lane }));
     }
-  features(site, map);
+  features(site, side, map);
   homeGround(home, set);
   const portal = platforms(site, bed, ringHome, map);
   fillGrotte(seed, site, free, map); // Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken, Felsinseln, Pfützen
-  scatter(seed, site, free, map);
+  scatter(seed, site, side, free, map);
   shadeGrotte(seed, site, (u, v) => Math.abs(u) <= 3 || nearStation(u, v), map); // Moos und Farn unter den Schächten
   adornGrotte(seed, site, free, map); // Fülle: Kristallfelder, Adern, Leuchtmoos an den Wänden, Wasserfall am See
   level(realm, map);
@@ -155,10 +157,30 @@ export function buildGrotte(
   const stone: Point = [bed[0] + CAVE_STONE[0], bed[1] + CAVE_STONE[1]]; // Klangstein `hoehle-offen` (homeGround)
   const spots = spotsOf(site, reach, map);
   // Wohnorte der Höhlen-Tiere: das erste je Art an seinem Fundort, die anderen verteilt über die Grotte
-  const spawns = findSpawns(seed, caveHaunts(spots, map, at, bed), spots, bed);
+  const spawns = findSpawns(seed, caveHaunts(spots, map, at, bed, side), spots, bed);
   const ghosts = at(GROTTE.ghost.stone); // Klangstein „lichtgeister“ in der Kristallhalle (hallOf)
   const more: [StoryId, Point][] = map.get(key(...ghosts))?.story === 'lichtgeister' ? [['lichtgeister', ghosts]] : [];
   return { bed, realm, spots, spawns, stone, more, portal: [CAVE_PORTAL, portal] };
+}
+
+/**
+ * Ein Feld der Grotte bei (u, v) von der Mitte: Klippe (in der Mündung Boden, so breit wie der Gang `half`), Boden mit
+ * sanften Hügeln, wo nichts frei bleiben muss (`free`); der Glitzergang der Grubenbahn samt Nachbarn ist bis zum Graben
+ * Fels, ihr offenes Gleis und der Zaun ebener Boden, ihr Bahnsteig markiert (`lane`)
+ */
+function terrain(
+  seed: number,
+  u: number,
+  v: number,
+  z: 'floor' | 'cliff',
+  { half, free, lane }: { half: number; free: (u: number, v: number) => boolean; lane: LaneMarks },
+): Cell {
+  const mark = lane.at.get(key(u, v));
+  if (mark && (mark.part === 'gang' || mark.part === 'side'))
+    return { ...(z === 'cliff' ? cliffCell(seed, u, v) : cliff(3)), lane: mark };
+  if (z === 'cliff') return v < 0 && Math.abs(u) <= half ? floor() : cliffCell(seed, u, v);
+  if (mark) return { ...floor(), lane: mark };
+  return { ...ground(seed, u, v, free(u, v)), ...(lane.platform.has(key(u, v)) && { stop: 'grube' }) };
 }
 
 /** Plätze von Bahnhof Fledermaus, Lokschuppen und Klangstein, für die Bahn markiert (`Cell.stop`, `shed`, `stone`) */
@@ -240,14 +262,15 @@ function pathsOf(site: Site, bed: Point, ring: Point) {
   };
 }
 
-function keepFree(site: Site, bed: Point, ring: Point) {
+function keepFree(site: Site, bed: Point, ring: Point, side: 1 | -1, lane: ReadonlySet<string>) {
   const { garden, clay, hall, lake, scree, portal } = GROTTE;
   const path = pathsOf(site, bed, ring);
   return (u: number, v: number) => {
-    if (path(u, v)) return true;
+    if (path(u, v) || lane.has(key(u, v))) return true; // Wege, Schleife der Grubenbahn samt Bahnsteig
     if (near(u, v, [garden.across, garden.out], garden.r)) return true;
     if (GROTTE.nearBeds.at.some((p) => near(u, v, p, 2.5))) return true; // die Beete näher am Bett, Moos ringsum
-    if (box(u, v, [clay.across - clay.step, clay.out], clay.step + 2, clay.long / 2 + 2)) return true;
+    const bank = clayOf(side); // Lehmhang, gegenüber der Kamera
+    if (box(u, v, [bank.across - clay.step, bank.out], clay.step + 2, clay.long / 2 + 2)) return true;
     if (box(u, v, [hall.across, hall.out + 2], 7, 9)) return true; // Säulen und Bogen mit Platz ringsum
     if (near(u, v, [GROTTE.drip.across + GROTTE.drip.basin, GROTTE.drip.out], 4)) return true; // Felsbecken
     const [lu, lv] = fromMouth([lake.across, lake.out]);
@@ -257,7 +280,7 @@ function keepFree(site: Site, bed: Point, ring: Point) {
   };
 }
 
-/** Ein Ding auf ein Feld der Grotte setzen (Lage [quer, vom Tor weg] von der Mündung aus; nie auf die Klippen) */
+/** Ein Ding auf ein Feld der Grotte setzen (Lage [quer, vom Tor weg] von der Mündung aus; nie auf die Klippen, nie auf die Schleife der Grubenbahn) */
 type Put = (p: readonly [number, number], c: Cell) => void;
 
 /**
@@ -265,10 +288,11 @@ type Put = (p: readonly [number, number], c: Cell) => void;
  * Kristallsäulen und Kristallbogen in der Halle, Felsbecken mit Tropfquelle und Tropfmoos auf dem Moosrand, stiller See
  * mit Steg und Kristallinsel, Geröllhang in drei Stufen
  */
-function features(site: Site, map: Map<string, Cell>) {
+function features(site: Site, side: 1 | -1, map: Map<string, Cell>) {
   const put: Put = (p, c) => {
     const [x, y] = site.at(...fromMouth(p));
-    if (map.get(key(x, y))?.region === 'hoehle') map.set(key(x, y), c);
+    const was = map.get(key(x, y));
+    if (was?.region === 'hoehle' && !was.lane) map.set(key(x, y), c); // die Schleife der Grubenbahn bleibt frei
   };
   const { lamps, garden, clay, drip, scree } = GROTTE;
   // Lampengang: links und rechts je eine Lampe alle `every` Felder, im Wechsel lila, türkis, rosa
@@ -281,10 +305,11 @@ function features(site: Site, map: Map<string, Cell>) {
   for (const [du, dv] of bedSpots())
     put([garden.across + du, garden.out + dv], { ...moss(), deco: 'shroombed', solid: true });
   nearBeds(put);
-  // Lehmhang des Dachses: nach außen zwei Stufen Lehm (Höhe 2 und 3), begehbar
+  // Lehmhang des Dachses: nach außen zwei Stufen Lehm (Höhe 2 und 3), begehbar; nie auf der Seite zur Kamera
+  const bank = clayOf(side);
   for (let du = 0; du < 2 * clay.step; du++)
     for (let dv = 0; dv < clay.long; dv++)
-      put([clay.across - du, clay.out - (clay.long >> 1) + dv], {
+      put([bank.across - du, bank.out - (clay.long >> 1) + dv], {
         ...floor(2 + Math.floor(du / clay.step)),
         deco: 'clay',
       });
@@ -427,7 +452,13 @@ function platforms(site: Site, bed: Point, ring: Point, map: Map<string, Cell>):
  * drei Höhen (in der Tropfsteingrotte dichter, Spitze in der Farbe der Zone), kleine Leuchtpilze (im Pilzgarten
  * dichter, begehbar). Feste Dinge stehen einzeln: im Umkreis von `OBSTACLE_GAP` Feldern kein anderes, so bleibt jeder Weg frei.
  */
-function scatter(seed: number, site: Site, free: (u: number, v: number) => boolean, map: Map<string, Cell>) {
+function scatter(
+  seed: number,
+  site: Site,
+  side: 1 | -1,
+  free: (u: number, v: number) => boolean,
+  map: Map<string, Cell>,
+) {
   const { things, drip, hall, garden } = GROTTE;
   const solidNear = (x: number, y: number) => {
     for (let dy = -OBSTACLE_GAP; dy <= OBSTACLE_GAP; dy++)
@@ -458,8 +489,8 @@ function scatter(seed: number, site: Site, free: (u: number, v: number) => boole
         map.set(
           key(x, y),
           roll < crystal
-            ? { ...c, deco: 'crystal', solid: true, color: crystalOf(u, v) }
-            : { ...c, deco: 'stalagmite', solid: true, note: pick % 3, color: tipOf(u, v) },
+            ? { ...c, deco: 'crystal', solid: true, color: crystalOf(u, v, side) }
+            : { ...c, deco: 'stalagmite', solid: true, note: pick % 3, color: tipOf(u, v, side) },
         );
       } else if (roll < crystal + stalagmite + things.shroom)
         map.set(key(x, y), { ...c, deco: 'glowshroom', color: GROTTE_COLORS.decoShroom });
@@ -568,13 +599,15 @@ function light(realm: ReadonlySet<string>, at: (p: readonly [number, number]) =>
 
 /**
  * Wohnplätze der Höhlen-Tiere: vom Bett aus erreichbare Felder der Grotte außerhalb der Mooswiese
- * und der Plattformen, nicht in der Mündung (zwei Felder Abstand zum Gang) und nicht auf dem Platz von Bahnhof und Lokschuppen
+ * und der Plattformen, nicht in der Mündung (zwei Felder Abstand zum Gang), nicht auf dem Platz von Bahnhof und Lokschuppen
+ * und nicht auf der Schleife der Grubenbahn samt Zaun und Bahnsteig
  */
 function spotsOf(site: Site, reach: ReadonlySet<string>, map: ReadonlyMap<string, Cell>): Point[] {
   const out: Point[] = [];
   for (const k of reach) {
     const c = map.get(k)!;
-    if (c.region !== 'hoehle' || c.garden || c.portal || c.stone) continue; // dort steht mit Bau 2 ein Klangstein
+    // am Klangstein steht mit Bau 2 ein Stein, auf der Schleife der Grubenbahn und ihrem Bahnsteig fährt sie später
+    if (c.region !== 'hoehle' || c.garden || c.portal || c.stone || c.lane || c.stop === 'grube') continue;
     const [x, y] = k.split(',').map(Number) as [number, number];
     const [u, v] = site.uv(x, y);
     const [, o] = mouthward(u, v);

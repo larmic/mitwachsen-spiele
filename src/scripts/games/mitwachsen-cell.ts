@@ -117,7 +117,16 @@ export type Cell = {
   stop?: RideId; // Platz eines Halts dieses Fahrzeugs (Bahnsteig; den Platz in der Grotte hält ihr Paket frei, den Bahnsteig baut das Paket des Fahrzeugs)
   shed?: RideId; // Platz des Schuppens dieses Fahrzeugs (Lokschuppen neben Bahnhof Fledermaus; den Platz hält die Grotte frei, den Schuppen baut das Paket der Bahn mit Bau 2)
   stone?: StoryId; // Platz eines Klangsteins, den ein Paket ohne eigene Welt später setzt (neben dem Lokschuppen: die Grotte hält ihn frei, das Paket der Bahn setzt den Stein `lokschuppen` mit Bau 2)
+  lane?: Lane; // Feld der künftigen Schleife eines Fahrzeugs in seiner Welt (Grubenbahn in der Grotte: die Grotte legt sie fest und hält sie frei, ihr Paket baut sie)
 };
+
+/**
+ * Feld der künftigen Schleife eines Fahrzeugs in seiner Welt (`RideRoute.loop`, die Grubenbahn in der Grotte): `part`
+ * offenes Gleis (`open`, begehbar), Gleis im Glitzergang (`gang`), Nachbarn des Gangs (`side`; beide bis zum Graben fester
+ * Fels), Zaunkristalle zur Höhle hin (`fence`, bis dahin freier Boden); `at` Platz des Gleises in der Runde (0 am Anfang
+ * des Halts, dann in Fahrtrichtung)
+ */
+export type Lane = { ride: RideId; part: 'open' | 'gang' | 'side' | 'fence'; at?: number };
 
 /**
  * Ein Stück Gleis (Paket der Bahn): `to` die Richtungen, in die es weiterführt (`n` oben, `e` rechts, `s` unten, `w`

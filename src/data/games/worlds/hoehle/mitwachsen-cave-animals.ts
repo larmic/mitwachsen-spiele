@@ -19,7 +19,7 @@ export type CaveHaunt = 'floor' | 'shrooms' | 'clay' | 'jetty' | 'scree' | 'arch
  * Platz des Bahnhofs, solange es die Bahn nicht gibt (Blick hinein); mit der Bahn sitzt er auf Toks Helm und zieht nach
  * Bau 2 ins Gehege am Höhlenbett (`WorldPack.away` im Paket der Bahn). Der Siebenschläfer schläft vorn im Lokschuppen
  * (in seiner ersten Reihe, nah am Gleis; der Lokschuppen kommt mit Bau 2), der Dachs am
- * Lehmhang neben dem Pilzgarten, die Glühwürmchen zwischen den Leuchtpilzen, die Fledermaus unter dem Kristallbogen, der
+ * Lehmhang neben dem Pilzgarten (liegt die Schleife der Grubenbahn auf dieser Seite, rückt er mit dem Hang hinter ihre Umkehr), die Glühwürmchen zwischen den Leuchtpilzen, die Fledermaus unter dem Kristallbogen, der
  * Grottenolm am Steg, Murmeltier und Sonnen-Eidechse auf dem Geröllhang am See.
  */
 export const CAVE_ANIMALS: readonly { species: CaveSpeciesId; near: CaveHaunt; at: readonly [number, number] }[] = [

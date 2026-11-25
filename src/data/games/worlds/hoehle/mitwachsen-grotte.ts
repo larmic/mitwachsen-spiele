@@ -31,6 +31,25 @@ export const GROTTE = {
    * ebener, freier Grund, zwei Felder neben dem Bahnsteig, gemessen wie `station`
    */
   shed: { out: 11, long: 5, wide: 4, side: 9 },
+  /**
+   * Schleife der Grubenbahn Funkel (Schritt 14 der Rückmeldung, mitwachsen-lane.ts; gebaut wird sie mit dem Paket der
+   * Grubenbahn): auf der Seite des Bahnhofs, gespiegelt auf die andere Seite, wenn diese zur Kamera zeigt. Halt `stop`:
+   * Gleis bei quer `across`, Feld `out` bis `out + long − 1`, der Bahnsteig `wide` Felder daneben zur Mitte hin. Am Ende
+   * des Halts quer hinüber auf den offenen Hinweg, dessen Gleis `leg` Felder innerhalb des echten, gewellten Rands liegt
+   * (Mitte des Felds); in der Reihe `turn` hinüber an die Wand und zurück durch den Glitzergang
+   * `gang` Felder innerhalb des Rands, zur Höhle hin die Zaunkristalle (`fence`); in der Reihe `near` verlässt der Gang
+   * die Wand und läuft quer zum Halt, er endet `open` Felder vor ihm. Vor dem Graben ist der Gang samt seinen Nachbarn
+   * fester Fels
+   */
+  grube: {
+    stop: { across: 16, out: 25, long: 12, wide: 2 },
+    leg: 6,
+    gang: 1.5,
+    fence: 3.5,
+    turn: 74,
+    near: 22,
+    open: 6,
+  },
   /** Drei Lichtschächte [quer, vom Tor weg]: über dem Bett, in der Kristallhalle, am stillen See */
   shafts: [
     [0, 28],
@@ -115,9 +134,10 @@ export const GROTTE = {
   /**
    * Kristallhalle rechts: fünf geschliffene, freistehende Säulen in einer Reihe, je zwei Felder Abstand, das
    * Säulen-Glockenspiel (Töne C5, D5, E5, G5, A5 von links nach rechts, `Cell.note` 0 bis 4); `columns` ihre Höhen je
-   * Ton, die tiefste die höchste wie bei einem Xylofon. Dahinter der Kristallbogen (fünf Felder breit), ringsum hohe Kristalle
+   * Ton, die tiefste die höchste wie bei einem Xylofon. Dahinter der Kristallbogen (fünf Felder breit), ringsum hohe Kristalle.
+   * Radius `r` 10 (früher 12): Platz für den Hinweg der Grubenbahn zwischen Halle und Wand
    */
-  hall: { across: 25, out: 57, r: 12, columns: [5, 4.5, 4, 3.5, 3], arch: 8 },
+  hall: { across: 25, out: 57, r: 10, columns: [5, 4.5, 4, 3.5, 3], arch: 8 },
   /**
    * Kleine Lichtgeister in der Kristallhalle (Schritt 11 der Rückmeldung, Regeln in mitwachsen-ghost.ts): `count` Geister,
    * jeder in einem Versteck seitlich an einer Säule (`side` Felder neben ihrer Mitte nach Osten oder Westen, `back` ein
@@ -182,9 +202,11 @@ export const GROTTE = {
   things: { crystal: 0.03, stalagmite: 0.015, shroom: 0.02 },
   /**
    * Lehmhang des Dachses links neben dem Pilzgarten (`'clay'`, begehbar): `long` Felder lang (vom Tor weg), nach außen
-   * zwei Stufen Lehm (Höhe 2 und 3), jede `step` Felder breit; `across` ist seine Innenkante
+   * zwei Stufen Lehm (Höhe 2 und 3), jede `step` Felder breit; `across` ist seine Innenkante, `out` seine Mitte. Liegt die
+   * Schleife der Grubenbahn gespiegelt auf dieser Seite, rückt er auf derselben Seite hinter ihre Umkehr an die Wand
+   * (`mirrored`, gegenüber der Tropfsteingrotte): Die andere Seite zeigt dann zur Kamera, ihre Klippen verdeckten Hang und Dachs
    */
-  clay: { across: -35, out: 43, long: 9, step: 2 },
+  clay: { across: -35, out: 43, long: 9, step: 2, mirrored: { across: -35, out: 86 } },
   /**
    * Füllung der Grotte, damit sie nicht leer wirkt (wie Bäume und Büsche auf der Lichtung; mitwachsen-fill.ts).
    * `groups`: Stalagmiten-Gruppen zu 3 bis 5 in drei Höhen, fest wie Bäume, mit begehbaren Lücken (ein Feld); je Feld

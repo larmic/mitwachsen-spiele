@@ -7,6 +7,7 @@
 import { REGIONS, type Point, type Region } from '../../../../data/games/mitwachsen';
 import { CAVE_ANIMALS, type CaveHaunt } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-animals';
 import type { Cell } from '../../mitwachsen-cell';
+import { onClay } from './mitwachsen-lane';
 
 /** Gehört ein Feld der Grotte zum Thema? Nur Felder, auf denen man stehen kann (das Tier wohnt auf dem Feld selbst) */
 export const HAUNTS: Record<CaveHaunt, (c: Cell) => boolean> = {
@@ -26,16 +27,18 @@ const HOEHLE = REGIONS.find((r) => r.id === 'hoehle')!; // die Höhlenwelt steht
 /**
  * Die Höhlenwelt mit den Fundorten ihrer Tiere relativ zum Höhlenbett (`bed`), wie `findSpawns` sie braucht: je Art das
  * Feld ihres Themas unter `cells`, das ihrem Platz in der Grotte (`toWorld(at)`) am nächsten liegt und auf dem man
- * stehen kann; gibt es keins, der Platz selbst.
+ * stehen kann; gibt es keins, der Platz selbst. Der Lehmhang rückt mit der Schleife der Grubenbahn (`side` −1:
+ * gespiegelt, `clayOf` in mitwachsen-lane.ts), der Platz des Dachses mit ihm
  */
 export function caveHaunts(
   cells: readonly Point[],
   map: ReadonlyMap<string, Cell>,
   toWorld: (at: readonly [number, number]) => Point,
   bed: Point,
+  side: 1 | -1 = 1,
 ): Region {
   const animals = CAVE_ANIMALS.map(({ species, near, at }) => {
-    const [tx, ty] = toWorld(at);
+    const [tx, ty] = toWorld(near === 'clay' ? onClay(at, side) : at);
     let best: Point = [tx, ty],
       bestD = Infinity;
     for (const [x, y] of cells) {
