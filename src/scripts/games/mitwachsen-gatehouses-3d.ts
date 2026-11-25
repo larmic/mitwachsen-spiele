@@ -9,7 +9,7 @@ import { Group, Mesh, type BufferGeometry } from 'three';
 import type { GateId } from '../../data/games/mitwachsen';
 import { parts, type GateLook, type Parts } from './mitwachsen-gate-kit';
 import { MovingGates } from './mitwachsen-gate-motion-3d';
-import { gate, moves, openStep, plate } from './mitwachsen-gates-3d';
+import { TURN_STEPS, gate, moves, openStep, plate } from './mitwachsen-gates-3d';
 import { ritualGlow } from './mitwachsen-guest-look';
 import { GUIDE_GATE, guideGate } from './mitwachsen-guide';
 import type { Plates3D } from './mitwachsen-plate-3d';
@@ -18,15 +18,29 @@ import type { GatePlace, World } from './mitwachsen-world';
 
 /** Was die Torhäuser je Bild aus der Szene brauchen (wie `Scene` in mitwachsen-render.ts) */
 type Frame = Parameters<MovingGates['sync']>[0] & { gates: ReadonlyMap<string, number> };
-/** Was sie von der Drehung zur Torfront wissen (`PlateTurn`): Bucht, Winkel, mehr als halb gedreht */
-type Turn = { front: GateId | null; far: boolean; view: { yaw: number } } | null;
+/** Was sie von der Drehung zur Torfront wissen (`PlateTurn`): Bucht, Winkel, mehr als halb gedreht, Anteil am Zielwinkel */
+type Turn = { front: GateId | null; far: boolean; amount: number; view: { yaw: number } } | null;
 /**
- * Fassung eines Torhauses: 0 für die Kamera im Süden; zur Front gebaut (alle Flächen, `all`) 1 mit Schild und Seiten
- * wie im Süden (sieht genauso aus, solange nichts gedreht ist), 2 mit allem zur Front (`cam` [0, 1]), sobald die Kamera
- * mehr als halb gedreht ist. So springt beim Betreten der Bucht nichts um
+ * Fassung eines Torhauses: 0 für die Kamera im Süden; zur Front gebaut (alle Flächen, `all`) 1 mit Schild wie im Süden
+ * (sieht genauso aus, solange nichts gedreht ist) und als letzte mit dem Schild zur Front (`cam` [0, 1]), sobald die
+ * Kamera mehr als halb gedreht ist. Der Körper bleibt in allen gleich (`home`): Beim Betreten der Bucht und beim Drehen
+ * ändert sich nur das Schild. Ein Zugang, der sich mitdreht (`TURN_STEPS`, die Wolke), hat dazwischen eine Fassung je
+ * Stufe: Fassung 1 + n ist n Stufen weit gedreht
  */
-type Mode = 0 | 1 | 2;
+type Mode = number;
+/** Stufen eines Zugangs zwischen Fassung 1 und der Fassung zur Front */
+const stepsOf = (id: GateId) => TURN_STEPS[id] ?? 1;
 type House = { key: string; group: Group; beats?: Group };
+
+/**
+ * Fassung zur Front für den Stand der Drehung (1 … `steps` + 1). Ohne Stufen (`steps` 1) wechselt das Schild bei halber
+ * Drehung; mit Stufen gilt die nächste Stufe zum Anteil am Zielwinkel (das Pendeln am Ziel, ±4°, bleibt unter einer
+ * halben Stufe, Zielwinkel in Ost, West und Süd mindestens 65°, Test)
+ */
+export function frontMode(steps: number, turn: Pick<NonNullable<Turn>, 'far' | 'amount'> | null): Mode {
+  if (steps === 1) return turn?.far ? 2 : 1;
+  return 1 + Math.round(Math.min(1, Math.max(0, turn?.amount ?? 0)) * steps);
+}
 
 /** Später, wenn der Browser Luft hat (Safari kennt `requestIdleCallback` nicht: dann gleich nach diesem Bild) */
 const idle = (f: () => void) =>
@@ -86,7 +100,9 @@ export class GateHouses {
     // zur Front nur Tore, die die Kamera im Süden nicht von vorn sieht (im Norden, `out` nach −y wie `lageOf` in
     // mitwachsen-turn-pace.ts, reichen die Flächen wie immer)
     const bay = this.bay === g.id && g.out[1] >= 0;
-    const mode: Mode = bay ? (turn?.far ? 2 : 1) : 0;
+    const steps = stepsOf(g.id);
+    const mode: Mode = bay ? frontMode(steps, turn) : 0;
+    const front = Array.from({ length: steps + 1 }, (_, n) => n + 1); // alle Fassungen zur Front
     // was fehlt, gleich bauen; außer 0 und 1, die gleich aussehen (1 hat nur mehr Flächen, die man ungedreht nicht
     // sieht): dann die andere zeigen und die fehlende im Leerlauf bauen
     const stand = mode === 0 ? fresh(1) : mode === 1 && !turn?.view.yaw ? fresh(0) : undefined;
@@ -96,8 +112,8 @@ export class GateHouses {
       this.later(g.id, mode, key, make);
     }
     shown ??= make(mode);
-    if (bay) for (const m of [1, 2] as const) if (!fresh(m)) this.later(g.id, m, key, make);
-    for (const m of [0, 1, 2] as const) {
+    if (bay) for (const m of front) if (!fresh(m)) this.later(g.id, m, key, make);
+    for (const m of [0, ...front]) {
       const h = this.houses.get(g.id + m);
       if (!h || h === shown) continue;
       h.group.visible = false;
@@ -154,15 +170,18 @@ export class GateHouses {
     const p = parts();
     const [[mx, my], [fx, fy]] = [g.mid, [-g.out[0], -g.out[1]]];
     const look = this.look(g.id); // aus dem Welt-Paket hinter dem Tor
-    // Richtung zur Kamera in Torhaus-Koordinaten (im Süden; Fassung 2 zur Front): danach richtet sich das Schild
-    const cam = mode === 2 ? ([0, 1] as const) : ([-fx || 0, fy || 0] as const);
+    // Richtung zur Kamera in Ruhe in Torhaus-Koordinaten (im Süden): Sie legt den Körper fest. Das Schild richtet sich
+    // nach `cam`: wie im Süden, mehr als halb gedreht zur Front
+    const home = [-fx || 0, fy || 0] as const;
+    const turned = mode > 0 ? (mode - 1) / stepsOf(g.id) : 0;
+    const cam = turned > 0.5 ? ([0, 1] as const) : home;
     const all = mode > 0; // zur Front: alle Flächen
-    const wings = gate(p, g.id, open, guest, lit, cam, look, all);
+    const wings = gate(p, g.id, open, guest, lit, cam, look, all, home, turned);
     const house = new Group(); // an der Mitte des Tors, sein +z schaut zur Lichtung
     house.position.set(mx + 0.5, world.cell(mx, my).h, my + 0.5);
     house.rotation.y = Math.atan2(fx, fy);
     house.add(...this.meshes(p), this.plates.of(g.id, look?.plate ?? plate(g.id), guest && shut)); // Torhaus und Torplatte davor
-    const beats = moves(g.id) ? this.moving.add(g.id, [mx + 0.5, my + 0.5], open, cam, all) : undefined;
+    const beats = moves(g.id) ? this.moving.add(g.id, [mx + 0.5, my + 0.5], open, cam, all, home) : undefined;
     if (beats) house.add(beats);
     for (const w of wings) {
       const wing = new Group();

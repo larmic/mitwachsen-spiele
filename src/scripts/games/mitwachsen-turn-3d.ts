@@ -90,6 +90,14 @@ export class PlateTurn {
     return Math.abs(this.view.yaw) > Math.abs(TARGET_DEG[this.lage]) / 2;
   }
 
+  /**
+   * Wie weit zur Front gedreht (0 … 1, Anteil am Zielwinkel): Zugänge, die sich mitdrehen, zeigen danach ihre Stufe
+   * (die Wolke dreht den Kopf mit, `TURN_STEPS` in mitwachsen-gates-3d.ts)
+   */
+  get amount(): number {
+    return Math.min(1, Math.abs(this.view.yaw) / Math.abs(TARGET_DEG[this.lage]));
+  }
+
   /** Winkel der Sonne (Bogenmaß): dreht mit, ohne Pendeln, gerastet (`sunYaw`) */
   get sun(): number {
     return sunYaw(this.st);
