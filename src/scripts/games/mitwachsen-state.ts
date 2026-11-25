@@ -73,7 +73,7 @@ export type State = Omit<Progress, 'position'> & {
   animals: Animal[];
   followers: string[]; // Reihenfolge = Platz in der Kette hinter der Figur
   arrived: readonly [number, number] | null; // Mittelfeld, auf dem die Figur angekommen ist: erst runter, dann wieder rauf (nicht gespeichert)
-  picked: Record<string, number>; // Büsche ohne Beeren, leere Fischkisten und Pilzbeete: "x,y" → Takt des Leerens (nicht gespeichert)
+  picked: Record<string, number>; // Büsche ohne Beeren, leere Fischkisten und Pilzbeete: "x,y" → Takt des Leerens; volle Pilzschale und Steintrog der Grotte: Takt des Füllens (nicht gespeichert)
   dayStart: number; // Takt, an dem der heutige Tag begann (Aufwachen): Das Wetter zählt ab hier, jeder Tag beginnt mit Sonne
   basket: boolean; // Korb mit Beeren auf dem Rücken (nach dem Pflücken, bis zum Futtertrog)
   shrooms: boolean; // Korb mit Leuchtpilzen auf dem Rücken (nach dem Sammeln am Pilzbeet, bis zur Pilzschale; nie zugleich mit Beeren)

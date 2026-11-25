@@ -27,7 +27,7 @@ export const RULES: Rule[] = [
     name: 'Spiel lädt 3D erst bei Bedarf',
     pages: /^spielen\//,
     // Kern: Regeln, Welt, 2D-Ansicht und Daten des Spiels; 3D (Three.js) und die Welt-Pakete kommen erst per import().
-    // Gemessen 149,7 KB (Bahn und Höhle freigeschaltet: Höhlentor mit Schlüssel Tok, Haken `ajar` und `ritual`)
+    // Gemessen 150,7 KB (Bahn und Höhle freigeschaltet, Schale und Trog der Grotte zeigen voll)
     budget: 162 * 1024,
     // Probe: Der Höhlenhimmel der Grotte steht nur in ihrem Welt-Paket (GROTTE_COLORS.sky)
     forbidden: /WebGLRenderer|three\.module|#4a4370/,
@@ -78,7 +78,8 @@ export const RULES: Rule[] = [
       // Kristallgrotte (Lage, Gelände, Zuhause, Licht, Portal am See, Fundorte der Höhlen-Tiere, Pilzbeete, Tropfquelle,
       // Tropfmoos), ihr Schmuck (Säulen-Glockenspiel mit Fledermaus-Runde, Grottenolm am Steg, Tropfsteine), ihre Füllung
       // (Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken, Felsinseln, Pfützen, Moos und Farn, Lehmhang) und Fülle
-      // (Kristallfelder, Adern, Leuchtmoos, Wasserfall am See), ihr Licht
+      // (Kristallfelder, Adern, Leuchtmoos, Wasserfall am See, Ufersteine), Sammelstellen (Funke über vollen Beeten, Glitzern
+      // der fernen Tropfquelle), ihr Licht
       // (Ränder im Dunkel, Lichtkreis, Kristall-Laterne, Dunkelmaske), Zeichenteile der 2D-Ansicht und Modelle der Höhlen-Tiere; geholt
       // nah am Höhlentor, mit offenem Tor oder vor einem Halt des Zugs; dazu das Hau-ruck am
       // Höhlentor (Regeln, Hände auf dem Stein, Fledermaus, Glühwürmchen, Töne)
@@ -86,7 +87,7 @@ export const RULES: Rule[] = [
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Welt
       { chunks: /\/welt-hoehle-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-hoehle)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 52,5 KB (mit Farben und Fülle der Grotte)
+    // Gemessen 55,6 KB (mit Farben, Fülle und Sammelstellen der Grotte)
     budget: 58 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },

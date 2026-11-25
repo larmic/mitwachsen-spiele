@@ -44,9 +44,11 @@ describe('Dinge der Kristallgrotte, gleich für 2D und 3D', () => {
       'crystalfield',
       'vein',
       'glowmoss',
+      'shore',
     ] as const) {
       const c = cell(deco, { note: 2, color: '#6fd6f0' });
-      const boxes = caveBoxes(w, c, 5, 7)!;
+      // Pilzschale und Steintrog sind leer, bis die Figur sie füllt (`picked`); alles andere wie es steht
+      const boxes = caveBoxes(w, c, 5, 7, deco !== 'shroombowl' && deco !== 'stonetrough')!;
       expect(boxes.length, deco).toBeGreaterThan(0);
       expect(drawDeco(view, w, c, 5, 7, at), deco).toEqual(boxes);
       expect(drawDeco(view3d, w, c, 5, 7, at), deco).toEqual(boxes);
@@ -77,6 +79,63 @@ describe('Dinge der Kristallgrotte, gleich für 2D und 3D', () => {
         deco,
       ).toEqual([]);
     }
+  });
+
+  it('Pilzschale und Steintrog leer, bis die Figur sie füllt (`picked` merkt den Takt), in 2D und 3D gleich: voll Pilze bzw. Wasser, leer der dunkle Boden', () => {
+    const top = (boxes: readonly (readonly unknown[])[]) =>
+      Math.max(...boxes.map((b) => (b[2] as number) + (b[5] as number)));
+    const bowl = cell('shroombowl', { ground: 'grass' });
+    const empty = drawDeco(view, w, bowl, 5, 7, at)!;
+    const full = drawDeco(view, w, bowl, 5, 7, { ...at, picked: { '5,7': 3 } })!;
+    expect(empty).toEqual(caveBoxes(w, bowl, 5, 7, false));
+    expect(full).toEqual(caveBoxes(w, bowl, 5, 7, true));
+    expect(drawDeco(view3d, w, bowl, 5, 7, { ...at, picked: { '5,7': 3 } })).toEqual(full);
+    const shrooms = (boxes: readonly (readonly unknown[])[]) =>
+      boxes.filter((b) => (GROTTE_COLORS.shrooms as readonly unknown[]).includes(b[6])).length;
+    expect([shrooms(empty), shrooms(full) >= 3]).toEqual([0, true]); // leer keine Pilze, voll ein Häufchen
+    expect(top(full)).toBeGreaterThan(top(empty));
+    const trough = cell('stonetrough', { ground: 'grass' });
+    const wet = (boxes: readonly (readonly unknown[])[]) => boxes.some((b) => b[6] === GROTTE_COLORS.water[0]);
+    expect(wet(drawDeco(view, w, trough, 5, 7, at)!)).toBe(false);
+    expect(wet(drawDeco(view, w, trough, 5, 7, { ...at, picked: { '5,7': 3 } })!)).toBe(true);
+    expect(wet(drawDeco(view3d, w, trough, 5, 7, { ...at, picked: { '5,7': 3 } })!)).toBe(true);
+  });
+
+  it('Pilzbeet: dunkler Felsrand, voll ein Büschel aus fünf Pilzen in einer Farbe etwa 0,7 hoch wie ein Beerenbusch, leer Stümpfe', () => {
+    const c = cell('shroombed', { ground: 'grass' });
+    const full = caveBoxes(w, c, 5, 7, true)!;
+    const empty = caveBoxes(w, c, 5, 7, false)!;
+    expect(full[0]![6]).toBe(GROTTE_COLORS.bedRim[0]); // der Rand
+    expect(GROTTE_COLORS.bedRim[0]).toBe('#4a3f6b');
+    const caps = full.filter((b) => (GROTTE_COLORS.shrooms as readonly string[]).includes(b[6]));
+    expect([caps.length, new Set(caps.map((b) => b[6])).size]).toEqual([5, 1]);
+    const top = (boxes: readonly (readonly number[] | readonly unknown[])[]) =>
+      Math.max(...boxes.map((b) => (b[2] as number) + (b[5] as number)));
+    expect(top(full) - 1).toBeCloseTo(0.7, 1);
+    expect(top(empty) - 1).toBeLessThan(0.3); // Stümpfe
+    expect(empty.some((b) => (GROTTE_COLORS.shrooms as readonly string[]).includes(b[6]))).toBe(false);
+    // je Beet eine der drei Farben, über viele Beete alle drei
+    const colors = new Set<string>();
+    for (let x = 0; x < 12; x++)
+      colors.add(
+        caveBoxes(w, c, x, 3, true)!.find(
+          (b) => b[6] !== GROTTE_COLORS.bedRim[0] && b[6] !== GROTTE_COLORS.moss[0] && b[6] !== '#efe4d2',
+        )![6],
+      );
+    expect([...colors].sort()).toEqual([...GROTTE_COLORS.shrooms].sort());
+  });
+
+  it('Deko-Pilz klein und weiß-blau, kleiner als ein Pilz im Beet; Tropfquelle heller Fels mit Wasserstreifen; helle Steine am Ufer flach', () => {
+    const deco = caveBoxes(w, cell('glowshroom', { solid: false }), 0, 0)!;
+    expect(deco.some((b) => b[6] === GROTTE_COLORS.decoShroom)).toBe(true);
+    expect(Math.max(...deco.map((b) => b[2] + b[5])) - 1).toBeLessThan(0.2);
+    const spring = caveBoxes(w, cell('dripspring', { ground: 'grass' }), 0, 0)!;
+    expect(spring[0]!.slice(6, 8)).toEqual([...GROTTE_COLORS.bright]);
+    const stripe = spring.find((b) => b[6] === GROTTE_COLORS.water[0])!;
+    expect(stripe[5]).toBeGreaterThan(0.4); // ein Streifen vorn hinab
+    const shore = caveBoxes(w, cell('shore', { solid: false }), 0, 0)!;
+    expect(shore.every((b) => b[6] === GROTTE_COLORS.bright[0])).toBe(true);
+    expect(Math.max(...shore.map((b) => b[2] + b[5])) - 1).toBeLessThan(0.15);
   });
 
   it('Kristallbogen: Pfeiler nur an den Enden, der Bogen läuft über alle fünf; Säulen so hoch wie ihr Ton', () => {

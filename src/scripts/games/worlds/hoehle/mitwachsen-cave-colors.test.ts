@@ -30,7 +30,7 @@ const FLOORS: [string, Rgb][] = [
 /** Boden unter der vollen Maske (abseits der Figur), auch auf den Flecken */
 const DARK = FLOORS.map(([name, c]): [string, Rgb] => [name, masked(c, GROTTE.dark.mask)]);
 /** Was leuchtet: Kristalle (auch Büsche, Felder, Lampen, Bogen, Säulen), Leuchtpilze (auch Beete und Schale), Leuchtmoos */
-const GLOWING = [...C.crystals, ...SHROOM_COLORS, C.glowmoss[1]];
+const GLOWING = [...C.crystals, ...SHROOM_COLORS, C.glowmoss[1], C.decoShroom];
 
 /** Farbton (0 … 360) und Sättigung (HSL, 0 … 1) */
 function hueSat(hex: string): [number, number] {
@@ -241,5 +241,43 @@ describe('Fülle (Schritt 8): Kristallfelder, Adern, Leuchtmoos', () => {
     expect(climb[5]).toBeGreaterThan(0.8);
     expect(climb[3]).toBeGreaterThan(climb[4]); // Norden: an der Wand quer, dünn
     expect(climb[1]).toBe(4); // an der Nordkante des Felds
+  });
+});
+
+describe('Sammelstellen (Schritt 9): Deko-Pilze, Beete, Tropfquelle', () => {
+  it('Deko-Pilze haben eine eigene Farbe, die nie gesammelt wird: Weiß-Blau, nicht in SHROOM_COLORS und weit weg von jeder', () => {
+    expect(C.decoShroom).toBe('#cfe8ff');
+    expect(SHROOM_COLORS as readonly string[]).not.toContain(C.decoShroom);
+    expect(C.shrooms as readonly string[]).not.toContain(C.decoShroom);
+    // auch nicht fast gleich: jeder Kanal einer Sammelfarbe weicht deutlich ab
+    for (const k of SHROOM_COLORS) {
+      const d = rgbOf(k).map((v, i) => Math.abs(v - rgbOf(C.decoShroom)[i]!));
+      expect(Math.max(...d), k).toBeGreaterThan(40);
+    }
+    expect(goldish(C.decoShroom)).toBe(false);
+  });
+
+  it('Pilzbeet: der dunkle Felsrand hebt sich vom Moos ab (mindestens 2 : 1), die Pilze vom Rand (mindestens 3 : 1); nirgends Gold', () => {
+    expect(C.bedRim[0]).toBe('#4a3f6b');
+    for (const m of C.moss) expect(contrast(rgbOf(C.bedRim[0]), rgbOf(m)), m).toBeGreaterThanOrEqual(2);
+    for (const k of SHROOM_COLORS) expect(contrast(rgbOf(k), rgbOf(C.bedRim[1])), k).toBeGreaterThanOrEqual(3);
+    expect([...C.bedRim, ...C.bright].filter(goldish)).toEqual([]);
+  });
+
+  it('Pilze der Beete, wie gezeichnet: nur das gelbe Beet liest sich als Gold (offene Frage an den Vater, docs/todo.md)', () => {
+    // Je Beet eine Farbe, fünf Pilze, der Hut obenauf heller: Das gelbe Beet (#ffe08a) liegt im Farbton des Golds. Bis der
+    // Vater entscheidet (Gelb bleibt oder wird etwa Gelbgrün), hält der Test fest, dass es nur dieses eine ist.
+    const caps = new Set<string>();
+    for (let x = 0; x < 12; x++)
+      for (const b of caveBoxes(world, cell('shroombed'), x, 0, true) ?? []) if (b[2] > 1.3) caps.add(b[6]).add(b[7]);
+    const yellow = SHROOM_COLORS[2];
+    expect([...caps].filter(goldish).sort()).toEqual([yellow, lighten(yellow, 0.25)].sort());
+  });
+
+  it('Tropfquelle und Ufersteine hell: heller als der Fels der Grotte, gegen den Boden unter der Maske mindestens 3 : 1', () => {
+    for (const b of C.bright) {
+      expect(brightness(rgbOf(b))).toBeGreaterThan(brightness(rgbOf(C.rock[1])));
+      for (const [name, f] of DARK) expect(contrast(rgbOf(b), f), `${b} ${name}`).toBeGreaterThanOrEqual(3);
+    }
   });
 });

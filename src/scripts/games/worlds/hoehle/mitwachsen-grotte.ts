@@ -4,8 +4,8 @@
 // in den zart lila-grauen Schichten des Höhlentors; der Gang ist der einzige Zugang. Von der Mündung aus: der Lampengang
 // mit Kristall-Lampen links und rechts, der freie Platz für den Bahnhof Fledermaus und daneben für den Lokschuppen (beide
 // kommen mit dem Zug), das Höhlenbett unter dem ersten Lichtschacht mit Mooswiese, Pilzschale, Steintrog und dem
-// Unterstand dahinter (vorn offen, seine Rückwand ist die Kristallwand), links der Pilzgarten mit Leuchtpilzen und sechs
-// Pilzbeeten und daneben der Lehmhang des Dachses, rechts die Kristallhalle (zweiter Lichtschacht, fünf Kristallsäulen,
+// Unterstand dahinter (vorn offen, seine Rückwand ist die Kristallwand), auf dem Weg zum Pilzgarten zwei Pilzbeete,
+// links der Pilzgarten mit vier Pilzbeeten und weiß-blauen Deko-Pilzen am Rand und daneben der Lehmhang des Dachses, rechts die Kristallhalle (zweiter Lichtschacht, fünf Kristallsäulen,
 // der Kristallbogen), in der Mitte die Tropfsteingrotte mit Stalagmiten in drei Höhen und einem Felsbecken samt
 // Tropfquelle und Tropfmoos, hinten der stille See mit Steg zur Kristallinsel (dritter Lichtschacht), daneben der
 // Geröllhang in drei Stufen und ganz am Ende die Plattform des Portals `hoehlensee` (schläft noch), ihr Gegenstück im
@@ -241,6 +241,7 @@ function keepFree(site: Site, bed: Point, ring: Point) {
   return (u: number, v: number) => {
     if (path(u, v)) return true;
     if (near(u, v, [garden.across, garden.out], garden.r)) return true;
+    if (GROTTE.nearBeds.at.some((p) => near(u, v, p, 2.5))) return true; // die Beete näher am Bett, Moos ringsum
     if (box(u, v, [clay.across - clay.step, clay.out], clay.step + 2, clay.long / 2 + 2)) return true;
     if (box(u, v, [hall.across, hall.out + 2], 7, 9)) return true; // Säulen und Bogen mit Platz ringsum
     if (near(u, v, [GROTTE.drip.across + GROTTE.drip.basin, GROTTE.drip.out], 4)) return true; // Felsbecken
@@ -274,6 +275,7 @@ function features(site: Site, map: Map<string, Cell>) {
       if (Math.hypot(du, dv) <= garden.r) put([garden.across + du, garden.out + dv], moss());
   for (const [du, dv] of bedSpots())
     put([garden.across + du, garden.out + dv], { ...moss(), deco: 'shroombed', solid: true });
+  nearBeds(put);
   // Lehmhang des Dachses: nach außen zwei Stufen Lehm (Höhe 2 und 3), begehbar
   for (let du = 0; du < 2 * clay.step; du++)
     for (let dv = 0; dv < clay.long; dv++)
@@ -299,9 +301,20 @@ function features(site: Site, map: Map<string, Cell>) {
         put([scree.across - scree.step + s * scree.step + du, scree.out + dv], { ...floor(2 + s), ground: 'stone' });
 }
 
+/** Zwei Pilzbeete näher am Bett (`GROTTE.nearBeds`), je auf einem kleinen Moosfleck */
+function nearBeds(put: Put) {
+  const { at, moss: patch } = GROTTE.nearBeds;
+  for (const [a, o] of at) {
+    for (let dv = -2; dv <= 2; dv++)
+      for (let du = -2; du <= 2; du++) if (Math.hypot(du, dv) <= patch) put([a + du, o + dv], moss());
+    put([a, o], { ...moss(), deco: 'shroombed', solid: true });
+  }
+}
+
 /**
- * Lagen der Pilzbeete [quer, vom Tor weg] von der Mitte des Pilzgartens: `GROTTE.garden.beds` Beete gleichmäßig im Kreis
- * mit Radius `ring` (je drei Leuchtpilze zum Sammeln; einzeln, mit freiem Moos ringsum)
+ * Lagen der Pilzbeete im Pilzgarten [quer, vom Tor weg] von seiner Mitte: `GROTTE.garden.beds` Beete gleichmäßig im
+ * Kreis mit Radius `ring` (je ein Büschel Leuchtpilze zum Sammeln; einzeln, mit freiem Moos ringsum). Die beiden Beete
+ * näher am Bett stehen in `GROTTE.nearBeds`
  */
 export function bedSpots(): Point[] {
   const { beds, ring } = GROTTE.garden;
@@ -425,7 +438,7 @@ function scatter(seed: number, site: Site, free: (u: number, v: number) => boole
       const roll = rand01(seed, x, y, 74);
       const pick = hash(seed, x, y, 75);
       if (near(u, v, [garden.across, garden.out], garden.r)) {
-        if (roll < 0.12) map.set(key(x, y), { ...c, deco: 'glowshroom', color: GROTTE_COLORS.shrooms[pick % 3] });
+        if (gardenEdge(u, v, roll)) map.set(key(x, y), { ...c, deco: 'glowshroom', color: GROTTE_COLORS.decoShroom });
         continue;
       }
       if (free(u, v) || c.ground !== 'grotto') continue;
@@ -442,9 +455,13 @@ function scatter(seed: number, site: Site, free: (u: number, v: number) => boole
             : { ...c, deco: 'stalagmite', solid: true, note: pick % 3, color: tipOf(u, v) },
         );
       } else if (roll < crystal + stalagmite + things.shroom)
-        map.set(key(x, y), { ...c, deco: 'glowshroom', color: GROTTE_COLORS.shrooms[pick % 3] });
+        map.set(key(x, y), { ...c, deco: 'glowshroom', color: GROTTE_COLORS.decoShroom });
     }
 }
+
+/** Deko-Pilze im Pilzgarten nur am Rand der Wiese (weiß-blau): Zwischen den Beeten steht nichts, was wie ein Sammelpilz aussieht */
+const gardenEdge = (u: number, v: number, roll: number) =>
+  roll < 0.12 && !near(u, v, [GROTTE.garden.across, GROTTE.garden.out], GROTTE.garden.edge);
 
 /**
  * Keine Stufe höher als eins (wie auf der Lichtung): Boden wird nur abgesenkt; Bett, Wiese, Plattformen und Wege

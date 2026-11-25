@@ -90,10 +90,28 @@ export const GROTTE = {
   /** Sockel der Kristall-Laterne, relativ zum Höhlenbett: rechts vorn, gespiegelt zum Platz des Klangsteins (−3, 1) */
   lantern: [3, 1],
   /**
-   * Pilzgarten links: Mooswiese mit kleinen Leuchtpilzen und `beds` Beeten (je drei Leuchtpilze zum Sammeln) im Kreis
-   * mit Radius `ring` um seine Mitte
+   * Pilzgarten links: Mooswiese mit `beds` Beeten (je ein Büschel aus fünf Leuchtpilzen zum Sammeln) im Kreis mit
+   * Radius `ring` um seine Mitte; kleine weiß-blaue Deko-Pilze nur am Rand der Wiese, ab `edge` Feldern von der Mitte
    */
-  garden: { across: -24, out: 47, r: 10, beds: 6, ring: 5 },
+  garden: { across: -24, out: 47, r: 10, beds: 4, ring: 4, edge: 8 },
+  /**
+   * Zwei Pilzbeete näher am Bett (Entscheidung des Vaters vom 24.11.2026): [quer, vom Tor weg] von der Mündung, etwa 12
+   * Felder vom Höhlenbett auf dem Weg zum Pilzgarten, je auf einem kleinen Moosfleck (`moss` Felder Radius), damit das
+   * Kind in der ersten Minute eine Quelle findet
+   */
+  nearBeds: {
+    at: [
+      [-11, 33],
+      [-8, 37],
+    ],
+    moss: 1.5,
+  },
+  /**
+   * Ein Funke über den Sammelstellen (Schritt 9 der Rückmeldung): alle `every` ms höchstens ein kleiner Funke auf dem
+   * ganzen Bild, `show` ms lang, abwechselnd über den `of` nächsten vollen Pilzbeeten bis `near` Felder um die Figur; bei
+   * reduzierter Bewegung keiner
+   */
+  spark: { every: 3500, show: 700, near: 12, of: 3 },
   /**
    * Kristallhalle rechts: fünf geschliffene, freistehende Säulen in einer Reihe, je zwei Felder Abstand, das
    * Säulen-Glockenspiel (Töne C5, D5, E5, G5, A5 von links nach rechts, `Cell.note` 0 bis 4); `columns` ihre Höhen je
@@ -107,9 +125,10 @@ export const GROTTE = {
   drip: { across: 0, out: 88, r: 11, basin: -6 },
   /**
    * Stiller See hinten: flaches Wasser (Ellipse), ein Holzsteg (drei Planken breit, `'jetty'`) vom vorderen Ufer zur
-   * Kristallinsel (Radius `isle`) in seiner Mitte; neben seinem Ende taucht der Grottenolm auf
+   * Kristallinsel (Radius `isle`) in seiner Mitte; neben seinem Ende taucht der Grottenolm auf. Am Ufer helle Steine auf
+   * dem Anteil `shore` der freien Felder am Wasser
    */
-  lake: { across: 0, out: 118, rx: 13, ry: 8, isle: 2.5 },
+  lake: { across: 0, out: 118, rx: 13, ry: 8, isle: 2.5, shore: 0.4 },
   /** Geröllhang seitlich am See: drei Stufen (Höhe 2, 3, 4), jede `step` Felder tief */
   scree: { across: 27, out: 116, half: 6, step: 3 },
   /** Mitte der Plattform des Portals `hoehlensee` [quer, vom Tor weg]: hinter dem See am Ende der Grotte */
@@ -191,6 +210,15 @@ export const GROTTE_COLORS = {
    */
   tips: { garden: '#86b45a', hall: '#8f6ad8', drip: '#c0609a', clay: '#a9825e' },
   shrooms: SHROOM_COLORS,
+  /**
+   * Deko-Pilze (Schritt 9 der Rückmeldung): kleine Leuchtpilze in Weiß-Blau, einer Farbe, die nie gesammelt wird (nie in
+   * `SHROOM_COLORS`): Was nach Sammelpilz aussieht, kann man sammeln
+   */
+  decoShroom: '#cfe8ff',
+  /** Dunkler Felsrand der Pilzbeete: Das Büschel hebt sich vom Moos ab */
+  bedRim: ['#4a3f6b', '#5c5080'],
+  /** Heller Fels der Tropfquelle und die hellen Steine am Ufer des Sees: Seite und Oberseite */
+  bright: ['#d4d0e6', '#f1eefb'],
   moss: ['#6f9a4a', '#86b45a'],
   wood: ['#8a5a34', '#a8723f'],
   /** Planken des Holzstegs am stillen See */

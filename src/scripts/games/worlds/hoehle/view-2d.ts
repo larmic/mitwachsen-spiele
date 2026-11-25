@@ -31,6 +31,8 @@ import { heaveAjar, heaveBodies, heaveScore, openScore } from './mitwachsen-heav
 const look: DrawDeco = (world, c, x, y) => caveBoxes(world, c, x, y);
 /** Pilzbeet: voll, bis die Figur es abgeerntet hat (`picked`), dann leer, bis es nachwächst */
 export const bed: DrawDeco = (world, c, x, y, { picked }) => caveBoxes(world, c, x, y, !(`${x},${y}` in picked));
+/** Pilzschale und Steintrog: voll, seit die Figur sie gefüllt hat (`picked` merkt den Takt), bis die Tiere sie leeren */
+export const bowl: DrawDeco = (world, c, x, y, { picked }) => caveBoxes(world, c, x, y, `${x},${y}` in picked);
 
 /** So lange klappt die Leiste beim Wechsel der Gegend um (wie in der Eis-Welt) */
 export const TURN_MS = 400;
@@ -89,8 +91,8 @@ const column: DrawDeco = (_world, c, x, y, { now }) => columnBoxes(c, x, y, fx.c
 export const view: View2D & { fx: CaveFx } = {
   fx,
   decos: {
-    shroombowl: look,
-    stonetrough: look,
+    shroombowl: bowl,
+    stonetrough: bowl,
     shed: look,
     cavelamp: look,
     column,
@@ -113,6 +115,7 @@ export const view: View2D & { fx: CaveFx } = {
     crystalfield: look,
     vein: look,
     glowmoss: look,
+    shore: look, // helle Steine am Seeufer (Sammelstellen, Schritt 9)
     waterfall: fall,
     lantern: look, // Sockel; die Laterne darauf kommt als Körper (`bodies`)
   },

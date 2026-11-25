@@ -66,8 +66,8 @@ export type Deco =
   | 'cavelamp' // Kristall-Lampe im Lampengang hinter der Mündung (fest)
   | 'column' // Kristallsäule des Säulen-Glockenspiels, `note` ist ihr Ton 0 = C5 … 4 = A5 (fest; Höhe aus `GROTTE.hall.columns`)
   | 'crystalarch' // Kristallbogen: `note` 0 und 4 die Pfeiler (fest), 1 bis 3 der Bogen darüber (begehbar)
-  | 'glowshroom' // kleiner Leuchtpilz im Pilzgarten, Farbe in `color` (nur Zierde, begehbar)
-  | 'shroombed' // Pilzbeet im Pilzgarten: Hineinlaufen sammelt seine drei Leuchtpilze in den Korb (fest wie ein Busch)
+  | 'glowshroom' // kleiner weiß-blauer Deko-Pilz, Farbe in `color` (nur Zierde, begehbar)
+  | 'shroombed' // Pilzbeet im Pilzgarten oder nah am Bett: Hineinlaufen sammelt seine Leuchtpilze in den Korb (fest wie ein Busch)
   | 'dripspring' // Tropfquelle über dem Felsbecken: Hineinlaufen füllt die Kanne wie das Wasser (fest)
   | 'dripmoss' // Tropfmoos auf dem Rand des Felsbeckens: daran naschen die Tiere selbst (nur Zierde, begehbar)
   | 'jetty' // Planke des Holzstegs am stillen See (begehbar); `note` 1 an seinem Ende: dort taucht der Grottenolm auf
@@ -77,6 +77,7 @@ export type Deco =
   | 'puddle' // kleine türkise Pfütze auf dem Grottenboden (begehbar, nur Zierde)
   | 'crystalfield' // Kristallfeld: niedrige Splitter in der Farbe der Zone (`color`), `note` 1 in seiner Mitte (begehbar)
   | 'vein' // Ader im Grottenboden: flacher Streifen in Rosa oder Lila (`color`), `note` seine Richtung (begehbar)
+  | 'shore' // helle Steine am Ufer des stillen Sees in der Grotte (begehbar, nur Zierde)
   | 'glowmoss' // Leuchtmoos am Fuß einer Felswand (`note` die Seite der Wand, 0 n … 3 w) oder unter einem Lichtschacht (begehbar)
   | 'waterfall' // kleiner Wasserfall am stillen See: Fels, das Wasser fällt nach Süden in den See (fest, nur Zierde)
   | 'lantern' // Sockel der Kristall-Laterne am Höhlenbett: Hineinlaufen nimmt die Laterne (fest; sie selbst zeichnet das Paket als Körper)

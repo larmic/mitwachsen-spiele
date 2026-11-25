@@ -5,7 +5,7 @@
 // Stalagmiten und Felsbrocken tragen die Farbe ihrer Zone an der Spitze (`tipOf`, `Cell.color`), Kristalle die Farbe
 // ihrer Zone (`crystalOf`). Dazu die Fülle (`adornGrotte`, flach und begehbar, nach allem anderen): Kristallfelder,
 // Adern im Boden in Rosa oder Lila (`veinOf`, nie Türkis), Leuchtmoos am Fuß der Felswände und unter den Schächten,
-// ein kleiner Wasserfall am See. Am Rand
+// ein kleiner Wasserfall am See, helle Steine an seinem Ufer. Am Rand
 // und in der Tropfsteingrotte dichter, die Mitte und die Wege bleiben frei, ebenso die Spur für das künftige Gleis von
 // der Mündung bis zum Platz des Bahnhofs (`corridorAt`). Feste Dinge halten `OBSTACLE_GAP` Felder Abstand zu allem
 // anderen Festen (nur die Glieder einer Gruppe stehen enger, mit einem freien Feld dazwischen), so bleibt jedes Feld
@@ -297,6 +297,23 @@ export function adornGrotte(seed: number, site: Site, free: Keep, map: Map<strin
   veins(seed, open, at, map);
   wallMoss(seed, open, at, map);
   waterfall(site, map);
+  shore(seed, site, map);
+}
+
+/**
+ * Helle Steine am Ufer des stillen Sees (Schritt 9 der Rückmeldung): auf dem Anteil `GROTTE.lake.shore` der freien
+ * Felder Grottenboden, die an das Wasser des Sees stoßen (flach und begehbar; Steg, Wasserfall und Kristallinsel bleiben)
+ */
+function shore(seed: number, site: Site, map: Map<string, Cell>) {
+  const { lake } = GROTTE;
+  for (let dv = -lake.ry - 1; dv <= lake.ry + 1; dv++)
+    for (let du = -lake.rx - 1; du <= lake.rx + 1; du++) {
+      const [x, y] = site.at(lake.across + du, lake.out + dv - ry);
+      const c = map.get(key(x, y));
+      if (!plain(c) || Math.hypot(du, dv) <= lake.isle + 1 || rand01(seed, x, y, 140) >= lake.shore) continue;
+      if (SIDES.some(([dx, dy]) => map.get(key(x + dx, y + dy))?.ground === 'water'))
+        map.set(key(x, y), { ...c, deco: 'shore' });
+    }
 }
 
 /** Kristallfelder: je Feld des Rasters ein Feld aus 3 bis 6 Feldern niedriger Splitter in der Farbe der Zone, Mitte `note` 1 */

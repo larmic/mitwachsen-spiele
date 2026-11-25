@@ -1,12 +1,13 @@
 // Leben in der Luft der Kristallgrotte, gleich für 2D und die Ebene über 3D (der Kern ruft es als `Sky.weather`, solange
 // die Figur in der Grotte ist; die 3D-Ansicht reicht ihre eigene Projektion herein): der fallende Tropfen
 // (mitwachsen-drips.ts), der Grottenolm am Steg (mitwachsen-olm-look.ts), die Fledermaus auf ihrer Runde und in 3D der
-// helle Schein einer Säule, die gerade klingt (mitwachsen-chime-look.ts; in 2D leuchtet die Säule selbst), dazu der
+// helle Schein einer Säule, die gerade klingt (mitwachsen-chime-look.ts; in 2D leuchtet die Säule selbst), der Tropfen
+// der fernen Tropfquelle als Glitzern und der eine Funke über einem vollen Pilzbeet (mitwachsen-spark.ts), dazu der
 // Lichtkreis um die Figur (mitwachsen-glow.ts; auch im Nebel, er gehört zur Figur), am Abend in 3D das golden-orange
 // Licht der Schächte und die Fledermaus-Runden um den Schacht über dem Bett (mitwachsen-dusk-look.ts). Im Nebel zeigt
 // sich sonst nichts. Bei reduzierter Bewegung kein Tropfen und keine Flugrunde. Wetter gibt es in der Grotte keins.
 // Reihenfolge: erst was zur Welt gehört (Abend, Tropfen, Grottenolm, Fledermaus), dann die Dunkelmaske
-// (mitwachsen-mask.ts), dann das Leuchten obendrauf (Lichtkreis, in 3D die klingende Säule); Zeichen, Herzen,
+// (mitwachsen-mask.ts), dann das Leuchten obendrauf (Lichtkreis, in 3D die klingende Säule, Glitzern, Funke); Zeichen, Herzen,
 // Sprechblasen und Leiste zeichnet der Kern danach.
 // Teil des Welt-Pakets der Höhlenwelt.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Schmuck der Grotte“)
@@ -26,12 +27,13 @@ import { OLM_MS, type Olm } from './mitwachsen-olm-look';
 import { circleOf, drawCircle, type Circle } from './mitwachsen-glow';
 import { drawDusk, type Dusk } from './mitwachsen-dusk-look';
 import { caveMask, type MaskFx } from './mitwachsen-mask';
+import { Spark, drawSpark, oneGlitter } from './mitwachsen-spark';
 
 /**
  * Was die Grotte sich fürs Bild merkt: Glockenspiel, Tropfen, Grottenolm; Licht: seit wann die Figur die Laterne trägt
  * (`since`, ms; für das Wachsen des Lichtkreises) und der zuletzt gezeichnete Lichtkreis (`drawn`, für die Tests); am
  * Abend, welche Fledermäuse gerade Runden fliegen (`dusk`, mitwachsen-dusk-look.ts); die Dunkelmaske (`mask`,
- * mitwachsen-mask.ts, beim ersten Bild angelegt)
+ * mitwachsen-mask.ts, beim ersten Bild angelegt); der Funke über den Sammelstellen (`spark`, mitwachsen-spark.ts, beim ersten Bild angelegt)
  */
 export type CaveFx = {
   chime: Chime;
@@ -40,6 +42,7 @@ export type CaveFx = {
   light: { since?: number; drawn?: Circle | null };
   dusk?: Dusk;
   mask?: MaskFx;
+  spark?: Spark;
 };
 
 const [WATER, WATER_TOP] = GROTTE_COLORS.water;
@@ -92,6 +95,14 @@ export function caveWeather(fx: CaveFx): Sky['weather'] {
     fx.light.drawn = circle;
     if (me && circle) drawCircle(ctx, P, { x: me.x, y: me.y, z: me.z + me.hop }, circle);
     if (sc.lit3d) glows(ctx, world, fx, sc, P, seen);
+    // Licht über der Maske: ein Funke über einem vollen Pilzbeet oder der Tropfen der fernen Tropfquelle glitzert, nie beides
+    const drop = sc.reduced ? null : fx.drips.falling(sc.now);
+    const lit = oneGlitter(
+      (fx.spark ??= new Spark()).now(world, state, sc.now, sc.reduced, seen),
+      drop?.far && seen(drop.x, drop.y) ? drop : null,
+    );
+    if (lit.far) glint(ctx, P, lit.far);
+    drawSpark(ctx, P, lit.spark);
   };
 }
 
@@ -105,7 +116,7 @@ function air(
   seen: (x: number, y: number) => boolean,
 ) {
   const drop = sc.reduced ? null : fx.drips.falling(sc.now);
-  if (drop && seen(drop.x, drop.y))
+  if (drop && !drop.far && seen(drop.x, drop.y))
     drawBox(ctx, P, [drop.x + 0.46, drop.y + 0.1, drop.z, 0.08, 0.08, 0.14, WATER, WATER_TOP]);
   const olm = fx.olm.now(world, sc.now, sc.reduced);
   if (olm && seen(olm.x, olm.y)) {
@@ -122,6 +133,14 @@ function air(
   const bat = sc.reduced ? null : fx.chime.bat(world, sc.now);
   if (bat && seen(bat.x, bat.y))
     drawModel(ctx, P, CAVE_MODELS.fledermaus, bat.x, bat.y, bat.z, bat.dir, CAVE_SPECIES.fledermaus.scale);
+}
+
+/** Der Tropfen der fernen Tropfquelle als Glitzern: hell, etwas größer als ein Tropfen, mit einem Schimmer quer */
+function glint(ctx: CanvasRenderingContext2D, P: Projection, drop: { x: number; y: number; z: number }) {
+  drawBox(ctx, P, [drop.x + 0.44, drop.y + 0.1, drop.z, 0.12, 0.08, 0.16, WATER_TOP, '#ffffff']);
+  ctx.globalAlpha = 0.7;
+  drawBox(ctx, P, [drop.x + 0.36, drop.y + 0.12, drop.z + 0.07, 0.28, 0.03, 0.03, '#ffffff', '#ffffff']);
+  ctx.globalAlpha = 1;
 }
 
 /** In 3D: Säulen, die gerade klingen, leuchten auf der Ebene darüber heller (halb durchsichtig, verblasst in 0,5 s) */

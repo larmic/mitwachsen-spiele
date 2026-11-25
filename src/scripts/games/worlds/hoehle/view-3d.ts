@@ -1,6 +1,7 @@
 // 3D-Teil des Welt-Pakets der Höhlenwelt: Was die 3D-Ansicht nur für die Kristallgrotte baut. Pilzschale, Steintrog,
 // Unterstand mit Kristallwand (das Dach vor der Figur durchsichtig), Kristall-Lampen, Kristallsäulen, Kristallbogen,
-// Leuchtpilze, Pilzbeete (voll oder abgeerntet; das Stück wird bei `gather` und `regrow` neu gebaut), Tropfquelle,
+// Leuchtpilze, Pilzbeete (voll oder abgeerntet; das Stück wird bei `gather` und `regrow` neu gebaut), Pilzschale und
+// Steintrog (leer oder voll; neu gebaut bei `feed`, `pour` und `regrow`), Tropfquelle,
 // Tropfmoos, Stalagmiten und Holzsteg (Quader aus mitwachsen-cave-look.ts, wie in 2D; Säulen stehen still, ihr
 // Leuchten beim Klingen zeichnet die Ebene darüber, mitwachsen-cave-sky.ts), Boden und Klippen in den zart lila-grauen
 // Schichten des Höhlentors (der Boden etwas dunkler als früher, ohne Flecken), Lichtflecken in den Farben der Ecken
@@ -18,6 +19,7 @@ import { darken, isWall } from './mitwachsen-glow';
 
 const look: DrawDeco = (world, c, x, y) => caveBoxes(world, c, x, y);
 const bed: DrawDeco = (world, c, x, y, { picked }) => caveBoxes(world, c, x, y, !(`${x},${y}` in picked));
+const bowl: DrawDeco = (world, c, x, y, { picked }) => caveBoxes(world, c, x, y, `${x},${y}` in picked);
 
 /** Kacheln je Boden in der Grotte (wie die 3D-Ansicht sie sonst nimmt), damit der Lichtfleck auch auf Moos und Steg liegt */
 const TILES: Partial<Record<Cell['ground'], Ground['tiles']>> = {
@@ -31,8 +33,8 @@ export const view3d: View3D = {
   // Das Höhlentor hat keine Flügel und keine Eiszapfen (Rollstein, mitwachsen-gate-hoehle.ts); die Platte bleibt Stein
   look: { door: () => [], icicle: () => '#ffffff' },
   decos: {
-    shroombowl: look,
-    stonetrough: look,
+    shroombowl: bowl,
+    stonetrough: bowl,
     shed: look,
     cavelamp: look,
     column: look,
@@ -54,6 +56,7 @@ export const view3d: View3D = {
     crystalfield: look,
     vein: look,
     glowmoss: look,
+    shore: look, // helle Steine am Seeufer (Sammelstellen, Schritt 9)
     waterfall: look,
     lantern: look, // Sockel; die Laterne darauf kommt als Körper (wie in 2D)
   },

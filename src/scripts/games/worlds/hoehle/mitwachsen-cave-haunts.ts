@@ -18,8 +18,8 @@ export const HAUNTS: Record<CaveHaunt, (c: Cell) => boolean> = {
   arch: (c) => c.perch !== undefined,
 };
 
-/** Flache Fülle auf dem Grottenboden (Kristallfeld, Ader, Leuchtmoos): zählt wie freier Boden, so bleiben die Fundorte */
-const FLAT: ReadonlySet<Cell['deco']> = new Set<Cell['deco']>(['crystalfield', 'vein', 'glowmoss']);
+/** Flache Fülle auf dem Grottenboden (Kristallfeld, Ader, Leuchtmoos, Ufersteine): zählt wie freier Boden, so bleiben die Fundorte */
+const FLAT: ReadonlySet<Cell['deco']> = new Set<Cell['deco']>(['crystalfield', 'vein', 'glowmoss', 'shore']);
 
 const HOEHLE = REGIONS.find((r) => r.id === 'hoehle')!; // die Höhlenwelt steht fest in REGIONS
 

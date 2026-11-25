@@ -688,7 +688,7 @@ describe('Korb mit Beeren', () => {
     s = run(s, w, 'e').s;
     expect(s.basket).toBe(true);
     const r = run(s, w, 'w');
-    expect(r.events).toEqual([{ type: 'feed', food: 'berries', ids: ['lichtung:hase'] }]);
+    expect(r.events).toEqual([{ type: 'feed', food: 'berries', ids: ['lichtung:hase'], x: -1, y: 0 }]);
     expect(r.s.basket).toBe(false);
     expect([r.s.player.x, r.s.player.y]).toEqual([0, 0]);
   });
@@ -709,7 +709,7 @@ describe('Eimer mit Wasser', () => {
     expect([s.bucket, s.player.x]).toEqual([true, 0]); // die Figur bleibt am Ufer stehen
     expect(types(run(s, w, 'e').events)).toEqual(['bump']); // voller Eimer: Wasser ist wieder nur Wasser
     r = run(s, w, 'w');
-    expect(r.events).toEqual([{ type: 'pour', ids: ['lichtung:hase'] }]);
+    expect(r.events).toEqual([{ type: 'pour', ids: ['lichtung:hase'], x: -1, y: 0 }]);
     expect(r.s.bucket).toBe(false);
   });
 
@@ -761,7 +761,7 @@ describe('Fischkisten und Eisschale (Eis-Welt)', () => {
     r = run({ ...s, fish: true }, w, 'e');
     expect([types(r.events), r.s.fish]).toEqual([['bump'], true]); // Fisch gehört nicht in den Futtertrog
     r = run({ ...s, fish: true }, w, 'w');
-    expect(r.events).toEqual([{ type: 'feed', food: 'fish', ids: ['lichtung:hase'] }]);
+    expect(r.events).toEqual([{ type: 'feed', food: 'fish', ids: ['lichtung:hase'], x: -1, y: 0 }]);
     expect([r.s.fish, r.s.player.x]).toEqual([false, 0]);
   });
 
@@ -816,7 +816,7 @@ describe('Fischkisten und Eisschale (Eis-Welt)', () => {
     expect(world.cell(tx, ty).biome).toBe('eis');
     s = { ...r.s, player: { x: tx, y: ty - 1, dir: 's' } };
     r = run(s, world, 's');
-    expect(r.events).toEqual([{ type: 'pour', ids: ['eis:pinguin'] }]);
+    expect(r.events).toEqual([{ type: 'pour', ids: ['eis:pinguin'], x: tx, y: ty }]);
     expect(r.s.bucket).toBe(false);
   });
 });
@@ -1328,18 +1328,20 @@ describe('Zuhause je Gegend', () => {
     const herd = [resident('lichtung:hase', 0, 'lichtung'), resident('eis:hase', 24, EIS)];
     const full = (x: number, y: number): State => ({ ...awake(w, x, y, herd), basket: true, bucket: true });
     expect(run(full(0, 0), w, 'w', 'e').events).toEqual([
-      { type: 'feed', food: 'berries', ids: ['lichtung:hase'] },
-      { type: 'pour', ids: ['lichtung:hase'] },
+      { type: 'feed', food: 'berries', ids: ['lichtung:hase'], x: -1, y: 0 },
+      { type: 'pour', ids: ['lichtung:hase'], x: 1, y: 0 },
     ]);
     expect(run(full(29, 0), w, 'w', 's').events).toEqual([
-      { type: 'feed', food: 'berries', ids: ['eis:hase'] },
-      { type: 'pour', ids: ['eis:hase'] },
+      { type: 'feed', food: 'berries', ids: ['eis:hase'], x: 28, y: 0 },
+      { type: 'pour', ids: ['eis:hase'], x: 29, y: 1 },
     ]);
     // Fisch in die Eisschale: auf der Schneewiese freuen sich nur die Eis-Tiere, auf der Lichtung nur ihre
     const pinguin = { ...resident('eis:pinguin', 25, EIS), species: 'pinguin' as const };
     const fishy = (x: number): State => ({ ...awake(w, x, 0, [...herd, pinguin]), fish: true });
-    expect(run(fishy(29), w, 'n').events).toEqual([{ type: 'feed', food: 'fish', ids: ['eis:hase', 'eis:pinguin'] }]);
-    expect(run(fishy(0), w, 'n').events).toEqual([{ type: 'feed', food: 'fish', ids: ['lichtung:hase'] }]);
+    expect(run(fishy(29), w, 'n').events).toEqual([
+      { type: 'feed', food: 'fish', ids: ['eis:hase', 'eis:pinguin'], x: 29, y: -1 },
+    ]);
+    expect(run(fishy(0), w, 'n').events).toEqual([{ type: 'feed', food: 'fish', ids: ['lichtung:hase'], x: 0, y: -1 }]);
   });
 });
 
@@ -1402,8 +1404,35 @@ describe('Pilzbeete, Pilzschale, Tropfquelle und Steintrog (Höhlenwelt)', () =>
     r = run({ ...s, shrooms: true }, w, 'e', 'n');
     expect([types(r.events), r.s.shrooms]).toEqual([['bump', 'bump'], true]); // Pilze nicht in Futtertrog und Eisschale
     r = run({ ...s, shrooms: true }, w, 'w');
-    expect(r.events).toEqual([{ type: 'feed', food: 'pilze', ids: ['lichtung:hase'] }]);
+    expect(r.events).toEqual([{ type: 'feed', food: 'pilze', ids: ['lichtung:hase'], x: -1, y: 0 }]);
     expect([r.s.shrooms, r.s.player.x]).toEqual([false, 0]);
+  });
+
+  it('Pilzschale und Steintrog der Grotte zeigen voll: gefüllt merkt `picked` den Takt, nach 300 Takten sind sie leer (`regrow`); andere Tröge nicht', () => {
+    const w = fakeWorld({
+      '-1,0': { deco: 'shroombowl', solid: true, garden: true },
+      '1,0': { deco: 'stonetrough', solid: true, garden: true },
+      '0,-1': { deco: 'trough', solid: true, garden: true },
+    });
+    let r = run({ ...awake(w, 0, 0), shrooms: true, bucket: true, basket: false }, w, 'w', 'e');
+    expect(types(r.events)).toEqual(['feed', 'pour']);
+    expect(Object.keys(r.s.picked).sort()).toEqual(['-1,0', '1,0']);
+    // mit vollen Händen noch einmal: Füllen geht immer (nie versperrt), der Takt beginnt neu
+    r = run({ ...r.s, basket: true }, w, 'n');
+    expect(types(r.events)).toEqual(['feed']);
+    expect('0,-1' in r.s.picked).toBe(false); // der Futtertrog der Lichtung zeigt nichts
+    let s: State = { ...r.s, sleeping: true };
+    const emptied: GameEvent[] = [];
+    for (let i = 0; i < REGROW; i++) {
+      r = run(s, w, TICK);
+      s = r.s;
+      emptied.push(...r.events);
+    }
+    expect(emptied).toEqual([
+      { type: 'regrow', x: -1, y: 0 },
+      { type: 'regrow', x: 1, y: 0 },
+    ]);
+    expect(s.picked).toEqual({});
   });
 
   it('an der Tropfquelle und am Wasser füllt die Figur die Kanne, im Steintrog leert sie sie; Tropfmoos ist begehbar', () => {
@@ -1421,7 +1450,7 @@ describe('Pilzbeete, Pilzschale, Tropfquelle und Steintrog (Höhlenwelt)', () =>
     expect([s.bucket, s.player.x]).toEqual([true, 0]);
     expect(types(run(s, w, 'e').events)).toEqual(['bump']); // volle Kanne: die Quelle ist nur Fels
     r = run(s, w, 'w');
-    expect(r.events).toEqual([{ type: 'pour', ids: ['lichtung:hase'] }]);
+    expect(r.events).toEqual([{ type: 'pour', ids: ['lichtung:hase'], x: -1, y: 0 }]);
     expect(r.s.bucket).toBe(false);
     r = run(r.s, w, 's');
     expect([types(r.events), r.s.player.y]).toEqual([['step'], 1]); // aufs Tropfmoos: ein Schritt, nichts geschieht

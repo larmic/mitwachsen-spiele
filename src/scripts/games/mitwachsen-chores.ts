@@ -15,7 +15,7 @@ export const REGROW = 300; // Takte, bis an einem Busch neue Beeren hängen, in 
 /** Was die Figur trägt und was gerade leer ist (Teil des Zustands der Regeln) */
 export type Hands = {
   tick: number;
-  picked: Record<string, number>; // leere Büsche, Fischkisten und Pilzbeete: "x,y" → Takt des Leerens
+  picked: Record<string, number>; // leere Büsche, Fischkisten und Pilzbeete: "x,y" → Takt des Leerens; volle Pilzschale und volle Steintröge der Grotte: Takt des Füllens
   basket: boolean; // Korb mit Beeren auf dem Rücken
   shrooms: boolean; // Korb mit Leuchtpilzen auf dem Rücken (nie zugleich mit Beeren)
   fish: boolean; // Netz mit Fischen in der linken Hand
@@ -27,20 +27,23 @@ export type ChoreEvent =
   | { type: 'pick'; x: number; y: number } // Beeren gepflückt
   | { type: 'catch'; x: number; y: number } // Fische ins Netz gefangen
   | { type: 'gather'; x: number; y: number } // Leuchtpilze aus dem Beet in den Korb gesammelt
-  | { type: 'regrow'; x: number; y: number } // neue Beeren am Busch, neue Fische in der Kiste, neue Pilze im Beet
-  | { type: 'feed'; food: 'berries' | 'fish' | 'pilze'; ids: string[] } // Futter in Trog, Eisschale oder Pilzschale: diese Tiere freuen sich
+  | { type: 'regrow'; x: number; y: number } // neue Beeren am Busch, neue Fische in der Kiste, neue Pilze im Beet; Pilzschale oder Steintrog wieder leer
+  | { type: 'feed'; food: 'berries' | 'fish' | 'pilze'; ids: string[]; x: number; y: number } // Futter in Trog (x, y), Eisschale oder Pilzschale: diese Tiere freuen sich
   | { type: 'fill'; x: number; y: number } // Eimer am Wasser (oder Kanne an der Tropfquelle) gefüllt
-  | { type: 'pour'; ids: string[] }; // Wasser in den Wassertrog oder Steintrog: diese Tiere der Wiese freuen sich
+  | { type: 'pour'; ids: string[]; x: number; y: number }; // Wasser in den Wassertrog oder Steintrog (x, y): diese Tiere der Wiese freuen sich
 
 /**
- * Nach diesen Ereignissen sieht ein Feld anders aus (Busch, Fischkiste oder Pilzbeet leer bzw. wieder voll, Schneehaufen um eine
- * Kugel gewachsen): Die 3D-Ansicht baut sein Stück neu. Ausdrücklich aufgezählt, damit ein neues Ereignis mit Feld nicht
- * unbemerkt Stücke neu bauen lässt.
+ * Nach diesen Ereignissen sieht ein Feld anders aus (Busch, Fischkiste oder Pilzbeet leer bzw. wieder voll, Pilzschale
+ * oder Steintrog voll bzw. wieder leer, Schneehaufen um eine Kugel gewachsen): Die 3D-Ansicht baut sein Stück neu.
+ * Ausdrücklich aufgezählt, damit ein neues Ereignis mit Feld nicht unbemerkt Stücke neu bauen lässt.
  */
+const RESHAPES = new Set(['pick', 'catch', 'gather', 'regrow', 'snowman', 'feed', 'pour']);
 export const reshapes = (e: {
   type: string;
-}): e is Extract<ChoreEvent | PackEvent, { type: 'pick' | 'catch' | 'gather' | 'regrow' | 'snowman' }> =>
-  e.type === 'pick' || e.type === 'catch' || e.type === 'gather' || e.type === 'regrow' || e.type === 'snowman';
+}): e is Extract<
+  ChoreEvent | PackEvent,
+  { type: 'pick' | 'catch' | 'gather' | 'regrow' | 'snowman' | 'feed' | 'pour' }
+> => RESHAPES.has(e.type);
 
 /** Wohin die Ereignisse gehen (die Liste der Regeln, die auch andere Ereignisse enthält) */
 type Events = { push(e: ChoreEvent): unknown };
@@ -53,6 +56,11 @@ const meadowAnimals = (s: Hands, world: World, x: number, y: number) =>
 const SOURCES = { bush: 'pick', fishcrate: 'catch', shroombed: 'gather' } as const;
 /** Trog, der Futter nimmt, und welches */
 const BOWLS = { trough: 'berries', icebowl: 'fish', shroombowl: 'pilze' } as const;
+/**
+ * Pilzschale und Steintrog der Grotte zeigen, ob sie voll sind: Gefüllt merkt `picked` den Takt, nach `REGROW` Takten
+ * haben die Tiere sie geleert (Ereignis `regrow`), dann kann das Kind sie wieder füllen
+ */
+const SHOWS_FULL: ReadonlySet<Cell['deco']> = new Set<Cell['deco']>(['shroombowl', 'stonetrough']);
 
 /** Trägt die Figur dieses Futter (Korb mit Beeren, Netz mit Fisch, Korb mit Leuchtpilzen)? */
 const carries = (s: Hands, food: (typeof BOWLS)[keyof typeof BOWLS]) =>
@@ -79,7 +87,8 @@ function feed(s: Hands, world: World, c: Cell, x: number, y: number, events: Eve
   if (food === 'berries') s.basket = false;
   else if (food === 'fish') s.fish = false;
   else s.shrooms = false;
-  events.push({ type: 'feed', food, ids: meadowAnimals(s, world, x, y) });
+  if (SHOWS_FULL.has(c.deco)) s.picked[`${x},${y}`] = s.tick;
+  events.push({ type: 'feed', food, ids: meadowAnimals(s, world, x, y), x, y });
   return true;
 }
 
@@ -103,11 +112,15 @@ export function chore(s: Hands, world: World, x: number, y: number, events: Even
   }
   if (!s.bucket || (c.deco !== 'watertrough' && c.deco !== 'stonetrough')) return false;
   s.bucket = false;
-  events.push({ type: 'pour', ids: meadowAnimals(s, world, x, y) });
+  if (SHOWS_FULL.has(c.deco)) s.picked[`${x},${y}`] = s.tick;
+  events.push({ type: 'pour', ids: meadowAnimals(s, world, x, y), x, y });
   return true;
 }
 
-/** Nach `REGROW` Takten hängen am Busch neue Beeren, liegen in der Kiste neue Fische und stehen im Beet neue Pilze, auch nachts */
+/**
+ * Nach `REGROW` Takten hängen am Busch neue Beeren, liegen in der Kiste neue Fische und stehen im Beet neue Pilze, auch
+ * nachts; Pilzschale und Steintrog der Grotte sind dann leer gefressen und getrunken
+ */
 export function regrow(s: Hands, events: Events) {
   for (const [k, at] of Object.entries(s.picked))
     if (s.tick - at >= REGROW) {

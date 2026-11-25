@@ -321,7 +321,7 @@ describe('Tropfsteine (Kristallgrotte)', () => {
   const far = all.find(
     ({ p, c }) =>
       c.deco === 'stalagmite' &&
-      Math.max(Math.abs(p[0] - spring[0]), Math.abs(p[1] - spring[1])) > DRIP.near + 2 &&
+      Math.max(Math.abs(p[0] - spring[0]), Math.abs(p[1] - spring[1])) > DRIP.far + 2 &&
       all.some((e) => e.c.deco === 'stalagmite' && e.p !== p),
   )!.p;
 
@@ -347,6 +347,48 @@ describe('Tropfsteine (Kristallgrotte)', () => {
     expect(drop.from).toBeGreaterThan(drop.to);
     const [bx, by] = w.homes.lichtung.bed;
     expect(dropOf(w, bx, by, 3)).toBeNull();
+  });
+
+  it('weiter weg (bis 16 Felder) glitzert der Tropfen der Quelle in jedem zweiten Fenster, ohne „plink“; ohne Stalagmit in jedem', () => {
+    const [sx, sy] = spring;
+    const at: [number, number] = [sx + DRIP.near + 3, sy];
+    const odd = dropOf(w, ...at, 1)!;
+    expect(odd).toMatchObject({ x: sx, y: sy, spring: true, far: true });
+    // gerades Fenster: mit Stalagmit in der Nähe fällt der Tropfen dort, ohne wieder an der Quelle
+    let tipNear = false;
+    for (let dy = -DRIP.near; dy <= DRIP.near; dy++)
+      for (let dx = -DRIP.near; dx <= DRIP.near; dx++)
+        if (w.cell(at[0] + dx, at[1] + dy).deco === 'stalagmite' && w.cell(at[0] + dx, at[1] + dy).region === 'hoehle')
+          tipNear = true;
+    const even = dropOf(w, ...at, 2)!;
+    if (tipNear) expect(w.cell(even.x, even.y).deco).toBe('stalagmite');
+    else expect(even).toMatchObject({ x: sx, y: sy, far: true });
+    // beide Fälle sicher in einer kleinen Grotte: Quelle 10 Felder weit, mit und ohne Stalagmit 3 Felder weit
+    const tiny = (stalagmite: boolean) =>
+      ({
+        cell: (x: number, y: number) => ({
+          h: 1,
+          ground: 'grotto',
+          region: 'hoehle',
+          note: 0,
+          deco: y !== 0 ? undefined : x === 10 ? 'dripspring' : x === 3 && stalagmite ? 'stalagmite' : undefined,
+        }),
+      }) as unknown as World;
+    for (let slot = 0; slot < 8; slot++) {
+      expect(dropOf(tiny(false), 0, 0, slot), `ohne Stalagmit, Fenster ${slot}`).toMatchObject({ x: 10, far: true });
+      expect(dropOf(tiny(true), 0, 0, slot), `mit Stalagmit, Fenster ${slot}`).toMatchObject(
+        slot % 2 ? { x: 10, far: true } : { x: 3, spring: false },
+      );
+    }
+    // nur Stalagmiten-Tropfen erkundet: kein Glitzern
+    expect(dropOf(w, ...at, 1, (x, y) => !(x === sx && y === sy))?.spring).not.toBe(true);
+    // jenseits von 16 Feldern nichts von der Quelle
+    expect(dropOf(w, sx + DRIP.far + 1, sy, 1)?.spring).not.toBe(true);
+    // ohne Ton: das Fenster mit dem Glitzern ist still, der Tropfen fällt (und wird gezeichnet)
+    const drips = new Drips();
+    const state = { player: { x: at[0], y: at[1] } };
+    expect(drips.tick(w, state, DRIP.every + 1, all_)).toEqual([]);
+    expect(drips.falling(DRIP.every + 10)).toMatchObject({ far: true, spring: true });
   });
 
   it('höchstens ein Tropfen je 2 s im Bild: je Zeitfenster einmal „plink“, außerhalb der Grotte keins', () => {

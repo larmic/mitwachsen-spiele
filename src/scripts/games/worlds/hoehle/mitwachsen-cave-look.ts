@@ -1,6 +1,7 @@
-// Aussehen der Dinge in der Kristallgrotte, gleich für 2D und 3D: Pilzschale, Steintrog mit Tropfmoos am Rand,
+// Aussehen der Dinge in der Kristallgrotte, gleich für 2D und 3D: Pilzschale und Steintrog (leer oder voll, Tropfmoos am Rand),
 // Unterstand mit der Kristallwand, Kristall-Lampen, Kristallsäulen (leuchten kurz heller, wenn sie klingen), Kristallbogen,
-// Leuchtpilze, Pilzbeete (voll und leer), Tropfquelle, Tropfmoos, Stalagmiten in drei Höhen (dunkler Fuß, Spitze in der
+// weiß-blaue Deko-Pilze, Pilzbeete (Büschel aus fünf Pilzen mit dunklem Felsrand, leer Stümpfe), Tropfquelle (heller Fels
+// mit Wasserstreifen), Tropfmoos, helle Steine am Seeufer, Stalagmiten in drei Höhen (dunkler Fuß, Spitze in der
 // Farbe ihrer Zone), der Holzsteg, der Sockel der Kristall-Laterne und die Füllung (Kristallbüsche, Felsbrocken, Moos auf
 // Felsinseln, Lehm, Pfützen, Farn) samt der Fülle (Kristallfelder, Adern im Boden, Leuchtmoos, der Wasserfall am See,
 // `adornBoxes`, `waterfallBoxes`); dazu Boden und Klippen in den Schichten des Höhlentors, Flecken im Boden in 2D
@@ -18,7 +19,7 @@ import type { Box } from '../../mitwachsen-view';
 import { POST_H } from './mitwachsen-lantern';
 
 const C = GROTTE_COLORS;
-const [KR, KT, KP] = C.crystals;
+const [KR, KT] = C.crystals;
 /** Höhe der Kristallwand und des Dachs des Unterstands am Bett */
 export const SHED_H = 2.2;
 
@@ -31,10 +32,12 @@ const DROP = C.water[1];
 
 /**
  * Ein Ding der Grotte als Quader (null: kein Ding der Grotte, die Ansicht zeichnet wie sonst). `full`: Das Pilzbeet auf
- * diesem Feld trägt Leuchtpilze (sonst ist es abgeerntet). Kein Gold: Beet, Quelle und Trog sind keine Aktion.
+ * diesem Feld trägt Leuchtpilze (sonst ist es abgeerntet), in Pilzschale und Steintrog liegen Pilze bzw. steht Wasser
+ * (sonst sind sie leer). Kein Gold: Beet, Quelle und Trog sind keine Aktion.
  */
 export function caveBoxes(world: Realms, c: Cell, x: number, y: number, full = true): readonly Box[] | null {
-  const own = OWN.get(c.deco); // Futter und Wasser, Füllung
+  if (c.deco === 'shroombowl' || c.deco === 'stonetrough') return bowlBoxes(c, x, y, full);
+  const own = OWN.get(c.deco); // Wasser, Füllung
   if (own) return own(c, x, y);
   if (c.deco === 'shroombed') return shroomBed(c, x, y, full);
   const h = c.h;
@@ -62,11 +65,14 @@ export function caveBoxes(world: Realms, c: Cell, x: number, y: number, full = t
       if (c.note === 0 || c.note === 4) return [[x + 0.2, y + 0.25, h, 0.6, 0.5, ARCH_PERCH, ...C.rock], beam, gem];
       return [beam, gem];
     }
-    case 'glowshroom': // kleiner Leuchtpilz: Stiel und Hut in seiner Farbe
+    case 'glowshroom': {
+      // kleiner Deko-Pilz: Stiel und Hut in Weiß-Blau (nie in den Farben der Sammelpilze), kleiner als ein Pilz im Beet
+      const k = c.color ?? C.decoShroom;
       return [
-        [x + 0.46, y + 0.5, h, 0.08, 0.08, 0.16, '#efe4d2', '#f7efe2'],
-        [x + 0.36, y + 0.42, h + 0.16, 0.28, 0.24, 0.1, c.color ?? KP, c.color ?? KP],
+        [x + 0.47, y + 0.5, h, 0.06, 0.06, 0.1, ...STEM],
+        [x + 0.4, y + 0.44, h + 0.1, 0.2, 0.18, 0.07, k, k],
       ];
+    }
     default:
       return null;
   }
@@ -95,12 +101,12 @@ export function columnBoxes(c: Cell, x: number, y: number, glow = 0): Box[] {
 }
 const C_HEIGHTS = GROTTE.hall.columns;
 
-/** Futter und Wasser: Pilzschale, Steintrog mit Tropfmoos am Rand, Tropfquelle über dem Becken, Tropfmoos */
-const SUPPLIES: readonly Cell['deco'][] = ['shroombowl', 'stonetrough', 'dripspring', 'dripmoss'];
+/** Wasser: Tropfquelle über dem Becken, Tropfmoos (Pilzschale und Steintrog: `bowlBoxes`) */
+const SUPPLIES: readonly Cell['deco'][] = ['dripspring', 'dripmoss'];
 /** Füllung der Grotte (mitwachsen-fill.ts); Farn und Felsbrocken gibt es auch in der Landschaft */
 const FILL: readonly Cell['deco'][] = ['crystalbush', 'boulder', 'mosstop', 'clay', 'puddle', 'fern'];
 /** Fülle der Grotte (mitwachsen-fill.ts, `adornGrotte`): flach und begehbar */
-const ADORN: readonly Cell['deco'][] = ['crystalfield', 'vein', 'glowmoss'];
+const ADORN: readonly Cell['deco'][] = ['crystalfield', 'vein', 'glowmoss', 'shore'];
 /** Wer die Quader dieser Dinge baut */
 const OWN = new Map<Cell['deco'], (c: Cell, x: number, y: number) => Box[] | null>([
   ...SUPPLIES.map((d) => [d, supplyBoxes] as const),
@@ -134,28 +140,47 @@ function post(c: Cell, x: number, y: number): Box[] {
   ];
 }
 
+/**
+ * Pilzschale und Steintrog am Bett, leer oder voll (`full`: gerade gefüllt, die Tiere fressen und trinken, bis sie nach
+ * `REGROW` Takten wieder leer sind, mitwachsen-chores.ts): die Schale aus Stein, voll mit einem Häufchen Leuchtpilze in
+ * den drei Farben, leer ihr dunkler Boden; der Trog aus Stein, voll mit türkisem Wasser, leer trocken; am Rand des Trogs
+ * immer ein Büschel Tropfmoos (für die Moosfresser)
+ */
+function bowlBoxes(c: Cell, x: number, y: number, full: boolean): Box[] {
+  const h = c.h;
+  if (c.deco === 'shroombowl') {
+    const bowl: Box[] = [
+      [x + 0.12, y + 0.2, h, 0.76, 0.6, 0.3, ...C.rock],
+      [x + 0.2, y + 0.28, h + 0.3, 0.6, 0.44, 0.01, ...C.bedRim],
+    ];
+    if (!full) return bowl;
+    return [
+      ...bowl,
+      [x + 0.2, y + 0.3, h + 0.3, 0.18, 0.16, 0.12, C.shrooms[0], C.shrooms[0]],
+      [x + 0.42, y + 0.36, h + 0.3, 0.18, 0.16, 0.18, C.shrooms[1], C.shrooms[1]],
+      [x + 0.62, y + 0.3, h + 0.3, 0.18, 0.16, 0.12, C.shrooms[2], C.shrooms[2]],
+      [x + 0.34, y + 0.5, h + 0.3, 0.16, 0.14, 0.1, C.shrooms[2], C.shrooms[2]],
+    ];
+  }
+  return [
+    [x + 0.1, y + 0.22, h, 0.8, 0.56, 0.34, ...C.rock],
+    full
+      ? [x + 0.18, y + 0.3, h + 0.34, 0.64, 0.4, 0.02, ...C.water]
+      : [x + 0.18, y + 0.3, h + 0.34, 0.64, 0.4, 0.01, ...C.bedRim],
+    [x - 0.04, y + 0.62, h, 0.26, 0.28, 0.16, ...C.moss],
+    [x + 0.04, y + 0.7, h + 0.16, 0.06, 0.06, 0.04, DROP, DROP],
+  ];
+}
+
 function supplyBoxes(c: Cell, x: number, y: number): Box[] {
   const h = c.h;
   switch (c.deco) {
-    case 'shroombowl': // Schale aus Stein, darin Leuchtpilze in drei Farben
+    case 'dripspring': // Tropfquelle: heller Fels, vorn ein Wasserstreifen von der Lippe hinab, oben Moos; Tropfen fallen ins Becken
       return [
-        [x + 0.12, y + 0.2, h, 0.76, 0.6, 0.3, ...C.rock],
-        [x + 0.22, y + 0.3, h + 0.3, 0.14, 0.14, 0.12, KP, KP],
-        [x + 0.45, y + 0.38, h + 0.3, 0.14, 0.14, 0.16, KT, KT],
-        [x + 0.64, y + 0.3, h + 0.3, 0.14, 0.14, 0.12, C.shrooms[2], C.shrooms[2]],
-      ];
-    case 'stonetrough': // Trog aus Stein mit türkisem Wasser, am Rand ein Büschel Tropfmoos (für die Moosfresser)
-      return [
-        [x + 0.1, y + 0.22, h, 0.8, 0.56, 0.34, ...C.rock],
-        [x + 0.18, y + 0.3, h + 0.34, 0.64, 0.4, 0.02, ...C.water],
-        [x - 0.04, y + 0.62, h, 0.26, 0.28, 0.16, ...C.moss],
-        [x + 0.04, y + 0.7, h + 0.16, 0.06, 0.06, 0.04, DROP, DROP],
-      ];
-    case 'dripspring': // Tropfquelle: bemooster Fels mit vorstehender Lippe, von der Tropfen ins Becken fallen
-      return [
-        [x + 0.12, y + 0.35, h, 0.76, 0.6, 0.9, ...C.rock],
-        [x + 0.2, y + 0.1, h + 0.7, 0.6, 0.35, 0.2, C.rock[0], C.moss[1]],
+        [x + 0.12, y + 0.35, h, 0.76, 0.6, 0.9, ...C.bright],
+        [x + 0.2, y + 0.1, h + 0.7, 0.6, 0.35, 0.2, C.bright[0], C.moss[1]],
         [x + 0.12, y + 0.35, h + 0.9, 0.76, 0.6, 0.06, ...C.moss],
+        [x + 0.42, y + 0.09, h + 0.12, 0.16, 0.02, 0.58, ...C.water],
         [x + 0.46, y + 0.1, h + 0.4, 0.08, 0.08, 0.1, DROP, DROP],
         [x + 0.47, y + 0.02, h + 0.1, 0.06, 0.06, 0.08, DROP, DROP],
       ];
@@ -227,35 +252,44 @@ function fillBoxes(c: Cell, x: number, y: number): Box[] | null {
   }
 }
 
-/** Lage der drei Leuchtpilze im Beet: Mitte, Höhe des Stiels */
+/** Lage der fünf Leuchtpilze im Büschel: Mitte, Höhe des Stiels, Breite des Huts (der mittlere hinten am höchsten) */
 const BED_SHROOMS = [
-  [0.3, 0.38, 0.14],
-  [0.62, 0.32, 0.1],
-  [0.46, 0.64, 0.18],
+  [0.48, 0.42, 0.42, 0.3],
+  [0.26, 0.36, 0.3, 0.26],
+  [0.7, 0.34, 0.32, 0.26],
+  [0.32, 0.64, 0.22, 0.24],
+  [0.64, 0.66, 0.2, 0.22],
 ] as const;
+/** Höhe des Felsrands um das Beet */
+const RIM_H = 0.16;
 
 /**
- * Pilzbeet: niedriger Rand aus Stein, darin Moos; voll stehen drei Leuchtpilze darauf, je einer in Rosa, Türkis und
- * Gelb (die Reihe der Farben je Feld verschieden), abgeerntet nur Moos mit kleinen Stummeln
+ * Pilzbeet: dunkler Felsrand, darin Moos; voll steht darauf ein Büschel aus fünf Leuchtpilzen in einer Farbe (je Beet
+ * Rosa, Türkis oder Gelb), etwa 0,7 hoch wie ein Beerenbusch; abgeerntet nur Stümpfe im Moos
  */
 function shroomBed(c: Cell, x: number, y: number, full: boolean): Box[] {
   const h = c.h;
   const out: Box[] = [
-    [x + 0.06, y + 0.12, h, 0.88, 0.76, 0.14, ...C.rock],
-    [x + 0.14, y + 0.2, h + 0.14, 0.72, 0.6, 0.02, ...C.moss],
+    [x + 0.04, y + 0.1, h, 0.92, 0.8, RIM_H, ...C.bedRim],
+    [x + 0.12, y + 0.18, h + RIM_H, 0.76, 0.64, 0.02, ...C.moss],
   ];
-  const turn = hash(6, x, y) % 3;
-  BED_SHROOMS.forEach(([dx, dy, stem], i) => {
-    const top = h + 0.16;
-    if (!full) return void out.push([x + dx - 0.03, y + dy - 0.03, top, 0.06, 0.06, 0.03, ...STEM]);
-    const color = C.shrooms[(i + turn) % 3]!;
+  const color = bedColor(x, y);
+  const top = h + RIM_H + 0.02;
+  for (const [dx, dy, stem, w] of BED_SHROOMS) {
+    if (!full) {
+      out.push([x + dx - 0.04, y + dy - 0.04, top, 0.08, 0.08, 0.06, ...STEM]);
+      continue;
+    }
     out.push(
       [x + dx - 0.04, y + dy - 0.04, top, 0.08, 0.08, stem, ...STEM],
-      [x + dx - 0.12, y + dy - 0.1, top + stem, 0.24, 0.2, 0.09, color, color],
+      [x + dx - w / 2, y + dy - w * 0.4, top + stem, w, w * 0.8, 0.1, color, lighten(color, 0.25)],
     );
-  });
+  }
   return out;
 }
+
+/** Farbe der Pilze eines Beets: je Beet eine der drei Farben der Sammelpilze, fest aus seiner Lage */
+export const bedColor = (x: number, y: number): string => C.shrooms[hash(6, x, y) % 3]!;
 
 /**
  * Unterstand am Höhlenbett (vorn offen): Jedes Feld der Rückwand ist ein Stück Kristallwand (Fels mit
@@ -319,6 +353,12 @@ const VEIN: readonly (readonly (readonly [number, number, number, number])[])[] 
     [0.64, 0.06, 0.36, 0.14],
   ],
 ];
+/** Kiesel am Seeufer: [dx, dy, Breite, Tiefe, Höhe] */
+const SHORE: readonly (readonly [number, number, number, number, number])[] = [
+  [0.18, 0.22, 0.28, 0.22, 0.1],
+  [0.56, 0.5, 0.24, 0.2, 0.08],
+  [0.3, 0.62, 0.18, 0.16, 0.07],
+];
 /** Leuchtmoos an der Wand je Seite (`note`, wie `SIDES` in mitwachsen-fill.ts): [dx, dy, Breite, Tiefe] des Polsters, das hochwächst */
 const CLIMB: readonly (readonly [number, number, number, number])[] = [
   [0.14, 0, 0.72, 0.1],
@@ -328,7 +368,7 @@ const CLIMB: readonly (readonly [number, number, number, number])[] = [
 ];
 
 /**
- * Fülle der Grotte, flach und begehbar: Kristallfeld (niedrige Splitter in der Farbe der Zone, `Cell.color`, niedriger
+ * Fülle der Grotte, flach und begehbar: helle Steine am Seeufer, Kristallfeld (niedrige Splitter in der Farbe der Zone, `Cell.color`, niedriger
  * als ein Leuchtpilz), Ader (flacher Streifen in Rosa oder Lila, leuchtet nicht), Leuchtmoos (flaches Polster mit hellen
  * Tupfen, am Fuß einer Felswand wächst es an ihr hoch: `note` die Seite)
  */
@@ -344,6 +384,11 @@ export function adornBoxes(c: Cell, x: number, y: number): Box[] | null {
       const sx = turn > 0 ? dx : 1 - dx - w;
       return [x + sx, y + dy, h, w, w, hh * (c.note === 1 ? 1.25 : 1), k, l];
     });
+  }
+  if (c.deco === 'shore') {
+    // helle Steine am Seeufer: zwei oder drei flache Kiesel, je Feld anders gelegt
+    const n = 2 + (hash(10, x, y) % 2);
+    return SHORE.slice(0, n).map(([dx, dy, w, d, hh]): Box => [x + dx, y + dy, h, w, d, hh, ...C.bright]);
   }
   if (c.deco === 'vein') {
     const k = c.color ?? C.veins[0];

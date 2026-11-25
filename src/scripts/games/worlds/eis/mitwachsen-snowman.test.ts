@@ -92,9 +92,9 @@ describe('Schneemänner bauen (Eis-Welt)', () => {
     expect(r.state.animals[0]!.mode).toBe('follow');
   });
 
-  it('die 3D-Ansicht baut nur nach Pflücken, Fangen, Nachwachsen und Schneemann ein Stück neu', () => {
+  it('die 3D-Ansicht baut nur nach Pflücken, Fangen, Nachwachsen, Schneemann und Füllen eines Trogs ein Stück neu', () => {
     const types = ['pick', 'catch', 'regrow', 'snowman', 'fill', 'feed', 'pour', 'bump', 'step'];
-    expect(types.filter((type) => reshapes({ type }))).toEqual(['pick', 'catch', 'regrow', 'snowman']);
+    expect(types.filter((type) => reshapes({ type }))).toEqual(['pick', 'catch', 'regrow', 'snowman', 'feed', 'pour']);
   });
 
   it('Tiere ringsum drehen sich um und schauen zu', () => {

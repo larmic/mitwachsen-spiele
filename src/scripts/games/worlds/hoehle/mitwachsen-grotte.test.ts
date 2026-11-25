@@ -53,13 +53,20 @@ function walkInto(w: World, steps: ReadonlyMap<string, number>, p: Point, hands:
 
 type Placed1 = { p: Point; c: Cell };
 
-/** Was an den Pilzbeeten nicht stimmt: Platz, Boden, Licht, erreichbar, Sammeln, Farben, Abstand */
+/**
+ * Was an den Pilzbeeten nicht stimmt: Platz (vier im Pilzgarten, zwei etwa 12 Felder vom Bett), Boden, Licht,
+ * erreichbar, Sammeln, Farben (ein Büschel aus fünf Pilzen in einer Farbe, leer nur Stümpfe), Abstand
+ */
 function bedProblems(w: World, site: Site, steps: ReadonlyMap<string, number>, all: readonly Placed1[]): string[] {
   const bad: string[] = [];
   const beds = all.filter(({ c }) => c.deco === 'shroombed');
-  const want = bedSpots().map(([du, dv]) =>
-    key(site.at(...fromMouth([GROTTE.garden.across + du, GROTTE.garden.out + dv]))),
-  );
+  const want = [
+    ...bedSpots().map(([du, dv]) => key(site.at(...fromMouth([GROTTE.garden.across + du, GROTTE.garden.out + dv])))),
+    ...GROTTE.nearBeds.at.map((p) => key(site.at(...fromMouth(p)))),
+  ];
+  const bed = site.at(...fromMouth([0, GROTTE.bed]));
+  const near = beds.filter(({ p }) => Math.hypot(p[0] - bed[0], p[1] - bed[1]) <= 13);
+  if (near.length !== 2) bad.push(`${near.length} Beete etwa 12 Felder vom Bett`);
   if (
     beds
       .map(({ p }) => key(p))
@@ -68,7 +75,7 @@ function bedProblems(w: World, site: Site, steps: ReadonlyMap<string, number>, a
   )
     bad.push('Beete nicht an ihren Plätzen');
   const colors = [...GROTTE_COLORS.shrooms] as string[];
-  // je Beet drei Leuchtpilze, je einer in Rosa, Türkis und Gelb; abgeerntet keiner mehr
+  // je Beet fünf Leuchtpilze in einer der drei Farben; abgeerntet keiner mehr
   const caps = ({ p, c }: Placed1, full: boolean) =>
     caveBoxes(w, c, ...p, full)!.flatMap((b) => (colors.includes(b[6]) ? [b[6]] : []));
   for (const bed of beds) {
@@ -77,7 +84,8 @@ function bedProblems(w: World, site: Site, steps: ReadonlyMap<string, number>, a
     if ((c.light ?? 0) < GROTTE.glow) bad.push(`${key(p)}: Beet leuchtet nicht`);
     const r = walkInto(w, steps, p);
     if (r?.events[0]?.type !== 'gather' || !r.state.shrooms) bad.push(`${key(p)}: nicht erreichbar oder sammelt nicht`);
-    if (caps(bed, true).sort().join() !== [...colors].sort().join()) bad.push(`${key(p)}: Farben`);
+    const full = caps(bed, true);
+    if (full.length !== 5 || new Set(full).size !== 1) bad.push(`${key(p)}: Farben`);
     if (caps(bed, false).length) bad.push(`${key(p)}: abgeerntet noch Pilze`);
   }
   // je Beet freies Moos ringsum (einzeln wie Busch und Fischkiste)
@@ -438,7 +446,7 @@ describe('Kristallgrotte: Gelände', () => {
       expect(steep.map(key).slice(0, 3)).toEqual([]);
     });
 
-    it(`Seed ${seed}: Sammeln: sechs Pilzbeete im Pilzgarten, Tropfquelle und Tropfmoos am Felsbecken, alles erreichbar`, () => {
+    it(`Seed ${seed}: Sammeln: vier Pilzbeete im Pilzgarten und zwei nah am Bett, Tropfquelle und Tropfmoos am Felsbecken, alles erreichbar`, () => {
       const all = placeOf(seed).cells.map((p) => ({ p, c: w.cell(...p) }));
       const bad = [...bedProblems(w, site, steps, all), ...dripProblems(w, site, steps, all)];
       // Futter und Wasser am Höhlenbett: mit Pilzen in die Pilzschale, mit der Kanne in den Steintrog
@@ -446,6 +454,26 @@ describe('Kristallgrotte: Gelände', () => {
       if (feed?.events[0]?.type !== 'feed' || feed.state.shrooms) bad.push('Pilzschale nimmt keine Pilze');
       const pour = walkInto(w, steps, home.water, { bucket: true });
       if (pour?.events[0]?.type !== 'pour' || pour.state.bucket) bad.push('Steintrog nimmt kein Wasser');
+      // Deko-Pilze weiß-blau, im Pilzgarten nur am Rand der Wiese (zwischen den Beeten nichts, was wie ein Sammelpilz aussieht)
+      const { garden, lake } = GROTTE;
+      for (const { p, c } of all) {
+        if (c.deco !== 'glowshroom') continue;
+        if (c.color !== GROTTE_COLORS.decoShroom) bad.push(`${key(p)}: Deko-Pilz in ${c.color}`);
+        const [u, v] = mouthOf(site, p);
+        const d = Math.hypot(u - garden.across, v - garden.out);
+        if (d <= garden.r && d < garden.edge) bad.push(`${key(p)}: Deko-Pilz zwischen den Beeten`);
+      }
+      // helle Steine am Ufer des Sees: begehbar, am Wasser
+      const shore = all.filter(({ c }) => c.deco === 'shore');
+      if (shore.length < 8) bad.push(`nur ${shore.length} Ufersteine`);
+      for (const { p, c } of shore) {
+        const [u, v] = mouthOf(site, p);
+        const wet = [-1, 1].some(
+          (d) => w.cell(p[0] + d, p[1]).ground === 'water' || w.cell(p[0], p[1] + d).ground === 'water',
+        );
+        if (c.solid || !wet || Math.hypot(u - lake.across, v - lake.out) > lake.rx + 2)
+          bad.push(`${key(p)}: Uferstein`);
+      }
       expect(bad, `Seed ${seed}`).toEqual([]);
     });
 
@@ -581,13 +609,15 @@ describe('Kristallgrotte: Gelände', () => {
       if (ferns.length < 5) bad.push(`nur ${ferns.length} Farne`);
       for (const { p, c, m } of ferns)
         if (!underShaft(m) || c.solid || c.ground !== 'grass') bad.push(`Farn ${key(p)}`);
-      // Moos (ground 'grass') nur auf der Mooswiese am Bett, im Pilzgarten, am Felsbecken und unter den Schächten
+      // Moos (ground 'grass') nur auf der Mooswiese am Bett, im Pilzgarten, um die Beete nah am Bett, am Felsbecken und
+      // unter den Schächten
       const mossy = all.filter(
         ({ c, m }) =>
           c.region === 'hoehle' &&
           c.ground === 'grass' &&
           !c.garden &&
           Math.hypot(m[0] - garden.across, m[1] - garden.out) > garden.r &&
+          !GROTTE.nearBeds.at.some(([a, o]) => Math.hypot(m[0] - a, m[1] - o) <= GROTTE.nearBeds.moss) &&
           Math.hypot(m[0] - drip.across - drip.basin, m[1] - drip.out) > 3 &&
           !underShaft(m),
       );
