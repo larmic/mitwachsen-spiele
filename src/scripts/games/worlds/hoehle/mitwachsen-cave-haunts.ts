@@ -36,9 +36,11 @@ export function caveHaunts(
   toWorld: (at: readonly [number, number]) => Point,
   bed: Point,
   side: 1 | -1 = 1,
+  arch?: Point,
 ): Region {
   const animals = CAVE_ANIMALS.map(({ species, near, at }) => {
-    const [tx, ty] = toWorld(near === 'clay' ? onClay(at, side) : at);
+    // der Bogen steht auf der Bühne der Halle in Weltrichtung (`arch`), nicht im Raster der Grotte
+    const [tx, ty] = near === 'arch' && arch ? arch : toWorld(near === 'clay' ? onClay(at, side) : at);
     let best: Point = [tx, ty],
       bestD = Infinity;
     for (const [x, y] of cells) {

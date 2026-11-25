@@ -18,6 +18,7 @@ import { kesselPlace } from '../../mitwachsen-world';
 import { bareOf, HOEHLE_PACK, SAMPLE_SEEDS, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import { HAUNTS } from './mitwachsen-cave-haunts';
 import { fromMouth } from './mitwachsen-grotte';
+import { HALL_STAGE, hallStage } from './mitwachsen-hall';
 import { laneSide, onClay } from './mitwachsen-lane';
 import type { Site } from './mitwachsen-site';
 
@@ -58,7 +59,13 @@ describe('Höhlen-Tiere: Wohnorte in der Grotte', () => {
       const { site } = kesselPlace(seed, HOEHLE_PACK) as KesselPlace & { site: Site };
       for (const { species, near, at } of CAVE_ANIMALS) {
         const spawn = w.spawns.get(animalId('hoehle', species))!;
-        const want = site.at(...fromMouth(near === 'clay' ? onClay(at, laneSide(site)) : at)); // Lehmhang rückt mit
+        // Lehmhang rückt mit; der Bogen steht auf der Bühne der Halle in Weltrichtung, die Fledermaus hängt in seiner Mitte
+        const want =
+          near === 'arch'
+            ? hallStage(site)(0, HALL_STAGE.arch)
+            : site.at(...fromMouth(near === 'clay' ? onClay(at, laneSide(site)) : at));
+        if (near === 'arch' && (spawn[0] !== want[0] || spawn[1] !== want[1]))
+          bad.push(`${seed}: Fledermaus nicht in der Mitte`);
         const d = cheb(spawn[0], spawn[1], want[0], want[1]);
         if (d > 6) bad.push(`${seed} ${species}: ${d} Felder vom Wunschort`);
       }

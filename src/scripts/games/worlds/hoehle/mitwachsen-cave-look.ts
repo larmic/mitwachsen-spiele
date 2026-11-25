@@ -10,7 +10,7 @@
 // view-2d.ts, 3D über den 3D-Teil view-3d.ts.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Die Kristallgrotte“)
 
-import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
+import { GROTTE, GROTTE_COLORS, JETTY_EAST } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import { ARCH_PERCH } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-animals';
 import { hash } from '../../../../lib/games/rng';
 import type { Cell } from '../../mitwachsen-cell';
@@ -52,7 +52,12 @@ export function caveBoxes(world: Realms, c: Cell, x: number, y: number, full = t
       ];
     case 'column':
       return columnBoxes(c, x, y);
-    case 'jetty': // Planke des Holzstegs: zwei Bretter quer, dazwischen eine schmale Fuge
+    case 'jetty': // Planke des Holzstegs: zwei Bretter quer zur Laufrichtung, dazwischen eine schmale Fuge
+      if ((c.note ?? 0) >= JETTY_EAST)
+        return [
+          [x + 0.04, y + 0.02, h, 0.44, 0.96, 0.06, ...C.jetty],
+          [x + 0.52, y + 0.02, h, 0.44, 0.96, 0.06, ...C.jetty],
+        ];
       return [
         [x + 0.02, y + 0.04, h, 0.96, 0.44, 0.06, ...C.jetty],
         [x + 0.02, y + 0.52, h, 0.96, 0.44, 0.06, ...C.jetty],
