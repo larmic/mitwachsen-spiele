@@ -3480,3 +3480,140 @@ test(
     expect(errors).toEqual([]);
   },
 );
+
+// Klingeltore und Glitzergang der Grubenbahn (Schritt 16, `?entwickler=grube`, fester Seed 1, in 2D): Zu Fuß gegen das
+// Tor am Ausgang gelaufen klingt es, die Figur bleibt davor stehen, und Funkel am Halt blinkt; danach eine ganze Runde
+// durch den Glitzergang: Die Tore heben ihre Scheibe, die Röhren singen, in der Mitte tutet Funkel mit Echo. Gezählt
+// werden alle Töne, die die Seite spielt (Oszillatoren mit Beginn und Ende auf der Uhr des Spiels): nie mehr als sechs
+// zugleich (sfx.ts begrenzt nur sofortige Töne, eingeplante nicht)
+test('Spiel: Funkel durch den Glitzergang: Klingeltor zu Fuß, Tore und Echo beim Durchfahren, höchstens sechs Stimmen, ohne Fehler', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  type Cell = { ride?: string; stop?: string; chimeGate?: string; lane?: { at?: number; part?: string } };
+  type Body = { id: string; z: number; glow?: true };
+  type Game = {
+    world: { homes: Record<string, { bed: [number, number] }>; cell(x: number, y: number): Cell };
+    state: {
+      player: { x: number; y: number; dir: string };
+      animals: unknown[];
+      ride?: { id: string; pos: number };
+      sleeping: boolean;
+    };
+    rides: Body[];
+    apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+  };
+  await page.addInitScript(() => {
+    const real = crypto.getRandomValues.bind(crypto);
+    const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+      a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+    Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    // jeder Ton der Seite: Beginn und Ende in Sekunden auf der Uhr des Spiels (Test-Uhr), aus start/stop des Oszillators
+    const log: [number, number][] = [];
+    (window as unknown as { __mwVoices: typeof log }).__mwVoices = log;
+    const on = (node: OscillatorNode, when: number) => performance.now() / 1000 + (when - node.context.currentTime);
+    // start und stop erbt der Oszillator von AudioScheduledSourceNode: eigene davor, die weiterreichen
+    const base = AudioScheduledSourceNode.prototype;
+    const index = new WeakMap<OscillatorNode, number>();
+    OscillatorNode.prototype.start = function (this: OscillatorNode, when = 0) {
+      index.set(this, log.push([on(this, when), Infinity]) - 1);
+      base.start.call(this, when);
+    };
+    OscillatorNode.prototype.stop = function (this: OscillatorNode, when = 0) {
+      const i = index.get(this);
+      if (i !== undefined) log[i]![1] = on(this, when);
+      base.stop.call(this, when);
+    };
+  });
+  const game = await openGame(page, { clock: true, dev: 'grube' });
+  await page.keyboard.press('ArrowDown'); // weckt die Figur und gibt den Ton frei (eine Geste)
+  await ticks(page, 5);
+  await render(page, 2);
+  const voices = () =>
+    page.evaluate(() => {
+      const log = (window as unknown as { __mwVoices: [number, number][] }).__mwVoices;
+      const most = Math.max(0, ...log.map(([a]) => log.filter(([b, e]) => b <= a && a < e).length));
+      return { notes: log.length, most };
+    });
+  // zu Fuß vor das Tor am Ausgang (auf das offene Gleis davor) und hineinlaufen
+  const rung = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const [bx, by] = el.world.homes.hoehle!.bed;
+    const dirs: [string, number, number][] = [
+      ['e', 1, 0],
+      ['w', -1, 0],
+      ['s', 0, 1],
+      ['n', 0, -1],
+    ];
+    for (let y = by - 30; y <= by + 30; y++)
+      for (let x = bx - 30; x <= bx + 30; x++) {
+        if (el.world.cell(x, y).chimeGate !== 'out') continue;
+        const [dir, dx, dy] = dirs.find(([, dx, dy]) => el.world.cell(x - dx, y - dy).lane?.part === 'open')!;
+        el.state = { ...el.state, animals: [], player: { x: x - dx, y: y - dy, dir: 's' } };
+        el.apply({ type: 'move', dir, fresh: true });
+        return { gate: [x, y], at: [el.state.player.x, el.state.player.y], from: [x - dx, y - dy] };
+      }
+    return undefined;
+  });
+  expect(rung).toBeDefined();
+  expect(rung!.at).toEqual(rung!.from); // vor dem Tor stehen geblieben
+  await render(page, 1);
+  const blink = await game.evaluate(
+    (node) => !!(node as unknown as Game).rides.find((r) => r.id === 'ride:grube:loco')?.glow,
+  );
+  expect(blink).toBe(true); // Funkel am Halt antwortet: die Lampe blinkt
+  const foot = await voices();
+  expect(foot.notes).toBeGreaterThanOrEqual(5); // drei Töne des Tors und das Signal von Funkel
+  // einsteigen vom Bahnsteig neben dem Sitz und eine ganze Runde fahren
+  const boarded = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const [bx, by] = el.world.homes.hoehle!.bed;
+    let seat: [number, number] | undefined;
+    for (let y = by - 30; y <= by + 30 && !seat; y++)
+      for (let x = bx - 30; x <= bx + 30 && !seat; x++) {
+        const c = el.world.cell(x, y);
+        if (c.ride === 'grube' && c.lane?.at === 5) seat = [x, y];
+      }
+    const dirs: [string, number, number][] = [
+      ['e', 1, 0],
+      ['w', -1, 0],
+      ['s', 0, 1],
+      ['n', 0, -1],
+    ];
+    const [dir, dx, dy] = dirs.find(([, dx, dy]) => el.world.cell(seat![0] - dx, seat![1] - dy).stop === 'grube')!;
+    el.state = { ...el.state, animals: [], player: { x: seat![0] - dx, y: seat![1] - dy, dir: 's' } };
+    el.apply({ type: 'move', dir, fresh: true });
+    return el.state.ride?.id;
+  });
+  expect(boarded).toBe('grube');
+  const seen = new Set<string>();
+  let lifted = false;
+  for (let i = 0; i < 60; i++) {
+    const now = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      return { riding: !!el.state.ride, ids: el.rides.map((r) => r.id) };
+    });
+    now.ids.forEach((id) => seen.add(id));
+    if (!now.riding) break;
+    await play(page, 500);
+    lifted ||= await game.evaluate((node) => {
+      const rides = (node as unknown as Game).rides;
+      const z = (id: string) => rides.find((r) => r.id === id)?.z ?? 0;
+      return z('grube-tor:in:scheibe') - z('grube-tor:out:scheibe') > 0.1;
+    });
+  }
+  expect(await game.evaluate((node) => (node as unknown as Game).state.ride ?? null)).toBeNull();
+  expect([...seen].filter((id) => id.startsWith('grube-tor:') || id === 'grube-fall').sort()).toEqual([
+    'grube-fall',
+    'grube-tor:in',
+    'grube-tor:in:scheibe',
+    'grube-tor:out',
+    'grube-tor:out:scheibe',
+  ]);
+  expect(lifted).toBe(true); // durch das Tor am Eingang: die Scheibe hebt sich
+  const ride = await voices();
+  // beim Durchfahren: Röhren aufwärts, Tuten mit zwei Echos, Röhren abwärts (je 6) und die Töne von Funkel
+  expect(ride.notes - foot.notes).toBeGreaterThanOrEqual(18);
+  expect(ride.most).toBeLessThanOrEqual(6);
+  expect(errors).toEqual([]);
+});

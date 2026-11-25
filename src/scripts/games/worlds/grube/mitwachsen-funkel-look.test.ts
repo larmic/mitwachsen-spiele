@@ -10,7 +10,16 @@ import type { RideAt } from '../../mitwachsen-ride-view';
 import { initialState, type State } from '../../mitwachsen-state';
 import { DUG, GRUBE_PACK, HOEHLE_PACK, worldOf } from '../../test-worlds';
 import { FUNKEL, funkelRoute } from './mitwachsen-funkel';
-import { FUNKEL_ID, JUMP, funkelBodies, funkelFx, funkelScores, grubeRails, railShape } from './mitwachsen-funkel-look';
+import { gangOf } from './mitwachsen-gang';
+import {
+  BLINK_MS,
+  FUNKEL_ID,
+  funkelBodies,
+  funkelFx,
+  funkelScores,
+  grubeRails,
+  railShape,
+} from './mitwachsen-funkel-look';
 import { pack } from './index';
 
 const world = worldOf(1, [HOEHLE_PACK, GRUBE_PACK], DUG);
@@ -84,9 +93,16 @@ describe('Bild von Funkel', () => {
     // am Halt leuchtet die Lampe am Abend: die Dunkelmaske öffnet dort ein kleines Loch (`glow`), ohne Licht nicht
     expect(evening.filter((b) => b.glow).map((b) => b.id)).toEqual([`${FUNKEL_ID}:loco`]);
     expect(funkelBodies(inCave(), world, AT).some((b) => b.glow)).toBe(false);
+    // stößt das Kind zu Fuß ein Klingeltor an, antwortet es am Halt: Die Lampe blinkt BLINK_MS lang, danach ist sie aus
+    const lamp = (now: number, reduced = false) =>
+      colors(funkelBodies(inCave(), world, { ...AT, now, reduced }, 1000)[0]!.parts).has(FUNKEL_COLORS.lit);
+    const blinks = [1000, 1100, 1250, 1450, 1650, BLINK_MS + 1100].map((t) => lamp(t));
+    expect(blinks).toEqual([true, true, false, true, false, false]);
+    expect([1250, 1650].map((t) => lamp(t, true))).toEqual([true, true]); // bei reduzierter Bewegung ruhig an
+    expect(lamp(900)).toBe(false);
   });
 
-  it('unterwegs: die Figur sitzt im ersten Wagen, die Wagen gleiten; bei reduzierter Bewegung in Sprüngen', () => {
+  it('unterwegs: die Figur sitzt im ersten Wagen, die Wagen gleiten; bei reduzierter Bewegung feste Bilder', () => {
     const ride = {
       id: 'grube',
       phase: 'go',
@@ -106,9 +122,18 @@ describe('Bild von Funkel', () => {
     const [a, b] = [route.path[40]!, route.path[41]!];
     expect(bodies[1]!.x).toBeCloseTo(a[0] + (b[0] - a[0]) * 0.5);
     expect(bodies[1]!.y).toBeCloseTo(a[1] + (b[1] - a[1]) * 0.5);
-    const calm = funkelBodies(s, world, { ...AT, reduced: true });
-    const jump = route.path[Math.floor(40.5 / JUMP) * JUMP]!;
-    expect([calm[1]!.x, calm[1]!.y]).toEqual(jump);
+    // bei reduzierter Bewegung feste Bilder: Halt, Klingeltor ein, Mitte des Gangs mit Wasserfall, Klingeltor aus, Halt;
+    // dazwischen steht es (kein Gleiten), am Ende wieder am Halt
+    const g = gangOf(world, route)!;
+    const len = route.path.length - 1;
+    const calmAt = (pos: number) => {
+      const b = funkelBodies(inCave(DUG, { ride: { ...ride, pos, greeted: [] } }), world, { ...AT, reduced: true });
+      return [b[1]!.x, b[1]!.y];
+    };
+    const frames = [0, g.gates.in - 0.5, g.gates.in, g.mid + 0.5, g.gates.out + 3, len - 0.2, len];
+    expect(frames.map(calmAt)).toEqual(
+      [0, 0, g.gates.in, g.mid, g.gates.out, g.gates.out, 0].map((i) => [...route.path[i]!]),
+    );
     // fährt die Figur mit einem anderen Fahrzeug, steht Funkel am Halt, ohne sie
     const other = funkelBodies({ ...s, ride: { ...s.ride!, id: 'hoehle' } }, world, AT);
     expect(other.some((x) => x.seat)).toBe(false);

@@ -5,7 +5,9 @@
 // sein Ankommen die Welt nicht neu, `lays`), und bringt
 // das Bähnchen für die Fahr-Engine (`rules.vehicle`; die Fahrregeln bringt das Paket der Fahrzeuge, worlds/fahrt/), dazu
 // sein Bild und seine Töne für 2D und 3D (mitwachsen-funkel-look.ts; Modell in
-// src/data/games/worlds/grube/mitwachsen-funkel-model.ts). Ein 3D-Teil mit Three.js ist nicht nötig: Gleis und Körper
+// src/data/games/worlds/grube/mitwachsen-funkel-model.ts), dazu den Glitzergang mit seinen zwei Klingeltoren (Schritt 16:
+// mitwachsen-gang.ts, rein; Bild und Ton in mitwachsen-gang-look.ts, Modelle in mitwachsen-gang-model.ts; zu Fuß klingt
+// ein Tor über `rules.bump`, `ringGate`). Ein 3D-Teil mit Three.js ist nicht nötig: Gleis und Körper
 // sind Quader wie in 2D, darum kommt `view3d` aus derselben Datei. Geladen wird es mit der Grotte (`ALONG` in
 // mitwachsen-packs.ts); der Entwickler-Schalter spielt den gegrabenen Gang vor (`/spielen/?entwickler=grube`,
 // mitwachsen-dev.ts). Nichts außerhalb dieses Ordners importiert statisch von hier (geprüft durch `npm run arch`): im
@@ -18,17 +20,30 @@ import type { WorldPack } from '../../mitwachsen-pack-types';
 import type { RideEngine, Vehicle } from '../../mitwachsen-rider';
 import type { View2D } from '../../mitwachsen-view';
 import type { View3D } from '../../mitwachsen-view-3d';
-import { dug, funkel, layGrube } from './mitwachsen-funkel';
+import { dug, funkel, layGrube, ringGate } from './mitwachsen-funkel';
 import { funkelBodies, funkelFx, grubeRails } from './mitwachsen-funkel-look';
+import { GangFx, gangBodies, gangDim } from './mitwachsen-gang-look';
 
-const view: View2D = { decos: {}, ground: () => null, rails: grubeRails, bodies: funkelBodies, rideFx: funkelFx };
+/** Was am Glitzergang zuletzt klang (je Spielseite eins) */
+const fx = new GangFx();
+
+const view: View2D = {
+  decos: {},
+  ground: () => null,
+  rails: grubeRails,
+  bodies: (state, world, at) => [...funkelBodies(state, world, at, fx.rangAt), ...gangBodies(state, world, at, fx)],
+  rideFx: funkelFx,
+  score: (e) => (e.type === 'chimegate' ? fx.ring(e.x, e.y, performance.now(), e.answer) : undefined), // zu Fuß ans Klingeltor
+  ambient: (world, state, now) => fx.ambient(world, state, now), // Röhren beim Durchfahren, Tuten mit Echo
+  dim: gangDim, // im Glitzergang wie im Tunnel
+};
 const view3d: View3D = { decos: {}, ground: () => null, rails: grubeRails };
 
 export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle> = {
   id: 'grube',
   lay: layGrube,
   lays: dug, // vor dem Graben kein Neubau, wenn das Paket mit der Grotte ankommt
-  rules: { bump: () => false, vehicle: funkel },
+  rules: { bump: ringGate, vehicle: funkel },
   view,
   view3d: () => Promise.resolve(view3d),
 };

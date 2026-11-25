@@ -67,6 +67,22 @@ const INFO_KEY = 'larmic.games.mitwachsen.info'; // Hinweis für Eltern schon ge
 const SPEED = (1000 / STEP_MS) * 1.1; // Felder pro Sekunde beim Gleiten: etwas schneller als der Takt, also weich
 
 const noop = () => {};
+/** Ereignisse aus den Regeln einer Welt (`PackEvent`): Ihre Töne kommen aus dem Paket dieser Welt (`packScore`) */
+const PACKED: ReadonlySet<string> = new Set<PackEvent['type']>([
+  'snowman',
+  'icicle',
+  'column',
+  'olm',
+  'web',
+  'chimegate',
+  'lantern',
+  'heave',
+]);
+const packed = (e: { type: string }): e is PackEvent => PACKED.has(e.type);
+/** Davon zeigt und spielt das Paket alles selbst (Säule, Grottenolm, Netz, Klingeltor) */
+type PackOnly = Extract<PackEvent, { type: 'column' | 'olm' | 'web' | 'chimegate' }>;
+const PACK_ONLY: ReadonlySet<string> = new Set<PackOnly['type']>(['column', 'olm', 'web', 'chimegate']);
+const packOnly = (e: { type: string }): e is PackOnly => PACK_ONLY.has(e.type);
 
 class LarmicMitwachsen extends HTMLElement {
   private store!: Store;
@@ -823,23 +839,15 @@ class LarmicMitwachsen extends HTMLElement {
    * Beeren gepflückt, Fische gefangen, nachgewachsen, Eimer geschöpft; Beeren, Fische oder Wasser in den Trog; ein
    * Schneehaufen wächst um eine Kugel (es ploppt, Töne aus dem Welt-Paket, und gleich gespeichert: der Schneemann
    * bleibt); ein Eiszapfen klingt (Ton aus dem Welt-Paket) und glitzert, die Figur läuft weiter; eine Kristallsäule
-   * klingt, der Grottenolm taucht am Steg auf, das Netz einer Tupfspinne klingt wie eine Harfe (Bild und Ton aus dem Paket der Höhlenwelt); die Figur nimmt die
+   * klingt, der Grottenolm taucht am Steg auf, das Netz einer Tupfspinne klingt wie eine Harfe (Bild und Ton aus dem Paket der Höhlenwelt), ein Klingeltor am Glitzergang
+   * spielt drei Töne (aus dem Paket der Grubenbahn); die Figur nimmt die
    * Kristall-Laterne (Ton aus dem Paket, sie hüpft, es glitzert)
    */
   private chore(e: ChoreEvent | Extract<GameEvent, { type: PackEvent['type'] | 'bob' }>, now: number) {
     if (e.type === 'bob') return void this.hops.set(e.id, now); // der Pinguin hüpft still neben der Torplatte
     if (reshapes(e)) this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]); // leer, wieder voll, gewachsen
-    if (
-      e.type === 'snowman' ||
-      e.type === 'icicle' ||
-      e.type === 'column' ||
-      e.type === 'olm' ||
-      e.type === 'web' ||
-      e.type === 'lantern' ||
-      e.type === 'heave'
-    )
-      this.sfx.score(packScore(this.renderer.views.values(), e)); // Töne aus dem Paket der Welt des Ereignisses
-    if (e.type === 'column' || e.type === 'olm' || e.type === 'web') return; // Säule, Grottenolm, Netz: Bild und Ton aus dem Paket
+    if (packed(e)) this.sfx.score(packScore(this.renderer.views.values(), e)); // Töne aus dem Paket der Welt des Ereignisses
+    if (packOnly(e)) return; // Säule, Grottenolm, Netz, Klingeltor: Bild und Ton aus dem Paket
     if (e.type === 'heave') {
       // Hau-ruck am Höhlentor: Figur und Tok lehnen sich an den Stein (Bild und Ton aus dem Paket der Höhlenwelt)
       if (e.n > 0) this.hops.set('player', now);

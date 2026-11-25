@@ -1,11 +1,12 @@
 // Aussehen und Klang des Grubenbähnchens Funkel, gleich für 2D und 3D (Haken `View2D.bodies`, `rails` und `rideFx`,
 // mitwachsen-ride-view.ts) – rein, ohne DOM und Three.js. Körper: Lok und zwei Bankwagen (Modelle in
 // src/data/games/worlds/grube/mitwachsen-funkel-model.ts) am Halt der Grotte, solange die Figur in der Grotte ist, oder
-// unterwegs auf der Runde: Sie gleiten zwischen den Takten weiter (bei reduzierter Bewegung in ruhigen Sprüngen alle
-// `JUMP` Felder), jeder Wagen schaut in seine Fahrtrichtung. Die Tür des ersten Wagens geht zum Bahnsteig auf, wenn
+// unterwegs auf der Runde: Sie gleiten zwischen den Takten weiter (bei reduzierter Bewegung springen sie zwischen
+// festen Bildern: Halt, Klingeltor ein, Mitte des Gangs, Klingeltor aus, Halt), jeder Wagen schaut in seine Fahrtrichtung. Die Tür des ersten Wagens geht zum Bahnsteig auf, wenn
 // das Kind anstößt oder aussteigt, und hat bis zur ersten Fahrt einen goldenen Rahmen, solange das Kind einsteigen kann
 // (nicht während einer Fahrt); die runde Lampe leuchtet während der Fahrt und am Abend (dann auch am Halt, mit einem
-// kleinen Loch der Dunkelmaske, `RideBody.glow`). Gleis: ein eigenes, schmales Gleisbild (Schiefer und dunkle Schienen, gerade oder in einer
+// kleinen Loch der Dunkelmaske, `RideBody.glow`) und blinkt am Halt, wenn das Kind zu Fuß ein Klingeltor anstößt (es
+// antwortet; mitwachsen-gang-look.ts). Bei reduzierter Bewegung steht es in festen Bildern (`frameOf`, mitwachsen-gang.ts). Gleis: ein eigenes, schmales Gleisbild (Schiefer und dunkle Schienen, gerade oder in einer
 // rechtwinkligen Kurve), nicht das der Höhlenbahn. Töne: sein Signal D5 → A5 (`RIDES`), Ankunft A5 → D5.
 // Spezifikation: docs/specs/mitwachsen.md („Die Grubenbahn Funkel“)
 
@@ -23,11 +24,13 @@ import type { Box, DrawRails } from '../../mitwachsen-view';
 import type { World } from '../../mitwachsen-world';
 import type { Scored } from '../../sfx';
 import { FUNKEL, funkelRoute } from './mitwachsen-funkel';
+import { frameOf, gangOf } from './mitwachsen-gang';
 
 /** Kennung der Körper (`ride:` trifft das Antippen) */
 export const FUNKEL_ID = `ride:${FUNKEL.id}`;
-/** Bei reduzierter Bewegung rückt Funkel in Sprüngen so vieler Felder vor */
-export const JUMP = 3;
+/** So lange (ms) blinkt die Lampe am Halt, wenn das Kind zu Fuß ein Klingeltor anstößt, je `BLINK_STEP` an oder aus */
+export const BLINK_MS = 1200;
+const BLINK_STEP = 200;
 /** So viele Takte nach dem Anstoßen oder Aussteigen steht die Tür offen (1 s) */
 export const OPEN_TICKS = 10;
 /** Rechte Hand, wenn ein Wagen in Richtung d schaut (wie in front.ts) */
@@ -58,14 +61,15 @@ function along(r: Pick<RideRoute, 'path'>, p: number, world: World): Spot {
   };
 }
 
-/** Wo der erste Wagen (der Sitz) gerade ist: am Halt 0, unterwegs zwischen den Takten weiter, bei reduzierter Bewegung in Sprüngen */
-function progress(r: RideRoute, state: State, at: RideAt): number {
+/**
+ * Wo der erste Wagen (der Sitz) gerade ist, als Index der Runde: am Halt 0, unterwegs zwischen den Takten weiter, bei
+ * reduzierter Bewegung das feste Bild (`frameOf`: Halt, Klingeltor ein, Mitte des Gangs, Klingeltor aus, Halt)
+ */
+export function funkelAt(r: RideRoute, state: State, at: Pick<RideAt, 'frac' | 'reduced'>, world: World): number {
   const ride = state.ride?.id === FUNKEL.id ? state.ride : undefined;
   if (!ride) return 0;
-  const len = r.path.length - 1;
-  let p = ride.phase === 'go' ? Math.max(0, ride.pos - ride.speed * (1 - at.frac)) : ride.pos;
-  if (at.reduced && p < len) p = Math.floor(p / JUMP) * JUMP;
-  return p;
+  const p = ride.phase === 'go' ? Math.max(0, ride.pos - ride.speed * (1 - at.frac)) : ride.pos;
+  return at.reduced ? frameOf(gangOf(world, r), p, r.path.length - 1) : p;
 }
 
 /** Seite der Tür zum Bahnsteig für einen Wagen mit Blick `dir` an der Stelle `x, y` (+1 rechts, −1 links) */
@@ -78,21 +82,24 @@ function sideOf(world: World, spot: Spot): 1 | -1 {
 /**
  * Körper von Funkel je Bild: Lok, erster Wagen (mit der Figur während seiner Fahrt), zweiter Wagen; am Halt, solange die
  * Figur in der Grotte ist, oder unterwegs. Leer, solange der Gang nicht gegraben ist oder die Figur woanders ist. Nur
- * seine eigene Fahrt bewegt ihn und setzt die Figur hinein
+ * seine eigene Fahrt bewegt ihn und setzt die Figur hinein. `rang`: wann (ms, wie `at.now`) das Kind zu Fuß zuletzt
+ * ein Klingeltor angestoßen hat; danach blinkt die Lampe am Halt `BLINK_MS` lang (bei reduzierter Bewegung leuchtet sie)
  */
-export function funkelBodies(state: State, world: World, at: RideAt): readonly RideBody[] {
+export function funkelBodies(state: State, world: World, at: RideAt, rang = -Infinity): readonly RideBody[] {
   const r = funkelRoute(world, state);
   if (!r) return [];
   const riding = state.ride?.id === FUNKEL.id;
   if (!riding && world.realm(state.player.x, state.player.y) !== world.realm(...r.stops.home)) return [];
-  const p = progress(r, state, at);
+  const p = funkelAt(r, state, at, world);
   const dozing = !!state.dozing?.includes(FUNKEL.id);
-  const since = (t: { id: string; at: number } | undefined) => (t?.id === FUNKEL.id ? state.tick - t.at : Infinity);
-  const open = !riding && Math.min(since(state.nudged), since(state.alighted)) < OPEN_TICKS;
+  const ago = (t: { id: string; at: number } | undefined) => (t?.id === FUNKEL.id ? state.tick - t.at : Infinity);
+  const open = !riding && Math.min(ago(state.nudged), ago(state.alighted)) < OPEN_TICKS;
   // goldener Rahmen bis zur ersten Fahrt, nur wenn das Kind einsteigen kann (wie beim Zug): nicht, wenn es schläft,
   // und nicht während einer Fahrt, auch nicht der eigenen
   const gold = !ridden(state.packs, FUNKEL.id) && !dozing && !state.ride;
-  const lit = riding || at.lit;
+  const since = at.now - rang;
+  const blink = !riding && since >= 0 && since < BLINK_MS && (at.reduced || Math.floor(since / BLINK_STEP) % 2 === 0);
+  const lit = riding || at.lit || blink;
   const kinds = [
     ['loco', p + 1],
     ['seat', p],

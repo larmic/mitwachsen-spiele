@@ -56,7 +56,8 @@ export type Kessel = {
  * hängt (die verschlafene Fledermaus, die nach je vier Tönen eine Runde dreht), keiner: fehlt; der Grottenolm taucht am
  * Ende des Stegs auf (x, y: die Planke); die Figur läuft gegen das Netz einer Tupfspinne (x, y: das Netz); die Figur nimmt die Kristall-Laterne von ihrem Sockel (x, y: der Sockel);
  * Hau-ruck am Höhlentor: das Hau-ruck beginnt (`n` 0) bzw. ein Stoß rollt den Stein (`n` 1 bis 3; x, y: Mitte der Tür;
- * `who`: Tok, er lehnt sich mit an den Stein))
+ * `who`: Tok, er lehnt sich mit an den Stein); Grubenbahn: die Figur läuft gegen ein Klingeltor des Glitzergangs (x, y: das
+ * Tor; es spielt drei Töne, Funkel am Halt antwortet, `answer`: nur, wenn er nicht schläft))
  */
 export type PackEvent =
   | { type: 'snowman'; x: number; y: number; stage: number }
@@ -64,6 +65,7 @@ export type PackEvent =
   | { type: 'column'; x: number; y: number; note: number; perch?: Point }
   | { type: 'olm'; x: number; y: number }
   | { type: 'web'; x: number; y: number }
+  | { type: 'chimegate'; x: number; y: number; answer: boolean }
   | { type: 'lantern'; x: number; y: number }
   | { type: 'heave'; x: number; y: number; n: number; who?: string };
 
@@ -79,6 +81,7 @@ export type Ruled = {
   player: { x: number; y: number };
   animals: { species: SpeciesId; x: number; y: number; dir: Dir; mode: string; rest: number }[];
   lamp?: RegionId; // die Figur trägt die Laterne dieser Gegend (Grotte: Kristall-Laterne; der Kern legt sie zurück)
+  dozing?: readonly string[]; // Fahrzeuge, die am Halt schlafen (`State.dozing`, nur lesen)
 };
 
 /**

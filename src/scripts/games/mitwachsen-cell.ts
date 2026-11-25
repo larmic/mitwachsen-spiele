@@ -117,6 +117,7 @@ export type Cell = {
   stop?: RideId; // Platz eines Halts dieses Fahrzeugs (Bahnsteig; den Platz in der Grotte hält ihr Paket frei, den Bahnsteig baut das Paket des Fahrzeugs)
   shed?: RideId; // Platz des Schuppens dieses Fahrzeugs (Lokschuppen neben Bahnhof Fledermaus; den Platz hält die Grotte frei, den Schuppen baut das Paket der Bahn mit Bau 2)
   stone?: StoryId; // Platz eines Klangsteins, den ein Paket ohne eigene Welt später setzt (neben dem Lokschuppen: die Grotte hält ihn frei, das Paket der Bahn setzt den Stein `lokschuppen` mit Bau 2)
+  chimeGate?: 'in' | 'out'; // Klingeltor der Grubenbahn am Eingang (`in`) oder Ausgang (`out`) des Glitzergangs: fest für Füße, frei für die Fahrt (Hineinlaufen lässt es klingen)
   lane?: Lane; // Feld der künftigen Schleife eines Fahrzeugs in seiner Welt (Grubenbahn in der Grotte: die Grotte legt sie fest und hält sie frei, ihr Paket baut sie)
 };
 

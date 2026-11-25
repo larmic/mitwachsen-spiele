@@ -4,8 +4,9 @@
 // dieses Paket rechnet nur aus diesen Feldern und importiert das Paket der Höhle nicht. Vor dem Graben (kein Eintrag
 // `packs.fahrt.grube`) legt es nichts: Gang und Nachbarn bleiben Fels. Ist der Gang gegraben (Stufe `bereit`), liegt das
 // schmale Gleis auf der ganzen Runde (`Cell.ride`, Richtungen in `Lane.to`), Gang und Nachbarn sind Grottenboden; fest
-// für Füße bleiben die beiden Enden des Gangs (dort kommen die Klingeltore hin), die Nachbarn neben offenem Gleis (ihre
-// Pfosten) und die Zaunkristalle zur Höhle hin. So kommt man zu Fuß nie in den Gang, nur mit dem Bähnchen.
+// für Füße bleiben die beiden Enden des Gangs (die Klingeltore, `Cell.chimeGate`: Läuft die Figur dagegen, klingt das Tor,
+// `ringGate`), die Nachbarn neben offenem Gleis (ihre Pfosten) und die Zaunkristalle zur Höhle hin. So kommt man zu Fuß
+// nie in den Gang, nur mit dem Bähnchen; gesperrt ist dabei nichts, was zählt (keine Tiere, nichts zum Sammeln).
 // Funkel erscheint nie von selbst (der Maulwurf gräbt den Gang, später); fahren tut es zuerst niemand, die Lampe ist sein
 // Gesicht. Lok und zwei Wagen belegen am Halt drei Felder des Gleises, die Figur sitzt im ersten Wagen hinter der Lok.
 // Eine Runde fährt immer vorwärts und kommt am selben Halt wieder an (`RideRoute.loop`); ausgestiegen wird auf den
@@ -16,7 +17,7 @@ import type { Point } from '../../../../data/games/mitwachsen';
 import { RIDES } from '../../../../data/games/mitwachsen-rides';
 import { FENCE_CRYSTAL } from '../../../../data/games/worlds/grube/mitwachsen-funkel-model';
 import type { Cell } from '../../mitwachsen-cell';
-import type { Laid } from '../../mitwachsen-pack-types';
+import type { Laid, WorldRules } from '../../mitwachsen-pack-types';
 import { rank, stageOf, withRidden } from '../../mitwachsen-ride-save';
 import type { RideRoute, Rider, Vehicle } from '../../mitwachsen-rider';
 import type { World } from '../../mitwachsen-world';
@@ -60,12 +61,16 @@ export function layGrube(laid: Laid): void {
   if (track.length < 3) return;
   const onTrack = new Map(track.map(([p, c]) => [key(...p), c.lane!.part]));
   const gang = track.filter(([, c]) => c.lane!.part === 'gang');
-  const ends = new Set([gang[0], gang.at(-1)].flatMap((e) => (e ? [key(...e[0])] : [])));
+  // die beiden Enden des Gangs sind die Klingeltore: am Eingang (`in`, zuerst gefahren) und am Ausgang (`out`)
+  const ends = new Map<string, 'in' | 'out'>();
+  if (gang[0]) ends.set(key(...gang[0][0]), 'in');
+  if (gang.at(-1)) ends.set(key(...gang.at(-1)![0]), 'out');
   const floor = (c: Cell, solid: boolean): Cell => ({ ...c, h: 1, deco: null, region: 'hoehle', solid });
   track.forEach(([p, c], i) => {
     const [prev, next] = [track[(i + track.length - 1) % track.length]![0], track[(i + 1) % track.length]![0]];
     const to = dirOf(p, prev) + dirOf(p, next);
-    const base = c.lane!.part === 'gang' ? floor(c, ends.has(key(...p))) : c;
+    const gate = ends.get(key(...p));
+    const base = c.lane!.part === 'gang' ? { ...floor(c, !!gate), ...(gate && { chimeGate: gate }) } : c;
     laid.map.set(key(...p), { ...base, ride: FUNKEL.id, lane: { ...c.lane!, to } });
   });
   for (const [p, c] of lane) {
@@ -164,4 +169,16 @@ export const funkel: Vehicle = {
   landed(s) {
     s.packs = withRidden(s.packs, FUNKEL.id); // kein goldener Rahmen mehr an der Tür
   },
+};
+
+/**
+ * Zu Fuß gegen ein Klingeltor gelaufen (`WorldRules.bump`): Es klingt (Ereignis `chimegate`, drei Töne, die Scheibe
+ * wackelt, Funkel am Halt tutet und blinkt; mitwachsen-gang-look.ts), die Figur bleibt stehen, ohne anzustoßen. Kein
+ * „noch nicht“, kein Gold: Das Tor ist für Füße nur zu eng
+ */
+export const ringGate: WorldRules['bump'] = (s, c, x, y, events) => {
+  if (!c.chimeGate) return false;
+  // schläft Funkel (es fehlt ein Paket), klingt nur das Tor: er antwortet nicht und lädt nicht ein
+  events.push({ type: 'chimegate', x, y, answer: !s.dozing?.includes(FUNKEL.id) });
+  return true;
 };

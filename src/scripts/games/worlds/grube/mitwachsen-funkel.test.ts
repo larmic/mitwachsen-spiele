@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import type { Point } from '../../../../data/games/mitwachsen';
 import { RIDES } from '../../../../data/games/mitwachsen-rides';
+import type { Cell } from '../../mitwachsen-cell';
 import type { RideEvent } from '../../mitwachsen-pack-types';
 import type { RideRoute } from '../../mitwachsen-rider';
 import { loopOk, parked, stopsOf } from '../../mitwachsen-ride-kit';
@@ -13,6 +14,7 @@ import { initialState, step, type Cmd, type GameEvent, type State } from '../../
 import { canStep, createWorld, type World } from '../../mitwachsen-world';
 import { DUG, FAHRT_PACK, GRUBE_PACK, HOEHLE_PACK, reachable, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import { FUNKEL, SEAT, dug, funkel, funkelExit, funkelRoute } from './mitwachsen-funkel';
+import { gangOf } from './mitwachsen-gang';
 import { pack } from './index';
 
 const keyOf = ([x, y]: readonly [number, number]) => `${x},${y}`;
@@ -125,12 +127,52 @@ describe('Grubenbähnchen Funkel', () => {
     const ends = [gang[0], gang.at(-1)].filter((p) => p !== undefined);
     if (ends.length !== 2 || ends.some((p) => !w.cell(...p).solid)) bad('Enden des Gangs nicht fest');
     if (gang.slice(1, -1).some((p) => w.cell(...p).solid || w.cell(...p).h !== 1)) bad('Gang nicht gegraben');
+    const gates = new Set(ends.map(keyOf));
     for (let y = hy - 90; y <= hy + 90; y++)
-      for (let x = hx - 90; x <= hx + 90; x++) {
-        const c = w.cell(x, y);
-        if (c.lane?.part === 'fence' && (c.deco !== 'crystalbush' || !c.solid)) bad(`Zaun bei ${x},${y}`);
-        if (c.lane?.part === 'side' && feet.has(keyOf([x, y]))) bad(`Nachbar des Gangs zu Fuß bei ${x},${y}`);
-      }
+      for (let x = hx - 90; x <= hx + 90; x++) cellOf(w.cell(x, y), keyOf([x, y]), feet, gates, bad);
+    gatesOf(w, r, feet, bad);
+  }
+
+  /** Ein Feld rings um die Schleife: Zaun fest, Nachbarn des Gangs nie zu Fuß, kein Wasser, Klingeltore nur an den Enden */
+  function cellOf(c: Cell, k: string, feet: ReadonlySet<string>, gates: ReadonlySet<string>, bad: Bad) {
+    if (c.lane?.part === 'fence' && (c.deco !== 'crystalbush' || !c.solid)) bad(`Zaun bei ${k}`);
+    if (c.lane?.part === 'side' && feet.has(k)) bad(`Nachbar des Gangs zu Fuß bei ${k}`);
+    if (c.lane && c.ground === 'water') bad(`Wasser auf der Schleife bei ${k}`);
+    if (c.chimeGate && !gates.has(k)) bad(`Klingeltor abseits des Gangs bei ${k}`);
+  }
+
+  /**
+   * Klingeltore und Glitzergang (Schritt 16): je ein Tor an den Enden des Gangs, zuerst der Eingang; das Tor am Ausgang
+   * liegt direkt am Halt (höchstens 8 Felder vom Bahnsteig) und ist wie das am Eingang zu Fuß anzulaufen (kein Köder,
+   * an dem man nicht ankommt); Wasserfall und Wandkristalle stehen im Gang, nie auf dem Gleis, nie zu Fuß erreichbar
+   */
+  function gatesOf(w: World, r: RideRoute, feet: ReadonlySet<string>, bad: Bad) {
+    const g = gangOf(w, r);
+    if (!g) return void bad('kein Glitzergang');
+    const len = r.path.length - 1;
+    const gates = r.path.slice(0, len).flatMap((p, i) => (w.cell(...p).chimeGate ? [[w.cell(...p).chimeGate, i]] : []));
+    if (
+      JSON.stringify(gates) !==
+      JSON.stringify([
+        ['in', g.gates.in],
+        ['out', g.gates.out],
+      ])
+    )
+      bad('Tore');
+    const [o, i] = [r.path[g.gates.out]!, r.path[g.gates.in]!];
+    const platform: Point[] = [];
+    const [hx, hy] = w.homes.hoehle.bed;
+    for (let y = hy - 30; y <= hy + 30; y++)
+      for (let x = hx - 30; x <= hx + 30; x++) if (w.cell(x, y).stop === 'grube') platform.push([x, y]);
+    const near = Math.min(...platform.map(([x, y]) => Math.hypot(x - o[0], y - o[1])));
+    if (near > 8) bad(`Tor am Ausgang ${near.toFixed(1)} Felder vom Bahnsteig`);
+    if (!feet.has(keyOf(r.path[g.gates.out + 1]!))) bad('Tor am Ausgang zu Fuß nicht anzulaufen');
+    if (!feet.has(keyOf(r.path[g.gates.in - 1]!))) bad('Tor am Eingang zu Fuß nicht anzulaufen');
+    if (Math.hypot(i[0] - o[0], i[1] - o[1]) < 20) bad('Tore zu nah beieinander');
+    if (!g.fall) bad('kein Wasserfall');
+    if (g.crystals.length < 8) bad(`nur ${g.crystals.length} Wandkristalle`);
+    for (const p of [...(g.fall ? [g.fall] : []), ...g.crystals.map((c) => c.at)])
+      if (r.on.has(keyOf(p)) || feet.has(keyOf(p)) || w.cell(...p).ground === 'water') bad(`Zierde bei ${keyOf(p)}`);
   }
 
   /**
