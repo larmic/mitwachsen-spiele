@@ -23,7 +23,7 @@
 import { fromKey } from '../../../../lib/games/chunks';
 import { hash, rand01, valueNoise } from '../../../../lib/games/rng';
 import type { Point } from '../../../../data/games/mitwachsen';
-import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
+import { GROTTE, GROTTE_COLORS, JETTY_EAST } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import { ARCH_PERCH } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-animals';
 import { FIRST_MOLE } from '../../../../data/games/mitwachsen-hoehle';
 import { HOMES } from '../../../../data/games/mitwachsen-homes';
@@ -39,6 +39,7 @@ import { caveHaunts } from './mitwachsen-cave-haunts';
 import { adornGrotte, corridorAt, crystalOf, fillGrotte, shadeGrotte, tipOf } from './mitwachsen-fill';
 import { dimGrotte } from './mitwachsen-glow';
 import { clayOf, laneMarks, lanePlan, laneSide, type LaneMarks } from './mitwachsen-lane';
+import { HALL_STAGE, hallStage } from './mitwachsen-hall';
 import { siteOf, type Site } from './mitwachsen-site';
 import { spinWebs } from './mitwachsen-spider';
 
@@ -163,8 +164,9 @@ export function buildGrotte(
     map,
   );
   // Wohnorte der Höhlen-Tiere: das erste je Art an seinem Fundort, die anderen verteilt über die Grotte
-  const spawns = findSpawns(seed, caveHaunts(spots, map, at, bed, side), spots, bed);
-  const ghosts = at(GROTTE.ghost.stone); // Klangstein „lichtgeister“ in der Kristallhalle (hallOf)
+  const stage = hallStage(site);
+  const spawns = findSpawns(seed, caveHaunts(spots, map, at, bed, side, stage(0, HALL_STAGE.arch)), spots, bed);
+  const ghosts = stage(...HALL_STAGE.stone); // Klangstein „lichtgeister“ in der Kristallhalle (hallOf)
   const more: [StoryId, Point][] = map.get(key(...ghosts))?.story === 'lichtgeister' ? [['lichtgeister', ghosts]] : [];
   return { bed, realm, spots, spawns, stone, more, portal: [CAVE_PORTAL, portal] };
 }
@@ -269,15 +271,21 @@ function pathsOf(site: Site, bed: Point, ring: Point) {
 }
 
 function keepFree(site: Site, bed: Point, ring: Point, side: 1 | -1, lane: ReadonlySet<string>) {
-  const { garden, clay, hall, lake, scree, portal } = GROTTE;
+  const { garden, clay, lake, scree, portal } = GROTTE;
   const path = pathsOf(site, bed, ring);
+  const [hx, hy] = hallStage(site)(0, 0);
+  // Bühne der Halle in Weltrichtung: Säulen, Bogen und Klangstein mit Platz ringsum
+  const onStage = (u: number, v: number) => {
+    const [x, y] = site.at(u, v);
+    return Math.abs(x - hx) <= 7 && Math.abs(y - hy + 2) <= 9;
+  };
   return (u: number, v: number) => {
     if (path(u, v) || lane.has(key(u, v))) return true; // Wege, Schleife der Grubenbahn samt Bahnsteig
     if (near(u, v, [garden.across, garden.out], garden.r)) return true;
     if (GROTTE.nearBeds.at.some((p) => near(u, v, p, 2.5))) return true; // die Beete näher am Bett, Moos ringsum
     const bank = clayOf(side); // Lehmhang, gegenüber der Kamera
     if (box(u, v, [bank.across - clay.step, bank.out], clay.step + 2, clay.long / 2 + 2)) return true;
-    if (box(u, v, [hall.across, hall.out + 2], 7, 9)) return true; // Säulen und Bogen mit Platz ringsum
+    if (onStage(u, v)) return true;
     if (near(u, v, [GROTTE.drip.across + GROTTE.drip.basin, GROTTE.drip.out], 4)) return true; // Felsbecken
     const [lu, lv] = fromMouth([lake.across, lake.out]);
     if (((u - lu) / (lake.rx + 3)) ** 2 + ((v - lv) / (lake.ry + 3)) ** 2 < 1) return true;
@@ -319,7 +327,7 @@ function features(site: Site, side: 1 | -1, map: Map<string, Cell>) {
         ...floor(2 + Math.floor(du / clay.step)),
         deco: 'clay',
       });
-  hallOf(put);
+  hallOf(put, hallStage(site), map);
   // Felsbecken 3 × 2 mit Moosrand: hinten die Tropfquelle (fest), auf dem Rand an den Seiten und hinten Tropfmoos
   // (begehbar), vorn bleibt Moos, von dort schöpft man
   for (let dv = -2; dv <= 1; dv++)
@@ -329,7 +337,7 @@ function features(site: Site, side: 1 | -1, map: Map<string, Cell>) {
       else if (dv === 1 && du === 0) put(p, { ...moss(), deco: 'dripspring', solid: true });
       else put(p, dv >= -1 ? { ...moss(), deco: 'dripmoss' } : moss());
     }
-  lakeOf(put);
+  lakeOf(put, site);
   // Geröllhang: drei Stufen nach außen, jede eine Ebene höher (2, 3, 4)
   for (let s = 0; s < 3; s++)
     for (let du = 0; du < scree.step; du++)
@@ -364,19 +372,18 @@ export function bedSpots(): Point[] {
 
 /**
  * Kristallhalle: fünf Säulen in einer Reihe (je ein Feld dazwischen), das Säulen-Glockenspiel (mitwachsen-cave-rules.ts),
- * dahinter der Kristallbogen, am Rand hohe Kristalle
+ * dahinter der Kristallbogen, am Rand hohe Kristalle. Säulen, Bogen und Klangstein stehen auf der Bühne der Halle
+ * (`hallStage`, in Weltrichtung): die Reihe quer im Bild, der tiefste Ton links, der Bogen dahinter im Norden. Die
+ * Kristalle am Rand liegen im Raster der Grotte
  */
-function hallOf(put: Put) {
+function hallOf(put: Put, stage: ReturnType<typeof hallStage>, map: Map<string, Cell>) {
   const { hall } = GROTTE;
   const [kr, kt, kp] = GROTTE_COLORS.crystals;
-  // das Säulen-Glockenspiel: `note` ist der Ton (0 = C5 links … 4 = A5 rechts), die Höhe kommt aus `hall.columns`
-  hall.columns.forEach((_, note) => put([hall.across - 4 + 2 * note, hall.out - 3], thing('column', { note })));
-  // Kristallbogen: Pfeiler an den Enden, darunter drei Felder, an deren Bogen man hängen kann (`perch`: die Fledermäuse)
-  for (let i = 0; i < 5; i++)
-    put(
-      [hall.across - 2 + i, hall.out + hall.arch - 3],
-      i % 4 === 0 ? thing('crystalarch', { note: i }) : { ...floor(), deco: 'crystalarch', note: i, perch: ARCH_PERCH },
-    );
+  const set = (right: number, front: number, c: Cell) => {
+    const k = key(...stage(right, front));
+    const was = map.get(k);
+    if (was?.region === 'hoehle' && !was.lane) map.set(k, c); // wie `put`: nie auf Klippen oder die Schleife der Grubenbahn
+  };
   for (const [du, dv, color] of [
     [-7, 3, kr],
     [7, 1, kp],
@@ -384,16 +391,28 @@ function hallOf(put: Put) {
     [6, 10, kr],
   ] as const)
     put([hall.across + du, hall.out + dv], thing('crystal', { color }));
+  // das Säulen-Glockenspiel: `note` ist der Ton (0 = C5 links … 4 = A5 rechts), die Höhe kommt aus `hall.columns`
+  hall.columns.forEach((_, note) => set(-4 + 2 * note, HALL_STAGE.columns, thing('column', { note })));
+  // Kristallbogen: Pfeiler an den Enden, darunter drei Felder, an deren Bogen man hängen kann (`perch`: die Fledermäuse)
+  for (let i = 0; i < 5; i++)
+    set(
+      i - 2,
+      HALL_STAGE.arch,
+      i % 4 === 0 ? thing('crystalarch', { note: i }) : { ...floor(), deco: 'crystalarch', note: i, perch: ARCH_PERCH },
+    );
   // Klangstein „lichtgeister“ links vor den Säulen: Hier spielen die kleinen Lichtgeister Verstecken (mitwachsen-ghost.ts)
-  put(GROTTE.ghost.stone, thing('klangstein', { story: 'lichtgeister' }));
+  set(...HALL_STAGE.stone, thing('klangstein', { story: 'lichtgeister' }));
 }
 
 /**
  * Stiller See, Kristallinsel in der Mitte (Kristalle an ihrem Rand), Holzsteg vom vorderen Ufer zur Insel, drei Planken
- * breit (`'jetty'`, begehbar); die Planken an der Insel (`note` 1) sind sein Ende: Dort taucht der Grottenolm auf
+ * breit (`'jetty'`, begehbar); die Planken an der Insel (`note` ungerade) sind sein Ende: Dort taucht der Grottenolm
+ * auf. Läuft der Steg in der Welt von West nach Ost, kommt 2 dazu (`JETTY_EAST`): So liegen seine Bretter in jeder Lage
+ * der Grotte quer zur Laufrichtung
  */
-function lakeOf(put: Put) {
+function lakeOf(put: Put, site: Pick<Site, 'at'>) {
   const { lake } = GROTTE;
+  const east = site.at(0, 1)[1] === site.at(0, 0)[1] ? JETTY_EAST : 0;
   const isleCrystal = thing('crystal', { color: GROTTE_COLORS.crystals[1] });
   const isle = (du: number, dv: number) => Math.hypot(du, dv) <= lake.isle;
   for (let dv = -lake.ry; dv <= lake.ry; dv++)
@@ -403,7 +422,7 @@ function lakeOf(put: Put) {
       const r = Math.hypot(du, dv);
       if (r <= lake.isle) put(p, r > lake.isle - 1 && (du + dv) % 2 === 0 && du !== 0 ? isleCrystal : floor());
       else if (Math.abs(du) <= 1 && dv < 0)
-        put(p, { ...floor(), ground: 'path', deco: 'jetty', note: isle(du, dv + 1) ? 1 : 0 });
+        put(p, { ...floor(), ground: 'path', deco: 'jetty', note: (isle(du, dv + 1) ? 1 : 0) + east });
       else put(p, water());
     }
 }

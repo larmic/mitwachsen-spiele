@@ -134,7 +134,8 @@ export const GROTTE = {
   /**
    * Kristallhalle rechts: fünf geschliffene, freistehende Säulen in einer Reihe, je zwei Felder Abstand, das
    * Säulen-Glockenspiel (Töne C5, D5, E5, G5, A5 von links nach rechts, `Cell.note` 0 bis 4); `columns` ihre Höhen je
-   * Ton, die tiefste die höchste wie bei einem Xylofon. Dahinter der Kristallbogen (fünf Felder breit), ringsum hohe Kristalle.
+   * Ton, die tiefste die höchste wie bei einem Xylofon. Dahinter der Kristallbogen (fünf Felder breit, `arch` Felder hinter der Reihe), ringsum hohe Kristalle. Säulen, Bogen
+   * und Klangstein stehen in Weltrichtung um die Mitte der Halle (`hallStage`), nicht im Raster der Grotte.
    * Radius `r` 10 (früher 12): Platz für den Hinweg der Grubenbahn zwischen Halle und Wand
    */
   hall: { across: 25, out: 57, r: 10, columns: [5, 4.5, 4, 3.5, 3], arch: 8 },
@@ -352,3 +353,11 @@ export const GROTTE_COLORS = {
     beads: ['#ff9cd4', '#6fd6f0', '#cbacff', '#86e05a', '#cfe8ff'],
   },
 } as const;
+
+/**
+ * Planke des Holzstegs (`Cell.note`): ungerade an seinem Ende an der Kristallinsel, dazu `JETTY_EAST`, wenn der Steg in
+ * der Welt von West nach Ost läuft (die Bretter liegen dann von Nord nach Süd, quer zur Laufrichtung)
+ */
+export const JETTY_EAST = 2;
+/** Ist diese Planke das Ende des Stegs an der Kristallinsel? (dort taucht der Grottenolm auf) */
+export const jettyEnd = (c: { note?: number }) => (c.note ?? 0) % 2 === 1;

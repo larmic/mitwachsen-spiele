@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Point } from '../../../../data/games/mitwachsen';
 import { CAVE_SPECIES } from '../../../../data/games/mitwachsen-hoehle';
 import { DIRS, type Dir, type Projection } from '../../../../lib/games/front';
+import { jettyEnd } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import { ENCOUNTERS, stops } from '../../input-pace';
 import { reshapes } from '../../mitwachsen-chores';
 import { initialState, progressOf, step, type GameEvent, type State } from '../../mitwachsen-state';
@@ -138,15 +139,15 @@ describe('Grottenolm am Steg (Kristallgrotte): Regel', () => {
           const olm = of(r.events, 'olm');
           if (r.state.player.x !== p[0] || r.state.player.y !== p[1]) bad.push(`${p.join(',')}: nicht betreten`);
           if (stops(r.events) !== null) bad.push(`${p.join(',')}: Halt`);
-          if (c.note === 1 && (olm.length !== 1 || olm[0]!.x !== p[0] || olm[0]!.y !== p[1]))
+          if (jettyEnd(c) && (olm.length !== 1 || olm[0]!.x !== p[0] || olm[0]!.y !== p[1]))
             bad.push(`${p.join(',')}: am Ende kein Grottenolm`);
-          if (c.note !== 1 && olm.length) bad.push(`${p.join(',')}: Grottenolm mitten auf dem Steg`);
+          if (!jettyEnd(c) && olm.length) bad.push(`${p.join(',')}: Grottenolm mitten auf dem Steg`);
         }
       expect(bad, `Seed ${seed}`).toEqual([]);
     });
 
     it(`Seed ${seed}: neben jedem Ende des Stegs ist Wasser, in dem er auftaucht`, () => {
-      const ends = jetty.filter(({ c }) => c.note === 1);
+      const ends = jetty.filter(({ c }) => jettyEnd(c));
       for (const { p } of ends) {
         const water = olmWater(w, ...p);
         expect(water, `Seed ${seed} ${p.join(',')}`).not.toBeNull();
@@ -158,7 +159,7 @@ describe('Grottenolm am Steg (Kristallgrotte): Regel', () => {
 
   it('geht der Schritt aufs Ende des Stegs nicht, taucht er nicht auf: die Figur stößt nur an', () => {
     const w = worldOf(1, [HOEHLE_PACK]);
-    const { p } = cellsOf(1).find(({ c }) => c.deco === 'jetty' && c.note === 1)!;
+    const { p } = cellsOf(1).find(({ c }) => c.deco === 'jetty' && jettyEnd(c))!;
     const [x, y] = p;
     const high = {
       ...w,
@@ -280,6 +281,13 @@ describe('Säulen-Glockenspiel (Kristallgrotte): Bild und Klang', () => {
     expect(Math.hypot(path[0]!.x - from.x, path[0]!.y - from.y)).toBeLessThan(0.01);
     expect(Math.hypot(path[48]!.x - from.x, path[48]!.y - from.y)).toBeLessThan(0.02);
     expect(path.every((b) => b.z >= from.z && Math.hypot(b.x - from.x, b.y - from.y) <= 2 * ROUND.r + 1e-9)).toBe(true);
+    // die Runde geht nach Süden, zu den Säulen hin: Sie stehen vor dem Bogen (Bühne der Halle, in jeder Lage der Grotte)
+    expect(path[24]!.y).toBeGreaterThan(from.y + ROUND.r);
+    for (const seed of SEEDS) {
+      const cells = cellsOf(seed);
+      const column = cells.find((e) => e.c.deco === 'column')!;
+      expect(column.p[1], `Seed ${seed}`).toBeGreaterThan(perchOf(seed)[1]);
+    }
     expect(batAt(-1, from)).toBeNull();
     expect(batAt(ROUND.ms, from)).toBeNull();
   });
@@ -303,7 +311,7 @@ describe('Grottenolm am Steg (Kristallgrotte): Bild und Klang', () => {
     expect(olmRise(OLM_MS, false)).toBeNull();
     expect(olmRise(-1, true)).toBeNull();
     const w = worldOf(1, [HOEHLE_PACK]);
-    const { p } = cellsOf(1).find(({ c }) => c.deco === 'jetty' && c.note === 1)!;
+    const { p } = cellsOf(1).find(({ c }) => c.deco === 'jetty' && jettyEnd(c))!;
     const olm = new Olm();
     expect(olm.now(w, 0, false)).toBeNull();
     olm.surface(...p, 1000);
@@ -449,7 +457,7 @@ describe('Luft der Grotte (2D und Ebene über 3D)', () => {
   const all = cellsOf(1);
   const spring = all.find(({ c }) => c.deco === 'dripspring')!.p;
   const column = all.find(({ c }) => c.deco === 'column')!;
-  const end = all.find(({ c }) => c.deco === 'jetty' && c.note === 1)!.p;
+  const end = all.find(({ c }) => c.deco === 'jetty' && jettyEnd(c))!.p;
 
   it('bei reduzierter Bewegung kein Tropfen und keine Flugrunde, der Grottenolm zeigt sich still', () => {
     const fresh = (): CaveFx => ({ chime: new Chime(), drips: new Drips(), olm: new Olm(), light: {} });

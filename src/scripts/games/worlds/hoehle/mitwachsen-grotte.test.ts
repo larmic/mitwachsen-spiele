@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MOOD_LIGHT, REGIONS, animalId, type Point } from '../../../../data/games/mitwachsen';
 import { FIRST_MOLE } from '../../../../data/games/mitwachsen-hoehle';
 import { CAVE_STONE, told } from '../../../../data/games/mitwachsen-stories';
-import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
+import { GROTTE, GROTTE_COLORS, JETTY_EAST, jettyEnd } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import { platformsToWake } from '../../mitwachsen-portal';
 import { initialState, step, type State } from '../../mitwachsen-state';
@@ -583,10 +583,22 @@ describe('Kristallgrotte: Gelände', () => {
         for (let y = y0; y <= y1; y++) if (!w.cell(x, y).roof || !w.cell(x, y).garden) shed.push(`Dach ${x},${y}`);
       }
       expect(shed, `Seed ${seed}`).toEqual([]);
-      // Säulen-Glockenspiel: fünf Säulen in einer Reihe quer, Töne 0 (C5) bis 4 (A5) von links nach rechts
-      const columns = all.filter(({ c }) => c.deco === 'column').sort((a, b) => a.m[0] - b.m[0]);
+      // Säulen-Glockenspiel: fünf Säulen in einer Reihe quer im Bild (Weltrichtung, wie auch die Grotte liegt), Töne 0
+      // (C5) bis 4 (A5) von links (Westen) nach rechts (Osten), je ein Feld dazwischen
+      const columns = all.filter(({ c }) => c.deco === 'column').sort((a, b) => a.p[0] - b.p[0]);
       expect(columns.map(({ c }) => c.note)).toEqual([0, 1, 2, 3, 4]);
-      expect(new Set(columns.map(({ m }) => m[1])).size).toBe(1);
+      expect(new Set(columns.map(({ p }) => p[1])).size).toBe(1);
+      expect(columns.map(({ p }) => p[0] - columns[0]!.p[0])).toEqual([0, 2, 4, 6, 8]);
+      // der Kristallbogen steht dahinter (Norden, von der Kamera in Ruhe aus hinter den Säulen), `hall.arch` Felder
+      // entfernt, mittig zur Reihe, fünf Felder nebeneinander von West nach Ost; der Klangstein links vor den Säulen
+      const arch = all.filter(({ c }) => c.deco === 'crystalarch').sort((a, b) => a.p[0] - b.p[0]);
+      expect(arch.map(({ c }) => c.note)).toEqual([0, 1, 2, 3, 4]);
+      expect(arch.map(({ p }) => [p[0] - columns[2]!.p[0], p[1] - columns[2]!.p[1]])).toEqual(
+        [-2, -1, 0, 1, 2].map((dx) => [dx, -GROTTE.hall.arch]),
+      );
+      const stone = all.find(({ c }) => c.story === 'lichtgeister')!;
+      expect(stone.p[0]).toBeLessThan(columns[0]!.p[0]);
+      expect(stone.p[1]).toBeGreaterThan(columns[0]!.p[1]);
       expect(columns.every(({ c }) => c.solid && c.region === 'hoehle')).toBe(true);
       expect(count(({ c }) => c.deco === 'crystalarch')).toBe(5);
       expect(count(({ c }) => c.deco === 'crystalarch' && c.solid)).toBe(2); // nur die Pfeiler
@@ -604,7 +616,12 @@ describe('Kristallgrotte: Gelände', () => {
       const jetty = all.filter(({ c }) => c.deco === 'jetty');
       expect(jetty.length).toBe(count(({ c }) => c.ground === 'path'));
       expect(jetty.every(({ c }) => !c.solid && c.ground === 'path')).toBe(true);
-      const ends = jetty.filter(({ c }) => c.note === 1);
+      const ends = jetty.filter(({ c }) => jettyEnd(c));
+      // die Bretter liegen quer zur Laufrichtung: Läuft der Steg in der Welt von West nach Ost, sind sie in y lang
+      const runsEast = site.at(0, 1)[1] === site.at(0, 0)[1];
+      expect(jetty.every(({ c }) => (c.note ?? 0) >= JETTY_EAST === runsEast)).toBe(true);
+      const boards = caveBoxes(w, jetty[0]!.c, 0, 0)!;
+      expect(boards.every(([, , , bw, bd]) => (runsEast ? bd > bw : bw > bd))).toBe(true);
       expect(ends.length).toBe(3);
       expect(ends.every(({ m }) => m[1] === Math.max(...jetty.map((j) => j.m[1])))).toBe(true);
       expect(ends.every(({ p }) => steps.has(key(p)))).toBe(true);

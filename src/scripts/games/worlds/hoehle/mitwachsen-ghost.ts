@@ -56,7 +56,7 @@ export type GhostInput = {
 const hideouts = new WeakMap<object, Hideout[]>();
 type Cave = Pick<World, 'homes' | 'portals' | 'cell' | 'realm'>;
 
-/** So weit (Felder, ringsum) um die Mitte der Säulenreihe sucht `hideoutsOf` die Säulen */
+/** So weit (Felder, ringsum) um die Mitte der Halle sucht `hideoutsOf` die Säulen */
 const SEARCH = 8;
 
 /**
@@ -69,7 +69,7 @@ export function hideoutsOf(world: Cave): Hideout[] {
   if (known) return known;
   const frame = caveFrame(world);
   const found: Hideout[] = [];
-  const [hx, hy] = frame ? frame.at(GROTTE.hall.across, GROTTE.hall.out - 3) : [0, 0];
+  const [hx, hy] = frame ? frame.at(GROTTE.hall.across, GROTTE.hall.out) : [0, 0];
   for (let y = hy - SEARCH; frame && y <= hy + SEARCH; y++)
     for (let x = hx - SEARCH; x <= hx + SEARCH; x++) found.push(...besideColumn(world, x, y));
   found.sort((a, b) => a.x - b.x || a.y - b.y);

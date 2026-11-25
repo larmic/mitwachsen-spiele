@@ -12,6 +12,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Schmuck der Grotte“)
 
 import type { Point } from '../../../../data/games/mitwachsen';
+import { jettyEnd } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import type { Cell } from '../../mitwachsen-cell';
 import type { Ruled, WorldRules } from '../../mitwachsen-pack-types';
 import { roostAt } from '../../mitwachsen-roost';
@@ -44,7 +45,7 @@ const bump: WorldRules['bump'] = (s, c, x, y, events, { walks, cell }) => {
     events.push({ type: 'web', x, y });
     return true; // Netz der Tupfspinne: die Harfe klingt, sie bleibt stehen, kein „boing“; es hält sie nie fest
   }
-  if (c.deco === 'jetty' && c.note === 1 && walks) events.push({ type: 'olm', x, y });
+  if (c.deco === 'jetty' && jettyEnd(c) && walks) events.push({ type: 'olm', x, y });
   return false;
 };
 
