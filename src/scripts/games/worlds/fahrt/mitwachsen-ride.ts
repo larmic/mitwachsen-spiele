@@ -9,7 +9,8 @@
 // Winken. Vor Tieren auf der Strecke hält es, nach 1 s hüpfen sie beiseite; hindurch fährt es nie. Vor einem Tunnel
 // kündigt es ihn an. Am Ziel steigt die Figur nach 1 s aus (wohin, darf das Fahrzeug vorschlagen: `Vehicle.exit`).
 // Folgende Tiere fahren nie mit, sie warten am Halt. Fehlt ihm ein Paket (Ziel-Gegend, `Rider.dozing`), schläft es am
-// Halt: schnarcht, steigt niemanden ein, bis es da ist.
+// Halt: schnarcht, steigt niemanden ein, bis es da ist. Eine Schleife (`RideRoute.loop`, die Grubenbahn in der Grotte)
+// hat nur einen Halt: Sie fährt von ihm immer vorwärts einmal herum und kommt dort wieder an, ohne Fest.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Der Schlitten“ und „Tok und die Bahn“, Fahren)
 
 import { DIRS } from '../../../../lib/games/front';
@@ -120,7 +121,7 @@ export function rideTicks(spec: Pick<Vehicle['spec'], 'ticks' | 'pace'>, len: nu
  */
 const speedOf = (spec: Vehicle['spec'], len: number, pos: number) => (len - pos) / rideTicks(spec, len - pos);
 
-/** Erste Heimfahrt eines Fahrzeugs, das erst danach auf der Lichtung hält (Schlitten, `spec.out` `'fest'`) */
+/** Erste Heimfahrt eines Fahrzeugs, das erst danach auf der Lichtung hält (Schlitten, `spec.out` `'fest'`; nie eine Schleife) */
 const firstHome = (c: Ctx, s: Rider) => stageOf(s.packs, c.id) === 'bereit' && c.v.spec.out === 'fest';
 
 /**
@@ -132,11 +133,13 @@ const firstHome = (c: Ctx, s: Rider) => stageOf(s.packs, c.id) === 'bereit' && c
 function board(c: Ctx, s: Rider, world: World, at: Parked, events: RideEvents) {
   clear(c, s, world, at, events);
   const len = c.r.path.length - 1;
-  const on = c.v.onward?.(s, world, at.end);
-  const to: End = on?.to ?? (at.end === 'home' ? 'out' : 'home');
+  const loop = !!c.r.loop; // eine Schleife fährt immer vorwärts herum, von ihrem einen Halt zu ihm zurück (`home`)
+  const on = loop ? undefined : c.v.onward?.(s, world, at.end);
+  const to: End = loop ? 'home' : (on?.to ?? (at.end === 'home' ? 'out' : 'home'));
   const pos = on ? Math.min(len, Math.max(0, on.pos)) : 0;
-  // sein Fest (`Vehicle.feast`; sonst die erste Heimfahrt eines Fahrzeugs, das erst danach auf der Lichtung hält: Schlitten)
-  const feast = to === 'out' && (c.v.feast?.(s, world) ?? firstHome(c, s));
+  // sein Fest (`Vehicle.feast`; sonst die erste Heimfahrt eines Fahrzeugs, das erst danach auf der Lichtung hält:
+  // Schlitten); eine Schleife hat keins
+  const feast = !loop && to === 'out' && (c.v.feast?.(s, world) ?? firstHome(c, s));
   s.ride = {
     id: c.id,
     phase: 'seated',
@@ -465,8 +468,9 @@ export function rideRules(v: Vehicle): One {
       const at = stopsOf(r);
       const k = key(x, y);
       if (at.home.cells.has(k)) return true;
-      // die Lichtung erst ab `spec.out` (Schlitten: nach der ersten Heimfahrt); die eigene Strecke als Feld immer
-      if (rank(stage) < rank(v.spec.out) && world.cell(x, y).ride !== id) return false;
+      // die Lichtung erst ab `spec.out` (Schlitten: nach der ersten Heimfahrt); die eigene Strecke als Feld immer;
+      // eine Schleife hat keinen Halt dort (kein `spec.out`)
+      if (v.spec.out && rank(stage) < rank(v.spec.out) && world.cell(x, y).ride !== id) return false;
       return at.out.cells.has(k) || (a.mode === 'wander' && r.on.has(k));
     },
   };

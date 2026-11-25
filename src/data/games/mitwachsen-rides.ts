@@ -1,6 +1,8 @@
 // Fahrzeuge von Mitwachsen („Reisewege“): je Welt eines, das zwischen einem Halt nahe ihrem Bett und einem Halt auf der
 // Lichtung pendelt. Heute der Schlitten der Eis-Welt und die Höhlenbahn; jedes weitere Fahrzeug kommt als Eintrag in
-// `RIDES` dazu. Die Fahrregeln aller Fahrzeuge bringt das Paket der Fahrzeuge mit (worlds/fahrt/), Strecke und Bild das
+// `RIDES` dazu. Ausnahme (Rückmeldung zur Höhle, 24.11.2026): ein zweites Fahrzeug innerhalb einer Welt, das eine
+// Schleife fährt (`loop`, die Grubenbahn `'grube'` in der Grotte, kommt später mit ihrem Paket): Start und Ziel sind
+// derselbe Halt, es hält nie auf der Lichtung, hat keinen Wimpel und kein Fest. Die Fahrregeln aller Fahrzeuge bringt das Paket der Fahrzeuge mit (worlds/fahrt/), Strecke und Bild das
 // Paket des Fahrzeugs (Schlitten: worlds/eis/mitwachsen-sled*.ts; Zug: worlds/bahn/mitwachsen-train*.ts). Die Liste steht
 // hier, weil die Pakete einander nicht importieren und jedes seinen Eintrag braucht; der Kern kennt nur die Typen
 // (`RideId`). Die Höhlenbahn (`'hoehle'`, Paket worlds/bahn/) kommt mit Tok nach der ersten Heimfahrt mit dem
@@ -9,8 +11,11 @@
 
 import type { GateId } from './mitwachsen';
 
-/** Fahrzeuge: der Schlitten der Eis-Welt, die Höhlenbahn (`'hoehle'`, das Gleis von der Lichtung in die Grotte) */
-export type RideId = 'schlitten' | 'hoehle';
+/**
+ * Fahrzeuge: der Schlitten der Eis-Welt, die Höhlenbahn (`'hoehle'`, das Gleis von der Lichtung in die Grotte), die
+ * Grubenbahn (`'grube'`, eine Schleife in der Grotte; ihr Eintrag in `RIDES` kommt mit ihrem Paket)
+ */
+export type RideId = 'schlitten' | 'hoehle' | 'grube';
 
 /**
  * Vorladen am Halt (`RIDE_PRELOAD`, Konzept „Reisewege“): Steht die Figur höchstens so viele Felder (Schachbrett) vor
@@ -21,7 +26,8 @@ export const RIDE_PRELOAD = 6;
 /** Zeichen auf dem Wimpel nach der Festfahrt (Schlitten: Schneeflocke; Zug: Kristall, kommt mit der Laternenfahrt) */
 export type Pennant = 'flocke' | 'kristall';
 
-export type RideSpec = {
+/** Was jedes Fahrzeug hat */
+type RideBase = {
   id: RideId;
   gate: GateId; // Tor der Welt, zu der das Fahrzeug gehört
   ticks: readonly [min: number, max: number]; // Dauer einer Fahrt in Takten zu 100 ms (15–20 s)
@@ -34,6 +40,11 @@ export type RideSpec = {
   pace?: number;
   signal: readonly number[]; // eigenes Signal aus 2 bis 3 Tönen der C-Pentatonik (Hz)
   color: string; // Grundfarbe des Fahrzeugs (auch die Tür nach der ersten Fahrt)
+};
+
+/** Ein Fahrzeug, das zwischen dem Halt in seiner Welt und dem Halt auf der Lichtung pendelt (Schlitten, Zug) */
+export type ShuttleSpec = RideBase & {
+  loop?: undefined;
   pennant: Pennant;
   /**
    * Ab welcher Stufe das Fahrzeug am Halt auf der Lichtung steht: der Schlitten erst nach der ersten Heimfahrt (`fest`,
@@ -41,6 +52,15 @@ export type RideSpec = {
    */
   out: 'bereit' | 'fest';
 };
+
+/**
+ * Ein Fahrzeug, das in seiner Welt eine Schleife fährt (`loop`, die Grubenbahn): Start und Ziel sind derselbe Halt, es
+ * fährt immer vorwärts. Es hält nie auf der Lichtung (kein `out`), hat keinen Wimpel (kein `pennant`), keine Festfahrt
+ * und kein „Gute Nacht“ (es steht nie in Sichtweite des Lichtungsbetts); seine Strecke trägt `RideRoute.loop`
+ */
+export type LoopSpec = RideBase & { loop: true; pennant?: undefined; out?: undefined };
+
+export type RideSpec = ShuttleSpec | LoopSpec;
 
 export const RIDES: readonly [RideSpec, ...RideSpec[]] = [
   // Himmelblauer Holzschlitten mit Schlittenrentier; Schellen D6–A5

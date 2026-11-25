@@ -19,7 +19,10 @@ import type { World } from './mitwachsen-world';
  */
 export type MoveCmd = { type: 'move'; dir: Dir; fresh?: true; tap?: true; ride?: RideId; who?: string };
 
-/** Ende einer Strecke: der Halt in der Welt (`home`) oder der auf der Lichtung (`out`) */
+/**
+ * Ende einer Strecke: der Halt in der Welt (`home`) oder der auf der Lichtung (`out`); eine Schleife
+ * (`RideRoute.loop`) hat nur einen Halt, beide Enden sind er, gefahren wird immer nach `home`
+ */
 export type End = 'home' | 'out';
 
 /**
@@ -82,7 +85,9 @@ export type RideRules = {
  * Lichtung (`out`), `stops` beide Sitze, `shed` sein Schuppen (am Halt `home`), `seats` feste Warteplätze je Halt für
  * folgende Tiere, `on` alle Felder der Strecke. Ein Fahrzeug mit Wagen (der Zug) belegt am Halt mehrere Felder (`cars`,
  * jedes davon ist zum Einsteigen da, es gibt kein Zugtier), vor ihm müssen `ahead` Felder frei sein (sonst 2: dort geht
- * das Zugtier); `dark`: Felder im Tunnel (Tunnelportal, Einschnitt, Gang), davor kündigt es ihn an
+ * das Zugtier); `dark`: Felder im Tunnel (Tunnelportal, Einschnitt, Gang), davor kündigt es ihn an. `loop`: eine
+ * Schleife (die Grubenbahn, `RideSpec.loop`): `path` beginnt und endet am Sitz desselben Halts, beide Enden sind dieser
+ * eine Halt (`stops.home` gleich `stops.out`, `seats.home` gleich `seats.out`), gefahren wird immer vorwärts
  */
 export type RideRoute = {
   path: readonly Point[];
@@ -93,6 +98,7 @@ export type RideRoute = {
   cars?: Record<End, readonly Point[]>;
   ahead?: number;
   dark?: ReadonlySet<string>;
+  loop?: true;
 };
 
 /** Wer auf der Festfahrt außer den Tieren noch winkt (Eis-Welt: Schneemänner) */

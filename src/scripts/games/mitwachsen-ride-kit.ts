@@ -40,20 +40,42 @@ export type Parked = {
 };
 
 const halts = new WeakMap<RideRoute, Record<End, Parked>>();
+const same = (a: readonly Point[], b: readonly Point[]) =>
+  a.length === b.length && a.every((p, i) => key(...p) === key(...b[i]!));
+/**
+ * Hält eine Schleife (`RideRoute.loop`) ihre Form? `path` beginnt und endet am Sitz ihres einen Halts, beide Halte sind
+ * dieses Feld (`stops.home` gleich `stops.out`) und beide Enden haben dieselben Warteplätze. Eine Pendelstrecke ist
+ * immer in Ordnung. `stopsOf` bricht sonst ab: Die Figur käme am Ende der Runde auf einem anderen Feld an als dem Sitz
+ */
+export function loopOk(r: Pick<RideRoute, 'path' | 'stops' | 'seats' | 'loop'>): boolean {
+  if (!r.loop) return true;
+  const [first, last] = [r.path[0], r.path.at(-1)];
+  return (
+    !!first &&
+    !!last &&
+    r.path.length > 2 &&
+    same([first, first, first], [last, r.stops.home, r.stops.out]) &&
+    same(r.seats.home, r.seats.out)
+  );
+}
 /**
  * Beide Halte einer Strecke: am Schuppen der Sitz auf dem ersten Feld, auf der Lichtung auf dem letzten, das Zugtier
- * davor; ein Fahrzeug mit Wagen belegt dort die Felder seiner Wagen (`RideRoute.cars`)
+ * davor; ein Fahrzeug mit Wagen belegt dort die Felder seiner Wagen (`RideRoute.cars`). Eine Schleife
+ * (`RideRoute.loop`) hat nur einen Halt: Beide Enden sind derselbe (`end` `'home'`, Sitz auf dem ersten Feld, Zugtier
+ * auf dem zweiten)
  */
 export function stopsOf(r: RideRoute): Record<End, Parked> {
   let out = halts.get(r);
   if (!out) {
+    if (!loopOk(r)) throw new Error('Schleife muss am Sitz ihres einen Halts beginnen und enden');
     const park = (end: End, seat: Point, pull: Point, more: readonly Point[] = []): Parked => {
       const cars = r.cars?.[end];
       const cells = new Set([seat, pull, ...(cars ?? []), ...more].map((p) => key(...p)));
       return { end, seat, pull, cells, board: cars ? new Set(cars.map((p) => key(...p))) : new Set([key(...seat)]) };
     };
     const [first, second] = [r.path[0]!, r.path[1] ?? r.path[0]!];
-    out = { home: park('home', first, second, r.shed), out: park('out', r.path.at(-1)!, r.path.at(-2) ?? first) };
+    const home = park('home', first, second, r.shed);
+    out = { home, out: r.loop ? home : park('out', r.path.at(-1)!, r.path.at(-2) ?? first) };
     halts.set(r, out);
   }
   return out;
@@ -63,7 +85,8 @@ export function stopsOf(r: RideRoute): Record<End, Parked> {
  * Wo das Fahrzeug steht, wenn es nicht fährt: am Halt der Gegend, in der die Figur ist, ab `bereit` (auf der Lichtung
  * erst ab der Stufe `spec.out`: der Schlitten nach der ersten Heimfahrt); liegen beide Halte in ihrer Gegend (der Zug
  * bei Ausbau 1), an dem, an dem es zuletzt ankam (`docked`, sonst auf der Lichtung). Undefined, solange es noch nicht da
- * ist, selbst unterwegs oder in einer anderen Gegend; fährt die Figur mit einem anderen Fahrzeug, steht es weiter da
+ * ist, selbst unterwegs oder in einer anderen Gegend; fährt die Figur mit einem anderen Fahrzeug, steht es weiter da.
+ * Eine Schleife (`RideRoute.loop`) steht immer an ihrem einen Halt, wenn die Figur in dessen Gegend ist
  */
 export function parked(
   spec: Pick<RideSpec, 'id' | 'out'>,
@@ -76,15 +99,19 @@ export function parked(
   const at = stopsOf(r);
   const realm = world.realm(s.player.x, s.player.y);
   const home = realm === world.realm(...at.home.seat);
-  const out = stage >= rank(spec.out) && realm === world.realm(...at.out.seat);
+  if (r.loop) return home ? at.home : undefined;
+  const out = !!spec.out && stage >= rank(spec.out) && realm === world.realm(...at.out.seat);
   if (home && out) return at[s.docked?.[spec.id] ?? 'out'];
   return home ? at.home : out ? at.out : undefined;
 }
 
-/** Feld der Fahrt bei Fortschritt `pos` (zum Halt auf der Lichtung vorwärts auf `path`, heim rückwärts) */
-export const cellOf = (r: Pick<RideRoute, 'path'>, ride: Pick<Ride, 'to'>, pos: number): Point => {
+/**
+ * Feld der Fahrt bei Fortschritt `pos` (zum Halt auf der Lichtung vorwärts auf `path`, heim rückwärts; auf einer
+ * Schleife, `RideRoute.loop`, immer vorwärts)
+ */
+export const cellOf = (r: Pick<RideRoute, 'path' | 'loop'>, ride: Pick<Ride, 'to'>, pos: number): Point => {
   const i = Math.floor(pos + EPS);
-  return r.path[ride.to === 'out' ? i : r.path.length - 1 - i]!;
+  return r.path[r.loop || ride.to === 'out' ? i : r.path.length - 1 - i]!;
 };
 
 const cheb = (ax: number, ay: number, bx: number, by: number) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
@@ -105,7 +132,8 @@ export function trotFrom(r: Pick<RideRoute, 'path'>, world: World, [sx, sy]: Poi
 /**
  * „Gute Nacht, Fahrzeuge“ (Konzept „Reisewege“): Schläft die Figur im Bett der Lichtung und steht das Fahrzeug an seinem
  * Halt in Sichtweite (`SIGHT` Felder vom Bett, der Zug an Bahnhof Bär, der Schlitten auf seinem Platz), wo es steht;
- * sonst undefined (wach, in einem anderen Bett, unterwegs, zu weit weg oder noch nicht da)
+ * sonst undefined (wach, in einem anderen Bett, unterwegs, zu weit weg oder noch nicht da). Eine Schleife
+ * (`RideRoute.loop`, die Grubenbahn) sagt nie „Gute Nacht“: Sie wohnt in ihrer Welt, nicht an der Lichtung
  */
 export function bedSight(
   spec: Pick<RideSpec, 'id' | 'out'>,
@@ -114,7 +142,7 @@ export function bedSight(
   world: World,
 ): Parked | undefined {
   const [bx, by] = world.homes.lichtung.bed;
-  if (!s.sleeping || s.player.x !== bx || s.player.y !== by) return undefined;
+  if (r.loop || !s.sleeping || s.player.x !== bx || s.player.y !== by) return undefined;
   const at = parked(spec, r, s, world);
   return at && cheb(...at.seat, bx, by) <= SIGHT ? at : undefined;
 }

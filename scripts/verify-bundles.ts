@@ -115,10 +115,10 @@ export const RULES: Rule[] = [
     // Die Fahr-Engine aller Fahrzeuge (einsteigen, fahren, Hindernis, Tunnel, ankommen), samt dem, was sie mit den Paketen
     // der Fahrzeuge teilt (Halte, Spielstand packs.fahrt); keine eigene Welt, kein 3D-Teil. Kommt, sobald es ein Fahrzeug
     // geben kann (Eistor offen); dazu das Schlafen am Halt, solange ein Paket fehlt (Vorladen), das Fest je Fahrzeug
-    // (`Vehicle.feast`) und das Aufwachen am neuen Spieltag (`schlaeft`)
+    // (`Vehicle.feast`), das Aufwachen am neuen Spieltag (`schlaeft`) und die Schleife (`RideRoute.loop`, Grubenbahn)
     chunks: /\/welt-fahrt\.[\w-]+\.js$/,
-    // Gemessen 9,2 KB
-    budget: 10.1 * 1024,
+    // Gemessen 10,0 KB (mit der Schleife und ihrer Formprüfung `loopOk`)
+    budget: 11.0 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {
