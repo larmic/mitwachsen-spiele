@@ -37,6 +37,10 @@ export const STORY_TEXTS: Record<StoryId, { title: string; text: string }> = {
     title: 'Am Höhlenbett',
     text: 'Hinter diesem Tor geht es unter die Erde, in eine große Höhle. Und jetzt ist sie offen, weil du mit Tok zusammen den großen Stein weggeschoben hast: Hau – ruck! Die Kristalle leuchten lila, türkis und rosa, und durch die Löcher oben scheint die Sonne herein. Eine Fledermaus ist kurz aufgewacht und hat dir zugewinkt. Jetzt schläft sie wieder im Kristallbogen. Wenn du heute Abend ins Bett gehst, wacht sie auf und fliegt eine Runde für dich.',
   },
+  lichtgeister: {
+    title: 'Bei den Lichtgeistern',
+    text: 'In der Grotte wohnen kleine Lichtgeister. Sie spielen so gern Verstecken. Hast du die Laterne dabei, kannst du sie sehen. Hörst du sie kichern?',
+  },
   lokschuppen: {
     title: 'Im Lokschuppen',
     text: 'Tok hat eine Spitzhacke, aber er haut damit nichts kaputt. Er klopft nur die Nägel in die Schienen: pink, pink, pink. Sein bester Freund ist der Maulwurf. Der sitzt immer oben auf Toks Helm und zeigt, wo es langgeht, denn unter der Erde kennt er sich aus. Abends fährt die kleine Bahn in den Schuppen, und der Siebenschläfer schläft schon im Wagen.',

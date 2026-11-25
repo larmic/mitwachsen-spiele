@@ -27,7 +27,8 @@ const CLIFF: Partial<Record<GateId, Ground>> = { eis: 'ice' };
 
 /**
  * Die Welt hinter dem Gang des Tors `gate` in die Karte bauen (`map`, dort liegt schon der Gang). Mit Paket erzählt ihr
- * Klangstein die zweite Fassung der Geschichte des Tors (`openStory`, beim Eistor „Wenn das Tor offen ist“). Ohne Paket
+ * Klangstein die zweite Fassung der Geschichte des Tors (`openStory`, beim Eistor „Wenn das Tor offen ist“), dazu ihre
+ * weiteren Klangsteine (`Kessel.more`, Grotte: `lichtgeister`). Ohne Paket
  * steht hinter dem Gang eines Tors, das aufgehen kann (`closable`: es hat einen Schlüssel), eine Klippe (am Eistor aus
  * Eis, sonst aus Fels, `CLIFF`), ebenso hinter einem, dessen Gegend eine Welt hat (`Region.room`: das Höhlentor);
  * hinter einem anderen, das nie aufgeht, gar nichts. Die Welt hat dann keine Felder, keine Wohnorte und kein Portal;
@@ -44,9 +45,14 @@ export function behind(
   closable = !!keyOf(gate) || !!regionBehind(gate)?.room, // kann das Tor aufgehen, oder liegt dahinter eine Welt?
 ): Behind {
   if (pack?.build) {
-    const { stone, portal, ...rest } = pack.build(seed, gang, beyond, passage, map);
+    const { stone, portal, more = [], ...rest } = pack.build(seed, gang, beyond, passage, map);
     const story = openStory(gate);
-    return { ...rest, portals: [portal], stones: story ? [[story, stone]] : [], built: true };
+    return {
+      ...rest,
+      portals: [portal],
+      stones: [...(story ? [[story, stone] as [StoryId, Point]] : []), ...more],
+      built: true,
+    };
   }
   const bed = gang.at(0, gang.end + CLOSED.length);
   const none = { bed, realm: new Set<string>(), spots: [], spawns: new Map<string, Point>(), portals: [], stones: [] };

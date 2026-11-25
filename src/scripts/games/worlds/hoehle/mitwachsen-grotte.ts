@@ -5,7 +5,7 @@
 // mit Kristall-Lampen links und rechts, der freie Platz für den Bahnhof Fledermaus und daneben für den Lokschuppen (beide
 // kommen mit dem Zug), das Höhlenbett unter dem ersten Lichtschacht mit Mooswiese, Pilzschale, Steintrog und dem
 // Unterstand dahinter (vorn offen, seine Rückwand ist die Kristallwand), auf dem Weg zum Pilzgarten zwei Pilzbeete,
-// links der Pilzgarten mit vier Pilzbeeten und weiß-blauen Deko-Pilzen am Rand und daneben der Lehmhang des Dachses, rechts die Kristallhalle (zweiter Lichtschacht, fünf Kristallsäulen,
+// links der Pilzgarten mit vier Pilzbeeten und weiß-blauen Deko-Pilzen am Rand und daneben der Lehmhang des Dachses, rechts die Kristallhalle (zweiter Lichtschacht, fünf Kristallsäulen mit den Verstecken der kleinen Lichtgeister, links davor ihr Klangstein `lichtgeister`,
 // der Kristallbogen), in der Mitte die Tropfsteingrotte mit Stalagmiten in drei Höhen und einem Felsbecken samt
 // Tropfquelle und Tropfmoos, hinten der stille See mit Steg zur Kristallinsel (dritter Lichtschacht), daneben der
 // Geröllhang in drei Stufen und ganz am Ende die Plattform des Portals `hoehlensee` (schläft noch), ihr Gegenstück im
@@ -27,7 +27,7 @@ import { ARCH_PERCH } from '../../../../data/games/worlds/hoehle/mitwachsen-cave
 import { FIRST_MOLE } from '../../../../data/games/mitwachsen-hoehle';
 import { HOMES } from '../../../../data/games/mitwachsen-homes';
 import { CAVE_PORTAL } from '../../../../data/games/mitwachsen-portals';
-import { CAVE_STONE } from '../../../../data/games/mitwachsen-stories';
+import { CAVE_STONE, type StoryId } from '../../../../data/games/mitwachsen-stories';
 import type { Cell } from '../../mitwachsen-cell';
 import { placeHome } from '../../mitwachsen-home';
 import type { Beyond, Gang, Kessel, KesselPlace } from '../../mitwachsen-pack-types';
@@ -153,7 +153,9 @@ export function buildGrotte(
   const spots = spotsOf(site, reach, map);
   // Wohnorte der Höhlen-Tiere: das erste je Art an seinem Fundort, die anderen verteilt über die Grotte
   const spawns = findSpawns(seed, caveHaunts(spots, map, at, bed), spots, bed);
-  return { bed, realm, spots, spawns, stone, portal: [CAVE_PORTAL, portal] };
+  const ghosts = at(GROTTE.ghost.stone); // Klangstein „lichtgeister“ in der Kristallhalle (hallOf)
+  const more: [StoryId, Point][] = map.get(key(...ghosts))?.story === 'lichtgeister' ? [['lichtgeister', ghosts]] : [];
+  return { bed, realm, spots, spawns, stone, more, portal: [CAVE_PORTAL, portal] };
 }
 
 /** Plätze von Bahnhof Fledermaus, Lokschuppen und Klangstein, für die Bahn markiert (`Cell.stop`, `shed`, `stone`) */
@@ -348,6 +350,8 @@ function hallOf(put: Put) {
     [6, 10, kr],
   ] as const)
     put([hall.across + du, hall.out + dv], thing('crystal', { color }));
+  // Klangstein „lichtgeister“ links vor den Säulen: Hier spielen die kleinen Lichtgeister Verstecken (mitwachsen-ghost.ts)
+  put(GROTTE.ghost.stone, thing('klangstein', { story: 'lichtgeister' }));
 }
 
 /**

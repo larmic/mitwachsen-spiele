@@ -1,5 +1,6 @@
 // Geschichten von Mitwachsen: Klangsteine am Bett, vor jedem großen Tor, am Schneebett im Gletscherkessel (die zweite
-// Fassung der Eis-Geschichte, „Wenn das Tor offen ist“) und am Höhlenbett (die zweite Fassung der Höhlen-Geschichte);
+// Fassung der Eis-Geschichte, „Wenn das Tor offen ist“), am Höhlenbett (die zweite Fassung der Höhlen-Geschichte) und
+// in der Kristallhalle bei den kleinen Lichtgeistern (`lichtgeister`, setzt die Grotte selbst);
 // dazu die Steine der Bahn, die erst mit ihr kommen (Paket der Bahn): am Bahnhof Bär ab Bau 1 und am
 // Lokschuppen ab Bau 2 (worlds/bahn/mitwachsen-stones.ts). Läuft die Figur hinein, erklingt die
 // Melodie des Ortes, später danach die eingesprochene Geschichte. Titel und Texte stehen in mitwachsen-story-texts.ts
@@ -8,7 +9,7 @@
 
 import type { GateId, Point } from './mitwachsen';
 
-export type StoryId = 'bett' | GateId | 'eis-offen' | 'hoehle-offen' | 'lokschuppen' | 'bahnhof';
+export type StoryId = 'bett' | GateId | 'eis-offen' | 'hoehle-offen' | 'lichtgeister' | 'lokschuppen' | 'bahnhof';
 
 /** Melodie: Töne [Hz, Länge in s, Lautstärke?] nacheinander, alle aus der Pentatonik C–D–E–G–A */
 export type Melody = {
@@ -160,6 +161,23 @@ export const STORIES: Record<StoryId, Story> = {
   // Zweite Fassung der Höhlen-Geschichte, am Höhlenbett in der Kristallgrotte
   'hoehle-offen': {
     melody: CAVE_MELODY,
+  },
+  lichtgeister: {
+    // leise und verspielt hinauf, dann kichern die Geister zweimal: hi-hi
+    melody: {
+      wave: 'sine',
+      gap: 0.05,
+      notes: [
+        [E5, 0.2],
+        [G5, 0.2],
+        [A5, 0.3],
+        [G5, 0.2],
+        [C6, 0.08, 0.1],
+        [C6, 0.08, 0.1],
+        [A5, 0.2],
+        [G5, 0.6],
+      ],
+    },
   },
   lokschuppen: {
     // dreimal klopft Tok die Nägel ein (pink, pink, pink), dann schaukelt die kleine Bahn in den Schuppen

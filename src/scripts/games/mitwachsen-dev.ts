@@ -20,7 +20,8 @@
 // sie bis zum Prellbock, sie wird nur vorgeladen). `&fest=1` (Ausbau 2) macht die Höhlen-Leiste voll und lässt die Figur im
 // Höhlenbett aufwachen: Die nächste Fahrt auf die Lichtung ist die Laternenfahrt. `&eis=1` (mit `&bau=1` oder 2) holt
 // die Eis-Welt mit und spielt dazu vor, was das Kind vor der Bahn schon hat (Eistor offen, Eis-Leiste voll, der
-// Schlitten nach der ersten Heimfahrt), wie im echten Spielstand: Schlitten und Zug in einem Spiel.
+// Schlitten nach der ersten Heimfahrt), wie im echten Spielstand: Schlitten und Zug in einem Spiel. `&laterne=1` gibt der
+// Figur im Höhlenbett die Kristall-Laterne in die Hand (`devLamp`): So sind die kleinen Lichtgeister gleich zu sehen.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Die Kristallgrotte“, Entwickler-Schalter, und „Tok und die Bahn“)
 
 import { REGIONS, animalId, type RegionId } from '../../data/games/mitwachsen';
@@ -58,6 +59,11 @@ export const DEV_FEAST = 'fest';
  * voll, der Schlitten hat seine erste Heimfahrt gemacht (Stufe `fest`) – wie bei `&bau=0`, nur mit gebauter Bahn
  */
 export const DEV_ICE = 'eis';
+/**
+ * Kristall-Laterne in der Hand vorspielen (`&laterne=1`, mit dem Höhlenbett, etwa `?entwickler=hoehle&laterne=1`): Die
+ * Figur wacht mit ihr auf, so sind die kleinen Lichtgeister in der Kristallhalle gleich zu sehen
+ */
+export const DEV_LAMP = 'laterne';
 /** Pakete, die ein Paket im Blick hinein mitbringt: die Bahn die Grotte (dort endet ihr Gleis) und die Fahr-Engine (der Zug fährt) */
 const WITH: Partial<Record<PackId, readonly PackId[]>> = { bahn: ['hoehle', 'fahrt'] };
 
@@ -173,6 +179,13 @@ const withMole = (garden: Progress['garden']): Progress['garden'] =>
 /** Spielt der Schalter Abend vor (`&abend=1`)? Nur zusammen mit einem Blick hinein (`dev`) */
 export const devLate = (dev: readonly PackId[], search: string): boolean =>
   dev.length > 0 && new URLSearchParams(search).get(DEV_EVENING) === '1';
+
+/**
+ * Laterne, die der Schalter der Figur in die Hand gibt (`&laterne=1`): die der Grotte, wenn sie im Höhlenbett aufwacht
+ * (`home`), sonst keine
+ */
+export const devLamp = (home: RegionId | null, search: string): RegionId | undefined =>
+  home === 'hoehle' && new URLSearchParams(search).get(DEV_LAMP) === '1' ? 'hoehle' : undefined;
 
 /**
  * Speicher für den Entwickler-Schalter: liest den Spielstand des Kindes, schreibt aber nur in den Arbeitsspeicher. So

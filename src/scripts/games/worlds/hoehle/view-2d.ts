@@ -4,7 +4,8 @@
 // (Quader aus mitwachsen-cave-look.ts, je Deko-Art an den Haken `drawDeco` des Kerns gehängt), Lichtflecken auf dem
 // Grottenboden, der lila Höhlenhimmel und das Zeichen der Gegend in der Leiste (ein Kristall). Dazu der Schmuck der
 // Grotte: Töne des Säulen-Glockenspiels und „blubb“ des Grottenolms (`score`), „plink“ der Tropfsteine (`ambient`) und
-// in der Luft Tropfen, Grottenolm und die Fledermaus auf ihrer Runde (`sky.weather`, mitwachsen-cave-sky.ts), am Abend
+// in der Luft Tropfen, Grottenolm und die Fledermaus auf ihrer Runde, die kleinen Lichtgeister samt Kichern (`sky.weather`,
+// `ambient`; mitwachsen-cave-sky.ts, mitwachsen-ghost-look.ts), am Abend
 // golden-orange Lichtschächte (`ground`) und Fledermaus-Runden um den Schacht über dem Bett (mitwachsen-dusk-look.ts).
 // Licht der Grotte (mitwachsen-glow.ts): Schatten der Ränder auf Boden und Wand (`ground`), der Lichtkreis um die Figur
 // in der Luft; die Kristall-Laterne auf ihrem Sockel als Körper (`bodies`) und ihr Ton beim Nehmen (mitwachsen-lantern.ts). Das
@@ -136,8 +137,12 @@ export const view: View2D & { fx: CaveFx } = {
   ajar: (state, reduced) => heaveAjar(state, reduced), // der Rollstein in Dritteln
   // die verschlafene Fledermaus auf ihrer Runde hängt solange nicht an ihrem Sitzplatz
   away: (x, y, now) => fx.chime.away(x, y, now) || duskAway(fx.dusk, x, y, now), // auch am Abend auf ihren Runden
-  // „plink“: höchstens ein Tropfen je 2 s in der Nähe der Figur, nur an Erkundetem
-  ambient: (world, state, now, explored) => fx.drips.tick(world, state, now, explored),
+  // „plink“: höchstens ein Tropfen je 2 s in der Nähe der Figur, nur an Erkundetem; dazu das Kichern der Lichtgeister
+  // (das Bild bedenkt sie, hier holt der Kern ihre Töne ab)
+  ambient: (world, state, now, explored) => [
+    ...fx.drips.tick(world, state, now, explored),
+    ...(fx.ghost?.take(now) ?? []),
+  ],
   sky: {
     weather: caveWeather(fx),
     aurora: none,

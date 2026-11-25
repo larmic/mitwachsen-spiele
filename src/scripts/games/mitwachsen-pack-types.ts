@@ -43,6 +43,8 @@ export type Kessel = {
   spots: readonly Point[];
   spawns: ReadonlyMap<string, Point>;
   stone: Point;
+  /** weitere Klangsteine dieser Welt mit eigener Geschichte (Grotte: `lichtgeister` in der Kristallhalle) */
+  more?: readonly [StoryId, Point][];
   portal: [PortalId, Portal];
 };
 

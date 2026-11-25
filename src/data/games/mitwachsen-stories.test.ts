@@ -5,9 +5,9 @@ import { STORIES, melodyLength } from './mitwachsen-stories';
 import { STORY_TEXTS } from './mitwachsen-story-texts';
 
 describe('Geschichten der Klangsteine', () => {
-  it('gibt es am Bett, für jedes große Tor, am Schneebett und am Höhlenbett (zweite Fassungen) und an der Bahn', () => {
+  it('gibt es am Bett, für jedes große Tor, am Schneebett und am Höhlenbett (zweite Fassungen), bei den Lichtgeistern und an der Bahn', () => {
     expect(Object.keys(STORIES).sort()).toEqual(
-      ['bett', ...GATES.map((g) => g.id), 'eis-offen', 'hoehle-offen', 'lokschuppen', 'bahnhof'].sort(),
+      ['bett', ...GATES.map((g) => g.id), 'eis-offen', 'hoehle-offen', 'lichtgeister', 'lokschuppen', 'bahnhof'].sort(),
     );
     expect(Object.keys(STORY_TEXTS).sort()).toEqual(Object.keys(STORIES).sort());
     // beide Fassungen der Eis-Geschichte beginnen gleich und klingen gleich

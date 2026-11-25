@@ -5,9 +5,11 @@ import {
   DEV_EVENING,
   DEV_FEAST,
   DEV_ICE,
+  DEV_LAMP,
   DEV_OPEN,
   DEV_PARAM,
   DEV_PRELOAD,
+  devLamp,
   devLate,
   devProgress,
   glimpse,
@@ -163,6 +165,15 @@ describe('Entwickler-Schalter', () => {
     expect(devLate(['bahn'], '?entwickler=bahn&bau=0&abend=1')).toBe(true);
     expect(devLate(['bahn'], '?entwickler=bahn&bau=0')).toBe(false);
     expect(devLate([], '?abend=1')).toBe(false); // ohne Schalter nie
+  });
+
+  it('`&laterne=1`: die Figur wacht im Höhlenbett mit der Kristall-Laterne in der Hand auf (Lichtgeister), sonst nie', () => {
+    expect(DEV_LAMP).toBe('laterne');
+    const home = glimpse('?entwickler=hoehle&laterne=1', PACK_IDS).home;
+    expect(devLamp(home, '?entwickler=hoehle&laterne=1')).toBe('hoehle');
+    expect(devLamp(home, '?entwickler=hoehle')).toBeUndefined();
+    expect(devLamp('lichtung', '?entwickler=bahn&laterne=1')).toBeUndefined(); // nur im Höhlenbett
+    expect(devLamp(null, '?laterne=1')).toBeUndefined(); // ohne Schalter nie
   });
 
   it('Speicher im Blick hinein: liest den Spielstand, schreibt nur in den Arbeitsspeicher', () => {

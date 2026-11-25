@@ -396,6 +396,70 @@ test('Spiel: Kristall-Laterne in der Grotte per Entwickler-Schalter, Lichtkreis 
   expect(errors).toEqual([]);
 });
 
+// Kleine Lichtgeister per Entwickler-Schalter mit der Laterne in der Hand (2D, `&laterne=1`): Ohne Licht sieht man sie
+// nicht; steht die Figur mit Laterne nah genug, blendet der Geist am Versteck ein; tritt sie auf 2 Felder heran, schwebt
+// er zum nächsten Versteck im Lichtkreis
+test('Spiel: kleine Lichtgeister per Entwickler-Schalter mit Laterne, im Licht zu sehen, schweben weiter, ohne Fehler', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  const game = await openGame(page, { clock: true, dev: 'hoehle&laterne=1' });
+  type Spot = { x: number; y: number };
+  type Game = {
+    world: { cell(x: number, y: number): { solid?: boolean; ground: string } };
+    state: { player: { x: number; y: number; dir: string }; lamp?: string; wokeAt: number };
+    renderer: {
+      views: Map<
+        string,
+        { fx?: { ghost?: { places: Spot[]; ghosts: { list: { at: number; from?: number; alpha: number }[] } } } }
+      >;
+    };
+    apply(cmd: { type: 'move'; dir: string }): void;
+  };
+  await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+  await ticks(page, 10);
+  await render(page, 2);
+  expect(await game.evaluate((node) => (node as unknown as Game).state.lamp ?? null)).toBe('hoehle');
+  /** Die Figur auf ein freies Feld stellen, dessen Mitte `from` bis `to` Felder vom ersten Versteck liegt */
+  const stand = (from: number, to: number) =>
+    game.evaluate(
+      (node, [a, b]) => {
+        const el = node as unknown as Game;
+        const h = el.renderer.views.get('hoehle')!.fx!.ghost!.places[0]!;
+        for (let r = 0; r <= 5; r++)
+          for (let dy = -r; dy <= r; dy++)
+            for (let dx = -r; dx <= r; dx++) {
+              const [x, y] = [Math.floor(h.x) + dx, Math.floor(h.y) + dy];
+              const c = el.world.cell(x, y);
+              const d = Math.hypot(h.x - x - 0.5, h.y - y - 0.5);
+              if (c.solid || c.ground === 'water' || d <= a || d > b) continue;
+              el.state = { ...el.state, wokeAt: -1e6, player: { x, y, dir: 's' } };
+              return true;
+            }
+        return false;
+      },
+      [from, to] as const,
+    );
+  const first = () =>
+    game.evaluate((node) => {
+      const g = (node as unknown as Game).renderer.views.get('hoehle')!.fx!.ghost!.ghosts.list[0]!;
+      return { at: g.at, moving: g.from !== undefined, alpha: g.alpha };
+    });
+  expect(await first()).toEqual({ at: 0, moving: false, alpha: 0 }); // fern der Halle: nicht zu sehen
+  expect(await stand(GROTTE.ghost.near + 0.5, GROTTE.circle.lantern - 0.5)).toBe(true); // im Licht, nicht zu nah
+  await arrive(page);
+  await render(page, Math.ceil(GROTTE.ghost.fade / 50) + 1);
+  expect(await first()).toEqual({ at: 0, moving: false, alpha: 1 });
+  expect(await stand(-1, GROTTE.ghost.near - 0.3)).toBe(true); // ganz nah heran
+  await render(page, 1);
+  const fled = await first();
+  expect(fled.moving).toBe(true);
+  expect(fled.at).not.toBe(0);
+  await render(page, Math.ceil(GROTTE.ghost.float / 50) + 1);
+  expect(await first()).toMatchObject({ at: fled.at, moving: false });
+  expect(errors).toEqual([]);
+});
+
 // Dunkelmaske der Grotte (Pixelprobe am fertigen Bild, als Bildschirmfoto: in 2D und in 3D mit der Ebene über WebGL;
 // @3d, damit der beleuchtete Boden in 3D mitgeprüft wird): mitten in der Grotte, fern von Bett und Schächten, liegt um
 // die Figur ein Lichtloch (nie dunkler als die Dämmerung, fast so hell wie mit „Höhle hell“), außerhalb ist es

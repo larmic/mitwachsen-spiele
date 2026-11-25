@@ -119,6 +119,27 @@ export const GROTTE = {
    */
   hall: { across: 25, out: 57, r: 12, columns: [5, 4.5, 4, 3.5, 3], arch: 8 },
   /**
+   * Kleine Lichtgeister in der Kristallhalle (Schritt 11 der Rückmeldung, Regeln in mitwachsen-ghost.ts): `count` Geister,
+   * jeder in einem Versteck seitlich an einer Säule (`side` Felder neben ihrer Mitte nach Osten oder Westen, `back` ein
+   * wenig dahinter, nie im Norden); zu sehen nur im Licht (Laterne: `circle.lantern`), ein- und ausblenden in `fade` ms;
+   * kommt die Figur auf `near` Felder heran, schwebt er in `float` ms zum nächsten Versteck höchstens `hop` Felder von
+   * ihr; nach `after` Verstecken eine Freudenrunde von `joy` ms; gekichert wird höchstens alle `gap` ms. Klangstein
+   * „lichtgeister“ an `stone` [quer, vom Tor weg], links vor den Säulen
+   */
+  ghost: {
+    count: 2,
+    side: 0.62,
+    back: 0.15,
+    fade: 400,
+    near: 2,
+    hop: 3.5,
+    float: 1000,
+    after: 3,
+    joy: 1600,
+    gap: 1200,
+    stone: [18, 52],
+  },
+  /**
    * Tropfsteingrotte in der Mitte: Stalagmiten in drei Höhen, dazu ein Felsbecken 3 × 2 mit Moosrand (`basin`: seine Mitte,
    * quer von der Mitte der Zone); hinten über dem Becken die Tropfquelle, auf dem Rand ringsum Tropfmoos
    */
@@ -247,4 +268,18 @@ export const GROTTE_COLORS = {
    * oder Blau (das läse sich neben Wasser als Wasser, und Wasser füllt die Kanne); etwas dunkler als der Boden, leuchten nicht
    */
   veins: ['#a68ee0', '#d98ab8'],
+  /**
+   * Kleine Lichtgeister: milchiges Pfirsich mit dunklerem, warmem Rand (sonst ginge er im hellen Licht unter), oben heller,
+   * kräftige Wangen, geschlossene lachende Augen in warmem Braun, Glimmerpünktchen ohne Licht, Sternenkranz der
+   * Freudenrunde in Weiß, Rosa und Lila (kein Gold: Gold ist nur, wo das Kind etwas tun kann)
+   */
+  ghost: {
+    body: '#ffe3d0',
+    top: '#fff0e4',
+    rim: '#d98b70',
+    cheek: '#f08a96',
+    eye: '#6b4034',
+    glimmer: '#fff3e8',
+    stars: ['#ffffff', '#ffd6ec', '#e3d6ff'],
+  },
 } as const;

@@ -79,7 +79,7 @@ export const RULES: Rule[] = [
       // Tropfmoos), ihr Schmuck (Säulen-Glockenspiel mit Fledermaus-Runde, Grottenolm am Steg, Tropfsteine), ihre Füllung
       // (Stalagmiten-Gruppen, Kristallbüsche, Felsbrocken, Felsinseln, Pfützen, Moos und Farn, Lehmhang) und Fülle
       // (Kristallfelder, Adern, Leuchtmoos, Wasserfall am See, Ufersteine), Sammelstellen (Funke über vollen Beeten, Glitzern
-      // der fernen Tropfquelle), ihr Licht
+      // der fernen Tropfquelle), die kleinen Lichtgeister (Verstecken an den Säulen, Kichern, Klangstein), ihr Licht
       // (Ränder im Dunkel, Lichtkreis, Kristall-Laterne, Dunkelmaske), Zeichenteile der 2D-Ansicht und Modelle der Höhlen-Tiere; geholt
       // nah am Höhlentor, mit offenem Tor oder vor einem Halt des Zugs; dazu das Hau-ruck am
       // Höhlentor (Regeln, Hände auf dem Stein, Fledermaus, Glühwürmchen, Töne)
@@ -87,8 +87,8 @@ export const RULES: Rule[] = [
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Welt
       { chunks: /\/welt-hoehle-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-hoehle)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 55,6 KB (mit Farben, Fülle und Sammelstellen der Grotte)
-    budget: 58 * 1024,
+    // Gemessen 61,1 KB (mit den kleinen Lichtgeistern)
+    budget: 68 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

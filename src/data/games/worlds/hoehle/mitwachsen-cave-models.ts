@@ -6,6 +6,7 @@
 
 import { eyes, type Part } from '../../../../lib/games/front';
 import type { CaveSpeciesId } from '../../mitwachsen-hoehle';
+import { GROTTE_COLORS } from './mitwachsen-grotte';
 
 const MOLE = '#2e2b33';
 const PINK = '#f2a7b8';
@@ -145,3 +146,30 @@ export const BAT_ROOST: readonly Part[] = [
   s(-0.02, -0.45, -0.13, 0.04, 0.03, 0.02, PINK), // Näschen
   ...eyes(0.12, 0.11, -0.43, 0.05, 0.05, 0.03),
 ];
+
+/**
+ * Ein kleiner Lichtgeist (Schritt 11 der Rückmeldung; kein Tier der Leiste): ein runder Tropfen, etwa 0,4 Felder hoch,
+ * unten drei weiche Zipfel, milchiges Pfirsich mit dunklerem, warmem Rand (der Rand liegt als etwas größerer Quader
+ * dahinter), kräftige Wangen, geschlossene lachende Augen (zwei kleine Bögen) und ein Lächeln. Kein Würfel, keine
+ * Tentakel, keine Zunge, kein Laken mit Augenlöchern. Schwebt knapp über dem Boden (z = 0 ist seine Unterkante)
+ */
+export const GHOST_MODEL: readonly Part[] = ((c) => {
+  const eye = (x: number): Part[] => [
+    s(x + 0.012, 0.215, -0.118, 0.036, 0.016, 0.006, c.eye), // Bogen oben
+    s(x, 0.196, -0.118, 0.014, 0.024, 0.006, c.eye), // links hinunter
+    s(x + 0.046, 0.196, -0.118, 0.014, 0.024, 0.006, c.eye), // rechts hinunter
+  ];
+  return [
+    s(-0.17, 0.05, -0.1, 0.34, 0.28, 0.2, c.rim), // warmer Rand
+    s(-0.12, 0.31, -0.08, 0.24, 0.08, 0.16, c.rim),
+    ...[-0.15, -0.045, 0.06].map((x) => s(x, 0, -0.095, 0.09, 0.07, 0.15, c.rim)),
+    s(-0.15, 0.07, -0.112, 0.3, 0.25, 0.2, c.body, c.top), // runder Körper
+    s(-0.1, 0.32, -0.09, 0.2, 0.065, 0.16, c.body, c.top), // gewölbt oben
+    ...[-0.14, -0.035, 0.07].map((x, i) => s(x, i === 1 ? 0.005 : 0.015, -0.106, 0.07, 0.065, 0.17, c.body)), // drei weiche Zipfel
+    s(-0.135, 0.13, -0.117, 0.05, 0.035, 0.005, c.cheek), // Wangen
+    s(0.085, 0.13, -0.117, 0.05, 0.035, 0.005, c.cheek),
+    ...eye(-0.1),
+    ...eye(0.04),
+    s(-0.025, 0.152, -0.118, 0.05, 0.014, 0.006, SMILE), // lächelt
+  ];
+})(GROTTE_COLORS.ghost);

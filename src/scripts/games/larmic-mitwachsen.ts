@@ -42,7 +42,7 @@ import { GUIDE_GATE, pending, type GuideRules } from './mitwachsen-guide';
 import { PACK_IDS, Packs, dawnOf, type LoadedPack } from './mitwachsen-packs';
 import { preloadOf } from './mitwachsen-preload';
 import type { Need } from './mitwachsen-pack';
-import { devLate, devProgress, glimpse, sandbox } from './mitwachsen-dev';
+import { devLamp, devLate, devProgress, glimpse, sandbox } from './mitwachsen-dev';
 import { randomId, randomSeed, savedOrNew, showName } from './mitwachsen-world-list';
 import { platformLift, portalColor } from './mitwachsen-portal';
 import { HOME_STAGGER, SNAP_DELAY, hopOf, nibblers, snaps } from './mitwachsen-gait';
@@ -269,7 +269,8 @@ class LarmicMitwachsen extends HTMLElement {
     const { home } = this.glimpse;
     if (home && (home === 'lichtung' || this.packs.get(home))) {
       const [x, y] = this.world.homes[home].bed;
-      this.state = { ...this.state, player: { ...this.state.player, x, y } };
+      const lamp = devLamp(home, location.search); // `&laterne=1`: mit der Kristall-Laterne in der Hand
+      this.state = { ...this.state, player: { ...this.state.player, x, y }, ...(lamp && { lamp }) };
     }
     this.live = this.saved.id;
     // Nebel: Am Anfang ist nur ein kleines Stück um das Bett zu sehen (die Figur liegt darin), ebenso, wenn das Bett

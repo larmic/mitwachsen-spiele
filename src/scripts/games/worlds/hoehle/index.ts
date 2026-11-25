@@ -3,7 +3,7 @@
 // Licht, Portal am stillen See, Fundorte der acht Höhlen-Tiere, Pilzbeete, Tropfquelle und Tropfmoos zum Sammeln) und
 // die Zeichenteile der 2D-Ansicht samt den Modellen der Höhlen-Tiere (die Fledermaus auch kopfüber), dazu ihr Schmuck:
 // Säulen-Glockenspiel, Grottenolm am Steg und Tropfsteine (Regeln in mitwachsen-cave-rules.ts, Bild und Ton in
-// view-2d.ts), ihre Füllung (mitwachsen-fill.ts) und ihr Licht: Ränder im Dunkel, Lichtkreis um die Figur und die
+// view-2d.ts), die kleinen Lichtgeister in der Kristallhalle samt Klangstein (mitwachsen-ghost.ts, mitwachsen-ghost-look.ts), ihre Füllung (mitwachsen-fill.ts) und ihr Licht: Ränder im Dunkel, Lichtkreis um die Figur und die
 // Kristall-Laterne am Bett (mitwachsen-glow.ts, mitwachsen-lantern.ts; die Regel der Laterne ist Teil von `rules`). Die
 // Regeln des Sammelns stehen bei den Handgriffen im Kern (mitwachsen-chores.ts). Dazu das Hau-ruck am Höhlentor: Tok
 // (aus dem Paket der Bahn) und die Figur schieben den Rollstein in drei Stößen in seine Nische (`rules.ritual`,
