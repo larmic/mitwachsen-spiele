@@ -1,6 +1,7 @@
 // Bahnhof Bär auf der Lichtung – rein: wo er liegt (je Seed gesucht, `LINE.bear`): Mitte 13 bis 16 Felder vom Bett, 20
 // bis 30° neben dem Strahl vom Bett zum Höhlentor (immer, für jeden Seed), Bahnsteig 2 × 7 mit dem Gleis daneben,
-// 12 bis 16 Schritte vom Bett, fern von Plattformen, Wiese, Trögen, Torplatten, Klangsteinen und Teichen. Sein Platz wird
+// 12 bis 16 Schritte vom Bett, fern von Plattformen, Wiese, Trögen, Torplatten, Klangsteinen und Teichen, zuerst mit dem
+// Bahnsteig weg von der Kamera (`facesCamera`, eine Strafe, kein Filter). Sein Platz wird
 // eben und frei gemacht; der Fußweg zum Tor weicht ihm aus (mitwachsen-line.ts). Teil des Pakets der Bahn.
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Gleis als Boden)
 
@@ -26,7 +27,8 @@ export type Station = { lane: Point[]; platform: Point[]; dir?: number };
  * Bahnhof Bär: Plätze in der Reihe, wie gut sie zu `LINE.bear` passen (Mitte 25° neben dem Strahl, 14,5 Felder vom Bett
  * zuerst, dann je halbes Feld und Grad weiter weg), jeweils auf der Seite der Spur u −2 (dort hat die Mitte das kleinere
  * u). Zuerst längs zum Tor, das Gleis auf der Seite weg vom Fußweg; dann quer, das Gleis auf der Seite zum Tor (der
- * Bahnsteig zwischen Bett und Gleis), die Strecke verlässt ihn zum Strahl hin oder von ihm weg
+ * Bahnsteig zwischen Bett und Gleis), die Strecke verlässt ihn zum Strahl hin oder von ihm weg. Plätze mit dem Bahnsteig
+ * zur Kamera (`facesCamera`) kosten `LINE.bear.camera` mehr: Sie kommen nach allen anderen, fallen aber nie weg
  */
 export function bearSpots(g: Door, bed: Point): Station[] {
   const { long, wide, r, angle } = LINE.bear;
@@ -52,8 +54,10 @@ export function bearSpots(g: Door, bed: Point): Station[] {
           ]);
   tries.sort((p, q) => p[2] - q[2]);
   const seen = new Set<string>();
-  const spots: Station[] = [];
-  for (const [rr, deg, , flat, side] of tries) {
+  const spots: { score: number; station: Station }[] = [];
+  const add = (score: number, station: Station) =>
+    spots.push({ score: score + (facesCamera(station) ? LINE.bear.camera : 0), station });
+  for (const [rr, deg, score, flat, side] of tries) {
     const c = [1, -1]
       .map((s): Point => {
         const b = a + (s * deg * Math.PI) / 180;
@@ -70,7 +74,7 @@ export function bearSpots(g: Door, bed: Point): Station[] {
       const platform = Array.from({ length: wide * long }, (_, i) =>
         at(side ? cu - (i % wide) : cu + (i % wide), ct - (long >> 1) + Math.floor(i / wide)),
       );
-      spots.push({ lane, platform, dir: out });
+      add(score, { lane, platform, dir: out });
       continue;
     }
     // quer: Gleis auf der Seite zum Tor, Bahnsteig zwischen ihm und dem Bett
@@ -78,9 +82,20 @@ export function bearSpots(g: Door, bed: Point): Station[] {
       at(cu - (long >> 1) + Math.floor(i / wide), ct - (i % wide)),
     );
     const row = Array.from({ length: long }, (_, i) => at(cu - (long >> 1) + i, ct + 1));
-    spots.push({ lane: row, platform, dir: across }, { lane: [...row].reverse(), platform, dir: (across + 2) % 4 });
+    add(score, { lane: row, platform, dir: across });
+    add(score, { lane: [...row].reverse(), platform, dir: (across + 2) % 4 });
   }
-  return spots;
+  return spots.sort((p, q) => p.score - q.score).map((s) => s.station); // stabil: bei gleicher Güte wie gesucht
+}
+
+/**
+ * Liegt der Bahnsteig auf der Seite zur Kamera (in Ruhe im Süden, +y, mitwachsen-camera.ts)? Dann stünde er zwischen
+ * Kamera und Zug, sein Dach verdeckte Wagen und Figur. `bearSpots` probiert solche Plätze erst nach den anderen (eine
+ * Strafe `LINE.bear.camera`, kein Filter: Passt nichts anderes, liegt er dort, statt dass die Welt ohne Gleis bleibt)
+ */
+export function facesCamera(s: Pick<Station, 'lane' | 'platform'>): boolean {
+  const y = (ps: readonly Point[]) => ps.reduce((a, p) => a + p[1], 0) / (ps.length || 1);
+  return y(s.platform) > y(s.lane) + 0.5;
 }
 
 /** Mitte eines Bahnhofs (Gleis und Bahnsteig) */

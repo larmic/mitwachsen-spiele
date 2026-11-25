@@ -12,9 +12,11 @@ export const LINE = {
    * Bahnhof Bär: Mitte `r` Felder vom Bett, `angle` Grad neben dem Strahl vom Bett zum Höhlentor (für jeden Seed), zuerst
    * auf der Seite der Spur (u −2); Bahnsteig `wide` × `long` Felder, das nächste Feld `steps` Schritte vom Bett. Jedes
    * Feld mindestens `ring` Felder vom Bett (außerhalb des Portalrings, r 9) und `gap` Felder (Chebyshev) fern von
-   * Plattformen, Wiese, Trögen, Wasser, Klangsteinen, Torplatten und dem Fußweg zum Tor (der Fußweg weicht ihm aus)
+   * Plattformen, Wiese, Trögen, Wasser, Klangsteinen, Torplatten und dem Fußweg zum Tor (der Fußweg weicht ihm aus).
+   * `camera`: Strafe für einen Bahnsteig südlich seines Gleises, zur Kamera hin (größer als alle anderen Teile der Güte
+   * zusammen, kein Filter, mitwachsen-bear.ts)
    */
-  bear: { r: [13, 16], angle: [20, 30], steps: [12, 16], long: 7, wide: 2, ring: 10.5, gap: 2 },
+  bear: { r: [13, 16], angle: [20, 30], steps: [12, 16], long: 7, wide: 2, ring: 10.5, gap: 2, camera: 40 },
   /** Spur des Gleises in der Bucht und im Gang: u −2, am Rand der Tür (Platte −1 … 1, Toks Platz +2, Warteplätze |u| ≥ 3) */
   lane: -2,
   /** Vor der Bucht (drei Reihen vor der Tür) liegen `cut` Felder Einschnitt, davor das Tunnelportal, davor `lead` Felder gerade */

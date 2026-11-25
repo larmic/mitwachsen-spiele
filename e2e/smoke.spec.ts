@@ -742,7 +742,7 @@ test(
       apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
     };
     // eine feste Welt (Seed 1, wie in mitwachsen-build.test.ts): Bahnhof Bär hat Platz, Tok kommt an seinen Platz; sonst
-    // zöge jeder Lauf einen neuen Seed (`randomSeed`), und in den elf Welten ohne Platz für Bahnhof Bär baut Tok nicht
+    // zöge jeder Lauf einen neuen Seed (`randomSeed`), und in den wenigen Welten ohne Platz für Bahnhof Bär baut Tok nicht
     await page.addInitScript(() => {
       const real = crypto.getRandomValues.bind(crypto);
       const fixed = (a: ArrayBufferView<ArrayBuffer>) =>

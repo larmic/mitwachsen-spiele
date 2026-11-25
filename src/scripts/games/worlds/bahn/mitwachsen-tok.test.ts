@@ -571,11 +571,12 @@ describe('Tok: Bild, Ton, Leiste, Hinweis', () => {
 // Bau 1 (mitwachsen-build.ts) baut die Welt neu: hier, weil die Welten vor Ausbau 1 schon für Tok gebaut sind
 describe('Bau 1: wer im Weg stünde, rückt zur Seite', () => {
   const FAELLIG = withTok(SLED_HOME, { stage: 'faellig' });
-  // nur die Seeds, deren Welt mit Ausbau 1 hier ohnehin gebaut wird (1 und 11, „Bahnhof Bär, den Tok erwartet …“), und
-  // Seed 39, an dem eine Biene im Häuschen stand: Jede weitere ganze Welt kostet test:deep gut 0,15 s, und es liegt schon
-  // knapp unter seiner Frist von 150 s in gates:ci; dass `unstick` jeden auf ein Feld bringt, auf dem man stehen kann,
-  // prüft der Test selbst, die Seeds zeigen nur, dass Bau 1 wirklich jemanden verdrängen kann
-  const SEEDS = [SAMPLE_SEEDS[0]!, ...REGRESSION_SEEDS, 39];
+  // nur die Seeds, deren Welt mit Ausbau 1 hier ohnehin gebaut wird (1 und 11, „Bahnhof Bär, den Tok erwartet …“): Jede
+  // weitere ganze Welt kostet test:deep gut 0,15 s, und es liegt schon knapp unter seiner Frist von 150 s in gates:ci.
+  // Seit Bahnhof Bär die Seite weg von der Kamera vorzieht, wohnt in den Seeds 1 bis 140 kein Tier mehr dort, wo das
+  // Häuschen hinkommt (vorher die Biene in Seed 39 und 80); dass Bau 1 jemanden verdrängen kann, stellt der Test unten
+  // darum selbst her
+  const SEEDS = [SAMPLE_SEEDS[0]!, ...REGRESSION_SEEDS];
   const stuck = (s: State, w: World) => [
     ...s.animals.flatMap((a) => [
       ...(standHeight(w, s.openGates, a.x, a.y) === null ? [`${a.id} auf ${a.x},${a.y}`] : []),
@@ -593,17 +594,25 @@ describe('Bau 1: wer im Weg stünde, rückt zur Seite', () => {
     expect(stuck(unstick(s, after), after), `Seed ${seed}`).toEqual([]);
   });
 
-  it('Seed 39: die Biene der Lichtung wohnt dort, wo das Häuschen hinkommt; die Figur auf dem Häuschen rückt auch', () => {
-    const before = worldOf(39, BAHN);
-    const after = worldOf(39, BAHN, { bahn: { built: 1 } });
+  it('Seed 1: ein Tier der Lichtung, das auf dem Häuschen wohnt und steht, rückt, die Figur auf dem Häuschen auch', () => {
+    // wie ein Spielstand, in dem jemand dort steht, wo Bahnhof Bär nun liegt (er ist umgezogen, oder Bau 1 kommt dorthin)
+    const before = worldOf(1, BAHN);
+    const after = worldOf(1, BAHN, { bahn: { built: 1 } });
     const hut = stationOf(after)!.hut!.at;
-    const s = { ...initialState(before, { packs: FAELLIG }), player: { x: hut[0], y: hut[1], dir: 's' as Dir } };
-    const bee = s.animals.find((a) => key([...a.spawn]) === key(hut));
-    expect(bee?.species).toBe('biene');
+    const s0 = initialState(before, { packs: FAELLIG });
+    // absichtlich gestellt: in den Seeds 1 bis 140 wohnt seit dem Umzug kein Tier mehr auf dem Häuschen
+    const animal = s0.animals.find((a) => a.realm === 'lichtung' && a.mode === 'wander');
+    expect(animal?.realm).toBe('lichtung');
+    const s = {
+      ...s0,
+      player: { x: hut[0], y: hut[1], dir: 's' as Dir },
+      animals: s0.animals.map((a) => (a === animal ? { ...a, x: hut[0], y: hut[1], spawn: hut } : a)),
+    };
+    expect(standHeight(after, s.openGates, ...hut)).toBeNull(); // das Häuschen ist fest
     expect(stuck(s, after).length).toBeGreaterThan(1);
     const moved = unstick(s, after);
     expect(stuck(moved, after)).toEqual([]);
-    expect(moved.animals.find((a) => a.id === bee!.id)!.spawn).toEqual(after.spawns.get(bee!.id));
+    expect(moved.animals.find((a) => a.id === animal!.id)!.spawn).toEqual(after.spawns.get(animal!.id));
     expect(unstick(moved, after)).toBe(moved); // niemand mehr im Weg: derselbe Zustand
   });
 });
