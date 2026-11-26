@@ -114,7 +114,7 @@
   - [x] Schritt 1: Wegsuche in den Kern und messen (Issue 59)
   - [x] Schritt 2: Weltpfade als Boden (Issue 61, `mitwachsen-worldpath.ts`, 2 ms je Welt); `test:deep` entlastet (Schlitten-Tests 12 statt 20 Seeds, wilde Läufe 6 statt 8)
   - [x] Schritt 3: schlafende Wegsteine und Lichterkette beim Öffnen eines Tors (Issue 65, `mitwachsen-waystone.ts`; am Gerät ansehen steht aus)
-  - [ ] Schritt 4: Stellplatz des Schlittens in die Linie von Stein und Pfad
+  - [x] Schritt 4: Stellplatz des Schlittens in die Linie von Stein und Pfad (Issue 67; 57 von 60 Welten auf der Linie; am Gerät ansehen steht aus)
   - [ ] Schritt 5: Bahnhof Bär an den Höhlen-Portalstein
   - [ ] Am Gerät ansehen: Folgt er einem Pfad, erkennt er die Materialien?
 - [x] Weltrand: eigene Antwort beim Dagegenlaufen (Issue 41, 26.11.2026): Ereignis `edge` statt `bump` an Hecke, Eisklippe und Grottenwand (`mitwachsen-edge.ts`), weicher tiefer Ton, Vogel in der Hecke, Glitzer am Eis, Echo in der Grotte, höchstens alle 1,5 s
