@@ -20,7 +20,7 @@ import { FENCE_CRYSTAL } from '../../../../data/games/worlds/grube/mitwachsen-fu
 import type { Cell } from '../../mitwachsen-cell';
 import type { Laid, WorldRules } from '../../mitwachsen-pack-types';
 import { rank, stageOf, withRidden } from '../../mitwachsen-ride-save';
-import type { RideRoute, Rider, Vehicle } from '../../mitwachsen-rider';
+import { MAX_LAPS, type RideRoute, type Rider, type Vehicle } from '../../mitwachsen-rider';
 import type { World } from '../../mitwachsen-world';
 
 /** Funkel in `RIDES` */
@@ -90,8 +90,58 @@ export function layGrube(laid: Laid): [StoryId, Point][] {
     story: 'grube',
     tufts: undefined,
   });
+  lapStones(laid.map, track[SEAT]![0], stone).forEach((p, i) =>
+    laid.map.set(key(...p), {
+      ...laid.map.get(key(...p))!,
+      deco: 'lapstone',
+      solid: true,
+      note: i + 1,
+      tufts: undefined,
+    }),
+  );
   return [['grube', stone]];
 }
+
+/**
+ * Plätze der vier Zahlensteine am Grubenhalt (Issue 48), in der Reihenfolge 1 bis 4: in der äußeren Reihe des
+ * Bahnsteigs (kein Gleis unter den acht Nachbarn), am Ende gegenüber vom Klangstein `stone`, weiter als `STONES_FROM_SEAT`
+ * vom Sitz (kein Warteplatz, das Aussteigen bleibt frei). Im Bild von links nach rechts (bei einem Bahnsteig von Nord
+ * nach Süd von oben nach unten). Die innere Reihe davor bleibt frei: Von dort und von außen läuft man hinein. Leer, wenn
+ * keine vier Platz haben
+ */
+export function lapStones(map: ReadonlyMap<string, Cell>, seat: Point, stone: Point): Point[] {
+  const far = ([x, y]: Point, [ox, oy]: Point) => Math.hypot(x - ox, y - oy);
+  const outer: Point[] = [];
+  for (const [k, c] of map) {
+    if (c.stop !== FUNKEL.id || !standable(c) || c.deco || c.ride) continue;
+    const p = k.split(',').map(Number) as unknown as Point;
+    if (far(p, seat) > STONES_FROM_SEAT && !near8(...p).some((q) => map.get(key(...q))?.ride)) outer.push(p);
+  }
+  const picked = outer.sort((a, b) => far(b, stone) - far(a, stone) || a[0] - b[0] || a[1] - b[1]).slice(0, MAX_LAPS);
+  return picked.length < MAX_LAPS ? [] : picked.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+}
+/** So weit (Felder) stehen die Zahlensteine mindestens vom Sitz: hinter den Warteplätzen (der fernste liegt 2,24 weg) */
+export const STONES_FROM_SEAT = 2.5;
+
+const stones = new WeakMap<World, readonly Point[]>();
+/** Die Zahlensteine einer Welt in der Reihenfolge 1 bis 4 (leer vor dem Graben oder ohne Grotte), je Welt einmal */
+export function lapStonesOf(world: World, s: Pick<Rider, 'packs'>): readonly Point[] {
+  const seat = funkelRoute(world, s)?.stops.home;
+  if (!seat) return [];
+  let found = stones.get(world);
+  if (found) return found;
+  const all: [number, Point][] = [];
+  for (let dy = -8; dy <= 8; dy++)
+    for (let dx = -8; dx <= 8; dx++) {
+      const c = world.cell(seat[0] + dx, seat[1] + dy);
+      if (c.deco === 'lapstone') all.push([c.note ?? 0, [seat[0] + dx, seat[1] + dy]]);
+    }
+  stones.set(world, (found = all.sort((a, b) => a[0] - b[0]).map(([, p]) => p)));
+  return found;
+}
+
+/** So viele Runden sind für Funkel gewählt (ohne Wahl und nach dem Neuladen eine) */
+export const lapsOf = (s: Pick<Rider, 'laps'>) => s.laps?.[FUNKEL.id] ?? 1;
 
 /** So weit (Felder) steht der Klangstein am Grubenhalt mindestens vom Sitz: hinter den Warteplätzen, am Ende des Bahnsteigs */
 export const STONE_FROM_SEAT = 4;
@@ -230,14 +280,22 @@ export const funkel: Vehicle = {
   landed(s) {
     s.packs = withRidden(s.packs, FUNKEL.id); // kein goldener Rahmen mehr an der Tür
   },
+  laps: lapsOf, // so viele Runden, wie am Zahlenstein gewählt
 };
 
 /**
- * Zu Fuß gegen ein Klingeltor gelaufen (`WorldRules.bump`): Es klingt (Ereignis `chimegate`, drei Töne, die Scheibe
+ * Zu Fuß in einen Zahlenstein gelaufen (`WorldRules.bump`): Er ist gewählt (Ereignis `lapstone`, so viele Töne wie
+ * seine Zahl, er leuchtet). Zu Fuß gegen ein Klingeltor gelaufen: Es klingt (Ereignis `chimegate`, drei Töne, die Scheibe
  * wackelt, Funkel am Halt tutet und blinkt; mitwachsen-gang-look.ts), die Figur bleibt stehen, ohne anzustoßen. Kein
  * „noch nicht“, kein Gold: Das Tor ist für Füße nur zu eng
  */
 export const ringGate: WorldRules['bump'] = (s, c, x, y, events) => {
+  if (c.deco === 'lapstone' && c.note) {
+    // Zahlenstein: Hineinlaufen wählt so viele Runden (bleibt, bis ein anderer gewählt wird; nicht gespeichert)
+    s.laps = { ...s.laps, [FUNKEL.id]: c.note };
+    events.push({ type: 'lapstone', x, y, n: c.note });
+    return true;
+  }
   if (!c.chimeGate) return false;
   // schläft Funkel (es fehlt ein Paket), klingt nur das Tor: er antwortet nicht und lädt nicht ein
   events.push({ type: 'chimegate', x, y, answer: !s.dozing?.includes(FUNKEL.id) });

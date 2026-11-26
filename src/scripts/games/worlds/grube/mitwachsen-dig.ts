@@ -22,7 +22,7 @@ import { rideOf, ridden, withRide } from '../../mitwachsen-ride-save';
 import type { MoveCmd } from '../../mitwachsen-rider';
 import type { Sight } from '../../mitwachsen-sight';
 import { canStep, type World } from '../../mitwachsen-world';
-import { FUNKEL, SEAT, dug, funkelRoute, laneOf } from './mitwachsen-funkel';
+import { FUNKEL, SEAT, dug, funkelRoute, laneOf, lapStonesOf } from './mitwachsen-funkel';
 
 /** Wohnt der erste Maulwurf zu Hause am Höhlenbett (er zog mit Bau 2 ein)? */
 export const moleHome = (garden: readonly { id: string }[]): boolean => garden.some((a) => a.id === FIRST_MOLE);
@@ -202,5 +202,17 @@ export const FUNKEL_SIGHT: Sight = {
   },
   done: (s) => ridden(s.packs, FUNKEL.id),
   call: (_, [x, y]) => ({ type: 'ride', what: 'nudge', id: FUNKEL.id, x, y }),
+  color: FUNKEL.color,
+};
+
+/**
+ * Sehenswürdigkeit Zahlensteine (Issue 48): Sie locken, sobald das Kind einmal mit Funkel gefahren ist, bis es einen
+ * gewählt hat. Der Ruf sind die Töne des Steins
+ */
+export const STONES_SIGHT: Sight = {
+  id: 'grube:zahlensteine',
+  cells: (world, s) => (s.dozing?.includes(FUNKEL.id) ? [] : lapStonesOf(world, s)),
+  ready: (s) => ridden(s.packs, FUNKEL.id),
+  call: (world, [x, y]) => ({ type: 'lapstone', x, y, n: world.cell(x, y).note ?? 1 }),
   color: FUNKEL.color,
 };

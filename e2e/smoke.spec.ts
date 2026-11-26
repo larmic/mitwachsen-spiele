@@ -3545,6 +3545,142 @@ test(
   },
 );
 
+// Zahlensteine an Funkel (Issue 48, `?entwickler=grube`, fester Seed 1; @3d, weil Steine und Lichter auf dem Dach auch
+// in 3D gezeichnet werden): Vier Steine stehen am Bahnsteig. Die Figur läuft in den Stein 2: Er ist gewählt (Petrol),
+// auf dem Dach des zweiten Wagens leuchten zwei Lichter. Eingestiegen fährt Funkel zwei Runden ohne Halt (nach der ersten
+// geht ein Licht aus), erst dann steigt die Figur aus. Alles über die Test-Uhr, gespeichert wird im Blick hinein nichts
+test(
+  'Spiel: Zahlensteine an Funkel: 2 gewählt, zwei Runden ohne Halt, ein Licht je Runde, dann aussteigen, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    type Cell = { ride?: string; stop?: string; deco?: string; note?: number; solid?: boolean; lane?: { at?: number } };
+    type Game = {
+      world: { seed: number; homes: Record<string, { bed: [number, number] }>; cell(x: number, y: number): Cell };
+      state: {
+        player: { x: number; y: number; dir: string };
+        animals: { x: number; y: number }[];
+        laps?: Record<string, number>;
+        ride?: { id: string; pos: number; laps?: number; phase: string };
+      };
+      rides: { id: string; key: string }[];
+      apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+    };
+    await page.addInitScript(() => {
+      const real = crypto.getRandomValues.bind(crypto);
+      const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+        a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+      Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    });
+    const game = await openGame(page, { clock: true, dev: 'grube' });
+    await expectView(page);
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    await ticks(page, 5);
+    await render(page, 2);
+    /** Bilder der Steine und des zweiten Wagens: welcher Stein gewählt ist, wie viele Lichter leuchten */
+    const look = () =>
+      game.evaluate((node) => {
+        const el = node as unknown as Game;
+        const stones = el.rides.filter((r) => r.id.startsWith('grube:stein:'));
+        return {
+          stones: stones.map((r) => r.id),
+          chosen: stones.filter((r) => r.key.endsWith(':1')).map((r) => r.id),
+          lights: Number(el.rides.find((r) => r.id === 'ride:grube:rear')?.key.at(-1)),
+        };
+      });
+    expect(await look()).toEqual({
+      stones: ['grube:stein:1', 'grube:stein:2', 'grube:stein:3', 'grube:stein:4'],
+      chosen: ['grube:stein:1'],
+      lights: 1,
+    });
+    // neben den Stein 2 stellen und hineinlaufen
+    const picked = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const [bx, by] = el.world.homes.hoehle!.bed;
+      const dirs: [string, number, number][] = [
+        ['e', 1, 0],
+        ['w', -1, 0],
+        ['s', 0, 1],
+        ['n', 0, -1],
+      ];
+      for (let y = by - 40; y <= by + 40; y++)
+        for (let x = bx - 40; x <= bx + 40; x++) {
+          const c = el.world.cell(x, y);
+          if (c.deco !== 'lapstone' || c.note !== 2) continue;
+          const [dir, dx, dy] = dirs.find(([, ax, ay]) => {
+            const n = el.world.cell(x - ax, y - ay);
+            return !n.solid && !n.ride;
+          })!;
+          const from = { x: x - dx, y: y - dy };
+          el.state = { ...el.state, animals: [], player: { ...from, dir: 's' } };
+          el.apply({ type: 'move', dir, fresh: true });
+          return { stayed: el.state.player.x === from.x && el.state.player.y === from.y, laps: el.state.laps };
+        }
+      return null;
+    });
+    expect(picked).toEqual({ stayed: true, laps: { grube: 2 } });
+    await render(page, 2);
+    expect(await look()).toMatchObject({ chosen: ['grube:stein:2'], lights: 2 });
+    // einsteigen: zwei Runden
+    const boarded = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const [bx, by] = el.world.homes.hoehle!.bed;
+      let seat: [number, number] | undefined;
+      for (let y = by - 30; y <= by + 30 && !seat; y++)
+        for (let x = bx - 30; x <= bx + 30 && !seat; x++) {
+          const c = el.world.cell(x, y);
+          if (c.ride === 'grube' && c.lane?.at === 5) seat = [x, y];
+        }
+      const dirs: [string, number, number][] = [
+        ['e', 1, 0],
+        ['w', -1, 0],
+        ['s', 0, 1],
+        ['n', 0, -1],
+      ];
+      const [dir, dx, dy] = dirs.find(([, ax, ay]) => el.world.cell(seat![0] - ax, seat![1] - ay).stop === 'grube')!;
+      el.state = { ...el.state, player: { x: seat![0] - dx, y: seat![1] - dy, dir: 's' } };
+      el.apply({ type: 'move', dir, fresh: true });
+      return el.state.ride?.laps;
+    });
+    expect(boarded).toBe(2);
+    const seen: number[] = [];
+    let wraps = 0;
+    let last = 0;
+    for (let i = 0; i < 60; i++) {
+      await ticks(page, 10);
+      await render(page, 1);
+      const now = await game.evaluate((node) => {
+        const r = (node as unknown as Game).state.ride;
+        return r ? { pos: r.pos, laps: r.laps ?? 1 } : null;
+      });
+      if (!now) break;
+      if (now.pos < last) wraps++;
+      last = now.pos;
+      const { lights } = await look();
+      expect(lights).toBe(now.laps); // so viele Lichter wie Runden, die noch kommen
+      if (seen.at(-1) !== lights) seen.push(lights);
+    }
+    expect(seen).toEqual([2, 1]);
+    expect(wraps).toBe(1);
+    const done = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      return {
+        ride: el.state.ride?.id ?? null,
+        stop: el.world.cell(el.state.player.x, el.state.player.y).stop ?? null,
+        laps: el.state.laps,
+      };
+    });
+    expect(done).toEqual({ ride: null, stop: 'grube', laps: { grube: 2 } }); // die Wahl bleibt
+    await render(page, 2);
+    expect(await look()).toMatchObject({ chosen: ['grube:stein:2'], lights: 2 });
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
+      [],
+    );
+    expect(errors).toEqual([]);
+  },
+);
+
 // Der Maulwurf gräbt den Glitzergang (Schritt 17, `?entwickler=grube&graben=1`, fester Seed 1; @3d, weil die Welt mitten
 // im Spiel neu gebaut wird und Erdwelle, Gang und Bähnchen auch in 3D gezeichnet werden): Der erste Maulwurf wohnt zu
 // Hause, das Graben ist fällig (hier über die alte Stufe `faellig`), der Gang ist noch Fels und Funkel nicht da. Die Figur geht an den Grubenhalt: Der Maulwurf

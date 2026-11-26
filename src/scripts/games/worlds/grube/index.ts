@@ -24,10 +24,10 @@ import type { RideEngine, Vehicle } from '../../mitwachsen-rider';
 import type { Sight } from '../../mitwachsen-sight';
 import type { View2D } from '../../mitwachsen-view';
 import type { View3D } from '../../mitwachsen-view-3d';
-import { DIG_RULES, DIG_SIGHT, FUNKEL_SIGHT } from './mitwachsen-dig';
+import { DIG_RULES, DIG_SIGHT, FUNKEL_SIGHT, STONES_SIGHT } from './mitwachsen-dig';
 import { digBodies, digFx } from './mitwachsen-dig-look';
 import { dug, funkel, layGrube, ringGate } from './mitwachsen-funkel';
-import { funkelBodies, funkelFx, grubeRails, haltBodies } from './mitwachsen-funkel-look';
+import { funkelBodies, funkelFx, grubeRails, haltBodies, lapScore } from './mitwachsen-funkel-look';
 import { GangFx, gangBodies, gangDim } from './mitwachsen-gang-look';
 
 /** Was am Glitzergang zuletzt klang (je Spielseite eins) */
@@ -45,7 +45,13 @@ const view: View2D = {
   ],
   rideFx: funkelFx,
   heraldFx: digFx, // der Maulwurf gräbt
-  score: (e) => (e.type === 'chimegate' ? fx.ring(e.x, e.y, performance.now(), e.answer) : undefined), // zu Fuß ans Klingeltor
+  // zu Fuß ans Klingeltor; ein Zahlenstein gewählt: so viele Töne wie seine Zahl
+  score: (e) =>
+    e.type === 'chimegate'
+      ? fx.ring(e.x, e.y, performance.now(), e.answer)
+      : e.type === 'lapstone'
+        ? lapScore(e.n)
+        : undefined,
   ambient: (world, state, now) => fx.ambient(world, state, now), // Röhren beim Durchfahren, Tuten mit Echo
   dim: gangDim, // im Glitzergang wie im Tunnel
 };
@@ -56,7 +62,8 @@ export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules
   lay: layGrube,
   lays: dug, // vor dem Graben kein Neubau, wenn das Paket mit der Grotte ankommt
   rules: { bump: ringGate, vehicle: funkel, herald: DIG_RULES },
-  sights: [DIG_SIGHT, FUNKEL_SIGHT], // vor dem Graben lockt der Grubenhalt (erst dort gräbt der Maulwurf), danach Funkel bis zur ersten Fahrt
+  // vor dem Graben lockt der Grubenhalt (erst dort gräbt der Maulwurf), danach Funkel bis zur ersten Fahrt, dann die Zahlensteine
+  sights: [DIG_SIGHT, FUNKEL_SIGHT, STONES_SIGHT],
   view,
   view3d: () => Promise.resolve(view3d),
 };

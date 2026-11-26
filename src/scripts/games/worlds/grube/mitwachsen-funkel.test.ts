@@ -13,7 +13,7 @@ import { ridden, withRidden } from '../../mitwachsen-ride-save';
 import { initialState, step, type Cmd, type GameEvent, type State } from '../../mitwachsen-state';
 import { canStep, createWorld, type World } from '../../mitwachsen-world';
 import { DUG, FAHRT_PACK, GRUBE_PACK, HOEHLE_PACK, reachable, seedRange, seedsFor, worldOf } from '../../test-worlds';
-import { FUNKEL, SEAT, dug, funkel, funkelExit, funkelRoute } from './mitwachsen-funkel';
+import { FUNKEL, SEAT, dug, funkel, funkelExit, funkelRoute, lapStonesOf, lapsOf } from './mitwachsen-funkel';
 import { digSpot, haltOf as haltOfDig } from './mitwachsen-dig';
 import { gangOf } from './mitwachsen-gang';
 import { pack } from './index';
@@ -227,6 +227,30 @@ describe('Grubenbähnchen Funkel', () => {
       bad('Klangstein nicht zu erreichen');
   }
 
+  /**
+   * Zahlensteine am Grubenhalt (Issue 48): vier feste Steine 1 bis 4 in einer Reihe auf dem Bahnsteig, im Bild von
+   * links nach rechts (oder von oben nach unten), kein Warteplatz, nicht am Aussteigen, nicht am Gleis, jeder zu Fuß
+   * zu erreichen; der Klangstein bleibt
+   */
+  function lapStonesIn(w: World, r: RideRoute, exits: readonly Point[], feet: ReadonlySet<string>, bad: Bad) {
+    const stones = lapStonesOf(w, { packs: DUG });
+    if (stones.length !== 4) return void bad(`${stones.length} Zahlensteine`);
+    stones.forEach((p, i) => {
+      const c = w.cell(...p);
+      const at = `Zahlenstein ${i + 1} bei ${keyOf(p)}`;
+      if (c.deco !== 'lapstone' || c.note !== i + 1 || !c.solid || c.stop !== 'grube') bad(`${at}: kein Stein`);
+      if (r.seats.home.some((q) => keyOf(q) === keyOf(p)) || exits.some((q) => keyOf(q) === keyOf(p)))
+        bad(`${at}: auf einem Warteplatz`);
+      if ([-1, 0, 1].some((dy) => [-1, 0, 1].some((dx) => w.cell(p[0] + dx, p[1] + dy).ride))) bad(`${at}: am Gleis`);
+      if (!Object.values(DIRS).some(([dx, dy]) => feet.has(keyOf([p[0] + dx, p[1] + dy]))))
+        bad(`${at}: nicht zu erreichen`);
+      const next = stones[i + 1];
+      if (next && !(next[0] - p[0] === 1 && next[1] === p[1]) && !(next[0] === p[0] && next[1] - p[1] === 1))
+        bad(`${at}: nicht in einer Reihe von links nach rechts oder von oben nach unten`);
+    });
+    if (w.cell(...w.stones.get('grube')!).deco !== 'klangstein') bad('der Klangstein ist weg');
+  }
+
   /** Was an der Strecke und den Feldern eines Seeds nicht stimmt */
   function problems(seed: number): string[] {
     const w = worldOf(seed, [HOEHLE_PACK, GRUBE_PACK], DUG);
@@ -236,12 +260,14 @@ describe('Grubenbähnchen Funkel', () => {
     const bad = (m: string) => out.push(`Seed ${seed}: ${m}`);
     shapeOf(w, r, bad);
     const exits = haltOf(w, r, bad);
-    stoneOf(w, r, exits, feetOf(w, r, exits, bad), bad);
+    const feet = feetOf(w, r, exits, bad);
+    stoneOf(w, r, exits, feet, bad);
+    lapStonesIn(w, r, exits, feet, bad);
     pawsOf(w, bad);
     return out;
   }
 
-  it('Strecke über die Seeds: geschlossene Runde vom Sitz zum Sitz, 15–20 s, Gleis mit Richtungen, Halt am Bahnsteig, Gang nur für Züge, Klangstein am Bahnsteig, kein Wohnplatz in der Schleife, der Maulwurf klopft draußen', () => {
+  it('Strecke über die Seeds: geschlossene Runde vom Sitz zum Sitz, 15–20 s, Gleis mit Richtungen, Halt am Bahnsteig, Gang nur für Züge, Klangstein und vier Zahlensteine am Bahnsteig, kein Wohnplatz in der Schleife, der Maulwurf klopft draußen', () => {
     expect(seedsFor(seedRange(1, 20)).flatMap(problems)).toEqual([]);
   });
 
@@ -313,5 +339,116 @@ describe('Grubenbähnchen Funkel', () => {
     expect(engine.blocks(s, world, walker, ...mid)).toBe(true);
     expect(engine.blocks(s, world, { ...walker, mode: 'follow' }, ...mid)).toBe(false);
     expect(engine.blocks({ ...s, packs: {} }, world, walker, ...r.stops.home)).toBe(false); // vor dem Graben nichts
+  });
+
+  /** Figur neben den Zahlenstein `n` stellen, mit der Richtung zu ihm */
+  function beside(world: World, s: State, n: number): { s: State; dir: Dir } {
+    const [x, y] = lapStonesOf(world, s)[n - 1]!;
+    const [dir, [dx, dy]] = (Object.entries(DIRS) as [Dir, readonly [number, number]][]).find(([, [ax, ay]]) => {
+      const c = world.cell(x - ax, y - ay);
+      return !c.solid && !c.ride;
+    })!;
+    return { s: { ...s, player: { x: x - dx, y: y - dy, dir } }, dir };
+  }
+
+  it('Zahlensteine: Hineinlaufen wählt die Runden, die Figur bleibt stehen; die Wahl bleibt bis zur nächsten, ohne Wahl eine', () => {
+    const world = worldOf(1, [HOEHLE_PACK, GRUBE_PACK], DUG);
+    const { s: s0 } = ready(world);
+    expect(lapsOf(s0)).toBe(1);
+    expect(funkel.laps!(s0, world)).toBe(1);
+    let s = s0;
+    for (const n of [3, 4, 1, 2]) {
+      const at = beside(world, s, n);
+      const out = step(at.s, world, { type: 'move', dir: at.dir, fresh: true }, undefined, undefined, RULES);
+      const [x, y] = lapStonesOf(world, s)[n - 1]!;
+      expect(out.events).toContainEqual({ type: 'lapstone', x, y, n });
+      expect(out.events.some((e) => e.type === 'bump')).toBe(false); // kein Anstoßen: Der Stein antwortet
+      expect(out.state.player).toMatchObject({ x: at.s.player.x, y: at.s.player.y });
+      expect(lapsOf(out.state)).toBe(n);
+      s = out.state;
+    }
+    // ein Takt ändert die Wahl nicht; gespeichert wird sie nicht (sie steht nicht in `packs`)
+    expect(lapsOf(step(s, world, TICK, undefined, undefined, RULES).state)).toBe(2);
+    expect(JSON.stringify(s.packs)).not.toContain('laps');
+  });
+
+  it.each([2, 4])(
+    '%i Runden gewählt: Funkel fährt sie ohne Halt zu Ende, ein Licht je Runde, erst dann steigt die Figur aus',
+    (n) => {
+      const world = worldOf(1, [HOEHLE_PACK, GRUBE_PACK], DUG);
+      const r = funkelRoute(world, { packs: DUG })!;
+      const len = r.path.length - 1;
+      const { s: s0, dir } = ready(world);
+      const events: GameEvent[] = [];
+      let s: State = { ...s0, laps: { grube: n } };
+      const play = (c: Cmd) => {
+        const out = step(s, world, c, undefined, undefined, RULES);
+        s = out.state;
+        events.push(...out.events);
+      };
+      play({ type: 'move', dir, fresh: true });
+      expect(s.ride).toMatchObject({ id: 'grube', laps: n });
+      const left: number[] = [];
+      let wraps = 0;
+      let last = 0;
+      let goAt = -1;
+      let arriveAt = -1;
+      for (let i = 0; i < 1200 && s.ride; i++) {
+        play(TICK);
+        if (!s.ride) break;
+        if (s.ride.phase === 'go' && goAt < 0) goAt = s.tick;
+        if (s.ride.phase === 'arrive' && arriveAt < 0) arriveAt = s.tick;
+        if (s.ride.pos < last) wraps++;
+        else if (s.ride.phase === 'go') expect(s.ride.pos - last).toBeLessThanOrEqual(s.ride.speed + 1e-6); // nie ein Sprung
+        last = s.ride.pos;
+        if (left.at(-1) !== s.ride.laps) left.push(s.ride.laps!);
+        expect(s.ride.pos).toBeLessThanOrEqual(len);
+        expect(s.ride.phase).not.toBe('stop'); // ohne Tiere hält es zwischen den Runden nie
+      }
+      expect(s.ride).toBeUndefined();
+      expect(wraps).toBe(n - 1);
+      expect(left).toEqual(Array.from({ length: n }, (_, i) => n - i)); // Lichter: n, …, 2, 1
+      const what = events.filter((e): e is RideEvent => e.type === 'ride').map((e) => e.what);
+      expect(what.filter((x) => ['board', 'go', 'lap', 'arrive', 'alight'].includes(x))).toEqual([
+        'board',
+        'go',
+        ...Array.from({ length: n - 1 }, () => 'lap'),
+        'arrive',
+        'alight',
+      ]);
+      // jede Runde 15 bis 20 s, zusammen also n-mal so lang
+      expect(arriveAt - goAt).toBeGreaterThanOrEqual(150 * n);
+      expect(arriveAt - goAt).toBeLessThanOrEqual(201 * n);
+      expect(world.cell(s.player.x, s.player.y).stop).toBe('grube');
+      expect(lapsOf(s)).toBe(n); // die Wahl bleibt für die nächste Fahrt
+      // unterwegs wird nie ausgestiegen: Ein Pfeil in der zweiten Runde winkt nur
+      let t: State = { ...s0, laps: { grube: n } };
+      t = step(t, world, { type: 'move', dir, fresh: true }, undefined, undefined, RULES).state;
+      for (let i = 0; i < 260; i++) t = step(t, world, TICK, undefined, undefined, RULES).state;
+      expect(t.ride?.laps).toBe(n - 1);
+      const waved = step(t, world, { type: 'move', dir: 'n', fresh: true }, undefined, undefined, RULES);
+      expect(waved.state.ride).toBeDefined();
+      expect(waved.events.some((e) => e.type === 'ride' && e.what === 'wave')).toBe(true);
+    },
+  );
+
+  it('mehr als vier oder weniger als eine Runde gibt es nicht; ein Fahrzeug ohne Schleife fährt nie Runden', () => {
+    const world = worldOf(1, [HOEHLE_PACK, GRUBE_PACK], DUG);
+    const { s: s0, dir } = ready(world);
+    for (const [want, got] of [
+      [9, 4],
+      [0, undefined],
+      [2.7, 2],
+    ] as const) {
+      const out = step(
+        { ...s0, laps: { grube: want } },
+        world,
+        { type: 'move', dir, fresh: true },
+        undefined,
+        undefined,
+        RULES,
+      );
+      expect(out.state.ride?.laps).toBe(got);
+    }
   });
 });
