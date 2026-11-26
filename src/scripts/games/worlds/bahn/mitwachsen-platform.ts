@@ -29,8 +29,9 @@ export type Platform = {
 };
 
 /**
- * Halbe Breite des Dachs (Bahnhof Bär und Fledermaus, Modelle `ROOF` und `BAT_ROOF`: 2,16 Felder um die Mitte zwischen
- * seinen zwei Reihen): Liegt ein Feld entlang des Gleises weiter als das von der Mitte weg, verdeckt das Dach es nicht
+ * Halbe Breite des Dachs entlang des Gleises (Bahnhof Bär und Fledermaus, `ROOF_SIZE.wide`: 2,16 Felder um die Mitte
+ * zwischen seinen zwei Reihen; seit Issue 15 liegt die Platte nur noch über den hinteren Feldern dieser Reihen, die
+ * Breite ist geblieben): Liegt ein Feld entlang des Gleises weiter als das von der Mitte weg, verdeckt das Dach es nicht
  */
 export const ROOF_HALF = 1.08;
 
