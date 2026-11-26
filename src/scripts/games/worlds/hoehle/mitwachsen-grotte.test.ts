@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { MOOD_LIGHT, REGIONS, animalId, type Point } from '../../../../data/games/mitwachsen';
 import { FIRST_MOLE } from '../../../../data/games/mitwachsen-hoehle';
 import { CAVE_STONE, told } from '../../../../data/games/mitwachsen-stories';
-import { GROTTE, GROTTE_COLORS, JETTY_EAST, jettyEnd } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
+import {
+  CAVE_PLACES,
+  GROTTE,
+  GROTTE_COLORS,
+  JETTY_EAST,
+  jettyEnd,
+} from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import { platformsToWake } from '../../mitwachsen-portal';
 import { initialState, step, type State } from '../../mitwachsen-state';
@@ -1005,5 +1011,64 @@ describe('Kristallgrotte: nie dunkler als die Dämmerung', () => {
 describe('Kristallgrotte: Regressions-Seeds bauen', () => {
   it('jede Welt der Regressions-Seeds hat eine Grotte mit Wohnplätzen', () => {
     for (const seed of REGRESSION_SEEDS) expect(worldOf(seed, CAVE).spotsOf('hoehle').length).toBeGreaterThan(5000);
+  });
+});
+
+describe('Kristallgrotte: Spielorte (Issue 56)', () => {
+  /** Zahlen-Kristalle: flach und begehbar, vom Bett weg in Reihenfolge */
+  function stoneFaults(w: World, stones: readonly (readonly [Point, Cell])[]): string[] {
+    const wrong: string[] = [];
+    const bed = w.homes.hoehle.bed;
+    const far = ([x, y]: Point) => Math.hypot(x - bed[0], y - bed[1]);
+    const ordered = [...stones].sort((a, b) => a[1].note! - b[1].note!);
+    ordered.forEach(([p, c], i) => {
+      if (c.solid || c.lane || c.stop || c.garden || c.portal)
+        wrong.push(`Zahlen-Kristall ${c.note} bei ${p.join(',')}`);
+      if (i && far(p) <= far(ordered[i - 1]![0]))
+        wrong.push(`Zahlen-Kristall ${c.note} näher am Bett als ${c.note! - 1}`);
+    });
+    return wrong;
+  }
+
+  /**
+   * Feste Dinge stehen frei: ringsum acht begehbare Felder auf gleicher Höhe, nie an Schleife, Bahnsteig, Wiese oder
+   * Plattform, und weit auseinander
+   */
+  function standFaults(w: World, solid: readonly (readonly [Point, Cell])[]): string[] {
+    const wrong: string[] = [];
+    for (const [p, c] of solid) {
+      const at = `${c.deco} ${p.join(',')}`;
+      if (!c.solid || c.region !== 'hoehle' || c.lane || c.stop || c.garden || c.portal)
+        wrong.push(`falscher Platz ${at}`);
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const n = w.cell(p[0] + dx, p[1] + dy);
+          if ((dx || dy) && (n.solid || n.h !== c.h || n.lane || n.ground !== 'grotto')) wrong.push(`nicht frei ${at}`);
+        }
+      if (solid.some(([q]) => q !== p && Math.hypot(q[0] - p[0], q[1] - p[1]) < CAVE_PLACES.apart))
+        wrong.push(`dicht beieinander ${at}`);
+    }
+    return wrong;
+  }
+
+  /** Was an den Spielorten einer Grotte nicht stimmt */
+  function placeFaults(seed: number): string[] {
+    const w = worldOf(seed, CAVE);
+    const wrong: string[] = [];
+    const cells = placeOf(seed).cells.map((p) => [p, w.cell(...p)] as const);
+    const of = (deco: Cell['deco']) => cells.filter(([, c]) => c.deco === deco);
+    const [shrooms, heaps, stones, echo] = [of('sleepshroom'), of('crystalheap'), of('numstone'), of('echostone')];
+    if (shrooms.length !== CAVE_PLACES.shrooms) wrong.push(`${shrooms.length} Leuchtpilze`);
+    if (heaps.length !== CAVE_PLACES.towers) wrong.push(`${heaps.length} Kristallhaufen`);
+    if (echo.length !== 1) wrong.push(`${echo.length} Echo-Wände`);
+    const notes = stones.map(([, c]) => c.note).sort();
+    if (notes.join('') !== '123456789') wrong.push(`Zahlen-Kristalle ${notes.join(' ')}`);
+    wrong.push(...standFaults(w, [...shrooms, ...heaps, ...echo]));
+    wrong.push(...stoneFaults(w, stones));
+    return wrong.slice(0, 5).map((m) => `Seed ${seed}: ${m}`);
+  }
+
+  it(`in jeder Grotte: zwölf Leuchtpilze, zehn Kristallhaufen, eine Echo-Wand, frei stehend und weit auseinander; neun Zahlen-Kristalle in Reihenfolge vom Bett weg (${SEEDS.length} Seeds)`, () => {
+    expect(SEEDS.flatMap(placeFaults)).toEqual([]);
   });
 });

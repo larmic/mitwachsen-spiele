@@ -17,6 +17,7 @@ import type { Cell } from '../../mitwachsen-cell';
 import type { Ruled, WorldRules } from '../../mitwachsen-pack-types';
 import { roostAt } from '../../mitwachsen-roost';
 import { takeLantern } from './mitwachsen-lantern';
+import { bumpPlace } from './mitwachsen-cave-places';
 
 /** So weit (Felder, ringsum) von der Säule sucht das Glockenspiel eine hängende Fledermaus */
 export const PERCH_REACH = 12;
@@ -33,7 +34,7 @@ export function sleeperNear(s: Pick<Ruled, 'animals'>, cell: (x: number, y: numb
   return best;
 }
 
-const bump: WorldRules['bump'] = (s, c, x, y, events, { walks, cell }) => {
+const bump: WorldRules['bump'] = (s, c, x, y, events, { here, walks, cell }) => {
   if (c.region !== 'hoehle') return false;
   if (takeLantern(s, c, x, y, events)) return true; // Kristall-Laterne am Bett (mitwachsen-lantern.ts)
   if (c.deco === 'column' && c.note !== undefined) {
@@ -46,7 +47,7 @@ const bump: WorldRules['bump'] = (s, c, x, y, events, { walks, cell }) => {
     return true; // Netz der Tupfspinne: die Harfe klingt, sie bleibt stehen, kein „boing“; es hält sie nie fest
   }
   if (c.deco === 'jetty' && jettyEnd(c) && walks) events.push({ type: 'olm', x, y });
-  return false;
+  return bumpPlace(s, c, x, y, events, { here, walks, cell }); // Leuchtpilz, Kristalltürmchen, Zahlen-Kristall, Echo-Wand
 };
 
 export const rules: WorldRules = { bump };

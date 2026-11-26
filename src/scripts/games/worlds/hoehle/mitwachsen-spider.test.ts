@@ -156,7 +156,12 @@ describe('Tupfspinne: Gruß', () => {
     expect(fx.bodies(w, webs, 1000, false, true).every((b) => b.key.startsWith('spider-asleep'))).toBe(true);
     expect(fx.bodies(worldOf(1, []), webs, 0, false, false)).toEqual([]); // ohne Grotte keine Netze
     // über das Paket: abends (warmes Licht) schlafen sie
-    const s = { ...w.homes.hoehle, sleeping: false } as unknown as Parameters<NonNullable<typeof view.bodies>>[0];
+    const s = {
+      ...w.homes.hoehle,
+      sleeping: false,
+      player: { x: 0, y: 0, dir: 's' },
+      packs: {},
+    } as unknown as Parameters<NonNullable<typeof view.bodies>>[0];
     const at = { now: 0, frac: 0, reduced: false, lit: false };
     const spiders = (warm: boolean) => view.bodies!(s, w, { ...at, warm }).filter((b) => b.id.startsWith('spider:'));
     expect(spiders(false).every((b) => !b.key.includes('asleep'))).toBe(true);

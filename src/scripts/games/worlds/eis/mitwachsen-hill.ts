@@ -65,7 +65,6 @@ function footprint(more: number): Point[] {
   return out;
 }
 const BODY = footprint(1);
-const AROUND = footprint(KEEP);
 
 /** Was nie weicht und Abstand braucht */
 const kept = (c: Cell | undefined) =>
@@ -94,19 +93,41 @@ export function buildHill(
   map: Map<string, Cell>,
   shut: ReadonlySet<string>,
 ): ReadonlySet<string> {
+  // Je Feld einmal fragen, dann je Platz nur noch Summen über Rechtecke (Summentafeln): Berg und Auslauf sind ein
+  // Quadrat und ein Rechteck. Die Suche über alle Felder mal alle Felder des Bergs kostete je Tal gut 100 ms
+  const xs = wild.map((w) => w.x);
+  const ys = wild.map((w) => w.y);
+  const pad = RINGS + KEEP + RUNOUT + 2;
+  const [x0, y0] = [Math.min(...xs) - pad, Math.min(...ys) - pad];
+  const [w, h] = [Math.max(...xs) + pad - x0 + 2, Math.max(...ys) + pad - y0 + 2];
   const open = new Set(wild.map(({ x, y }) => key(x, y)));
+  /** Summentafel über `is` (Feld in der Karte) */
+  const table = (is: (k: string, c: Cell | undefined) => boolean) => {
+    const t = new Int32Array(w * h);
+    for (let y = 1; y < h; y++)
+      for (let x = 1; x < w; x++) {
+        const k = key(x0 + x - 1, y0 + y - 1);
+        t[y * w + x] = +is(k, map.get(k)) + t[(y - 1) * w + x]! + t[y * w + x - 1]! - t[(y - 1) * w + x - 1]!;
+      }
+    /** Summe über die Felder von (ax, ay) bis (bx, by), beide eingeschlossen */
+    return (ax: number, ay: number, bx: number, by: number) => {
+      const [l, u, r, d] = [ax - x0, ay - y0, bx - x0 + 1, by - y0 + 1];
+      return t[d * w + r]! - t[u * w + r]! - t[d * w + l]! + t[u * w + l]!;
+    };
+  };
+  const bad = table((k, c) => !open.has(k) || shut.has(k) || !free(c));
+  const gone = table((_, c) => !!c && blocked(c));
+  const near = table((_, c) => kept(c));
+  /** Summe über Berg (Quadrat) und Auslauf (Rechteck) samt `more` Feldern Rand um den Gipfel (x, y), wie `footprint` */
+  const over = (sum: ReturnType<typeof table>, x: number, y: number, more: number) => {
+    const r = RINGS + more;
+    return sum(x - r, y - r, x + r, y + r) + sum(x + 2 - more, y + r + 1, x + 4 + more, y + RINGS + RUNOUT + more);
+  };
   const cost = (x: number, y: number): number | undefined => {
     const far = Math.hypot(x - bed[0], y - bed[1]);
     if (far < HILL.near[0] || far > HILL.near[1]) return undefined;
-    let gone = 0;
-    for (const [dx, dy] of BODY) {
-      const k = key(x + dx, y + dy);
-      const c = map.get(k);
-      if (!open.has(k) || shut.has(k) || !free(c)) return undefined;
-      if (blocked(c!)) gone++;
-    }
-    for (const [dx, dy] of AROUND) if (kept(map.get(key(x + dx, y + dy)))) return undefined;
-    return gone * 4 + far;
+    if (over(bad, x, y, 1) || over(near, x, y, KEEP)) return undefined;
+    return over(gone, x, y, 1) * 4 + far;
   };
   let best: { top: Point; cost: number } | undefined;
   for (const { x, y } of wild) {
@@ -136,7 +157,7 @@ export function buildHill(
     const before = built.run[i - 1];
     if (before) put(p, { h: Math.min(map.get(key(...p))!.h, map.get(key(...before))!.h) });
   });
-  settle(at(best.top, AROUND), map);
+  settle(at(best.top, footprint(KEEP)), map);
   for (const p of built.run) put(p, { ride: TUBE });
   for (const p of built.stairs) put(p, { deco: 'hillstep' });
   put(best.top, { stop: TUBE });

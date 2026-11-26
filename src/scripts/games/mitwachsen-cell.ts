@@ -59,6 +59,11 @@ export type Deco =
   | 'fishcrate' // Fischkiste im Gletscherkessel: Hineinlaufen fängt Fische ins Netz (fest wie ein Busch)
   | 'snowheap' // Schneehaufen im Gletscherkessel: Hineinlaufen lässt eine Kugel wachsen, bis ein Schneemann steht (fest)
   | 'icicle' // Eiszapfen des Glockenspiels am Klippenfuß im Gletschertal: Hinlaufen lässt ihn klingen (begehbar)
+  // Spielorte der Kristallgrotte (Issue 56; zeichnet nur ihr Paket)
+  | 'sleepshroom' // schlafender Leuchtpilz (fest): Hineinlaufen weckt ihn, er leuchtet und bleibt an
+  | 'crystalheap' // Kristallhaufen (fest): Hineinlaufen lässt ihn Stufe um Stufe zu einem Türmchen wachsen
+  | 'numstone' // Zahlen-Kristall am Hauptweg (flach, begehbar; `note`: seine Zahl 1 bis 9)
+  | 'echostone' // Echo-Wand (fest): Hineinlaufen lässt einen Ton leiser zurückkommen
   | 'numflag' // Zahlen-Fähnchen am Hauptweg der Eis-Welt (flach, begehbar; `note`: seine Zahl 1 bis 9; zeichnet nur das Paket)
   | 'hillstep' // Stufe der Treppe am Rodelberg der Eis-Welt (flach, begehbar; zeichnet nur das Paket)
   | 'lapstone' // Zahlenstein an einer Rundfahrt (fest; `note`: seine Zahl): Hineinlaufen wählt so viele Runden (zeichnet nur das Paket)

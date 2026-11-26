@@ -8,6 +8,24 @@ import { SHROOM_COLORS } from '../../mitwachsen-hoehle';
  * Die Grotte: eine große, oben offene Höhle hinter dem Höhlentor. Lagen quer zum Gang (`across`, links negativ) und vom
  * Tor weg (`out`), gemessen von der Mündung aus (dem inneren Rand der Klippen, wo der Gang hereinkommt).
  */
+/**
+ * Spielorte der Grotte (worlds/hoehle/mitwachsen-cave-places.ts, Issue 56). `shrooms`: so viele schlafende Leuchtpilze,
+ * `towers`: so viele Kristallhaufen für Türmchen (`full`: Stufen bis zum fertigen Turm); alle diese festen Dinge stehen
+ * mindestens `apart` Felder auseinander. `stones`: Zahlen-Kristalle am Hauptweg vom Höhlenbett zum stillen See, der
+ * erste `from` Felder hinter der Mündung, dann alle `every` Felder, `across` Felder neben der Mitte, jeder auf dem
+ * nächsten freien Feld bis `reach` weit. `echo`: Wunschplatz der Echo-Wand [quer, vom Tor weg] und wie weit sie davon
+ * rücken darf. `near`: Lichtinseln geweckter Pilze und fertiger Türme zeichnet die Ansicht bis so weit um die Figur
+ */
+export const CAVE_PLACES = {
+  shrooms: 12,
+  towers: 10,
+  full: 3,
+  apart: 12,
+  stones: { count: 9, from: 36, every: 8, across: 2, reach: 4 },
+  echo: { at: [-26, 84], reach: 12 },
+  near: 14,
+} as const;
+
 export const GROTTE = {
   /** Halbachsen der Grotte innen: quer und vom Tor weg (etwa 92 × 144 Felder, etwa 10.000 Bodenfelder; das Konzept schätzte 9.000) */
   shape: { rx: 46, ry: 72 },

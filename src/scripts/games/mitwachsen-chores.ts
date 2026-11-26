@@ -34,15 +34,16 @@ export type ChoreEvent =
 
 /**
  * Nach diesen Ereignissen sieht ein Feld anders aus (Busch, Fischkiste oder Pilzbeet leer bzw. wieder voll, Pilzschale
- * oder Steintrog voll bzw. wieder leer, Schneehaufen um eine Kugel gewachsen): Die 3D-Ansicht baut sein Stück neu.
+ * oder Steintrog voll bzw. wieder leer, Schneehaufen um eine Kugel gewachsen, Leuchtpilz der Grotte geweckt,
+ * Kristalltürmchen gewachsen): Die 3D-Ansicht baut sein Stück neu.
  * Ausdrücklich aufgezählt, damit ein neues Ereignis mit Feld nicht unbemerkt Stücke neu bauen lässt.
  */
-const RESHAPES = new Set(['pick', 'catch', 'gather', 'regrow', 'snowman', 'feed', 'pour']);
+const RESHAPES = new Set(['pick', 'catch', 'gather', 'regrow', 'snowman', 'feed', 'pour', 'caveshroom', 'cavetower']);
 export const reshapes = (e: {
   type: string;
 }): e is Extract<
   ChoreEvent | PackEvent,
-  { type: 'pick' | 'catch' | 'gather' | 'regrow' | 'snowman' | 'feed' | 'pour' }
+  { type: 'pick' | 'catch' | 'gather' | 'regrow' | 'snowman' | 'feed' | 'pour' | 'caveshroom' | 'cavetower' }
 > => RESHAPES.has(e.type);
 
 /** Wohin die Ereignisse gehen (die Liste der Regeln, die auch andere Ereignisse enthält) */

@@ -59,6 +59,10 @@ export const SIGHT_OF: Record<PackEvent['type'], string | null> = {
   lapstone: 'grube:zahlensteine',
   numflag: 'eis:faehnchen',
   treelamp: 'eis:laternen',
+  caveshroom: 'hoehle:leuchtpilze',
+  cavetower: 'hoehle:tuermchen',
+  numstone: 'hoehle:zahlen',
+  echo: 'hoehle:echo',
 };
 
 /** Womit ein Ding ruft: sein eigenes Ereignis (die Ansicht spielt dessen Klang leiser) oder die Melodie seines Steins */

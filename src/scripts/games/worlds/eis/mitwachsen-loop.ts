@@ -74,8 +74,14 @@ export function buildLoop(
   shut: ReadonlySet<string>,
 ): ReadonlySet<string> {
   const open = new Set(wild.map(({ x, y }) => key(x, y)));
+  const known = new Map<string, boolean>(); // je Feld einmal fragen: Die Suche fragt jedes viele Male
   const ok = (x: number, y: number) => {
     const k = key(x, y);
+    let is = known.get(k);
+    if (is === undefined) known.set(k, (is = allowed(x, y, k)));
+    return is;
+  };
+  const allowed = (x: number, y: number, k: string) => {
     if (!open.has(k) || shut.has(k) || !free(map.get(k))) return false;
     for (let dy = -1; dy <= 1; dy++)
       for (let dx = -1; dx <= 1; dx++) if (kept(map.get(key(x + dx, y + dy)))) return false;
@@ -100,7 +106,13 @@ export function buildLoop(
   const roomyNear = (p: Point) => !!nearest(p);
   const stops = ring.map(nearest).filter((p): p is Point => !!p); // ohne Platz (etwa mitten im See) fällt ein Punkt weg
   if (stops.length < CAT_LOOP.points - 3 || !ring[0] || !roomyNear(ring[0])) return new Set(); // zu wenig Platz, oder keiner am Halt
-  const height = (x: number, y: number) => cleared(map.get(key(x, y))!).h;
+  const heights = new Map<string, number>();
+  const height = (x: number, y: number) => {
+    const k = key(x, y);
+    let h = heights.get(k);
+    if (h === undefined) heights.set(k, (h = cleared(map.get(k)!).h));
+    return h;
+  };
   // von Punkt zu Punkt; ein Feld neben schon gelegter Runde ist für die nächsten Stücke gesperrt (sie berührt sich nie):
   // Nur neben dem Feld, von dem das Stück ausgeht, und zuletzt neben dem Halt darf es liegen
   const on = new Set<string>();
