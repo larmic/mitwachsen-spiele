@@ -2,7 +2,7 @@
 // den Feldern mit `ride` (gebaut von mitwachsen-sled-ground.ts), durch Tür und Bucht geht sie gerade bei u = −2 der
 // Torplatte (neben Platte und Platz des Pinguins, `BESIDE`) und weiter in die Lichtung, solange es geht (bis
 // `STRAIGHT` Reihen; vor der Bucht liegen oft Teich, Fels oder Busch), dann auf dem günstigsten Weg (`costs`) zum Halt
-// auf der Lichtung (`lichtungStop`): gleich neben der Plattform des Eistor-Portals am Bett, außen am Ring. Auf der
+// auf der Lichtung (`lichtungStop`): direkt außen an der Plattform des Eistor-Portals am Bett, auf der Linie des Weltpfads. Auf der
 // Lichtung liegt sie nie im Feld (die Lichtung bleibt mit und ohne Paket gleich), nur hier.
 // Dazu je Halt 8 feste Warteplätze für die folgenden Tiere, abseits von Strecke und dem freien Platz hinter dem Halt.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Der Schlitten“)
@@ -15,6 +15,7 @@ import { crossings } from '../../mitwachsen-border';
 import { atHome } from '../../mitwachsen-meadow';
 import { platformCells } from '../../mitwachsen-portal';
 import { canStep, type GatePlace, type World } from '../../mitwachsen-world';
+import { line } from '../../mitwachsen-worldpath';
 import { BESIDE, plateRow } from '../../mitwachsen-bay';
 import { ALL, key } from './mitwachsen-flood';
 import { postOf, yardOf } from './mitwachsen-sled-ground';
@@ -163,17 +164,23 @@ export function onFootpath(world: World, g: Pick<GatePlace, 'mid'>, [x, y]: Poin
   return along >= 0 && along <= len && Math.abs(dx * ay - dy * ax) / len <= 2;
 }
 
+/** Linie des Weltpfads vom Portalstein am Bett zur Plattform am Tor: je Feld ("x,y") seine Stelle ab dem Stein */
+const pathRow = (p: { home: Point; gate: Point }) => new Map(line(p.home, p.gate).map((q, i) => [key(...q), i]));
+
 /**
  * Halt des Fahrzeugs auf der Lichtung: neben der Plattform des Eistor-Portals am Bett (dort, wo das Kind das Portal
- * kennt), auf einem erreichbaren Feld ohne Aufpreis (`costs`), nicht auf dem Fußweg (`onFootpath`), zwei Felder weg
- * von Teichen, im Wunschbereich (`STOP_STAGES[0]`), so nah wie möglich an der Plattform, bei Gleichstand auf der Seite
- * der Strecke. Gibt es dort keins, weicht er Stufe für Stufe aus (`stage`). undefined ohne Eistor, Portal oder Platz.
+ * kennt), auf einem erreichbaren Feld ohne Aufpreis (`costs`), zwei Felder weg von Teichen, im Wunschbereich
+ * (`STOP_STAGES[0]`). Zuerst auf der Linie des Weltpfads vom Portalstein zum Tor (`pathRow`), das nächste Feld am Stein:
+ * Stein, Schlitten und Pfad liegen in einer Reihe (Weltpfade, Schritt 4). Ist dort nichts frei (Teich), so nah wie
+ * möglich an der Plattform, dann nicht auf dem Fußweg (`onFootpath`), bei Gleichstand auf der Seite der Strecke. Gibt es dort keins, weicht er Stufe für Stufe aus (`stage`). undefined ohne Eistor, Portal oder Platz.
  */
 export function lichtungStop(world: World): { at: Point; stage: StopStage } | undefined {
   const part = lichtung(world);
   const g = world.gates.get('eis');
-  const plate = world.portals.get('eis')?.home;
-  if (!part || !g || !plate) return undefined;
+  const portal = world.portals.get('eis');
+  if (!part || !g || !portal) return undefined;
+  const plate = portal.home;
+  const row = pathRow(portal);
   const bed = world.homes.lichtung.bed;
   const axis = Math.atan2(g.mid[1] - bed[1], g.mid[0] - bed[0]);
   const end = part.straight.at(-1)!;
@@ -187,9 +194,12 @@ export function lichtungStop(world: World): { at: Point; stage: StopStage } | un
         const at: Point = [plate[0] + x, plate[1] + y];
         const d = Math.hypot(x, y);
         if (d > r || !part.from.has(key(...at))) continue;
-        if ((at[0] === end[0] && at[1] === end[1]) || onFootpath(world, g, at) || wet(world, at)) continue;
+        if ((at[0] === end[0] && at[1] === end[1]) || wet(world, at)) continue;
         if (part.cost(...at) !== 1) continue;
-        found.push({ at, rank: [Math.round(d * 2), sideOf(at) === side ? 0 : 1, x, y] });
+        // auf der Linie zuerst (das nächste Feld am Stein), sonst so nah wie möglich, nie sonst auf dem Fußweg
+        const i = row.get(key(...at)) ?? (onFootpath(world, g, at) ? -1 : Infinity);
+        if (i < 0) continue;
+        found.push({ at, rank: [i, Math.round(d * 2), sideOf(at) === side ? 0 : 1, x, y] });
       }
     found.sort((a, b) => {
       for (let i = 0; i < a.rank.length; i++) if (a.rank[i] !== b.rank[i]) return a.rank[i]! - b.rank[i]!;
