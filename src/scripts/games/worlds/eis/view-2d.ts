@@ -91,7 +91,7 @@ export const view: View2D = {
   ],
   // „noch nicht“: Steht die Figur auf der Scholle, ohne dass der Pinguin führt, zeigt das Tor, was fehlt
   hint: plateHint(),
-  // Schlitten mit Schlittenrentier und Schuppen, Schneespur und Fleck am Halt, Ton und Freude (mitwachsen-sled-look.ts)
+  // Schlitten mit Schlittenrentier und Laternenpfahl, Schneespur und Fleck am Halt, Ton und Freude (mitwachsen-sled-look.ts)
   bodies: sledBodies,
   marks: sledMarks,
   goodNight: sledGoodNight, // „Gute Nacht, Fahrzeuge“

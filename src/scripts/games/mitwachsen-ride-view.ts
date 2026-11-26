@@ -1,4 +1,4 @@
-// Haken der Ansicht für Fahrzeuge aus einem Welt-Paket (Eis-Welt: Schlitten mit Schlittenrentier und Schuppen,
+// Haken der Ansicht für Fahrzeuge aus einem Welt-Paket (Eis-Welt: Schlitten mit Schlittenrentier und Laternenpfahl,
 // worlds/eis/mitwachsen-sled-look.ts) – rein, ohne DOM und Three.js. Das Paket liefert Körper (Modelle mit Lage), flache
 // Marken am Boden (Spur, Fleck am Halt) und zu jedem Ereignis Ton, Hüpfer, Herz und Funken; der Kern zeichnet sie in 2D
 // und 3D gleich, lässt die Figur dem Sitz folgen und trifft sie beim Antippen. Die Figur sitzt im Modell des Fahrzeugs

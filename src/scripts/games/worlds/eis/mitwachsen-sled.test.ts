@@ -161,7 +161,7 @@ describe('Fahrregeln des Schlittens (Eis-Welt)', () => {
     expect(sled.blocks(awakeAt(world, undefined, 'fest'), bare, awakeAt(world).animals[0]!, 0, 0)).toBe(false);
   });
 
-  it('ein neuer Druck steigt ein, gehalten stößt nur an (gedrosselt), das Rentier schnaubt, der Schuppen ist eine Wand', () => {
+  it('ein neuer Druck steigt ein, gehalten stößt nur an (gedrosselt), das Rentier schnaubt, der Laternenpfahl ist eine Wand', () => {
     const world = W();
     const r = sledRoute(world)!;
     const { s, dir, stop } = beforeSeat(world, 'home');
@@ -188,7 +188,7 @@ describe('Fahrregeln des Schlittens (Eis-Welt)', () => {
     ]);
     expect(rideEvents(snort.events).map((e) => e.what)).toEqual(['snort']);
     expect(at(snort.s)).toEqual(pull.from);
-    // Schuppen: wie eine Wand (kein Schritt, `bump` wie an jeder Wand)
+    // Laternenpfahl: wie eine Wand (kein Schritt, `bump` wie an jeder Wand)
     const wall = r.shed
       .map((p) => {
         try {
@@ -214,12 +214,12 @@ describe('Fahrregeln des Schlittens (Eis-Welt)', () => {
     const ok = play(awakeAt(world, near, 'bereit'), world, [tap]);
     expect(rideEvents(ok.events, 'board')).toHaveLength(1);
     expect(at(ok.s)).toEqual(stop.seat);
-    // das erste Feld der Strecke, das weiter als TAP_REACH (Schachbrett) vom Sitz liegt (die Strecke biegt am Schuppen ab)
+    // das erste Feld der Strecke, das weiter als TAP_REACH (Schachbrett) vom Sitz liegt (die Strecke biegt am Laternenpfahl ab)
     const far = r.path.find((p) => Math.max(Math.abs(p[0] - stop.seat[0]), Math.abs(p[1] - stop.seat[1])) > TAP_REACH)!;
     const no = play(awakeAt(world, far, 'bereit'), world, [tap]);
     expect(no.events).toEqual([]);
     expect(at(no.s)).toEqual(far);
-    // auf der Lichtung vor dem Fest (dort hält er noch nicht): den Schuppen antippen läuft nicht
+    // auf der Lichtung vor dem Fest (dort hält er noch nicht): den Laternenpfahl antippen läuft nicht
     const door = r.path.find((p) => world.realm(...p) === 'lichtung')!;
     const step1 = beside(world, awakeAt(world, door, 'bereit'), door, new Set()).from;
     const lich = awakeAt(world, step1, 'bereit');

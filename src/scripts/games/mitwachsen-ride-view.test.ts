@@ -25,7 +25,7 @@ const body = (id: string, x: number, y: number, more: Partial<RideBody> = {}): R
 });
 const SLED = body('ride:schlitten', 10, 5, { seat: true });
 const DEER = body('ride:schlitten:rentier', 11, 5);
-const SHED = body('ride:schlitten:schuppen', 8.5, 5.5);
+const SHED = body('ride:schlitten:laterne', 8.5, 5.5);
 
 describe('Haken der Ansicht für Fahrzeuge (mitwachsen-ride-view.ts)', () => {
   it('die Figur sitzt im Körper mit `seat`; hüpft sie, hüpft nur er mit', () => {

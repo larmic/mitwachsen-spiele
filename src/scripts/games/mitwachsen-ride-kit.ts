@@ -29,7 +29,7 @@ export const key = (x: number, y: number) => `${x},${y}`;
 
 /**
  * Fahrzeug am Halt: Ende der Strecke, Sitz, Zugtier (beim Zug das nächste Feld der Strecke) und alle Felder, die es
- * belegt (samt Schuppen); `board`: die Felder, die zum Einsteigen da sind (Schlitten: der Sitz; Zug: jeder Wagen)
+ * belegt (samt Laternenpfahl); `board`: die Felder, die zum Einsteigen da sind (Schlitten: der Sitz; Zug: jeder Wagen)
  */
 export type Parked = {
   end: End;
@@ -59,7 +59,7 @@ export function loopOk(r: Pick<RideRoute, 'path' | 'stops' | 'seats' | 'loop'>):
   );
 }
 /**
- * Beide Halte einer Strecke: am Schuppen der Sitz auf dem ersten Feld, auf der Lichtung auf dem letzten, das Zugtier
+ * Beide Halte einer Strecke: am Halt `home` der Sitz auf dem ersten Feld, auf der Lichtung auf dem letzten, das Zugtier
  * davor; ein Fahrzeug mit Wagen belegt dort die Felder seiner Wagen (`RideRoute.cars`). Eine Schleife
  * (`RideRoute.loop`) hat nur einen Halt: Beide Enden sind derselbe (`end` `'home'`, Sitz auf dem ersten Feld, Zugtier
  * auf dem zweiten)

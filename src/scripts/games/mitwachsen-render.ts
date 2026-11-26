@@ -97,7 +97,7 @@ export type Scene = {
   away: (x: number, y: number) => boolean; // Sitzplatz, dessen Tier gerade nur im Bild eines Pakets fliegt (`View2D.away`)
   plate: PlateFx | null; // Torplatte, die die Figur zuletzt betreten oder verlassen hat (sinkt ein, springt hoch)
   hint: Hint | null; // „noch nicht“: was dem Eistor fehlt und seit wann es das zeigt (vergeht nach HINT_MS von selbst)
-  rides: readonly RideBody[]; // Fahrzeug aus einem Welt-Paket (Schlitten, Zugtier, Schuppen; die Figur sitzt darin)
+  rides: readonly RideBody[]; // Fahrzeug aus einem Welt-Paket (Schlitten, Zugtier, Laternenpfahl; die Figur sitzt darin)
 };
 
 /** Rahmen des Betts aus Holz (das Schneebett der Eis-Welt ist aus Schnee: `BED_SNOW`) */

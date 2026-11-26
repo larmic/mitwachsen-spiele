@@ -3235,7 +3235,7 @@ const sledStage = (game: Locator) =>
 
 /**
  * Die Figur wach `gap` Felder neben den Sitz des Schlittens stellen (quer zur Strecke, nicht aufs Zugtier und nicht in
- * den Schuppen dahinter), auf freie, begehbare Felder, von denen sie Schritt für Schritt zum Sitz kommt. Liefert die
+ * den Laternenpfahl dahinter), auf freie, begehbare Felder, von denen sie Schritt für Schritt zum Sitz kommt. Liefert die
  * Pfeiltaste zum Sitz und die zurück (null: kein Platz, dann scheitert der Test mit dem Seed)
  */
 const besideSeat = (page: Page, game: Locator, gap: 1 | 2) =>
@@ -3413,7 +3413,7 @@ test('Spiel: Schlitten – ein gehaltener Pfeil stößt nur an, ein neuer Druck 
 });
 
 test(
-  'Spiel: Schlitten wird gezeichnet (Schuppen, Schlitten, Rentier; die Figur sitzt darin), ohne Fehler',
+  'Spiel: Schlitten wird gezeichnet (Laternenpfahl, Schlitten, Rentier; die Figur sitzt darin), ohne Fehler',
   { tag: '@3d' },
   async ({ page }) => {
     const errors = watchErrors(page);
@@ -3429,7 +3429,7 @@ test(
     const shown = () =>
       game.evaluate((node, id) => {
         const el = node as unknown as SledGame;
-        const ids = [id, `${id}:rentier`, `${id}:schuppen`];
+        const ids = [id, `${id}:rentier`, `${id}:laterne`];
         const has = (k: string) => (el.r3d ? el.r3d.bodies.has(k) : el.rides.some((r) => r.id === k));
         return { sled: ids.every(has), player: el.r3d ? el.r3d.bodies.has('player') : true };
       }, SLED);

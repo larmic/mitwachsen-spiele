@@ -1,5 +1,5 @@
 // Antippen (Teil der Web Component larmic-mitwachsen.ts), die einzige Ausnahme von „die Maus nur fürs Menü“: Ein Finger
-// oder Klick auf ein Fahrzeug (Schlitten mit Zugtier und Schuppen, Zug) oder auf Tok, den Boten der Höhlenwelt, ist wie
+// oder Klick auf ein Fahrzeug (Schlitten mit Zugtier und Laternenpfahl, Zug) oder auf Tok, den Boten der Höhlenwelt, ist wie
 // ein neuer Druck zu ihm hin (`tap`), wirkt also wie Hineinlaufen: einsteigen, Tok baut oder schnarcht, wenn die Figur
 // nah genug ist; gelaufen wird per Antippen nie. Getroffen wird in 2D und 3D gleich, über die Projektion der Ansicht
 // (`tapRide` in mitwachsen-ride-view.ts, Treffer höchstens `TAP_MAX`). Der Listener hängt am AbortSignal der Komponente.

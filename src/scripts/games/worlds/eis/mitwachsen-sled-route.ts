@@ -4,7 +4,7 @@
 // `STRAIGHT` Reihen; vor der Bucht liegen oft Teich, Fels oder Busch), dann auf dem günstigsten Weg (`costs`) zum Halt
 // auf der Lichtung (`lichtungStop`): gleich neben der Plattform des Eistor-Portals am Bett, außen am Ring. Auf der
 // Lichtung liegt sie nie im Feld (die Lichtung bleibt mit und ohne Paket gleich), nur hier.
-// Dazu je Halt 8 feste Warteplätze für die folgenden Tiere, abseits von Strecke und Schuppen.
+// Dazu je Halt 8 feste Warteplätze für die folgenden Tiere, abseits von Strecke und dem freien Platz hinter dem Halt.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Der Schlitten“)
 
 import { fromKey } from '../../../../lib/games/chunks';
@@ -17,7 +17,7 @@ import { platformCells } from '../../mitwachsen-portal';
 import { canStep, type GatePlace, type World } from '../../mitwachsen-world';
 import { BESIDE, plateRow } from '../../mitwachsen-bay';
 import { ALL, key } from './mitwachsen-flood';
-import { shedOf } from './mitwachsen-sled-ground';
+import { postOf, yardOf } from './mitwachsen-sled-ground';
 
 /**
  * Halt auf der Lichtung: höchstens so weit (Luftlinie) von der Mitte der Plattform des Eistor-Portals am Bett, je
@@ -38,8 +38,8 @@ const OPEN = ['eis'] as const;
 export const TIGHT = 30;
 
 /**
- * Die Strecke: `path` vom Halt am Schuppen (`stops.home`, im Kessel) bis zum Halt auf der Lichtung (`stops.out`), Feld
- * für Feld; der Schuppen (`shed`), die Warteplätze je Halt, alle Felder der Strecke (`on`, "x,y") und die Ausweichstufe
+ * Die Strecke: `path` vom Halt im Kessel (`stops.home`) bis zum Halt auf der Lichtung (`stops.out`), Feld
+ * für Feld; das Feld des Laternenpfahls am Halt im Kessel (`shed`, fest wie eine Wand), die Warteplätze je Halt, alle Felder der Strecke (`on`, "x,y") und die Ausweichstufe
  * des Halts auf der Lichtung (`stage`, 0 im Wunschbereich)
  */
 export type Route = {
@@ -222,9 +222,10 @@ function build(world: World): Route | undefined {
   const path = loopless([...inner, trackAt(g, 0), ...part.straight, ...out.slice(1)]);
   const home = path[0]!;
   const [bx, by] = path[1]!;
-  const shed = shedOf(home, [home[0] - bx, home[1] - by]);
+  const back: Point = [home[0] - bx, home[1] - by];
+  const shed = [postOf(home, back)];
   const on = new Set(path.map((p) => key(...p)));
-  const keep = new Set([...grow(path, 1), ...grow(shed, 1)]);
+  const keep = new Set([...grow(path, 1), ...grow(yardOf(home, back), 1)]);
   const seats = (realm: RegionId, at: Point) => seatsAt(world, realm, at, keep);
   return {
     path,
@@ -252,7 +253,7 @@ function loopless(path: readonly Point[]): Point[] {
 }
 
 /**
- * Strecke im Kessel und im Gang, vom Halt am Schuppen bis zum ersten Feld hinter der Tür: Breitensuche über die Felder
+ * Strecke im Kessel und im Gang, vom Halt im Kessel bis zum ersten Feld hinter der Tür: Breitensuche über die Felder
  * mit `ride` ab dem Gang; der Halt ist das Feld am Ende
  */
 function kesselPart(world: World, g: GatePlace): Point[] | undefined {
@@ -276,7 +277,7 @@ function kesselPart(world: World, g: GatePlace): Point[] | undefined {
 
 /**
  * Feste Warteplätze an einem Halt: Wohnplätze der Gegend (erreichbar, nicht auf der Wiese, nicht an Durchgängen und
- * Plattformen) bis `SEAT_REACH` vom Halt, nicht an der Strecke oder am Schuppen (`keep`), nicht am Klangstein, nicht
+ * Plattformen) bis `SEAT_REACH` vom Halt, nicht an der Strecke oder am freien Platz hinter dem Halt (`keep`), nicht am Klangstein, nicht
  * an der Weltgrenze und nicht auf Gleis oder Bahnsteig eines anderen Fahrzeugs; der nächste zuerst
  */
 function seatsAt(world: World, realm: RegionId, at: Point, keep: ReadonlySet<string>): Point[] {

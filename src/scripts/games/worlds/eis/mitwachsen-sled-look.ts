@@ -1,7 +1,7 @@
 // Aussehen und Klang des Schlittens der Eis-Welt, gleich für 2D und 3D (Haken `View2D.bodies`, `marks` und `rideFx`,
 // mitwachsen-ride-view.ts) – rein, ohne DOM und Three.js. Körper: der Schlitten (mit goldenem Rahmen bis zur ersten
 // Fahrt, danach mit Wimpel; am Abend mit Laterne; angestoßen kurz mit offenen Seitenwänden; während der Fahrt sitzt
-// die Figur darin), das Schlittenrentier davor und der Schuppen aus Eisblöcken. Wo sie stehen, folgt nur aus dem Zustand: am Halt der Gegend der Figur, beim
+// die Figur darin), das Schlittenrentier davor und der Laternenpfahl am Halt im Kessel. Wo sie stehen, folgt nur aus dem Zustand: am Halt der Gegend der Figur, beim
 // Erscheinen trabt er aus den Tannen herbei, unterwegs gleitet er zwischen den Takten weiter (bei reduzierter Bewegung
 // in ruhigen Sprüngen alle 3 Felder). Durch die Tür rückt er etwas zur Mitte, sonst führe er durch die Torflügel.
 // Marken: die Schneespur im Kessel ab dem Erscheinen, auf der Lichtung ab der ersten Heimfahrt (auf ihr wächst sie mit),
@@ -11,7 +11,7 @@
 
 import type { Dir, Part } from '../../../../lib/games/front';
 import type { Point } from '../../../../data/games/mitwachsen';
-import { REINDEER, shedParts, sledParts } from '../../../../data/games/worlds/eis/mitwachsen-sled-models';
+import { REINDEER, postParts, sledParts } from '../../../../data/games/worlds/eis/mitwachsen-sled-models';
 import { dirTo } from '../../mitwachsen-free';
 import type { Ride, RideEvent } from '../../mitwachsen-pack-types';
 import type { GoodNight, RideAt, RideBody, RideFx } from '../../mitwachsen-ride-view';
@@ -99,19 +99,19 @@ function standing(r: Route, state: State, world: World, at: RideAt, h: (x: numbe
   return [spot(seat), spot(pull)] as const;
 }
 
-/** Der Schuppen in der Mitte seiner Felder, die Tür zum Halt */
-function shed(r: Route, h: (x: number, y: number) => number, lit: boolean): RideBody {
+/** Der Laternenpfahl auf seinem Feld am Halt im Kessel, der Arm mit der Laterne zur Strecke */
+function post(r: Route, h: (x: number, y: number) => number, lit: boolean): RideBody {
   const [hx, hy] = r.stops.home;
   const [bx, by] = r.path[1]!;
-  const n = r.shed.length;
+  const [x, y] = r.shed[0]!;
   return {
-    id: `${SLED_ID}:schuppen`,
-    key: `${SLED_ID}:schuppen${lit ? ':licht' : ''}`,
-    x: r.shed.reduce((s, p) => s + p[0], 0) / n,
-    y: r.shed.reduce((s, p) => s + p[1], 0) / n,
+    id: `${SLED_ID}:laterne`,
+    key: `${SLED_ID}:laterne${lit ? ':licht' : ''}`,
+    x,
+    y,
     z: h(hx, hy),
     dir: dirTo(bx - hx, by - hy),
-    parts: model(`schuppen${lit}`, () => shedParts(lit)),
+    parts: model(`laterne${lit}`, () => postParts(lit)),
   };
 }
 
@@ -122,7 +122,7 @@ function shed(r: Route, h: (x: number, y: number) => number, lit: boolean): Ride
 const sledRide = (state: Pick<State, 'ride'>) => (state.ride?.id === SLED.id ? state.ride : undefined);
 
 /**
- * Körper des Schlittens je Bild: Schuppen (sobald er da ist), Schlitten und Zugtier am Halt der Gegend der Figur oder
+ * Körper des Schlittens je Bild: Laternenpfahl (sobald der Schlitten da ist), Schlitten und Zugtier am Halt der Gegend der Figur oder
  * unterwegs; leer, solange er noch nicht erschienen ist oder die Welt keine Strecke hat. Nur seine eigene Fahrt bewegt
  * ihn und setzt die Figur hinein (`sledRide`)
  */
@@ -131,7 +131,7 @@ export function sledBodies(state: State, world: World, at: RideAt): readonly Rid
   const stage = r && stageOf(state.packs, SLED.id);
   if (!r || !stage) return [];
   const h = heightAt(state, world);
-  const out = [shed(r, h, at.lit)];
+  const out = [post(r, h, at.lit)];
   const ride = sledRide(state);
   const pair = ride ? riding(r, ride, at, h) : standing(r, state, world, at, h);
   if (!pair) return out;

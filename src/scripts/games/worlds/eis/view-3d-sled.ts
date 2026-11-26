@@ -2,7 +2,7 @@
 // über dem Boden, alle in einem Mesh (wie die Fußspuren, view-3d-prints.ts). Welche es gibt, sagt mitwachsen-sled-look.ts
 // (`sledMarks`, gleich wie in 2D); neu gebaut wird nur, wenn sich das ändert (der Schlitten erscheint, die erste
 // Heimfahrt, die Spur wächst auf der Festfahrt) oder sich der Nebel über ihr lichtet: Im Nebel liegt keine Spur. Den
-// Schlitten selbst, das Rentier und den Schuppen zeichnet die 3D-Ansicht wie die Tiere (`View2D.bodies`). Nur Klassen
+// Schlitten selbst, das Rentier und den Laternenpfahl zeichnet die 3D-Ansicht wie die Tiere (`View2D.bodies`). Nur Klassen
 // von Three.js, die die 3D-Ansicht schon nutzt.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Der Schlitten“)
 

@@ -128,7 +128,7 @@ export function buildKessel(
   const wild = winter(seed, gang, place, free, map);
   frost(seed, wild, map); // Kristalle, Schneewehen und Schneehaufen nach Tannen und Eisblöcken
   chimes(seed, wild, map); // zuletzt das Glockenspiel am Klippenfuß, nur auf blankem Schnee: sonst bleibt alles, wo es war
-  const sled = sledGround(gang, place, map); // ganz zuletzt Strecke und Schuppen des Schlittens: nichts wird neu gewürfelt
+  const sled = sledGround(gang, place, map); // ganz zuletzt Strecke und freier Platz des Schlittens: nichts wird neu gewürfelt
   // Eis-Welt: der ganze Kessel und der Gang ab seiner Mitte (dort wechselt auch die Tieranzeige)
   let inner = gang.depth + 1;
   while (map.get(key(...gang.at(0, inner)))?.region !== 'eis' && inner < centre) inner++;
@@ -489,7 +489,7 @@ function slidePath(gang: Gang, bed: Point, map: ReadonlyMap<string, Cell>): Poin
 /**
  * Wohnplätze der Eis-Tiere: vom Schneebett aus erreichbare Felder des Kessels außerhalb der Schneewiese und der
  * Portal-Plattformen, nicht in der Mündung (zwei Felder Abstand zum Gang, so versperrt kein Tier den Weg hinein), nicht
- * auf Strecke und Schuppen des Schlittens (`sled`)
+ * auf Strecke und freiem Platz des Schlittens (`sled`)
  */
 function spotsOf({ bed }: Valley, map: ReadonlyMap<string, Cell>, sled: ReadonlySet<string>): Point[] {
   const seen = new Set<string>();

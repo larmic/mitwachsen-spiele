@@ -1,11 +1,12 @@
-// Strecke des Schlittens im Gletscherkessel und Platz seines Schuppens – rein und deterministisch, im Bau des Kessels
+// Strecke des Schlittens im Gletscherkessel und der freie Platz hinter seinem Halt – rein und deterministisch, im Bau des Kessels
 // ganz zuletzt (nach Glockenspiel, vor Wohnplätzen und Wohnorten der Tiere): So wird nichts neu gewürfelt, und
 // gespeicherte Schneemänner bleiben, wo sie sind. Die Strecke ist eine Schneespur neben der Rutschspur: vom ersten
 // Feld hinter dem Tor gerade durch den Gang (zwei Felder neben der Rutschspur, `trackU`), dann auf dem günstigsten Weg
-// (Suche mit Kosten) bis vor den Schuppen. Der Schuppen (3 × 2 Felder, `shedOf`) steht gleich neben der Plattform des
-// Eis-Portals am Schneebett (dort sieht man ihn vom Bett aus), auf der Seite der Strecke; die Strecke läuft gerade in
-// seine Tür. Auf Strecke und Schuppen weichen nur
-// Tannen und Eisblöcke; Felder der Strecke tragen `ride`. Den Schuppen zeigt erst das Fahrzeug (ein Körper, keine
+// (Suche mit Kosten) bis an den Halt. Hinter dem Halt bleibt ein Platz frei (3 × 2 Felder, `yardOf`), gleich neben der
+// Plattform des Eis-Portals am Schneebett (dort sieht man den Halt vom Bett aus), auf der Seite der Strecke; die Strecke
+// läuft gerade auf ihn zu. Bis Issue 25 stand dort der Schlittenschuppen; heute steht nur ein Laternenpfahl auf einem
+// seiner Felder (`postOf`). Auf Strecke und Platz weichen nur
+// Tannen und Eisblöcke; Felder der Strecke tragen `ride`. Den Pfahl zeigt erst das Fahrzeug (ein Körper, keine
 // Zierde im Feld). Auf der Lichtung liegt die Strecke nie im Feld (mitwachsen-sled-route.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Der Schlitten“)
 
@@ -19,8 +20,8 @@ import { key } from './mitwachsen-flood';
 /** Lage des Tals samt Mitte (t im Gang), wie `placeKessel` sie liefert */
 type Valley = KesselPlace & { centre: number };
 
-/** So weit (Luftlinie) steht die Mitte des Schuppens von der Mitte der Plattform des Eis-Portals am Schneebett */
-export const SHED_NEAR = { near: 4, far: 9 } as const;
+/** So weit (Luftlinie) liegt die Mitte des Platzes hinter dem Halt von der Mitte der Plattform des Eis-Portals am Schneebett */
+export const YARD_NEAR = { near: 4, far: 9 } as const;
 /** Die Strecke hält mindestens so viele Felder Abstand zur Rutschspur (Schachbrett-Abstand) */
 export const SLIDE_GAP = 2;
 /** … und so viele zu Plattformen des Eis-Portals (am Gegenstück, das auf der Achse der Rutschspur steht: |u| ≥ 4) */
@@ -50,14 +51,20 @@ export function trackU(gang: Pick<Gang, 'at'>): number {
 }
 
 /**
- * Felder des Schuppens vor dem Halt `stop`, in den die Strecke aus Richtung `[dx, dy]` (vom vorletzten Feld zum Halt)
- * hineinläuft: 3 Felder breit, 2 tief, gleich hinter dem Halt
+ * Felder des freien Platzes hinter dem Halt `stop`, auf den die Strecke aus Richtung `[dx, dy]` (vom vorletzten Feld zum Halt)
+ * zuläuft: 3 Felder breit, 2 tief, gleich hinter dem Halt
  */
-export function shedOf([sx, sy]: Point, [dx, dy]: Point): Point[] {
+export function yardOf([sx, sy]: Point, [dx, dy]: Point): Point[] {
   const out: Point[] = [];
   for (let a = 1; a <= 2; a++) for (let b = -1; b <= 1; b++) out.push([sx + dx * a - dy * b, sy + dy * a + dx * b]);
   return out;
 }
+
+/**
+ * Feld des Laternenpfahls am Halt `stop` (Richtung wie bei `yardOf`): schräg hinter dem Halt, auf dem freien Platz. Das
+ * Feld gleich hinter dem Halt bleibt frei, dorthin läuft das Zugtier aus, wenn der Schlitten ankommt
+ */
+export const postOf = ([sx, sy]: Point, [dx, dy]: Point): Point => [sx + dx - dy, sy + dy + dx];
 
 /** Ist das Feld ein Eisblock zum Klettern (eine Stufe über dem Schnee, kein See, kein Eisberg)? */
 const isBlock = (c: Cell) => c.ground === 'ice' && c.h >= 2 && !c.solid && !c.color && !c.slide;
@@ -111,7 +118,7 @@ function forbidden(cells: readonly Point[], map: ReadonlyMap<string, Cell>) {
 }
 
 /**
- * Strecke und Schuppen in die Karte bauen (`map`, der fertige Kessel): Liefert die Felder von Strecke und Schuppen
+ * Strecke und freien Platz hinter dem Halt in die Karte bauen (`map`, der fertige Kessel): Liefert die Felder von Strecke und Platz
  * (als "x,y"; dort wohnt kein Tier). Findet sich kein Platz, bleibt alles, wie es war (dann gibt es keinen Schlitten).
  */
 export function sledGround(gang: Gang, place: Valley, map: Map<string, Cell>): ReadonlySet<string> {
@@ -123,7 +130,7 @@ export function sledGround(gang: Gang, place: Valley, map: Map<string, Cell>): R
   const no = forbidden(place.cells, map);
   if (no(...mouth)) return new Set();
   const height = (x: number, y: number) => cleared(map.get(key(x, y))!).h;
-  const spots = shedSpots(gang, place, map, no, height);
+  const spots = yardSpots(gang, place, map, no, height);
   for (const { stop, dir, shed } of spots) {
     const shut = new Set(
       [...shed, ...N4.map(([dx, dy]): Point => [stop[0] + dx, stop[1] + dy]), stop].map((p) => key(...p)),
@@ -140,20 +147,20 @@ export function sledGround(gang: Gang, place: Valley, map: Map<string, Cell>): R
   return new Set();
 }
 
-type ShedSpot = { stop: Point; dir: Point; shed: Point[]; cost: number };
+type YardSpot = { stop: Point; dir: Point; shed: Point[]; cost: number };
 
 /**
- * Plätze für den Schuppen, der beste zuerst: Mitte `SHED_NEAR` von der Plattform des Eis-Portals am Schneebett, auf der
+ * Plätze für den Halt mit seinem freien Platz, der beste zuerst: Mitte `YARD_NEAR` von der Plattform des Eis-Portals am Schneebett, auf der
  * Seite der Strecke (über die Rutschspur führt sie nie), alle Felder samt Halt und dem Feld davor eben und erlaubt.
  * Bevorzugt, wo am wenigsten weichen muss, dann so nah wie möglich an der Plattform. Ohne Plattform keiner.
  */
-function shedSpots(
+function yardSpots(
   gang: Gang,
   { cells }: Valley,
   map: ReadonlyMap<string, Cell>,
   no: (x: number, y: number) => boolean,
   height: (x: number, y: number) => number,
-): ShedSpot[] {
+): YardSpot[] {
   const [ox, oy] = gang.at(0, 0);
   const across = [gang.at(1, 0)[0] - ox, gang.at(1, 0)[1] - oy] as const;
   const side = Math.sign(trackU(gang));
@@ -162,14 +169,14 @@ function shedSpots(
     return p?.side === 'home' && p.at === 'centre';
   });
   if (!plate) return [];
-  const spots: ShedSpot[] = [];
+  const spots: YardSpot[] = [];
   for (const stop of cells)
     for (const dir of N4) {
       const [cx, cy] = [stop[0] + dir[0] * 1.5 - plate[0], stop[1] + dir[1] * 1.5 - plate[1]];
       const r = Math.hypot(cx, cy);
-      if (r < SHED_NEAR.near || r > SHED_NEAR.far) continue;
+      if (r < YARD_NEAR.near || r > YARD_NEAR.far) continue;
       if ((cx * across[0] + cy * across[1]) * side <= 0) continue;
-      const shed = shedOf(stop, dir);
+      const shed = yardOf(stop, dir);
       const all = [...shed, stop, [stop[0] - dir[0], stop[1] - dir[1]] as const];
       if (all.some(([x, y]) => no(x, y))) continue;
       const h = height(...stop);
