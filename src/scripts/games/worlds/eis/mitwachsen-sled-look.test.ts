@@ -26,6 +26,7 @@ import {
 } from './mitwachsen-sled-look';
 import { sledRoute, trackAt } from './mitwachsen-sled-route';
 import { view } from './view-2d';
+import { tubeFx } from './mitwachsen-tube-look';
 
 const world = worldOf(1, [EIS_PACK]);
 const r = sledRoute(world)!;
@@ -62,10 +63,13 @@ const colors = (b: RideBody | undefined) => new Set(b!.parts.flatMap((p) => [p[6
 describe('Aussehen des Schlittens (mitwachsen-sled-look.ts)', () => {
   it('kommt mit dem Paket: Fahrzeug über `rules.vehicle` (Regeln aus der Fahr-Engine), Bild über die Haken der Ansicht', () => {
     expect(EIS_PACK.rules!.vehicle).toBe(sled);
-    expect(view).toMatchObject({ bodies: sledBodies, marks: sledMarks });
+    expect(view).toMatchObject({ marks: sledMarks });
+    // die Körper der Eis-Welt: die des Schlittens, dazu Rodelreifen und Fahne am Rodelberg
+    expect(view.bodies!(at(), world, AT).filter((b) => b.id.startsWith(SLED_ID))).toEqual(sledBodies(at(), world, AT));
     const e: RideEvent = { type: 'ride', what: 'board', id: 'schlitten', x: 0, y: 0 };
     expect(view.rideFx!(e, at())).toEqual(rideFx(e, at()));
     expect(view.rideFx!({ ...e, id: 'hoehle' }, at())).toBeUndefined(); // der Zug antwortet selbst
+    expect(view.rideFx!({ ...e, id: 'rodel' }, at())).toEqual(tubeFx({ ...e, id: 'rodel' })); // der Rodelreifen: sein eigener Klang
   });
 
   it('Körper je Stufe: noch nichts, dann Laternenpfahl (kein Schuppen mehr, Issue 25), Schlitten mit goldenem Rahmen und Rentier; danach mit Wimpel', () => {

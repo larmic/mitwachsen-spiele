@@ -69,9 +69,9 @@ export const postOf = ([sx, sy]: Point, [dx, dy]: Point): Point => [sx + dx - dy
 /** Ist das Feld ein Eisblock zum Klettern (eine Stufe über dem Schnee, kein See, kein Eisberg)? */
 const isBlock = (c: Cell) => c.ground === 'ice' && c.h >= 2 && !c.solid && !c.color && !c.slide;
 /** Muss hier etwas weichen (Tanne, Eisblock)? */
-const blocked = (c: Cell) => c.tree === 'snowpine' || isBlock(c);
+export const blocked = (c: Cell) => c.tree === 'snowpine' || isBlock(c);
 /** Das Feld, wenn Tanne oder Eisblock geweicht sind: Schnee auf seiner Höhe (der Block sinkt auf den Schnee ringsum) */
-const cleared = (c: Cell): Cell =>
+export const cleared = (c: Cell): Cell =>
   c.tree === 'snowpine'
     ? { ...c, deco: null, solid: false, tree: undefined }
     : isBlock(c)

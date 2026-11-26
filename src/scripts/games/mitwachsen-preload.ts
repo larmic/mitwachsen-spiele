@@ -10,14 +10,11 @@
 import { RIDE_PRELOAD, type RideId } from '../../data/games/mitwachsen-rides';
 import type { PackId } from './mitwachsen-pack-types';
 import { workOf, type Work } from './mitwachsen-herald';
-import type { Rider, RideEngine, RideRoute, Vehicle } from './mitwachsen-rider';
+import { vehiclesOf, type Rider, type RideEngine, type RideRoute, type Vehicle } from './mitwachsen-rider';
 import type { World } from './mitwachsen-world';
 
 /** Was die Haken der Pakete dafür hergeben: das Fahrzeug eines Pakets und die Fahr-Engine (Paket der Fahrzeuge) */
-type Hooked = { rules?: { vehicle?: Vehicle; ride?: RideEngine } };
-
-/** Die Fahrzeuge der geladenen Pakete */
-const vehiclesOf = (packs: readonly Hooked[]) => packs.flatMap((p) => (p.rules?.vehicle ? [p.rules.vehicle] : []));
+type Hooked = { rules?: { vehicle?: Vehicle; more?: readonly Vehicle[]; ride?: RideEngine } };
 
 /**
  * Fahrzeuge, die schlafen: Es fehlt die Fahr-Engine oder die Welt einer Gegend, die es braucht (`Vehicle.needs`; ohne

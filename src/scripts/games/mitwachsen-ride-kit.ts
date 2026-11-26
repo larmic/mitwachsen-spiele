@@ -71,7 +71,7 @@ export function stopsOf(r: RideRoute): Record<End, Parked> {
     if (!loopOk(r)) throw new Error('Schleife muss am Sitz ihres einen Halts beginnen und enden');
     const park = (end: End, seat: Point, pull: Point, more: readonly Point[] = []): Parked => {
       const cars = r.cars?.[end];
-      const cells = new Set([seat, pull, ...(cars ?? []), ...more].map((p) => key(...p)));
+      const cells = new Set([seat, ...(r.solo ? [] : [pull]), ...(cars ?? []), ...more].map((p) => key(...p)));
       return { end, seat, pull, cells, board: cars ? new Set(cars.map((p) => key(...p))) : new Set([key(...seat)]) };
     };
     const [first, second] = [r.path[0]!, r.path[1] ?? r.path[0]!];
@@ -87,20 +87,21 @@ export function stopsOf(r: RideRoute): Record<End, Parked> {
  * erst ab der Stufe `spec.out`: der Schlitten nach der ersten Heimfahrt); liegen beide Halte in ihrer Gegend (der Zug
  * bei Ausbau 1), an dem, an dem es zuletzt ankam (`docked`, sonst auf der Lichtung). Undefined, solange es noch nicht da
  * ist, selbst unterwegs oder in einer anderen Gegend; fährt die Figur mit einem anderen Fahrzeug, steht es weiter da.
- * Eine Schleife (`RideRoute.loop`) steht immer an ihrem einen Halt, wenn die Figur in dessen Gegend ist
+ * Eine Schleife (`RideRoute.loop`) steht immer an ihrem einen Halt, wenn die Figur in dessen Gegend ist; ebenso ein
+ * Fahrzeug nur bergab (`RideSpec.slide`, der Rodelreifen): immer oben an `home`, vom ersten Besuch an
  */
 export function parked(
-  spec: Pick<RideSpec, 'id' | 'out'>,
+  spec: Pick<RideSpec, 'id' | 'out' | 'slide'>,
   r: RideRoute,
   s: Pick<Rider, 'packs' | 'ride' | 'player' | 'docked'>,
   world: World,
 ): Parked | undefined {
   const stage = rank(stageOf(s.packs, spec.id));
-  if (s.ride?.id === spec.id || stage < rank('bereit')) return undefined;
+  if (s.ride?.id === spec.id || (stage < rank('bereit') && !spec.slide)) return undefined;
   const at = stopsOf(r);
   const realm = world.realm(s.player.x, s.player.y);
   const home = realm === world.realm(...at.home.seat);
-  if (r.loop) return home ? at.home : undefined;
+  if (r.loop || spec.slide) return home ? at.home : undefined; // nur bergab: immer oben, ohne Eintrag im Spielstand
   const out = !!spec.out && stage >= rank(spec.out) && realm === world.realm(...at.out.seat);
   if (home && out) return at[s.docked?.[spec.id] ?? 'out'];
   return home ? at.home : out ? at.out : undefined;
@@ -137,7 +138,7 @@ export function trotFrom(r: Pick<RideRoute, 'path'>, world: World, [sx, sy]: Poi
  * (`RideRoute.loop`, die Grubenbahn) sagt nie „Gute Nacht“: Sie wohnt in ihrer Welt, nicht an der Lichtung
  */
 export function bedSight(
-  spec: Pick<RideSpec, 'id' | 'out'>,
+  spec: Pick<RideSpec, 'id' | 'out' | 'slide'>,
   r: RideRoute,
   s: Pick<Rider, 'packs' | 'ride' | 'player' | 'docked' | 'sleeping'>,
   world: World,

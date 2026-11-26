@@ -15,7 +15,7 @@ import type { World } from '../../mitwachsen-world';
 import { sledRoute } from './mitwachsen-sled-route';
 import { SNOWMAN, stageAt } from './mitwachsen-snowman';
 
-export const SLED = RIDES[0];
+export const SLED = RIDES.find((r) => r.id === 'schlitten')!;
 const ICE = REGIONS.find((r) => r.behind === SLED.gate)!; // die Eis-Welt
 
 /**

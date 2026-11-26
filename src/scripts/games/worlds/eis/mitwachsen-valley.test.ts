@@ -4,9 +4,10 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { fromKey } from '../../../../lib/games/chunks';
 import { DIRS } from '../../../../lib/games/front';
 import { PLATFORM_HALF, platformArea, platformCells } from '../../mitwachsen-portal';
-import { KESSEL, KESSEL_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
+import { HILL, KESSEL, KESSEL_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
 import { KESSEL_WILDS } from './mitwachsen-kessel';
 import { FROST, HEAPS } from './mitwachsen-frost';
+import { hillOf } from './mitwachsen-hill';
 import { bergPeak } from './mitwachsen-ice-sky';
 import { ICE_CRYSTALS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import { crossings } from '../../mitwachsen-border';
@@ -77,6 +78,12 @@ function icePortalFaults(w: World): string[] {
   for (const { x, y } of platformCells(p.home))
     if (x >= x0 - 1 && x <= x1 + 1 && y >= y0 - 2 && y <= y1 + 1) wrong.push(`Iglu ${x},${y}`);
   return wrong;
+}
+
+/** Liegt das Feld auf dem Rodelberg (höchstens `HILL.rings` Ringe um seinen Gipfel)? Dort reicht der Schnee bis `HILL.top` */
+function onHill(w: World, x: number, y: number): boolean {
+  const top = hillOf(w)?.top;
+  return !!top && Math.max(Math.abs(x - top[0]), Math.abs(y - top[1])) <= HILL.rings;
 }
 
 describe('Gletschertal im Kessel (Eis-Welt)', () => {
@@ -182,7 +189,8 @@ describe('Gletschertal im Kessel (Eis-Welt)', () => {
         if (h === null) continue;
         ground++;
         if (h >= 2) high++;
-        if (h > (isBerg(w.cell(x, y)) ? KESSEL.berg.top : 3)) wrong.push(`zu hoch ${x},${y}`); // Hügel bis 3
+        if (h > (isBerg(w.cell(x, y)) ? KESSEL.berg.top : onHill(w, x, y) ? HILL.top : 3))
+          wrong.push(`zu hoch ${x},${y}`); // Hügel bis 3, Rodelberg bis 7
         const steps = Object.values(DIRS).map(([dx, dy]) => standHeight(w, [], x + dx, y + dy));
         if (steps.some((to) => to !== null && Math.abs(to - h) > 1)) wrong.push(`Stufe ${x},${y}`);
       }
@@ -456,7 +464,7 @@ describe('Gletschertal im Kessel (Eis-Welt)', () => {
     for (const [x, y] of floor) {
       const h = standHeight(w, [], x, y);
       if (h === null) continue;
-      if (h > KESSEL.berg.top) wrong.push(`zu hoch ${x},${y}`);
+      if (h > (onHill(w, x, y) ? HILL.top : KESSEL.berg.top)) wrong.push(`zu hoch ${x},${y}`);
       for (const [dx, dy] of Object.values(DIRS)) {
         const to = standHeight(w, [], x + dx, y + dy);
         if (to !== null && Math.abs(to - h) > 1) wrong.push(`Stufe ${x},${y} → ${x + dx},${y + dy}`);
@@ -598,5 +606,89 @@ describe('Gletschertal im Kessel (Eis-Welt)', () => {
     }
     expect(things / walk).toBeGreaterThan(0.095);
     expect(things / walk).toBeLessThan(0.115);
+  });
+
+  type HillOf = NonNullable<ReturnType<typeof hillOf>>;
+  const chebTo = ([tx, ty]: readonly [number, number], [x, y]: readonly [number, number]) =>
+    Math.max(Math.abs(x - tx), Math.abs(y - ty));
+
+  /** Die Bahn: vom Gipfel Feld an Feld, nie bergauf, begehbar, als Strecke markiert, am Ende unten */
+  function runFaults(w: World, hill: HillOf): string[] {
+    const wrong: string[] = [];
+    hill.run.forEach((p, i) => {
+      const c = w.cell(...p);
+      const before = hill.run[i - 1];
+      if (c.ride !== 'rodel' || c.solid || c.deco || standHeight(w, ['eis'], ...p) === null)
+        wrong.push(`Bahn ${p.join(',')}`);
+      if (!before) return;
+      if (Math.abs(p[0] - before[0]) + Math.abs(p[1] - before[1]) !== 1)
+        wrong.push(`Lücke in der Bahn bei ${p.join(',')}`);
+      if (c.h > w.cell(...before).h) wrong.push(`Bahn bergauf bei ${p.join(',')}`);
+    });
+    if (hill.run[0]!.join(',') !== hill.top.join(',')) wrong.push('Bahn beginnt nicht am Gipfel');
+    if (w.cell(...hill.run.at(-1)!).h > 2) wrong.push('Bahn endet nicht unten');
+    return wrong;
+  }
+
+  /** Die Treppe: zwei Felder je Stufe, westlich vom Gipfel, mindestens so hoch wie der Berg dort */
+  function stairFaults(w: World, hill: HillOf): string[] {
+    const wrong: string[] = [];
+    if (hill.stairs.length !== 2 * HILL.rings) wrong.push(`${hill.stairs.length} Stufen`);
+    for (const p of hill.stairs) {
+      const c = w.cell(...p);
+      if (c.deco !== 'hillstep' || c.solid || c.ride || p[0] >= hill.top[0]) wrong.push(`Stufe ${p.join(',')}`);
+      // mindestens so hoch wie der Berg dort (am Fuß kann ein Hügel des Tals höher liegen), nie über dem Gipfel
+      if (c.h < HILL.top - chebTo(hill.top, p) || c.h > HILL.top) wrong.push(`Stufe ${p.join(',')} auf Höhe ${c.h}`);
+    }
+    return wrong;
+  }
+
+  /** Nichts Geschütztes ist nah, der Berg liegt auf nichts, was frei bleibt, und jedes seiner Felder ist begehbar */
+  function aroundFaults(w: World, hill: HillOf): string[] {
+    const wrong: string[] = [];
+    const [tx, ty] = hill.top;
+    const kept = ['snowheap', 'crystal', 'fishcrate', 'icicle'];
+    const r = HILL.rings + HILL.keep;
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) {
+        const c = w.cell(tx + dx, ty + dy);
+        if (kept.includes(c.deco!)) wrong.push(`${c.deco} am Berg bei ${tx + dx},${ty + dy}`);
+        if (c.slide || c.garden || c.portal || c.ride === 'schlitten')
+          wrong.push('Berg auf Spur, Wiese, Plattform oder Strecke');
+        const on = Math.max(Math.abs(dx), Math.abs(dy)) <= HILL.rings;
+        if (on && standHeight(w, ['eis'], tx + dx, ty + dy) === null)
+          wrong.push(`Berg nicht begehbar ${tx + dx},${ty + dy}`);
+      }
+    return wrong;
+  }
+
+  /** Kein Tier wohnt auf Berg, Auslauf oder Warteplätzen; die Warteplätze sind frei */
+  function spotFaults(w: World, hill: HillOf): string[] {
+    const wrong: string[] = [];
+    const off = new Set([...hill.run, ...hill.foot].map(keyOf));
+    for (const p of w.spotsOf('eis'))
+      if (chebTo(hill.top, p) <= HILL.rings || off.has(keyOf(p))) wrong.push(`Wohnplatz am Berg ${p.join(',')}`);
+    for (const p of hill.foot)
+      if (standHeight(w, ['eis'], ...p) === null || w.cell(...p).ride) wrong.push(`Warteplatz ${p.join(',')}`);
+    return wrong;
+  }
+
+  /** Was am Rodelberg eines Tals nicht stimmt (Issue 50) */
+  function hillFaults(seed: number): string[] {
+    const w = worldOf(seed, ICE);
+    const hill = hillOf(w);
+    if (!hill) return [`Seed ${seed}: kein Rodelberg`];
+    const wrong: string[] = [];
+    const [tx, ty] = hill.top;
+    const bed = w.homes.eis.bed;
+    const far = Math.hypot(tx - bed[0], ty - bed[1]);
+    if (far < HILL.near[0] || far > HILL.near[1]) wrong.push(`Gipfel ${far.toFixed(0)} Felder vom Bett`);
+    if (w.cell(tx, ty).h !== HILL.top || w.cell(tx, ty).stop !== 'rodel') wrong.push('Gipfel nicht auf Höhe 7');
+    wrong.push(...runFaults(w, hill), ...stairFaults(w, hill), ...aroundFaults(w, hill), ...spotFaults(w, hill));
+    return wrong.slice(0, 6).map((m) => `Seed ${seed}: ${m}`);
+  }
+
+  it(`Rodelberg: in jedem Tal einer, Gipfel auf Höhe 7, Treppe im Westen, Bahn nie bergauf, nichts Geschütztes weicht, kein Wohnplatz darauf (${VALLEY_SEEDS.length} Seeds)`, () => {
+    expect(VALLEY_SEEDS.flatMap(hillFaults)).toEqual([]);
   });
 });

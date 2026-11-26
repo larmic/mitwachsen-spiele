@@ -9,7 +9,15 @@
 import type { GateId } from '../../data/games/mitwachsen';
 import type { Guided } from './mitwachsen-guide';
 import type { PackEvent } from './mitwachsen-pack-types';
-import type { MoveCmd, RideEngine, RideEvents, RideRules, Rider, Vehicle } from './mitwachsen-rider';
+import {
+  vehiclesOf,
+  type MoveCmd,
+  type RideEngine,
+  type RideEvents,
+  type RideRules,
+  type Rider,
+  type Vehicle,
+} from './mitwachsen-rider';
 import type { World } from './mitwachsen-world';
 
 /**
@@ -109,14 +117,22 @@ export const heraldOf = <A extends { mode: string }>(s: { animals: readonly A[] 
 /** Ohne Ritual am Tor (sein Paket fehlt): Es tut nichts */
 const NONE: HeraldRules = { step: () => {}, meet: () => false };
 
-type Hooks = { rules?: { ride?: RideEngine; vehicle?: Vehicle; herald?: HeraldRules; ritual?: HeraldRules } };
+type Hooks = {
+  rules?: {
+    ride?: RideEngine;
+    vehicle?: Vehicle;
+    more?: readonly Vehicle[];
+    herald?: HeraldRules;
+    ritual?: HeraldRules;
+  };
+};
 // je Fahr-Engine die zuletzt gebauten Regeln: `step` fragt in jedem Befehl, die Fahrzeuge ändern sich nur, wenn ein Paket kommt
 const built = new WeakMap<RideEngine, { vehicles: readonly Vehicle[]; rules: RideRules }>();
 
 /** Regeln aller Fahrzeuge: die Fahr-Engine (Paket der Fahrzeuge) mit den Fahrzeugen der geladenen Pakete */
 function ridesOf(rules: readonly Hooks[]): RideRules | undefined {
   const engine = rules.find((r) => r.rules?.ride)?.rules?.ride;
-  const vehicles = rules.flatMap((r) => (r.rules?.vehicle ? [r.rules.vehicle] : []));
+  const vehicles = vehiclesOf(rules);
   if (!engine || !vehicles.length) return undefined;
   const last = built.get(engine);
   if (last && last.vehicles.length === vehicles.length && last.vehicles.every((v, i) => v === vehicles[i]))

@@ -14,9 +14,10 @@ import type { GateId } from './mitwachsen';
 
 /**
  * Fahrzeuge: der Schlitten der Eis-Welt, die Höhlenbahn (`'hoehle'`, das Gleis von der Lichtung in die Grotte), die
- * Grubenbahn Funkel (`'grube'`, eine Schleife in der Grotte)
+ * Grubenbahn Funkel (`'grube'`, eine Schleife in der Grotte), der Rodelreifen (`'rodel'`, nur bergab am Rodelberg der
+ * Eis-Welt)
  */
-export type RideId = 'schlitten' | 'hoehle' | 'grube';
+export type RideId = 'schlitten' | 'hoehle' | 'grube' | 'rodel';
 
 /**
  * Vorladen am Halt (`RIDE_PRELOAD`, Konzept „Reisewege“): Steht die Figur höchstens so viele Felder (Schachbrett) vor
@@ -31,7 +32,7 @@ export type Pennant = 'flocke' | 'kristall';
 type RideBase = {
   id: RideId;
   gate: GateId; // Tor der Welt, zu der das Fahrzeug gehört
-  ticks: readonly [min: number, max: number]; // Dauer einer Fahrt in Takten zu 100 ms (15–20 s)
+  ticks: readonly [min: number, max: number]; // Dauer einer Fahrt in Takten zu 100 ms (15–20 s; der Rodelreifen 4–6 s)
   /**
    * Höchsttempo in Feldern je Takt (Zug: 0,8 = 8 Felder je Sekunde, Konzept; die Messung in 3D entscheidet, Rückfall 6):
    * Die Fahrt dauert dann Länge / Tempo Takte, in `ticks` gehalten (eine kurze Strecke, etwa bis zum Prellbock in der
@@ -46,6 +47,7 @@ type RideBase = {
 /** Ein Fahrzeug, das zwischen dem Halt in seiner Welt und dem Halt auf der Lichtung pendelt (Schlitten, Zug) */
 export type ShuttleSpec = RideBase & {
   loop?: undefined;
+  slide?: undefined;
   pennant: Pennant;
   /**
    * Ab welcher Stufe das Fahrzeug am Halt auf der Lichtung steht: der Schlitten erst nach der ersten Heimfahrt (`fest`,
@@ -59,9 +61,16 @@ export type ShuttleSpec = RideBase & {
  * fährt immer vorwärts. Es hält nie auf der Lichtung (kein `out`), hat keinen Wimpel (kein `pennant`), keine Festfahrt
  * und kein „Gute Nacht“ (es steht nie in Sichtweite des Lichtungsbetts); seine Strecke trägt `RideRoute.loop`
  */
-export type LoopSpec = RideBase & { loop: true; pennant?: undefined; out?: undefined };
+export type LoopSpec = RideBase & { loop: true; slide?: undefined; pennant?: undefined; out?: undefined };
 
-export type RideSpec = ShuttleSpec | LoopSpec;
+/**
+ * Ein Fahrzeug, das nur bergab fährt (`slide`, der Rodelreifen am Rodelberg, Issue 50): Es steht immer oben an seinem
+ * Halt `home`, fährt hinab zum Ende seiner Strecke und steht danach wieder oben (im Bild wird es hochgezogen). Es ist
+ * immer da, ohne Eintrag im Spielstand, verlässt seine Welt nie, hat keinen Wimpel und kein Fest
+ */
+export type SlideSpec = RideBase & { slide: true; loop?: undefined; pennant?: undefined; out?: undefined };
+
+export type RideSpec = ShuttleSpec | LoopSpec | SlideSpec;
 
 export const RIDES: readonly [RideSpec, ...RideSpec[]] = [
   // Himmelblauer Holzschlitten mit Schlittenrentier; Schellen D6–A5
@@ -96,5 +105,16 @@ export const RIDES: readonly [RideSpec, ...RideSpec[]] = [
     signal: [587.33, 880],
     color: '#2f8f83',
     loop: true,
+  },
+  // Rodelreifen am Rodelberg der Eis-Welt: ein runder, roter Reifen; rund 28 Felder bergab in etwa 5 s (6 Felder je s);
+  // Signal E6 → C6 → A5 (hell und abwärts, wie die Abfahrt)
+  {
+    id: 'rodel',
+    gate: 'eis',
+    ticks: [40, 60],
+    pace: 0.6,
+    signal: [1318.51, 1046.5, 880],
+    color: '#e8504a',
+    slide: true,
   },
 ];

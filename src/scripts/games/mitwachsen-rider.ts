@@ -97,10 +97,15 @@ export type RideRoute = {
   seats: { home: readonly Point[]; out: readonly Point[] };
   on: ReadonlySet<string>;
   cars?: Record<End, readonly Point[]>;
+  solo?: true; // ohne Zugtier: Am Halt belegt es nur seinen Sitz (der Rodelreifen)
   ahead?: number;
   dark?: ReadonlySet<string>;
   loop?: true;
 };
+
+/** Die Fahrzeuge der Pakete `packs`: je Paket seines (`rules.vehicle`) und seine weiteren (`rules.more`) */
+export const vehiclesOf = (packs: readonly { rules?: { vehicle?: Vehicle; more?: readonly Vehicle[] } }[]): Vehicle[] =>
+  packs.flatMap((p) => [...(p.rules?.vehicle ? [p.rules.vehicle] : []), ...(p.rules?.more ?? [])]);
 
 /** So viele Runden fährt eine Rundfahrt höchstens am Stück (Zahlensteine 1 bis 4) */
 export const MAX_LAPS = 4;

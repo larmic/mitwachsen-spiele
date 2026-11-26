@@ -3545,6 +3545,108 @@ test(
   },
 );
 
+// Rodelberg in der Eis-Welt (Issue 50, `?entwickler=eis`, fester Seed 1; @3d, weil Berg, Treppe, Bahn und Reifen auch in
+// 3D gezeichnet werden und die Kamera dem Reifen folgt): Der Reifen steht vom ersten Besuch an oben auf dem Gipfel. Die
+// Figur steht oben auf der Treppe und läuft hinein: Sie sitzt im Reifen, 2 s später geht es die Bahn hinab, nie bergauf,
+// unten steigt sie aus, und der Reifen steht wieder oben. Alles über die Test-Uhr, gespeichert wird im Blick hinein nichts
+test(
+  'Spiel: Rodelberg: oben in den Reifen, die Bahn hinab, unten aussteigen, der Reifen steht wieder oben, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    type Cell = { stop?: string; ride?: string; h: number; deco?: string | null };
+    type Game = {
+      world: { seed: number; homes: Record<string, { bed: [number, number] }>; cell(x: number, y: number): Cell };
+      state: {
+        player: { x: number; y: number; dir: string };
+        animals: unknown[];
+        packs: Record<string, unknown>;
+        ride?: { id: string; pos: number; phase: string };
+      };
+      rides: { id: string; key: string; x: number; y: number; seat?: true }[];
+      apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+    };
+    await page.addInitScript(() => {
+      const real = crypto.getRandomValues.bind(crypto);
+      const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+        a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+      Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    });
+    const game = await openGame(page, { clock: true, dev: 'eis' });
+    await expectView(page);
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    await ticks(page, 5);
+    // auf die oberste Stufe der Treppe, links neben den Gipfel
+    const top = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const [bx, by] = el.world.homes.eis!.bed;
+      for (let y = by - 72; y <= by + 72; y++)
+        for (let x = bx - 72; x <= bx + 72; x++)
+          if (el.world.cell(x, y).stop === 'rodel') {
+            el.state = { ...el.state, animals: [], player: { x: x - 1, y, dir: 'e' } };
+            return { x, y, h: el.world.cell(x, y).h, step: el.world.cell(x - 1, y).deco };
+          }
+      return null;
+    });
+    expect(top).toMatchObject({ h: 7, step: 'hillstep' });
+    await render(page, 2);
+    const tube = () =>
+      game.evaluate((node) => {
+        const b = (node as unknown as Game).rides.find((r) => r.id === 'ride:rodel');
+        return b ? { x: Math.round(b.x), y: Math.round(b.y), key: b.key, seat: !!b.seat } : null;
+      });
+    // immer da; der goldene Griff kommt, sobald die Fahr-Engine nachgeladen ist (bis dahin lädt er nicht ein)
+    await expect
+      .poll(async () => {
+        await ticks(page, 1);
+        await render(page);
+        return await tube();
+      })
+      .toEqual({ x: top!.x, y: top!.y, key: 'ride:rodel:gold', seat: false });
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 'e', fresh: true }));
+    await render(page, 2);
+    expect(await game.evaluate((node) => (node as unknown as Game).state.ride?.id)).toBe('rodel');
+    expect(await tube()).toMatchObject({ key: 'ride:rodel:figur', seat: true });
+    const heights: number[] = [];
+    for (let i = 0; i < 30; i++) {
+      await ticks(page, 5);
+      await render(page, 1);
+      const now = await game.evaluate((node) => {
+        const el = node as unknown as Game;
+        const p = el.state.player;
+        return el.state.ride ? { h: el.world.cell(p.x, p.y).h, on: el.world.cell(p.x, p.y).ride } : null;
+      });
+      if (!now) break;
+      expect(now.on).toBe('rodel'); // immer auf der Bahn
+      heights.push(now.h);
+    }
+    expect(heights[0]).toBe(7);
+    expect(heights.at(-1)).toBeLessThanOrEqual(2);
+    expect(heights.every((h, i) => i === 0 || h <= heights[i - 1]!)).toBe(true); // nie bergauf
+    const done = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const p = el.state.player;
+      return {
+        ride: el.state.ride?.id ?? null,
+        h: el.world.cell(p.x, p.y).h,
+        on: el.world.cell(p.x, p.y).ride ?? null,
+      };
+    });
+    expect(done.ride).toBeNull();
+    expect(done.on).toBeNull(); // neben der Bahn ausgestiegen
+    expect(done.h).toBeLessThanOrEqual(3);
+    // im Bild wird der Reifen hochgezogen; nach 3 s steht er wieder oben, jetzt ohne goldenen Griff
+    await ticks(page, 35);
+    await render(page, 2);
+    expect(await tube()).toEqual({ x: top!.x, y: top!.y, key: 'ride:rodel:leer', seat: false });
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
+      [],
+    );
+    expect(errors).toEqual([]);
+  },
+);
+
 // Zahlensteine an Funkel (Issue 48, `?entwickler=grube`, fester Seed 1; @3d, weil Steine und Lichter auf dem Dach auch
 // in 3D gezeichnet werden): Vier Steine stehen am Bahnsteig. Die Figur läuft in den Stein 2: Er ist gewählt (Petrol),
 // auf dem Dach des zweiten Wagens leuchten zwei Lichter. Eingestiegen fährt Funkel zwei Runden ohne Halt (nach der ersten
