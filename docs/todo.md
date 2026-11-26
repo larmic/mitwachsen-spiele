@@ -110,4 +110,11 @@
   - [ ] Am Gerät ansehen: Ist die Runde zu lang, sieht man die gewalzte Spur?
 - [x] Spielorte in der Grotte (Issue 56, 26.11.2026): zwölf schlafende Leuchtpilze, zehn Kristalltürmchen, neun Zahlen-Kristalle, eine Echo-Wand (`worlds/hoehle/mitwachsen-cave-places.ts`), Zustand in `packs.hoehle`, kleine Lichtinseln an wachen Pilzen und fertigen Türmchen. Paket der Höhle 80,4 KB, Grenze neu 88,4 KB. Vorarbeit: Bau der Eis-Welt von 309 auf etwa 258 ms je Tal beschleunigt
   - [ ] Am Gerät ansehen: Sieht man die Lichtinseln, ist die Grotte noch dunkel genug, liest er die Zahlen-Kristalle?
+- [ ] Weltpfade und Stellplätze am Portalstein (Review Punkte 7 und 14, entschieden am 26.11.2026: kein gemeinsamer Bahnhof)
+  - [x] Schritt 1: Wegsuche in den Kern und messen (Issue 59)
+  - [x] Schritt 2: Weltpfade als Boden (Issue 61, `mitwachsen-worldpath.ts`, 2 ms je Welt); `test:deep` entlastet (Schlitten-Tests 12 statt 20 Seeds, wilde Läufe 6 statt 8)
+  - [ ] Schritt 3: schlafende Wegsteine und Lichterkette beim Öffnen eines Tors
+  - [ ] Schritt 4: Stellplatz des Schlittens in die Linie von Stein und Pfad
+  - [ ] Schritt 5: Bahnhof Bär an den Höhlen-Portalstein
+  - [ ] Am Gerät ansehen: Folgt er einem Pfad, erkennt er die Materialien?
 - [ ] Als Nächstes: Wasserwelt mit dem Boot (plant ihre Rundfahrt von Anfang an mit) (Konzept „Reisewege“ und „Gleisbauer und Höhlen-Welt“, Folgen für wasserwelt.html): Das Boot ruht, bis die Höhlen-Leiste voll ist und der Zug das Kind danach einmal heimgebracht hat; dann kommt der Otter als Bote ans Lichtungsbett; Hafenbecken und Kanal, dieselben Fahrregeln (Fahr-Engine `worlds/fahrt/`)

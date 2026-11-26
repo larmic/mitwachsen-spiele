@@ -122,6 +122,7 @@ export type Cell = {
   tint?: string; // Farbe, mit der Gras und Blätter auf der Lichtung getönt sind (Stimmung der Richtung)
   story?: StoryId; // Klangstein dieser Geschichte
   note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz); Kristallgrotte: Ton einer Säule, Teil, Höhe oder Ende des Stegs, Mitte eines Kristallfelds, Richtung einer Ader, Seite der Wand am Leuchtmoos
+  way?: GateId; // Weltpfad der Lichtung zu diesem Tor (Boden im Material der Welt, mitwachsen-worldpath.ts)
   lamp?: true; // Laternen-Tanne der Eis-Welt: Die Tanne trägt eine Kristall-Laterne zum Anzünden (zeichnet nur das Paket)
   light?: number; // so viel heller (0 … 0,5) ist das Feld in der Grotte: Lichtschacht, Kristall oder Leuchtpilz daneben
   shaft?: number; // Lichtfleck dieses Lichtschachts der Grotte liegt hier (0 über dem Bett, 1 Kristallhalle, 2 am See): abends golden-orange, Fledermaus-Runden
