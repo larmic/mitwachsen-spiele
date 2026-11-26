@@ -23,7 +23,7 @@ import {
   seedsFor,
   worldOf,
 } from '../../test-worlds';
-import { bayAt, bearSpots, besideRay, centreOf, facesCamera, headOf } from './mitwachsen-bear';
+import { bayAt, bearSpots, besideRay, centreOf, facesCamera, headOf, stoneGap } from './mitwachsen-bear';
 import { APPROACH, PORTAL_T, clean, joined } from './mitwachsen-line';
 import { STONE_GAPS } from './mitwachsen-stones';
 import { OPEN_TICKS, stationOf, stationBodies } from './mitwachsen-station-look';
@@ -51,10 +51,16 @@ const BEAR_FAR = 38;
 const BEAR_SOUTH = [BEAR_FAR, 104];
 /**
  * Seeds, deren ganze Linie mit dem umgezogenen Bahnhof Bär in 20 s schneller als `TRAIN.pace` + 5 % wird (Seed 26, um
- * die Ecke: 173 statt 167 Felder, knapp 9 je s); bis zu 10 % erlaubt, bis der Vater entscheidet, ob eine lange Fahrt
+ * die Ecke: 173 statt 167 Felder, knapp 9 je s; Seed 2, seit der Bahnhof am Höhlen-Portalstein liegt: 170 Felder); bis zu 10 % erlaubt, bis der Vater entscheidet, ob eine lange Fahrt
  * länger als 20 s dauern darf (offen in docs/todo.md). Dann fällt die Liste weg
  */
-const LONG_RIDE = [26];
+const LONG_RIDE = [2, 26];
+/**
+ * Seeds, in denen der Klangstein am Bahnhof Bär nicht näher am Kopf als am anderen Ende steht, seit der Bahnhof am
+ * Höhlen-Portalstein liegt (Weltpfade, Schritt 5): Am Kopf biegt dort das Gleis ab oder liegt der Portalstein, der
+ * Stein steht am nächsten Feld, das passt (die Regel in `bearStone` gilt weiter)
+ */
+const STONE_ASIDE = [4, 6];
 /** Erlaubtes Tempo der Strecke über `TRAIN.pace`: 5 %, in `LONG_RIDE` 10 % */
 const slackOf = (seed: number) => (LONG_RIDE.includes(seed) ? 1.1 : 1.05);
 const key = ([x, y]: Point) => `${x},${y}`;
@@ -349,7 +355,9 @@ function trainStoneFaults(w: World, laid: Laid) {
   const ends = bear ? [bear.rows[0]!.back, bear.rows.at(-1)!.back] : [];
   const dist = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
   const [head, other] = ends.sort((a, b) => dist(b, bed) - dist(a, bed));
-  if (!stone || !head || !other || dist(stone, head) >= dist(stone, other)) bad.push('bahnhof: nicht am Kopf');
+  const aside = STONE_ASIDE.includes(w.seed);
+  if (!stone || !head || !other || (!aside && dist(stone, head) >= dist(stone, other)))
+    bad.push('bahnhof: nicht am Kopf');
   if (
     bear &&
     head &&
@@ -764,6 +772,28 @@ describe('Bahnhof Bär: die Seite weg von der Kamera zuerst (bearSpots)', () => 
       // zwischen Bett und Gleis, also nördlich davon)
       expect(south.includes(true)).toBe(mid[1] <= 0);
       if (south.includes(true)) expect(south.indexOf(true)).toBeGreaterThan(south.lastIndexOf(false));
+      // Weltpfade, Schritt 5: Der erste Platz beginnt nah am Portalstein der Höhle (ohne Stein: auf dem Strahl zum Tor,
+      // 9 Felder vom Bett); ob er Abstand zu ihm hält, prüft erst `bearFits`
+      const stone: Point = [out[0] * LINE.bear.stone, out[1] * LINE.bear.stone];
+      const gaps = spots.map((s) => stoneGap(s, stone));
+      expect(gaps[0]).toBeLessThanOrEqual(4);
+      // ein genannter Stein zählt: Liegt er woanders, beginnt der erste Platz dort
+      const moved: Point = [stone[0] + out[1] * 5, stone[1] + out[0] * 5];
+      const first = bearSpots(g, [0, 0], moved)[0]!;
+      expect(stoneGap(first, moved)).toBeLessThanOrEqual(stoneGap(spots[0]!, moved));
     },
   );
+});
+
+describe('Bahnhof Bär am Portalstein der Höhle (Weltpfade, Schritt 5)', () => {
+  // gemessen über Seeds 1 bis 60: das nächste Feld des Bahnsteigs 3 bis 6 Felder von der Mitte des Steins (Median 3,6;
+  // vorher 3,2 bis 7, Median 5,4); näher als 3 geht nicht (`LINE.bear.gap`)
+  it.each(SAMPLE_SEEDS)('Seed %i: der Bahnsteig beginnt höchstens 6 Felder vom Portalstein', (seed) => {
+    const w = worldOf(seed, [BAHN_PACK], BUILT);
+    const st = bearPlatform(w)!;
+    const stone = w.portals.get('hoehle')!.home;
+    const gap = stoneGap({ platform: st.rows.flatMap((r) => [r.edge, r.back]) }, stone);
+    expect(gap).toBeGreaterThanOrEqual(3);
+    expect(gap).toBeLessThanOrEqual(6);
+  });
 });

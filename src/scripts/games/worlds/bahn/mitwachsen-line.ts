@@ -2,8 +2,8 @@
 // der Bahn legt es in die fertig gebaute Karte (`WorldPack.lay`), erst ab Ausbau 1 (`packs.bahn.built`, vorher legt es
 // nichts und die Lichtung bleibt, wie sie ist), nur auf Lichtung, Gang und Grotte, und rechnet es nur aus deren Feldern
 // (es kennt kein anderes Paket). Die eine Linie:
-// - Bahnhof Bär auf der Lichtung (mitwachsen-bear.ts): je Seed gesucht, Mitte 13 bis 16 Felder vom Bett, 20 bis 30°
-//   neben dem Strahl vom Bett zum Höhlentor, 12 bis 16 Schritte vom Bett, Bahnsteig 2 × 7 mit dem Gleis daneben. Wo er
+// - Bahnhof Bär auf der Lichtung (mitwachsen-bear.ts): je Seed gesucht, Mitte 12 bis 16 Felder vom Bett, 8 bis 30°
+//   neben dem Strahl vom Bett zum Höhlentor, so nah wie möglich am Portalstein der Höhle, 12 bis 16 Schritte vom Bett, Bahnsteig 2 × 7 mit dem Gleis daneben. Wo er
 //   liegt, markiert `Cell.stop` (gebaut wird der Bahnsteig später). Der Fußweg vom Bett zur Torplatte weicht ihm aus.
 // - Von dort die Trasse (mitwachsen-trace.ts) bis vor die Bucht, durch das Tunnelportal und den oben offenen Einschnitt
 //   auf die Spur u −2 der Bucht, bis an den Prellbock vor der Tür (Ende des Ausbaus 1). Portal, Einschnitt, die Felder
@@ -255,6 +255,23 @@ function traceFrom(at: Ground, station: Station, walked: ReadonlySet<string>, bu
 }
 
 /**
+ * Plätze für Bahnhof Bär in der Reihe, in der sie versucht werden: zuerst die, deren Bahnsteig am nächsten am
+ * Portalstein der Höhle beginnt (`bearSpots`; der Stein aus der Karte, sonst auf dem Strahl zum Tor); Plätze, die auf
+ * dem Weltpfad zur Höhle lägen (`Cell.way`), kommen nach allen anderen: Der Pfad bleibt neben dem Bahnhof zu sehen
+ */
+function spotsBy(map: Map<string, Cell>, g: Door, bed: Point): Station[] {
+  let stone: Point | undefined;
+  for (let y = bed[1] - 12; y <= bed[1] + 12 && !stone; y++)
+    for (let x = bed[0] - 12; x <= bed[0] + 12 && !stone; x++) {
+      const p = map.get(key(x, y))?.portal;
+      if (p?.id === 'hoehle' && p.side === 'home' && p.at === 'centre') stone = [x, y];
+    }
+  const spots = bearSpots(g, bed, stone);
+  const onPath = (s: Station) => [...s.lane, ...s.platform].some((p) => map.get(key(...p))?.way === 'hoehle');
+  return [...spots.filter((s) => !onPath(s)), ...spots.filter(onPath)];
+}
+
+/**
  * Das Gleis auf der Lichtung: Bahnhof Bär (der erste Platz im Bereich des Konzepts, `LINE.bear.steps` Schritte vom Bett,
  * von dem aus eine Trasse bis vor die Bucht passt; höchstens `LINE.tries` Trassen-Suchen) und die Felder von seinem
  * Prellbock bis an den Prellbock vor der Tür; null, wenn nichts passt. Einschnitte und Dämme der Trasse werden ins
@@ -265,7 +282,7 @@ function lichtungLine(map: Map<string, Cell>, g: Door, home: { bed: Point; wake:
   const reach = walk(map, home.wake);
   const at: Ground = { map, g, home, fixed, reserved, goal: approach[0]! };
   const budget = { left: LINE.tries };
-  for (const station of bearSpots(g, home.bed)) {
+  for (const station of spotsBy(map, g, home.bed)) {
     if (budget.left <= 0) break;
     if (!bearFits(station, g, home.bed, map, reach, reserved)) continue;
     const undo = snapshot(map, [...station.lane, ...station.platform]);

@@ -291,7 +291,8 @@ describe('Fahren mit der Höhlenbahn: Regeln (Fahr-Engine mit dem Zug)', () => {
       x: block[0],
       y: block[1],
     };
-    const s: State = { ...going, animals: [{ ...hase, mode: 'wander' as const }] };
+    // er ruht (`rest`), damit er nicht von selbst weiterläuft, bevor der Zug ihn verscheucht
+    const s: State = { ...going, animals: [{ ...hase, mode: 'wander' as const, rest: 99 }] };
     const stopped = play(s, W1, [TICK]);
     expect(rides(stopped.events).map((e) => [e.what, e.who])).toEqual([['stop', 'lichtung:hase']]);
     expect(trainScores(rides(stopped.events)[0]!).length).toBe(2); // zweimal freundlich tuten
