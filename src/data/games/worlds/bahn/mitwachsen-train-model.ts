@@ -10,6 +10,7 @@
 // Spec: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 1)
 
 import type { Part } from '../../../../lib/games/front';
+import { HALT_NUMBER, numberBadge } from '../../mitwachsen-digits';
 import { LOOK, figureParts } from '../../mitwachsen';
 import { GOLD } from '../../mitwachsen-portals';
 import { TOK_MODEL } from './mitwachsen-tok-model';
@@ -273,4 +274,5 @@ export const SIGN: readonly Part[] = [
   [-0.05, -0.05, 0, 0.1, 0.1, 0.16, SC.wood],
   [-0.03, -0.44, 0.16, 0.06, 0.88, 0.88, SC.sign, SC.sign],
   ...pixels(BEAR, SC.bear, 0.03, 0, 0.96, 0.09),
+  ...numberBadge(HALT_NUMBER.baer, 0.045, -0.31, 1.03), // oben rechts im Bild: Bahnhof 1 (Issue 40)
 ];
