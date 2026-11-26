@@ -9,7 +9,7 @@ export const RIM_COLORS = {
   rock: '#b4bad6', // Tönung der Steinkachel in 3D (multipliziert): Schiefer mit Stich ins Blaue
   hedge: '#4f9d49', // Tönung der Laubkachel in 3D
   blossoms: ['#f7a8d0', '#ffffff', '#ffe98a'],
-  map: { rock: '#6a6f82', hedge: '#2f7d33' },
+  map: { rock: '#6a6f82', hedge: '#2f7d33', ice: '#2c5884' }, // `ice`: Tiefeis am Rand der Eis-Welt (worlds/eis/mitwachsen-ice-rim.ts)
 } as const;
 /** Farben der Steinkachel des Rings in 2D (wie `PAL_STONE`, dunkler und bläulich) */
 export const PAL_RING: Palette = { S: [['#6f7589', 1]], s: [['#585e72', 1]], r: [['#858ba1', 1]] };

@@ -67,11 +67,11 @@ export function mapColor(c: Cell): string {
   if (c.deco === 'gatetower') return THEME_COLORS[c.part!.id].side;
   if (BOARDS.has(c.deco)) return COLORS.gate;
   if (c.biome === 'eis' && c.color) return c.color; // Eiskristall, Eisfall, Eisberg und Scholle in ihrer Farbe (Schneewehen zeigt die Karte als Schnee)
+  if (c.rim) return c.biome ? RIM_COLORS.map.ice : RIM_COLORS.map.hedge; // Rand: Hecke der Lichtung, Tiefeis der Eis-Welt
   if (WORLD_GROUND[c.ground]) return WORLD_GROUND[c.ground]!;
   if (c.ground === 'water') return COLORS.water;
   if (c.deco === 'tree') return COLORS.tree;
   if (c.deco === 'bush' || c.deco === 'hedge') return COLORS.bush;
-  if (c.rim) return RIM_COLORS.map.hedge; // Rand der Lichtung: Hecke innen, dunkler Fels dahinter
   if (isRing(c)) return RIM_COLORS.map.rock;
   if (c.ground === 'stone' || c.deco === 'rock' || c.deco === 'boulder') return COLORS.stone;
   if (c.ground === 'sand') return COLORS.sand;

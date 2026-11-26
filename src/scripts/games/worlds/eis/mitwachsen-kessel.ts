@@ -31,6 +31,7 @@ import { chimes } from './mitwachsen-chime';
 import { haunts } from './mitwachsen-haunts';
 import { iceberg, lakes, peaks, type Iceberg } from './mitwachsen-lakes';
 import { key } from './mitwachsen-flood';
+import { markIceRim } from './mitwachsen-ice-rim';
 import { sledGround } from './mitwachsen-sled-ground';
 
 const { rx, ry } = KESSEL.shape;
@@ -129,6 +130,7 @@ export function buildKessel(
   frost(seed, wild, map); // Kristalle, Schneewehen und Schneehaufen nach Tannen und Eisblöcken
   chimes(seed, wild, map); // zuletzt das Glockenspiel am Klippenfuß, nur auf blankem Schnee: sonst bleibt alles, wo es war
   const sled = sledGround(gang, place, map); // ganz zuletzt Strecke und freier Platz des Schlittens: nichts wird neu gewürfelt
+  markIceRim(place.cells, map); // innerste Reihe der Klippen: dunkles Tiefeis mit Zacken (nur Bild, Höhen bleiben)
   // Eis-Welt: der ganze Kessel und der Gang ab seiner Mitte (dort wechselt auch die Tieranzeige)
   let inner = gang.depth + 1;
   while (map.get(key(...gang.at(0, inner)))?.region !== 'eis' && inner < centre) inner++;
