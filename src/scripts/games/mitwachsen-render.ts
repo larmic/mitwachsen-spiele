@@ -49,7 +49,7 @@ import type { Climate } from './mitwachsen-world';
 import type { State } from './mitwachsen-state';
 import { cycle, hash } from '../../lib/games/rng';
 import type { Cell, TreeKind, World } from './mitwachsen-world';
-import { homeAt } from './mitwachsen-home';
+import { PILZ_OVER, ROOF_LEFT, homeAt, openRoof } from './mitwachsen-home';
 import { drawPlate, drawPlatform } from './mitwachsen-platform-2d';
 import type { PlateFx } from './mitwachsen-plate';
 import type { PackId } from './mitwachsen-pack-types';
@@ -128,6 +128,7 @@ export class Renderer {
   views = new Map<GateId | PackId, View2D>();
   private at: DecoAt = { now: 0, reduced: false, picked: {}, packs: {} };
   private album = new Album(); // Leiste unten
+  private roof = 1; // Deckkraft der Dächer am Zuhause in diesem Bild (`openRoof`)
   private guest: Guest | null = null; // der Pinguin am Tor, solange er führt (Umriss, goldene Torplatte; nachgeladen)
   private blocks: Record<'grass' | 'dirt' | 'stone' | 'ring' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
 
@@ -174,13 +175,19 @@ export class Renderer {
 
     this.later = [];
     this.at = { now: sc.now, reduced: sc.reduced, picked: state.picked, packs: state.packs, work: workOf(state) };
+    this.roof = 1 - (1 - ROOF_LEFT) * openRoof(world, state.player.x, state.player.y).open;
     this.guest = this.guestAt(world, state);
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) this.ground(P, world, x, y, sc);
       for (const b of marks.get(y) ?? []) if (sc.explored(Math.floor(b[0]), y)) drawBox(ctx, P, b);
       for (const v of this.views.values()) v.trail?.draw(ctx, world, P, y); // Fußspuren im Schnee (aus dem Welt-Paket)
       for (let x = x0; x <= x1; x++) this.deco(P, world, state, sc, x, y);
-      for (const b of this.later) if (Math.ceil(b[1] + b[4] - 1e-6) - 1 === y) drawBox(ctx, P, b);
+      for (const b of this.later)
+        if (Math.ceil(b[1] + b[4] - 1e-6) - 1 === y) {
+          ctx.globalAlpha = b[8] === 'see' ? this.roof : 1; // Dach am Zuhause durchscheinend (`openRoof`)
+          drawBox(ctx, P, b);
+          ctx.globalAlpha = 1;
+        }
       for (const r of rides.get(y) ?? []) this.ride(P, sc, r);
       const ids = (rows.get(y) ?? []).sort((a, b) => sc.bodies.get(a)!.x - sc.bodies.get(b)!.x);
       for (const id of ids) {
@@ -772,9 +779,13 @@ export class Renderer {
         // Riesenpilz: Stiel mit Kragen, darüber der rote Hut mit Tupfen (über die ganze Breite des Unterstands)
         const { x0, y0, x1, y1 } = homeAt(world, x, y).shelter;
         box(ctx, P, x + 0.15, y + 0.15, h, 0.7, 0.7, 3.2, '#efe4d2', '#f7efe2');
-        box(ctx, P, x0 - 0.6, y0 - 0.8, h + 3.2, x1 - x0 + 2.2, y1 - y0 + 2.6, 0.45, '#d9473a', '#e0574a');
-        box(ctx, P, x0 + 0.3, y0 - 0.1, h + 3.65, x1 - x0 + 0.4, y1 - y0 + 1.2, 0.45, '#d9473a', '#e0574a');
-        for (const dx of [0.5, 2.5, 4.5, 6.5]) box(ctx, P, x0 - 0.2 + dx, y1 + 1.0, h + 3.3, 0.5, 0.05, 0.3, '#ffffff');
+        const [w, d] = [x1 - x0 + 1 + 2 * PILZ_OVER, y1 - y0 + 1 + 2 * PILZ_OVER];
+        ctx.globalAlpha = this.roof; // der Hut wird durchscheinend, solange die Figur zu Hause ist (`openRoof`)
+        box(ctx, P, x0 - PILZ_OVER, y0 - PILZ_OVER, h + 3.2, w, d, 0.45, '#d9473a', '#e0574a');
+        box(ctx, P, x0 - PILZ_OVER + 0.9, y0 - PILZ_OVER + 0.7, h + 3.65, w - 1.8, d - 1.4, 0.45, '#d9473a', '#e0574a');
+        for (const dx of [0.6, 2.4, 4.4, 6.2])
+          box(ctx, P, x0 - PILZ_OVER + dx, y1 + 1 + PILZ_OVER - 0.05, h + 3.3, 0.5, 0.05, 0.3, '#ffffff');
+        ctx.globalAlpha = 1;
         break;
       }
       case 'cloudpuff':

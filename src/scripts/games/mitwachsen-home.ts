@@ -96,6 +96,35 @@ export function realmsOf(
 /** Zuhause der Gegend, in der ein Feld liegt (Bett, Wiese, Unterstand dort, wo die Figur gerade ist) */
 export const homeAt = (world: Realms, x: number, y: number): Homestead => world.homes[world.realm(x, y)];
 
+/** So weit ragt der Hut des Riesenpilzes über seinen Unterstand (Felder; bis Issue 38 waren es 0,6 und 0,8) */
+export const PILZ_OVER = 0.2;
+/** So weit über die Wiese hinaus wird das Dach des Unterstands wieder dicht (Felder) */
+export const ROOF_FADE = 2;
+/**
+ * So viel vom Dach bleibt, wenn es offen ist: in 3D jeder zweite Bildpunkt im Schachbrett (beim Ein- und Ausblenden drei
+ * von vier), in 2D diese Deckkraft
+ */
+export const ROOF_LEFT = 0.5;
+/** Offenes Dach: Mitte des Unterstands (Felder, Mitte bei +0,5), Radius um ihn und wie weit es offen ist (0 dicht … 1) */
+export type OpenRoof = { x: number; y: number; r: number; open: number };
+/**
+ * Das Dach des Unterstands wird durchscheinend, solange die Figur zu Hause ist (Issue 38, Review vom 25.11.2026,
+ * Punkt 1: Unter dem Dach sah man die Tiere nicht): ganz offen bis zum Rand der Wiese ihrer Gegend (`meadow` Felder vom
+ * Bett), darüber hinaus in `ROOF_FADE` Feldern wieder dicht. Gilt für Riesenpilz, Iglu und das Dach am Höhlenbett; nur
+ * Bild, keine Regel ändert sich
+ */
+export function openRoof(world: Realms, px: number, py: number): OpenRoof {
+  const home = homeAt(world, px, py);
+  const far = Math.hypot(px - home.bed[0], py - home.bed[1]);
+  const { x0, y0, x1, y1 } = home.shelter;
+  return {
+    x: (x0 + x1 + 1) / 2,
+    y: (y0 + y1 + 1) / 2,
+    r: Math.hypot(x1 - x0 + 1, y1 - y0 + 1) / 2 + 1.5,
+    open: Math.min(1, Math.max(0, (home.meadow + ROOF_FADE - far) / ROOF_FADE)),
+  };
+}
+
 /**
  * Gegend, in deren Bett die Figur aufwacht: die der gespeicherten Position. Fehlt sie, ist sie kaputt oder liegt sie
  * hinter einem Tor, das zu ist, ist es die Lichtung.
