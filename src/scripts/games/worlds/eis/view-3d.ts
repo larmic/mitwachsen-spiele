@@ -23,6 +23,7 @@ import { chimeBoxes } from './mitwachsen-chime-look';
 import { SNOW_FILLS } from './mitwachsen-snow-fill';
 import { TUBE } from './mitwachsen-hill';
 import { stepBoxes } from './mitwachsen-tube-look';
+import { flagBoxes } from './mitwachsen-places-look';
 import { fillBoxes } from './mitwachsen-snow-fill-look';
 import { DEEP_ICE, crestBoxes } from './mitwachsen-ice-rim';
 
@@ -81,6 +82,7 @@ export const view3d: View3D = {
     rock: (_, c, x, y) => crestBoxes(c, x, y),
     snowdrift: fill,
     hillstep: (_, c, x, y) => stepBoxes(c, x, y), // Treppe am Rodelberg
+    numflag: (_, c, x, y) => flagBoxes(c, x, y), // Zahlen-Fähnchen am Hauptweg
     ...Object.fromEntries(SNOW_FILLS.map((d) => [d, fill])),
   },
   ground(c, open) {

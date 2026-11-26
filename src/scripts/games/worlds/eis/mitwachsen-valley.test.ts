@@ -691,4 +691,39 @@ describe('Gletschertal im Kessel (Eis-Welt)', () => {
   it(`Rodelberg: in jedem Tal einer, Gipfel auf Höhe 7, Treppe im Westen, Bahn nie bergauf, nichts Geschütztes weicht, kein Wohnplatz darauf (${VALLEY_SEEDS.length} Seeds)`, () => {
     expect(VALLEY_SEEDS.flatMap(hillFaults)).toEqual([]);
   });
+
+  /** Was an den Spielorten eines Tals nicht stimmt (Issue 52): Zahlen-Fähnchen und Laternen-Tannen */
+  function placeFaults(seed: number): string[] {
+    const w = worldOf(seed, ICE);
+    const cells = kesselPlace(seed, EIS_PACK).cells.map((p) => [p, w.cell(...p)] as const);
+    const wrong: string[] = [];
+    const bed = w.homes.eis.bed;
+    const far = ([x, y]: readonly [number, number]) => Math.hypot(x - bed[0], y - bed[1]);
+    const flags = cells.filter(([, c]) => c.deco === 'numflag').sort((a, b) => a[1].note! - b[1].note!);
+    if (flags.map(([, c]) => c.note).join('') !== '123456789')
+      wrong.push(`Fähnchen ${flags.map(([, c]) => c.note).join(' ')}`);
+    flags.forEach(([p, c], i) => {
+      if (c.solid || c.ground !== 'snow' || c.ride || c.slide || c.garden || c.portal || c.stop)
+        wrong.push(`Fähnchen ${c.note} bei ${p.join(',')}`);
+      if (standHeight(w, ['eis'], ...p) === null) wrong.push(`Fähnchen ${c.note} nicht begehbar`);
+      const before = flags[i - 1];
+      // vom Bett weg in Reihenfolge: jedes weiter als das davor, nie dicht beieinander
+      if (before && far(p) <= far(before[0])) wrong.push(`Fähnchen ${c.note} näher am Bett als ${c.note! - 1}`);
+      if (before && chebTo(before[0], p) < 4) wrong.push(`Fähnchen ${c.note} dicht an ${c.note! - 1}`);
+      if (cells.some(([q, n]) => n.deco === 'icicle' && chebTo(p, q) <= 4))
+        wrong.push(`Fähnchen ${c.note} am Glockenspiel`);
+    });
+    const lamps = cells.filter(([, c]) => c.lamp);
+    if (lamps.length < 8 || lamps.length > 12) wrong.push(`${lamps.length} Laternen-Tannen`);
+    for (const [p, c] of lamps) {
+      if (c.tree !== 'snowpine' || !c.solid) wrong.push(`Laterne ohne Tanne bei ${p.join(',')}`);
+      if (lamps.some(([q]) => q !== p && Math.hypot(q[0] - p[0], q[1] - p[1]) < 16))
+        wrong.push(`Laternen dicht bei ${p.join(',')}`);
+    }
+    return wrong.slice(0, 5).map((m) => `Seed ${seed}: ${m}`);
+  }
+
+  it(`Spielorte: neun Zahlen-Fähnchen in Reihenfolge vom Bett weg auf blankem Schnee, acht bis zwölf Laternen-Tannen weit verteilt (${VALLEY_SEEDS.length} Seeds)`, () => {
+    expect(VALLEY_SEEDS.flatMap(placeFaults)).toEqual([]);
+  });
 });

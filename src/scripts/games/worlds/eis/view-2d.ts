@@ -24,6 +24,7 @@ import { plateHint } from './mitwachsen-plate-hint';
 import { SLED_ID, rideFx, sledBodies, sledGoodNight, sledMarks } from './mitwachsen-sled-look';
 import { TUBE } from './mitwachsen-hill';
 import { runBox, stepBoxes, tubeBodies, tubeFx } from './mitwachsen-tube-look';
+import { LAMP_SCORE, flagBoxes, flagScore, lampBodies } from './mitwachsen-places-look';
 
 /** Iglu, Eisschale, Eistrog: Quader wie in 3D */
 const look: DrawDeco = (world, c, x, y) => iceBoxes(world, c, x, y);
@@ -93,6 +94,7 @@ export const view: View2D = {
     rock: (_, c, x, y) => crestBoxes(c, x, y),
     snowdrift: fill,
     hillstep: (_, c, x, y) => stepBoxes(c, x, y), // Treppe am Rodelberg
+    numflag: (_, c, x, y) => flagBoxes(c, x, y), // Zahlen-Fähnchen am Hauptweg
     ...Object.fromEntries(SNOW_FILLS.map((d) => [d, fill])),
   },
   // Rutschspur zum Schneebett: glänzt, sobald das Eistor offen ist
@@ -114,7 +116,11 @@ export const view: View2D = {
       ? (ring(e.x, e.y, performance.now()), chimeScore(e))
       : e.type === 'snowman'
         ? snowScore(e)
-        : undefined, // Säule, Grottenolm: Grotte
+        : e.type === 'numflag'
+          ? flagScore(e.n) // ein Fähnchen bimmelt
+          : e.type === 'treelamp'
+            ? [...LAMP_SCORE] // eine Laterne geht an
+            : undefined, // Säule, Grottenolm: Grotte
   // Torplatte vor dem Eistor: Eisscholle mit Schneeflocke, Klirren statt Klonk (E7 und G7, Pentatonik)
   plate: ICE_FLOE,
   clink: [
@@ -125,7 +131,12 @@ export const view: View2D = {
   hint: plateHint(),
   // Schlitten mit Schlittenrentier und Laternenpfahl, Schneespur und Fleck am Halt, Ton und Freude (mitwachsen-sled-look.ts)
   // dazu Rodelreifen und Fahne am Rodelberg (mitwachsen-tube-look.ts)
-  bodies: (state, world, at) => [...sledBodies(state, world, at), ...tubeBodies(state, world, at)],
+  // und die Laternen der Laternen-Tannen (mitwachsen-places-look.ts)
+  bodies: (state, world, at) => [
+    ...sledBodies(state, world, at),
+    ...tubeBodies(state, world, at),
+    ...lampBodies(state, world),
+  ],
   marks: sledMarks,
   goodNight: sledGoodNight, // „Gute Nacht, Fahrzeuge“
   rideFx: (e, state) => (e.id === SLED_ID.slice(5) ? rideFx(e, state) : tubeFx(e)), // je Fahrzeug nur seine Ereignisse

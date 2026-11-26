@@ -103,6 +103,18 @@ export const SNOWMAN_COLORS = {
 export const HILL = { top: 7, rings: 6, runout: 8, near: [16, 70], keep: 3 } as const;
 
 /**
+ * Spielorte im Tal (worlds/eis/mitwachsen-places.ts, Issue 52). `flags`: so viele Zahlen-Fähnchen am Hauptweg vom
+ * Schneebett zum Eisfall, `across` Felder neben der Mitte, das erste `every` Felder hinter dem Bett, dann alle `every`
+ * Felder; jedes auf dem nächsten blanken Feld bis `reach` weit, mindestens `apart` Felder von den Eiszapfen des
+ * Glockenspiels. `lamps`: höchstens so viele Laternen-Tannen, je zwei
+ * mindestens `spacing` Felder auseinander
+ */
+export const PLACES = {
+  flags: { count: 9, every: 12, across: 3, reach: 6, apart: 4 },
+  lamps: { count: 12, spacing: 16 },
+} as const;
+
+/**
  * Fülle im Schnee (worlds/eis/mitwachsen-snow-fill.ts): flache, begehbare Zierde auf blankem Schnee, ganz zuletzt
  * gesetzt. Je Kästchen eines Rasters aus `every` Feldern höchstens eine Stelle (an zufälligem Platz darin), Anteil
  * `none` bleibt leer. `kinds`: Gewichte der Sorten. Eisblumen wachsen zu `flowers` Feldern (von bis), ein Eisfleck

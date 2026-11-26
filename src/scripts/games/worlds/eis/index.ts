@@ -26,6 +26,8 @@ import { rules as snowman } from './mitwachsen-snowman';
 import { rules as chime } from './mitwachsen-chime';
 import { sled } from './mitwachsen-sled';
 import { tube } from './mitwachsen-tube';
+import { rules as places } from './mitwachsen-places';
+import { PLACE_SIGHTS } from './mitwachsen-places-look';
 import { SIGHTS } from './mitwachsen-sights';
 import { haltSight } from '../../mitwachsen-ride-kit';
 
@@ -38,8 +40,12 @@ export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules
   // Tür im Vorspiel des Eistors (die Flügel sind noch zu); Schneemänner bauen; Eiszapfen klingen (ohne Halt, darum
   // zuletzt); der Schlitten mit dem Schlittenrentier (mitwachsen-sled.ts; seine Fahrregeln bringt das Paket der Fahrzeuge)
   // dazu der Rodelreifen am Rodelberg (mitwachsen-tube.ts): nur bergab, immer da
-  rules: { bump: (...a) => shut(...a) || snowman.bump(...a) || chime.bump(...a), vehicle: sled, more: [tube] },
-  sights: [...SIGHTS, haltSight(sled), haltSight(tube)], // der Schlitten bis zur ersten Fahrt; Schneehaufen und Eiszapfen-Glockenspiel locken, bis sie gefunden sind
+  rules: {
+    bump: (...a) => shut(...a) || snowman.bump(...a) || places.bump(...a) || chime.bump(...a),
+    vehicle: sled,
+    more: [tube],
+  },
+  sights: [...SIGHTS, haltSight(sled), haltSight(tube), ...PLACE_SIGHTS], // dazu Fähnchen und Laternen-Tannen // der Schlitten bis zur ersten Fahrt; Schneehaufen und Eiszapfen-Glockenspiel locken, bis sie gefunden sind
   view,
   view3d: () => import('./view-3d').then((m) => m.view3d),
   models: ICE_MODELS,

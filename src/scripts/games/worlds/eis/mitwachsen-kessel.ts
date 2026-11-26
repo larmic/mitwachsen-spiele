@@ -15,7 +15,7 @@
 import { fromKey } from '../../../../lib/games/chunks';
 import { hash, rand01, valueNoise } from '../../../../lib/games/rng';
 import type { Point } from '../../../../data/games/mitwachsen';
-import { KESSEL, KESSEL_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
+import { KESSEL, KESSEL_COLORS, PLACES } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
 import { HOMES } from '../../../../data/games/mitwachsen-homes';
 import { ICE_PORTAL } from '../../../../data/games/mitwachsen-portals';
 import { ICE_STONE } from '../../../../data/games/mitwachsen-stories';
@@ -28,6 +28,7 @@ import { findSpawns } from '../../mitwachsen-spawns';
 import { OBSTACLE_GAP, eisCell } from '../../mitwachsen-world';
 import { adornKessel } from './mitwachsen-snow-fill';
 import { buildHill } from './mitwachsen-hill';
+import { hangLamps, placeFlags } from './mitwachsen-places';
 import { frost, type Wild } from './mitwachsen-frost';
 import { chimes } from './mitwachsen-chime';
 import { haunts } from './mitwachsen-haunts';
@@ -144,6 +145,14 @@ export function buildKessel(
   const spots = spotsOf(place, map, off);
   const eis = haunts(place.cells, map, (p) => gang.at(...uv(centre, p)), place.bed); // Lieblingsorte nur hier
   const spawns = findSpawns(seed, eis, spots, place.bed);
+  // Spielorte, nach allem anderen und vor der Fülle: Fähnchen am Hauptweg (vom Bett zum Eisfall), Laternen an Tannen
+  const { count, every, across } = PLACES.flags;
+  placeFlags(
+    Array.from({ length: count }, (_, i) => gang.at(...uv(centre, [across, every * (i + 1)]))),
+    map,
+    off,
+  );
+  hangLamps(seed, place.cells, map);
   adornKessel(seed, place.cells, map, sled); // Fülle im Schnee, nach allem anderen: Nichts wird neu gewürfelt
   return { bed: place.bed, realm, spots, spawns, stone, portal: [ICE_PORTAL, portal] };
 }
