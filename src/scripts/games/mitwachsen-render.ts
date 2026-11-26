@@ -51,6 +51,8 @@ import { cycle, hash } from '../../lib/games/rng';
 import type { Cell, TreeKind, World } from './mitwachsen-world';
 import { PILZ_OVER, ROOF_LEFT, homeAt, openRoof } from './mitwachsen-home';
 import { drawPlate, drawPlatform } from './mitwachsen-platform-2d';
+import { stoneOf } from './mitwachsen-waystone';
+import { waystoneBoxes } from './mitwachsen-waystone-look';
 import type { PlateFx } from './mitwachsen-plate';
 import type { PackId } from './mitwachsen-pack-types';
 import { BED_SNOW, flatColors } from './mitwachsen-ground-2d';
@@ -392,8 +394,10 @@ export class Renderer {
     this.haze(P, x, y, c.h, sc); // Nebelrand zuletzt: Er liegt auch über Tönung und Torplatte
   }
 
-  /** Torplatte auf dem Feld (nach dem Boden, vor dem Nebelrand: Sinkt sie ein, verdeckt das Feld davor ihre Vorderkante) */
+  /** Wegstein und Torplatte auf dem Feld (nach dem Boden, vor dem Nebelrand: Sinkt sie ein, verdeckt das Feld davor ihre Vorderkante) */
   private plate(P: Projection, world: World, c: Cell, x: number, y: number, sc: Scene) {
+    const way = stoneOf(c); // Wegstein neben einem Weltpfad: wach, sobald sein Tor offen ist
+    if (way) for (const b of waystoneBoxes(x, y, c.h, way, sc.gates.has(way))) box(this.ctx, P, ...b);
     if (c.plate) {
       const look = this.views.get(c.plate)?.plate; // Schmuck aus dem Paket der Welt dahinter (Eis-Welt: Scholle)
       // goldener Rand, solange der Pinguin zu diesem Tor führt (aus dem Paket)

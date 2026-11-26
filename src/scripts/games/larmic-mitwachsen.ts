@@ -5,6 +5,8 @@
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md
 
 import type { EdgeEvent } from './mitwachsen-edge';
+import { due } from './mitwachsen-waystone';
+import { waystoneSparks } from './mitwachsen-waystone-look';
 import { later } from '../../lib/games/later';
 import { chunkOf } from '../../lib/games/chunks';
 import { projection } from '../../lib/games/front';
@@ -412,6 +414,7 @@ class LarmicMitwachsen extends HTMLElement {
     this.lift();
     if (events.length) this.react(events);
     if (cmd.type === 'tick') this.ageTired();
+    if (cmd.type === 'tick') this.chain(state.tick);
     // Moosfresser naschen selbst am Tropfmoos (Schnapp-Hüpfer ohne Zutun des Kinds)
     if (cmd.type === 'tick')
       for (const id of nibblers(state, (x, y) => this.world.cell(x, y))) this.hops.set(`snap:${id}`, performance.now());
@@ -788,6 +791,13 @@ class LarmicMitwachsen extends HTMLElement {
     // der Vogel sitzt vorn auf der Hecke (ein Zeichen schwebt 0,9 über seinem Ort), nicht oben auf dem Fels dahinter
     if (e.kind === 'hedge')
       this.floats.push({ kind: 'bird', who: 'spot', color: BIRD_COLOR, born: now, ...at, z: at.z - 1.1, age: 0 });
+  }
+
+  /** Lichterkette der Wegsteine: Schwingen die Flügel eines Tors auf, läuft ein Glitzern vom Bett zum Tor */
+  private chain(tick: number) {
+    for (const [id, at] of this.gates)
+      for (const [x, y] of at ? due(this.world.waystones.get(id as GateId) ?? [], at, tick) : [])
+        this.burst('', waystoneSparks(id as GateId), 5, { x, y, z: this.world.cell(x, y).h - 0.6 });
   }
 
   private float(kind: Float['kind'], who: string, color: string, born: number) {

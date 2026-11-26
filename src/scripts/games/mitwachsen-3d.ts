@@ -71,6 +71,8 @@ import { drawDeco, type DecoAt } from './mitwachsen-view';
 import { Views3D, type Air } from './mitwachsen-view-3d';
 import { DUSK_SKY, nightMix, sunLevel, type Rgb } from './mitwachsen-dusk';
 import { tree, tufts } from './mitwachsen-trees-3d';
+import { stoneOf } from './mitwachsen-waystone';
+import { waystoneBoxes } from './mitwachsen-waystone-look';
 import type { PlateTurn } from './mitwachsen-turn-3d';
 import { CAM_REST, camPose } from './mitwachsen-camera';
 import { hangAt } from './mitwachsen-roost';
@@ -713,6 +715,10 @@ export class World3D {
       }
     }
     if (c.rim) for (const [bx, by, bz, w, d, bh, color] of rimBlossoms(x, y, h)) g.box(bx, bz, by, w, bh, d, color);
+    const way = stoneOf(c); // Wegstein neben einem Weltpfad: wach, sobald sein Tor offen ist
+    if (way)
+      for (const [bx, by, bz, w, d, bh, side, top] of waystoneBoxes(x, y, h, way, this.opened.includes(way)))
+        g.box(bx, bz, by, w, bh, d, side, top);
   }
 
   /**
