@@ -20,6 +20,8 @@ import { joined, marksLayer } from './view-3d-sled';
 import { stageAt } from './mitwachsen-snowman';
 import { snowBoxes } from './mitwachsen-snowman-look';
 import { chimeBoxes } from './mitwachsen-chime-look';
+import { SNOW_FILLS } from './mitwachsen-snow-fill';
+import { fillBoxes } from './mitwachsen-snow-fill-look';
 import { DEEP_ICE, crestBoxes } from './mitwachsen-ice-rim';
 
 /** Im Gletscherkessel (Boden und Klippen): Schnee obenauf, darunter Eis */
@@ -59,6 +61,9 @@ const icicle: DrawDeco = (world, c, x, y) => chimeBoxes(world, c, x, y);
 /** Eisscholle auf einem Eisloch, liegt still */
 const floe: DrawDeco = (_world, _c, x, y) => floeBoxes(x, y);
 
+/** Fülle im Schnee und Schneewehen: liegen still (in 3D blitzt nichts) */
+const fill: DrawDeco = (_world, c, x, y) => fillBoxes(c, x, y);
+
 export const view3d: View3D = {
   gate: 'eis',
   look: gateLook,
@@ -72,6 +77,8 @@ export const view3d: View3D = {
     snowheap: heap,
     icicle,
     rock: (_, c, x, y) => crestBoxes(c, x, y),
+    snowdrift: fill,
+    ...Object.fromEntries(SNOW_FILLS.map((d) => [d, fill])),
   },
   ground(c, open) {
     if (c.biome !== 'eis' || c.region === 'wild') return null;

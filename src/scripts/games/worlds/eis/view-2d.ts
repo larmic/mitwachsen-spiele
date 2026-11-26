@@ -18,6 +18,8 @@ import { stageAt } from './mitwachsen-snowman';
 import { snowBoxes, snowScore, wobble } from './mitwachsen-snowman-look';
 import { chimeBoxes, chimeScore, ring, since, swing } from './mitwachsen-chime-look';
 import { DEEP_ICE, crestBoxes } from './mitwachsen-ice-rim';
+import { SNOW_FILLS } from './mitwachsen-snow-fill';
+import { fillBoxes } from './mitwachsen-snow-fill-look';
 import { plateHint } from './mitwachsen-plate-hint';
 import { SLED_ID, rideFx, sledBodies, sledGoodNight, sledMarks } from './mitwachsen-sled-look';
 
@@ -69,6 +71,13 @@ const heap: DrawDeco = (world, c, x, y, { now, reduced, packs }) => {
 const icicle: DrawDeco = (world, c, x, y, { now, reduced }) =>
   chimeBoxes(world, c, x, y, reduced ? 0 : swing(since(x, y, now)));
 
+/**
+ * Fülle im Schnee und Schneewehen: liegen still; nur der Funke auf einem Eisfleck blitzt ab und zu (nicht bei
+ * reduzierter Bewegung)
+ */
+const fill: DrawDeco = (_world, c, x, y, { now, reduced }) =>
+  fillBoxes(c, x, y, reduced || c.deco !== 'iceglint' ? 0 : crystalGlint(now, x + 31, y));
+
 export const view: View2D = {
   decos: {
     igloo: look,
@@ -80,6 +89,8 @@ export const view: View2D = {
     snowheap: heap,
     icicle,
     rock: (_, c, x, y) => crestBoxes(c, x, y),
+    snowdrift: fill,
+    ...Object.fromEntries(SNOW_FILLS.map((d) => [d, fill])),
   },
   // Rutschspur zum Schneebett: glänzt, sobald das Eistor offen ist
   ground: (c, x, y, open) =>

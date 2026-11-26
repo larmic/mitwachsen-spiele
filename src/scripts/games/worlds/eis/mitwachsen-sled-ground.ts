@@ -201,7 +201,7 @@ function cheapest(
 ): Point[] | undefined {
   const cost = (x: number, y: number) => {
     const c = map.get(key(x, y))!;
-    let n = 1 + (blocked(c) ? CLEAR : 0) + (c.deco === 'cloudpuff' ? 1 : 0);
+    let n = 1 + (blocked(c) ? CLEAR : 0) + (c.deco === 'snowdrift' ? 1 : 0);
     for (let dy = -1; dy <= 1; dy++)
       for (let dx = -1; dx <= 1; dx++) {
         const d = map.get(key(x + dx, y + dy));

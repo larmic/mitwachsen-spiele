@@ -36,3 +36,20 @@ export const ICE_FLOE = {
  * `cell.color`; Kern und Karte zeichnen sie damit, das Leuchten beim Polarlicht kommt mit dem Welt-Paket.
  */
 export const ICE_CRYSTALS = ['#8ec5ff', '#3fd6b8', '#5b8def'] as const;
+
+/**
+ * Fülle im Schnee (worlds/eis/mitwachsen-snow-fill-look.ts): Eisblumen in zwei Farben der Eiskristalle mit weißer
+ * Mitte, blanker Eisfleck mit Funke, graue Kiesel (Seite, Oberseite), Tundra-Büschel in Moosgrün mit blauen Beeren,
+ * Schneewehe (Körper, Schattenrand). Kein Gold: Das ist die Aktionsfarbe.
+ */
+export const SNOW_FILL_COLORS = {
+  flowers: [ICE_CRYSTALS[0], ICE_CRYSTALS[1]],
+  heart: '#ffffff',
+  glint: ICE_COLORS.ice,
+  spark: '#ffffff',
+  pebble: ['#7d8896', '#9da8b5'],
+  tuft: ['#8a9a3c', '#a9b84e'],
+  berry: ICE_CRYSTALS[2],
+  drift: ['#e6eef7', '#ffffff'],
+  shadow: ['#a9c6dd', '#c3d9ea'],
+} as const;

@@ -26,6 +26,7 @@ import { straightCentre } from '../../mitwachsen-behind';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from '../../mitwachsen-portal';
 import { findSpawns } from '../../mitwachsen-spawns';
 import { OBSTACLE_GAP, eisCell } from '../../mitwachsen-world';
+import { adornKessel } from './mitwachsen-snow-fill';
 import { frost, type Wild } from './mitwachsen-frost';
 import { chimes } from './mitwachsen-chime';
 import { haunts } from './mitwachsen-haunts';
@@ -140,6 +141,7 @@ export function buildKessel(
   const spots = spotsOf(place, map, sled);
   const eis = haunts(place.cells, map, (p) => gang.at(...uv(centre, p)), place.bed); // Lieblingsorte nur hier
   const spawns = findSpawns(seed, eis, spots, place.bed);
+  adornKessel(seed, place.cells, map, sled); // Fülle im Schnee, nach allem anderen: Nichts wird neu gewürfelt
   return { bed: place.bed, realm, spots, spawns, stone, portal: [ICE_PORTAL, portal] };
 }
 
@@ -219,8 +221,9 @@ const grove = (seed: number, x: number, y: number) => valueNoise(seed + 65, x, y
 const GROVE = 0.62;
 /**
  * So viele Schneetannen und Eisblöcke hat jeder Kessel mindestens (fehlen welche, wachsen sie nach). Im Hain stehen die
- * Tannen dichter als draußen (dort 3 %, `OBSTACLE_GAP` dünnt aus): So wird das weite Tal nicht leer, etwa 5 Dinge je
- * 100 Felder.
+ * Tannen dichter als draußen (dort 0,8 %, `OBSTACLE_GAP` dünnt aus). Feste Dinge bleiben dünn gesät, damit jedes Feld
+ * erreichbar ist; dicht wird das Tal durch die flache Fülle im Schnee (mitwachsen-snow-fill.ts): zusammen etwa 10 Dinge
+ * je 100 Felder.
  */
 export const KESSEL_WILDS = { pines: 4, blocks: 2 } as const;
 
