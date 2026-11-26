@@ -8,6 +8,7 @@ import type { Gang } from '../../mitwachsen-pack-types';
 import { platformCells } from '../../mitwachsen-portal';
 import { PLATE_ROW } from '../../mitwachsen-plate';
 import { canStep, createWorld, type World } from '../../mitwachsen-world';
+import { line } from '../../mitwachsen-worldpath';
 import { EIS_PACK, seedChunks, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import { BESIDE, plateRow } from '../../mitwachsen-bay';
 import { SLIDE_GAP, YARD_NEAR, postOf, trackU, yardOf } from './mitwachsen-sled-ground';
@@ -99,8 +100,8 @@ function apartFaults(w: World, r: Route): string[] {
 }
 
 /**
- * Halt auf der Lichtung neben der Plattform des Eistor-Portals am Bett (im Bereich seiner Stufe), nicht auf dem
- * Fußweg, zwei Felder weg von Wasser; Halte an den Enden
+ * Halt auf der Lichtung neben der Plattform des Eistor-Portals am Bett (im Bereich seiner Stufe), auf der Linie des
+ * Weltpfads oder sonst nicht auf dem Fußweg, zwei Felder weg von Wasser; Halte an den Enden
  */
 function stopFaults(w: World, r: Route): string[] {
   const wrong: string[] = [];
@@ -109,7 +110,9 @@ function stopFaults(w: World, r: Route): string[] {
   const out = r.stops.out;
   const dist = Math.hypot(out[0] - plate[0], out[1] - plate[1]);
   if (dist > STOP_STAGES[r.stage].r) wrong.push(`Halt ${keyOf(out)}: ${dist.toFixed(1)} von der Plattform`);
-  if (onFootpath(w, g, out) || around(out, 1).some((q) => w.cell(...q).ground === 'water'))
+  // auf dem Fußweg nur, wenn er auf der Linie des Weltpfads steht (Stein, Schlitten, Pfad in einer Reihe)
+  const onLine = line(plate, w.portals.get('eis')!.gate).some((q) => keyOf(q) === keyOf(out));
+  if ((!onLine && onFootpath(w, g, out)) || around(out, 1).some((q) => w.cell(...q).ground === 'water'))
     wrong.push('Halt am Weg oder Teich');
   if (keyOf(r.path.at(-1)!) !== keyOf(out) || keyOf(r.path[0]!) !== keyOf(r.stops.home)) wrong.push('Halte');
   return wrong;
@@ -201,6 +204,21 @@ describe('Strecke des Schlittens (Eis-Welt)', () => {
     expect(sledRoute(createWorld(1, []))).toBeUndefined();
     const w = worldOf(1, ICE);
     expect(sledRoute(w)).toBe(sledRoute(w));
+  });
+
+  // Weltpfade, Schritt 4: Stein, Schlitten und Pfad in einer Reihe (gemessen über Seeds 1 bis 60: 57 auf der Linie, am
+  // 3. bis 8. Feld; in 3 Welten liegt dort ein Teich, dann steht er wie früher daneben)
+  it('der Halt auf der Lichtung steht auf der Linie des Weltpfads, direkt außen am Portalstein', () => {
+    const at = [7, 42, 2026, 123456].map((seed) => {
+      const w = worldOf(seed, ICE);
+      const p = w.portals.get('eis')!;
+      const out = sledRoute(w)!.stops.out;
+      return line(p.home, p.gate).findIndex((q) => q[0] === out[0] && q[1] === out[1]);
+    });
+    for (const i of at) {
+      expect(i).toBeGreaterThanOrEqual(3); // näher liegen Plattform und Portalring
+      expect(i).toBeLessThanOrEqual(8);
+    }
   });
 
   // Tief (MITWACHSEN_DEEP) Seeds 1 bis 20 in zwei Abschnitten, sonst die Stichprobe. Eine ganze Welt zu bauen kostet
