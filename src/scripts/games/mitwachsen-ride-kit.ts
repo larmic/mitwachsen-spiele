@@ -163,5 +163,6 @@ export function haltSight(v: Vehicle): Sight {
     },
     done: (s) => ridden(s.packs, id),
     call: (_, [x, y]) => ({ type: 'ride', what: 'nudge', id, x, y }),
+    color: v.spec.color,
   };
 }

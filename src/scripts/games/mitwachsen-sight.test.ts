@@ -22,6 +22,7 @@ import {
   aheadOf,
   cellsOf,
   goalsOf,
+  marksOf,
   quiet,
   sightStep,
   sightsOf,
@@ -377,6 +378,39 @@ describe('Hinführen: was die Pakete eintragen', () => {
     expect(halt.done!({ ...here, packs: { fahrt: { schlitten: { stage: 'bereit', gefahren: true } } } })).toBe(true);
     expect(halt.done!({ ...here, packs: { fahrt: { schlitten: { stage: 'fest' } } } })).toBe(true);
     expect(goalsOf(here, world, [halt]).map((g) => g.sight.id)).toEqual(['halt:schlitten']);
+  });
+});
+
+describe('Karte: Zeichen gefundener Sehenswürdigkeiten (Issue 32)', () => {
+  const all = sightsOf(ALL);
+
+  it('nichts gefunden: kein Zeichen, die Karte verrät nichts; jede Sehenswürdigkeit hat eine Farbe', () => {
+    const fresh = { ...at(...world.homes.eis.bed), heard: [] };
+    expect(marksOf(fresh, world, all)).toEqual([]);
+    for (const x of all) expect(x.color, x.id).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it('gefunden: ihre Felder in ihrer Farbe; Schneehaufen samt fertiger Schneemänner; Klangsteine je gehörtem Stein', () => {
+    const s = at(...world.homes.eis.bed, { heard: [] });
+    const chime = marksOf({ ...s, found: ['eis:glockenspiel'] }, world, all);
+    expect(chime.map((m) => key(m.at)).sort()).toEqual(ICICLES.map(key).sort());
+    expect(new Set(chime.map((m) => m.color))).toEqual(new Set(['#9fe0ff']));
+    const heaps = only('eis:schneehaufen')[0]!.cells(world, s);
+    const built = { ...s, found: ['eis:schneehaufen'], packs: { eis: { v: 1, snow: { [key(heaps[0]!)]: 3 } } } };
+    expect(marksOf(built, world, only('eis:schneehaufen'))).toHaveLength(heaps.length);
+    const heard = marksOf({ ...s, heard: ['bett'] }, world, [STONES]);
+    expect(heard).toEqual([{ at: world.stones.get('bett'), color: STONES.color }]);
+  });
+
+  it('Halte: Zeichen am Sitz, sobald die Figur einmal gefahren ist; der Grubenhalt vor dem Graben hat kein eigenes', () => {
+    const halt = only('halt:schlitten');
+    const s = at(...world.homes.eis.bed);
+    const here = { ...s, packs: { fahrt: { schlitten: { stage: 'bereit' } } } };
+    expect(marksOf(here, world, halt)).toEqual([]);
+    const rode = { ...s, packs: { fahrt: { schlitten: { stage: 'bereit', gefahren: true } } } };
+    expect(marksOf(rode, world, halt)).toEqual([{ at: halt[0]!.cells(world, rode)[0], color: halt[0]!.color }]);
+    const dig = all.filter((x) => x.id === 'grube:graben');
+    expect(marksOf({ ...s, packs: DUG }, world, dig)).toEqual([]);
   });
 });
 

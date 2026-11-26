@@ -186,6 +186,8 @@ export const DIG_SIGHT: Sight = {
   ready: (s) => digDue(s.packs, s.garden),
   done: (s) => dug(s.packs),
   call: (_, [x, y]) => ({ type: 'herald', what: 'dig', id: FIRST_MOLE, x, y }),
+  color: FUNKEL.color,
+  marks: () => [], // kein eigenes Zeichen: Dort steht danach Funkels Halt
 };
 
 /**
@@ -200,4 +202,5 @@ export const FUNKEL_SIGHT: Sight = {
   },
   done: (s) => ridden(s.packs, FUNKEL.id),
   call: (_, [x, y]) => ({ type: 'ride', what: 'nudge', id: FUNKEL.id, x, y }),
+  color: FUNKEL.color,
 };

@@ -75,6 +75,24 @@ export function mapColor(c: Cell): string {
   return COLORS.grass[Math.max(0, Math.min(COLORS.grass.length - 1, c.h - 1))] ?? COLORS.water;
 }
 
+/** Kleine Raute mit dunklem Rand: das Zeichen einer gefundenen Sehenswürdigkeit */
+function diamond(ctx: CanvasRenderingContext2D, x: number, y: number, cell: number, color: string) {
+  const r = Math.max(2.5, cell * 0.9);
+  for (const [grow, fill] of [
+    [1.5, COLORS.ink],
+    [0, color],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(x, y - r - grow);
+    ctx.lineTo(x + r + grow, y);
+    ctx.lineTo(x, y + r + grow);
+    ctx.lineTo(x - r - grow, y);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+  }
+}
+
 /**
  * Karte zeichnen. `explored(x, y)` sagt, ob ein Feld schon erkundet ist (ohne Nebel: immer true).
  * `cx, cy` ist der Mittelpunkt in Feldern (die gleitende Figur), `size` die Kantenlänge in CSS-Pixeln.
@@ -88,6 +106,7 @@ export function drawMap(
   size: number,
   explored: (x: number, y: number) => boolean,
   now: number,
+  marks: readonly { at: readonly [number, number]; color: string }[] = [],
 ) {
   const cell = size / (MAP_RADIUS * 2 + 1);
   const ox = size / 2 - (cx + 0.5) * cell,
@@ -118,6 +137,10 @@ export function drawMap(
       ctx.fillRect(px - r, py - r, 2 * r, 2 * r);
     }
   }
+
+  // gefundene Sehenswürdigkeiten (mitwachsen-sight.ts), sobald erkundet: kleine Raute in ihrer Farbe
+  for (const m of marks)
+    if (explored(...m.at)) diamond(ctx, ox + (m.at[0] + 0.5) * cell, oy + (m.at[1] + 0.5) * cell, cell, m.color);
 
   // Bett der Gegend, in der die Figur steht, als Häuschen, sonst ein Pfeil am Rand dorthin (führt der Pinguin: zum Tor;
   // wartet Tok wach, der Bote der Höhlenwelt: zu ihm)
