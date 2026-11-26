@@ -61,7 +61,7 @@ import { moodLife } from './mitwachsen-sky';
 import { turnHead } from './mitwachsen-air';
 import { Album } from './mitwachsen-album';
 import { ASK, HEART, NOTE, ZZZ, sprite, type Particle } from './mitwachsen-glyphs';
-import { byRow, type RideBody } from './mitwachsen-ride-view';
+import { byRow, drawRide, type RideBody } from './mitwachsen-ride-view';
 import { hangAt, labelHeight } from './mitwachsen-roost';
 import { workOf } from './mitwachsen-herald';
 
@@ -216,7 +216,7 @@ export class Renderer {
   private ride(P: Projection, sc: Scene, r: RideBody) {
     if (!sc.explored(Math.round(r.x), Math.round(r.y))) return;
     this.shadow(P, r.x + 0.5, r.y + 0.5, r.z, 0.3);
-    drawModel(this.ctx, P, r.parts, r.x + 0.5, r.y + 0.5, r.z, r.dir, 1);
+    drawRide(this.ctx, P, r);
   }
 
   /**

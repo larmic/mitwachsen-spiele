@@ -48,6 +48,22 @@ function stopsBy(world: World, lane: readonly Point[], realm?: RegionId): Point[
   return [...found.values()];
 }
 
+/** Wo die Figur steht und ob sie fährt (aus dem Zustand) */
+export type Standing = { player: { x: number; y: number }; ride?: unknown };
+
+/**
+ * Verdeckt die Dachplatte die Figur? Die Platte liegt über den hinteren Feldern der beiden Reihen unter dem Dach
+ * (`ROOF_HALF`). Die Kamera schaut von Süden schräg von oben: Verdeckt ist die Figur unter der Platte und auf dem Feld
+ * gleich dahinter (nördlich davon; liegt der Bahnsteig seitlich am Gleis, ist das ein Feld des Bahnsteigs). Dann
+ * zeichnen beide Ansichten die Platte durchscheinend (`RideBody.sheer`), nie während einer Fahrt
+ */
+export const underRoof = (st: Pick<Platform, 'rows' | 'roof'>, s: Standing): boolean =>
+  !s.ride &&
+  st.roof.some((i) => {
+    const back = st.rows[i]?.back;
+    return !!back && back[0] === s.player.x && (back[1] === s.player.y || back[1] - 1 === s.player.y);
+  });
+
 /**
  * Dach von Bahnhof Bär: über den Reihen 1 und 2, neben der Sitzreihe (`SEAT` = 3); steht Toks Häuschen in der letzten
  * Reihe, über den beiden davor

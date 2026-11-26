@@ -52,7 +52,7 @@ import { ridden, stageOf, tokOf } from '../../mitwachsen-ride-save';
 import { LETTERS, STEPS } from './mitwachsen-trace';
 import { SEAT, TRAIN, bearEnd, farOf, inTunnel, lineOf, trainRoute } from './mitwachsen-train';
 import { batBodies } from './mitwachsen-bat-look';
-import { batPlatform, bearPlatform } from './mitwachsen-platform';
+import { batPlatform, bearPlatform, underRoof, type Standing } from './mitwachsen-platform';
 import { capOf } from './mitwachsen-build2';
 import { FLIES, fireflies } from './mitwachsen-feast-look';
 
@@ -181,14 +181,24 @@ export function stationBodies(state: State, world: World, at: RideAt): readonly 
   const st = stationOf(world);
   if (!st) return [];
   const work = progress(state, at);
-  return [...stationParts(st, world, work, at.reduced), ...trainParts(st, world, state, work, at), ...batBodies(world)];
+  return [
+    ...stationParts(st, world, state, work, at.reduced),
+    ...trainParts(st, world, state, work, at),
+    ...batBodies(world, state),
+  ];
 }
 
 /**
  * Bahnsteig, Dachplatte (ein eigener Körper), Pfosten mit Bank, Schild und Häuschen; beim Bau erst ab `pop`, dann
  * wachsen sie kurz aus dem Boden
  */
-function stationParts(st: BearStation, world: World, work: number | undefined, reduced: boolean): RideBody[] {
+function stationParts(
+  st: BearStation,
+  world: World,
+  state: Standing,
+  work: number | undefined,
+  reduced: boolean,
+): RideBody[] {
   if (work !== undefined && work < BUILD.pop) return [];
   const rise = work === undefined || reduced ? 0 : Math.max(0, 1 - (work - BUILD.pop) / POP_FOR) * -0.9;
   const dir = dirTo(...st.side);
@@ -211,7 +221,16 @@ function stationParts(st: BearStation, world: World, work: number | undefined, r
       y = under.reduce((s, p) => s + p[1], 0) / 4;
     const z = world.cell(...under[0]!).h + rise;
     out.push(
-      { id: 'bahn:dach', key: 'bahn:dach', x, y, z, dir, parts: ROOF },
+      {
+        id: 'bahn:dach',
+        key: 'bahn:dach',
+        x,
+        y,
+        z,
+        dir,
+        parts: ROOF,
+        ...(underRoof(st, state) ? { sheer: true } : {}),
+      },
       { id: 'bahn:pfosten', key: 'bahn:pfosten', x, y, z, dir, parts: ROOF_POSTS },
       { id: 'bahn:schild', key: 'bahn:schild', ...signAt(x, y, st.side), z: z + ROOF_TOP, dir: 's', parts: SIGN },
     );

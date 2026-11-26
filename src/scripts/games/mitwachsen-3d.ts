@@ -59,6 +59,7 @@ import { fogMask } from './mitwachsen-fog-3d';
 import { StoneNotes, stoneInto } from './mitwachsen-story-3d';
 import type { LoadedPack } from './mitwachsen-packs';
 import type { Scene } from './mitwachsen-render';
+import { SHEER } from './mitwachsen-ride-view';
 import type { State } from './mitwachsen-state';
 import type { Cell, World } from './mitwachsen-world';
 import { homeAt } from './mitwachsen-home';
@@ -154,6 +155,7 @@ export class World3D {
   private fogDirty = true;
   private fogKey = '';
   private entity = new MeshLambertMaterial({ vertexColors: true });
+  private sheer = new MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: SHEER, depthWrite: false }); // Dachplatte über der Figur (`RideBody.sheer`)
   private dark = new MeshLambertMaterial({ color: GAME_COLORS.silhouette }); // verlorene Tiere auf den Tafeln
   private lava!: MeshLambertMaterial; // leuchtet auch nachts
   private canopy!: MeshLambertMaterial;
@@ -321,7 +323,8 @@ export class World3D {
     for (const g of this.models.values()) g.dispose();
     this.models.clear();
     this.solid.map?.dispose();
-    for (const m of [this.solid, this.foliage, this.water, this.lava, this.canopy, this.entity, this.dark]) m.dispose();
+    for (const m of [this.solid, this.foliage, this.water, this.lava, this.canopy, this.entity, this.sheer, this.dark])
+      m.dispose();
     this.fogTex.dispose();
     this.sun.shadow.dispose();
     this.renderer.dispose();
@@ -952,7 +955,10 @@ export class World3D {
       else place(a.id, this.model(a.species, sp.parts), sp.scale, a.dir);
     }
     for (const r of sc.rides)
-      if (this.explored(Math.round(r.x), Math.round(r.y))) place(r.id, this.model(r.key, r.parts), 1, r.dir, r);
+      if (this.explored(Math.round(r.x), Math.round(r.y))) {
+        place(r.id, this.model(r.key, r.parts), 1, r.dir, r);
+        this.bodies.get(r.id)!.material = r.sheer ? this.sheer : this.entity;
+      }
     for (const [id, m] of this.bodies)
       if (!seen.has(id)) {
         this.scene.remove(m);
