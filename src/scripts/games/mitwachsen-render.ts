@@ -63,6 +63,8 @@ import { Album } from './mitwachsen-album';
 import { ASK, HEART, NOTE, ZZZ, sprite, type Particle } from './mitwachsen-glyphs';
 import { byRow, drawRide, type RideBody } from './mitwachsen-ride-view';
 import { hangAt, labelHeight } from './mitwachsen-roost';
+import { isRing } from './mitwachsen-rim';
+import { PAL_RING, rimBlossoms } from './mitwachsen-rim-look';
 import { workOf } from './mitwachsen-herald';
 
 /** Gleitende Position eines Wesens auf dem Bildschirm (in Feldern), dazu Hüpfer und Blickrichtung */
@@ -127,13 +129,14 @@ export class Renderer {
   private at: DecoAt = { now: 0, reduced: false, picked: {}, packs: {} };
   private album = new Album(); // Leiste unten
   private guest: Guest | null = null; // der Pinguin am Tor, solange er führt (Umriss, goldene Torplatte; nachgeladen)
-  private blocks: Record<'grass' | 'dirt' | 'stone' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
+  private blocks: Record<'grass' | 'dirt' | 'stone' | 'ring' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
 
   constructor(private readonly ctx: CanvasRenderingContext2D) {
     this.blocks = {
       grass: frontBlock(GRASS_TOP, GRASS_SIDE, PAL_GRASS),
       dirt: frontBlock(DIRT, DIRT, PAL_GRASS),
       stone: frontBlock(STONE, STONE, PAL_STONE),
+      ring: frontBlock(STONE, STONE, PAL_RING), // Fels am Rand der Lichtung: dunkler Schiefer (mitwachsen-rim-look.ts)
       sand: frontBlock(DIRT, DIRT, PAL_SAND),
       path: frontBlock(DIRT, DIRT, PAL_PATH),
       leaves: frontBlock(LEAVES, LEAVES, PAL_LEAVES),
@@ -336,9 +339,10 @@ export class Renderer {
     const low = Math.max(0, Math.min(c.h - 1, frontH));
     for (let k = low; k < c.h; k++) {
       const top = k === c.h - 1;
-      const image =
-        c.ground === 'stone'
-          ? this.blocks.stone
+      const image = c.rim
+        ? this.blocks.leaves // Hecke an der innersten Reihe des Rands
+        : c.ground === 'stone'
+          ? this.blocks[isRing(c) ? 'ring' : 'stone']
           : !top
             ? this.blocks.dirt
             : c.ground === 'sand'
@@ -349,6 +353,9 @@ export class Renderer {
       this.img(P, image, x, y, k + 1);
     }
     this.edges(P, world, x, y, c.h);
+    if (c.rim)
+      for (const [bx, by, bz, w, d, bh, color] of rimBlossoms(x, y, c.h))
+        box(this.ctx, P, bx, by, bz, w, d, bh, color, color);
     if (c.tint && c.ground === 'grass') {
       // Stimmung der Richtung: Gras tönen (multiplizieren, damit die Körnung bleibt)
       const [ax, ay] = P(x, y, c.h);

@@ -10,6 +10,8 @@ import { homeAt } from './mitwachsen-home';
 import { portalColor } from './mitwachsen-portal';
 import { guideGate } from './mitwachsen-guide';
 import { heraldOf } from './mitwachsen-herald';
+import { isRing } from './mitwachsen-rim';
+import { RIM_COLORS } from './mitwachsen-rim-look';
 
 export const MAP_RADIUS = 28; // Felder vom Mittelpunkt bis zum Rand
 
@@ -69,6 +71,8 @@ export function mapColor(c: Cell): string {
   if (c.ground === 'water') return COLORS.water;
   if (c.deco === 'tree') return COLORS.tree;
   if (c.deco === 'bush' || c.deco === 'hedge') return COLORS.bush;
+  if (c.rim) return RIM_COLORS.map.hedge; // Rand der Lichtung: Hecke innen, dunkler Fels dahinter
+  if (isRing(c)) return RIM_COLORS.map.rock;
   if (c.ground === 'stone' || c.deco === 'rock' || c.deco === 'boulder') return COLORS.stone;
   if (c.ground === 'sand') return COLORS.sand;
   if (c.ground === 'path') return COLORS.path;

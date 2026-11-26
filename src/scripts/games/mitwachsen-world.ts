@@ -21,6 +21,7 @@ import { BED_STONE, type StoryId } from '../../data/games/mitwachsen-stories';
 import type { Cell, Ground, TreeKind } from './mitwachsen-cell';
 import { LICHTUNG_HOME, bedsOf, realmsOf, type Realms } from './mitwachsen-home';
 import type { Beyond, Gang, WorldPack } from './mitwachsen-pack-types';
+import { sharpenRim } from './mitwachsen-rim';
 import { behind, hullOf, landOf, roomBehind, straightCentre, type Behind } from './mitwachsen-behind';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal, type PortalId } from './mitwachsen-portal';
 import { findSpawns } from './mitwachsen-spawns';
@@ -344,6 +345,7 @@ function buildStart(
   const reached = new Set(reach.map(([x, y]) => key(x, y)));
   for (const [k, c] of map)
     if (c.region === 'lichtung' && !c.solid && c.ground !== 'water' && !reached.has(k)) map.set(k, rock(3));
+  sharpenRim(map, [...at.gates.values()]); // Kante statt Treppe: Hecke innen, Fels ragt dahinter (mitwachsen-rim.ts)
   const spots = reach.filter(([x, y]) => map.get(key(x, y))!.region === 'lichtung' && !map.get(key(x, y))!.garden);
   const spawns = new Map([
     ...findSpawns(seed, lichtung, spots, LICHTUNG_HOME.bed),
