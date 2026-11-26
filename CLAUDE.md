@@ -44,6 +44,7 @@ Vor jedem Commit `npm run format`, `npm run lint`, `npm run arch`, `npm run chec
 
 - Schichten (geprüft durch `npm run arch`): `src/lib` ist generisch und importiert nichts aus `src/data`, `components`, `layouts`, `pages`, `scripts`. `src/data` kennt keine Oberfläche. Browser-Code in `src/scripts` nutzt aus `lib` nur `textures.ts` und `src/lib/games/`, nichts aus Node. `src/lib/games/` und `src/data/games/` laufen im Browser und nutzen aus `lib` nur `games/` und `textures.ts`.
 - Design-Tokens aus `tokens.css` nutzen, keine neuen Farben ohne Grund. Gold ist die einzige Aktionsfarbe.
+- Sehenswürdigkeiten (Hinführen, `src/scripts/games/mitwachsen-sight.ts`): Wer etwas baut, wo das Kind etwas tun kann (Spielzeug, Halt eines Fahrzeugs, Klangstein), trägt es als `Sight` ein, ohne dass es jemand dazusagt: im Paket seiner Welt unter `WorldPack.sights` (Fahrzeug: `haltSight`), und jede neue Art von `PackEvent` in `SIGHT_OF` (Kennung oder `null` mit Grund). Dann ruft es leise, der Funkelfreund führt hin, und nach dem ersten Finden ist Ruhe. Ein Test in `mitwachsen-sight.test.ts` lehnt fehlende Einträge ab. Was nur schön anzusehen ist, bekommt keinen Eintrag.
 - Alle Inhalte bleiben im HTML; Interaktion ist Zusatz. Ohne JavaScript bleibt die Seite für Eltern lesbar, das Spiel zeigt einen `<noscript>`-Text.
 - Keine Logos, Figuren oder Texturen aus Minecraft oder Hytale – nur eigene Voxel-Grafik.
 - Keine externen Ressourcen ohne Klick des Nutzers (Schriften lokal). Geprüft durch `npm run verify:dist` (Logik in `scripts/dist.ts`).
