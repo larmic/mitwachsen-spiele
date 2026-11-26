@@ -25,6 +25,7 @@ import { sharpenRim } from './mitwachsen-rim';
 import { behind, hullOf, landOf, roomBehind, straightCentre, type Behind } from './mitwachsen-behind';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal, type PortalId } from './mitwachsen-portal';
 import { findSpawns } from './mitwachsen-spawns';
+import { layPaths } from './mitwachsen-worldpath';
 import { GATE_FLOOR, forecourt } from './mitwachsen-apron';
 
 export type { Cell, Deco, Ground, TreeKind } from './mitwachsen-cell';
@@ -336,6 +337,7 @@ function buildStart(
         if (c && (c.region === 'lichtung' || c.deco === 'rock')) set(x, y, { ...grass('lichtung'), h: c.h || 1 });
       }
   smooth(map);
+  layPaths(map, LICHTUNG_HOME.bed, portalsOf(places)); // Weltpfade: vom Portalstein am Bett zu jedem Tor (nur Boden)
   // Pakete ohne eigene Welt legen jetzt nach ihrem Spielstand etwas in die Karte (Bahn: Gleis, Klangsteine)
   const at = { seed, map, gates: gatesOf(places), beds: bedsOf(inner), packs: saved };
   const laid = packs.flatMap((p) => p.lay?.(at) ?? []);

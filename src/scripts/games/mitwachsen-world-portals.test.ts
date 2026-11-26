@@ -137,7 +137,9 @@ describe('Torhaus und Felsring', () => {
         const along = [g.out[1], -g.out[0]] as const;
         const xy = (u: number, t: number) =>
           [g.mid[0] + along[0] * u - g.out[0] * t, g.mid[1] + along[1] * u - g.out[1] * t] as const;
-        const row = (t: number) => U.filter((u) => w.cell(...xy(u, t)).ground === APRON[g.id]);
+        // ohne die Felder des Weltpfads (Issue 61): Er läuft im selben Material auf das Vorfeld zu
+        const row = (t: number) =>
+          U.filter((u) => w.cell(...xy(u, t)).ground === APRON[g.id] && !w.cell(...xy(u, t)).way);
         // direkt vor der Torreihe mitten im Weg, weiter vorn weniger (Sand und Schnee gibt es auch sonst auf der Lichtung)
         expect(w.cell(...xy(0, 1)).ground, `${w.seed} ${g.id}`).toBe(APRON[g.id]);
         expect(row(1).length).toBeGreaterThanOrEqual(row(5).length);
