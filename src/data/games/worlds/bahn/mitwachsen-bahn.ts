@@ -13,10 +13,12 @@ export const LINE = {
    * auf der Seite der Spur (u −2); Bahnsteig `wide` × `long` Felder, das nächste Feld `steps` Schritte vom Bett. Jedes
    * Feld mindestens `ring` Felder vom Bett (außerhalb des Portalrings, r 9) und `gap` Felder (Chebyshev) fern von
    * Plattformen, Wiese, Trögen, Wasser, Klangsteinen, Torplatten und dem Fußweg zum Tor (der Fußweg weicht ihm aus).
+   * `stone`: so weit vom Bett liegt die Mitte des Portalsteins der Höhle auf dem Strahl zum Tor, wenn niemand sie nennt
+   * (Portalring); der Bahnsteig beginnt so nah an ihm wie möglich (Weltpfade, Schritt 5).
    * `camera`: Strafe für einen Bahnsteig südlich seines Gleises, zur Kamera hin (größer als alle anderen Teile der Güte
    * zusammen, kein Filter, mitwachsen-bear.ts)
    */
-  bear: { r: [13, 16], angle: [20, 30], steps: [12, 16], long: 7, wide: 2, ring: 10.5, gap: 2, camera: 40 },
+  bear: { r: [12, 16], angle: [8, 30], steps: [12, 16], long: 7, wide: 2, ring: 10.5, gap: 2, camera: 40, stone: 9 },
   /** Spur des Gleises in der Bucht und im Gang: u −2, am Rand der Tür (Platte −1 … 1, Toks Platz +2, Warteplätze |u| ≥ 3) */
   lane: -2,
   /** Vor der Bucht (drei Reihen vor der Tür) liegen `cut` Felder Einschnitt, davor das Tunnelportal, davor `lead` Felder gerade */

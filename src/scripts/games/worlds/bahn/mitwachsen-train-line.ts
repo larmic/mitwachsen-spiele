@@ -16,7 +16,7 @@ export const TRAIN = RIDES.find((r) => r.id === 'hoehle')!;
 export const CARS = 6;
 /** Feld des Sitzes (Mitte des mittleren Wagens), vom Ende des Gleises an gezählt */
 export const SEAT = 3;
-/** So weit ums Bett der Lichtung wird nach dem Prellbock von Bahnhof Bär gesucht (er liegt 13 bis 16 Felder weg) */
+/** So weit ums Bett der Lichtung wird nach dem Prellbock von Bahnhof Bär gesucht (er liegt 12 bis 16 Felder weg) */
 const SEARCH = 24;
 
 /** Der Prellbock am Anfang der Linie auf der Lichtung (Bahnhof Bär), gesucht ums Bett */

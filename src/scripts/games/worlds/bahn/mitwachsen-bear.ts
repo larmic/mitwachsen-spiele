@@ -1,5 +1,6 @@
-// Bahnhof Bär auf der Lichtung – rein: wo er liegt (je Seed gesucht, `LINE.bear`): Mitte 13 bis 16 Felder vom Bett, 20
-// bis 30° neben dem Strahl vom Bett zum Höhlentor (immer, für jeden Seed), Bahnsteig 2 × 7 mit dem Gleis daneben,
+// Bahnhof Bär auf der Lichtung – rein: wo er liegt (je Seed gesucht, `LINE.bear`): Mitte 12 bis 16 Felder vom Bett, 8
+// bis 30° neben dem Strahl vom Bett zum Höhlentor (immer, für jeden Seed), zuerst dort, wo der Bahnsteig am nächsten am
+// Portalstein der Höhle beginnt (`stoneGap`; Weltpfade, Schritt 5), Bahnsteig 2 × 7 mit dem Gleis daneben,
 // 12 bis 16 Schritte vom Bett, fern von Plattformen, Wiese, Trögen, Torplatten, Klangsteinen und Teichen, zuerst mit dem
 // Bahnsteig weg von der Kamera (`facesCamera`, eine Strafe, kein Filter). Sein Platz wird
 // eben und frei gemacht; der Fußweg zum Tor weicht ihm aus (mitwachsen-line.ts). Teil des Pakets der Bahn.
@@ -24,39 +25,33 @@ export const bayAt =
 export type Station = { lane: Point[]; platform: Point[]; dir?: number };
 
 /**
- * Bahnhof Bär: Plätze in der Reihe, wie gut sie zu `LINE.bear` passen (Mitte 25° neben dem Strahl, 14,5 Felder vom Bett
- * zuerst, dann je halbes Feld und Grad weiter weg), jeweils auf der Seite der Spur u −2 (dort hat die Mitte das kleinere
+ * Bahnhof Bär: Plätze im Bereich von `LINE.bear` in der Reihe, wie nah ihr Bahnsteig am Portalstein der Höhle beginnt
+ * (`stone`, seine Mitte; der nächste zuerst), jeweils auf der Seite der Spur u −2 (dort hat die Mitte das kleinere
  * u). Zuerst längs zum Tor, das Gleis auf der Seite weg vom Fußweg; dann quer, das Gleis auf der Seite zum Tor (der
  * Bahnsteig zwischen Bett und Gleis), die Strecke verlässt ihn zum Strahl hin oder von ihm weg. Plätze mit dem Bahnsteig
  * zur Kamera (`facesCamera`) kosten `LINE.bear.camera` mehr: Sie kommen nach allen anderen, fallen aber nie weg
  */
-export function bearSpots(g: Door, bed: Point): Station[] {
+export function bearSpots(g: Door, bed: Point, stone: Point = stoneOn(g, bed)): Station[] {
   const { long, wide, r, angle } = LINE.bear;
   const at = bayAt(g);
   const a = Math.atan2(g.mid[1] - bed[1], g.mid[0] - bed[0]);
   const u = (p: Point) => (p[0] - g.mid[0]) * -g.out[1] + (p[1] - g.mid[1]) * g.out[0];
   const t = (p: Point) => (p[0] - g.mid[0]) * g.out[0] + (p[1] - g.mid[1]) * g.out[1];
-  const mid = (r[0] + r[1]) / 2,
-    turn = (angle[0] + angle[1]) / 2;
   const out = dirOf([0, 0], g.out);
   const across = dirOf([0, 0], [-g.out[1], g.out[0]]); // u wächst
   const tries: [number, number, number, boolean, 0 | 1][] = [];
   for (let rr = r[0]; rr <= r[1]; rr += 0.5)
     for (let deg = angle[0]; deg <= angle[1]; deg += 1)
       for (const flat of [false, true])
-        for (const side of [0, 1] as const)
-          tries.push([
-            rr,
-            deg,
-            Math.abs(rr - mid) + Math.abs(deg - turn) / 2 + (flat ? 10 : 0) + side * 20,
-            flat,
-            side,
-          ]);
-  tries.sort((p, q) => p[2] - q[2]);
+        for (const side of [0, 1] as const) tries.push([rr, deg, (flat ? 10 : 0) + side * 20, flat, side]);
   const seen = new Set<string>();
   const spots: { score: number; station: Station }[] = [];
+  // je näher der Bahnsteig am Portalstein der Höhle beginnt, desto besser (Weltpfade, Schritt 5)
   const add = (score: number, station: Station) =>
-    spots.push({ score: score + (facesCamera(station) ? LINE.bear.camera : 0), station });
+    spots.push({
+      score: score + stoneGap(station, stone) + (facesCamera(station) ? LINE.bear.camera : 0),
+      station,
+    });
   for (const [rr, deg, score, flat, side] of tries) {
     const c = [1, -1]
       .map((s): Point => {
@@ -87,6 +82,16 @@ export function bearSpots(g: Door, bed: Point): Station[] {
   }
   return spots.sort((p, q) => p.score - q.score).map((s) => s.station); // stabil: bei gleicher Güte wie gesucht
 }
+
+/** Mitte des Portalsteins der Höhle am Bett, wenn niemand sie nennt: auf dem Strahl zum Tor, `LINE.bear.stone` Felder weit */
+const stoneOn = (g: Pick<Door, 'mid'>, bed: Point): Point => {
+  const a = Math.atan2(g.mid[1] - bed[1], g.mid[0] - bed[0]);
+  return [bed[0] + LINE.bear.stone * Math.cos(a), bed[1] + LINE.bear.stone * Math.sin(a)];
+};
+
+/** So weit (Luftlinie) liegt das nächste Feld des Bahnsteigs von der Mitte des Portalsteins `stone` */
+export const stoneGap = (s: Pick<Station, 'platform'>, stone: Point) =>
+  Math.min(...s.platform.map((p) => Math.hypot(p[0] - stone[0], p[1] - stone[1])));
 
 /**
  * Liegt der Bahnsteig auf der Seite zur Kamera (in Ruhe im Süden, +y, mitwachsen-camera.ts)? Dann stünde er zwischen
