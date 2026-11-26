@@ -34,7 +34,7 @@ describe('Kristallfackeln: in der Welt', () => {
       const w = worldOf(seed, [HOEHLE_PACK]);
       const frame = caveFrame(w)!;
       const torches = torchesOf(w);
-      expect(torches.length).toBeGreaterThanOrEqual(12);
+      expect(torches.length).toBeGreaterThanOrEqual(16);
       expect(torches.length).toBeLessThanOrEqual(torchPlan().length);
       const bed = w.homes.hoehle.bed;
       const reach = new Set(reachable(w, ['eis', 'hoehle'], w.homes.hoehle.wake[0]!).map(([x, y]) => key(x, y)));
@@ -54,11 +54,12 @@ describe('Kristallfackeln: in der Welt', () => {
         expect(c.garden || c.stop || c.lane || c.portal).toBeFalsy();
         expect(Math.hypot(x - bed[0], y - bed[1])).toBeGreaterThan(GROTTE.flat);
       }
-      // Kette: Auf dem Weg durch die Mitte folgt spätestens nach drei Abständen die nächste Fackel (auf einer der Seiten)
+      // Kette: Auf dem Weg durch die Mitte folgt spätestens nach gut drei Abständen die nächste Fackel (auf einer der
+      // Seiten; am Höhlenbett fehlen zwei Paare, dort leuchtet die Wiese)
       const outs = [...new Set(torches.map(([x, y]) => frame.out(x, y)))].sort((a, b) => a - b);
-      const along = outs.filter((o) => torchPlan().some(([u, po]) => Math.abs(u) === T.side && Math.abs(po - o) <= 1));
+      const along = outs.filter((o) => torchPlan().some(([u, po]) => Math.abs(u) === T.side && Math.abs(po - o) <= 2));
       for (let i = 1; i < along.length; i++)
-        expect(along[i]! - along[i - 1]!, `Seed ${seed}`).toBeLessThanOrEqual(3 * T.every);
+        expect(along[i]! - along[i - 1]!, `Seed ${seed}`).toBeLessThanOrEqual(3 * T.every + 4);
       // kein Tier wohnt auf einer Fackel
       const spawns = new Set([...w.spawns.values()].map(([x, y]) => key(x, y)));
       expect(torches.filter(([x, y]) => spawns.has(key(x, y)))).toEqual([]);

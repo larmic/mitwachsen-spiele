@@ -32,16 +32,10 @@ export function torchPlan(): [number, number][] {
   return out;
 }
 
-/** Flache Zierde, die einer Fackel weicht (begehbar, nichts hängt daran) */
-const SOFT: ReadonlySet<Cell['deco']> = new Set<Cell['deco']>([
-  'puddle',
-  'vein',
-  'glowmoss',
-  'glowshroom',
-  'crystalfield',
-]);
+/** Flache Zierde, die einer Fackel weicht (begehbar, nichts hängt daran; Kristallfelder nicht: Sie brauchen ihre Größe) */
+const SOFT: ReadonlySet<Cell['deco']> = new Set<Cell['deco']>(['puddle', 'vein', 'glowmoss', 'glowshroom']);
 /**
- * Ausweichen, wenn es am Wunschplatz nicht passt: erst nach außen (weg vom Weg), dann ein Feld vor oder zurück; in
+ * Ausweichen, wenn es am Wunschplatz nicht passt: erst nach außen (weg vom Weg), dann ein, zwei Felder vor oder zurück; in
  * Schritten [nach außen, vom Tor weg]
  */
 const NUDGE: readonly (readonly [number, number])[] = [
@@ -52,6 +46,11 @@ const NUDGE: readonly (readonly [number, number])[] = [
   [1, 1],
   [1, -1],
   [2, 0],
+  [0, 2],
+  [0, -2],
+  [2, 1],
+  [2, -1],
+  [3, 0],
 ];
 
 /**
@@ -62,7 +61,7 @@ function fits(map: ReadonlyMap<string, Cell>, [x, y]: Point): boolean {
   const c = map.get(key(x, y));
   const plain = (n: Cell | undefined): n is Cell =>
     !!n && n.region === 'hoehle' && !n.solid && n.ground === 'grotto' && !n.lane && !n.stop && !n.garden && !n.portal;
-  if (!plain(c) || (c.deco && !SOFT.has(c.deco)) || (c.deco === 'crystalfield' && c.note === 1)) return false;
+  if (!plain(c) || (c.deco && !SOFT.has(c.deco))) return false;
   for (let dy = -2; dy <= 2; dy++)
     for (let dx = -2; dx <= 2; dx++) {
       const n = map.get(key(x + dx, y + dy));
