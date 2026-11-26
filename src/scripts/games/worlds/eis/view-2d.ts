@@ -17,6 +17,7 @@ import { trail } from './mitwachsen-prints';
 import { stageAt } from './mitwachsen-snowman';
 import { snowBoxes, snowScore, wobble } from './mitwachsen-snowman-look';
 import { chimeBoxes, chimeScore, ring, since, swing } from './mitwachsen-chime-look';
+import { DEEP_ICE, crestBoxes } from './mitwachsen-ice-rim';
 import { plateHint } from './mitwachsen-plate-hint';
 import { SLED_ID, rideFx, sledBodies, sledGoodNight, sledMarks } from './mitwachsen-sled-look';
 
@@ -69,9 +70,24 @@ const icicle: DrawDeco = (world, c, x, y, { now, reduced }) =>
   chimeBoxes(world, c, x, y, reduced ? 0 : swing(since(x, y, now)));
 
 export const view: View2D = {
-  decos: { igloo: look, icebowl: look, watertrough: look, fishcrate: crate, crystal, floe, snowheap: heap, icicle },
+  decos: {
+    igloo: look,
+    icebowl: look,
+    watertrough: look,
+    fishcrate: crate,
+    crystal,
+    floe,
+    snowheap: heap,
+    icicle,
+    rock: (_, c, x, y) => crestBoxes(c, x, y),
+  },
   // Rutschspur zum Schneebett: glänzt, sobald das Eistor offen ist
-  ground: (c, x, y, open) => (c.slide && open ? [x + 0.12, y, c.h, 0.76, 1, 0.02, ...ICE_COLORS.slide] : null),
+  ground: (c, x, y, open) =>
+    c.rim
+      ? [x, y, 0, 1, 1, c.h, DEEP_ICE.side, DEEP_ICE.top] // innerste Reihe der Klippen: Tiefeis (mitwachsen-ice-rim.ts)
+      : c.slide && open
+        ? [x + 0.12, y, c.h, 0.76, 1, 0.02, ...ICE_COLORS.slide]
+        : null,
   // Wetter und Bild der Weltgrenze der Eis-Welt in der Form, die der Kern kennt (`Sky` in mitwachsen-view.ts)
   sky: { weather: iceWeather, aurora, waitArrow, realmSign, turnAlbum, guestAt, gateScore },
   // Fußspuren im Schnee, die langsam verwehen (mitwachsen-prints.ts)

@@ -20,6 +20,7 @@ import { joined, marksLayer } from './view-3d-sled';
 import { stageAt } from './mitwachsen-snowman';
 import { snowBoxes } from './mitwachsen-snowman-look';
 import { chimeBoxes } from './mitwachsen-chime-look';
+import { DEEP_ICE, crestBoxes } from './mitwachsen-ice-rim';
 
 /** Im Gletscherkessel (Boden und Klippen): Schnee obenauf, darunter Eis */
 const KESSEL: Ground = { tiles: ['snowTop', 'ice', 'ice'] };
@@ -35,6 +36,8 @@ const fall = (color: string): Ground => ({
 });
 /** Die Rutschspur glänzt bei offenem Eistor aus Eis */
 const SLIDE: Ground = { tiles: ['ice', 'ice', 'ice'], top: ICE_COLORS.slide[1] };
+/** Innerste Reihe der Klippen: dunkles Tiefeis, kein Schnee obenauf */
+const DEEP: Ground = { tiles: ['ice', 'ice', 'ice'], top: DEEP_ICE.top, side: DEEP_ICE.side };
 /** Rahmen des Betts aus Schnee */
 const SNOW_FRAME: Frame = [...ICE_COLORS.snow, 'white'];
 
@@ -59,10 +62,21 @@ const floe: DrawDeco = (_world, _c, x, y) => floeBoxes(x, y);
 export const view3d: View3D = {
   gate: 'eis',
   look: gateLook,
-  decos: { igloo: look, icebowl: look, watertrough: look, fishcrate: crate, crystal, floe, snowheap: heap, icicle },
+  decos: {
+    igloo: look,
+    icebowl: look,
+    watertrough: look,
+    fishcrate: crate,
+    crystal,
+    floe,
+    snowheap: heap,
+    icicle,
+    rock: (_, c, x, y) => crestBoxes(c, x, y),
+  },
   ground(c, open) {
     if (c.biome !== 'eis' || c.region === 'wild') return null;
     if (c.slide && open.includes('eis')) return SLIDE;
+    if (c.rim) return DEEP; // innerste Reihe der Klippen: Tiefeis statt Schnee (mitwachsen-ice-rim.ts)
     if (c.color && (c.region === 'border' || c.ground === 'ice')) return fall(c.color); // Eisfall, Stufen des Eisbergs
     return c.region === 'border' || c.ground === 'snow' ? KESSEL : null;
   },

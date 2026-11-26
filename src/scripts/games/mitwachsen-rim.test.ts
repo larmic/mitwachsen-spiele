@@ -34,7 +34,7 @@ describe('Rand der Lichtung: Kante statt Treppe', () => {
         for (let x = -R; x <= R; x++) {
           const c = w.cell(x, y);
           if (!isRing(c)) {
-            if (c.rim) bad.push(`Hecke ohne Fels ${x},${y}`);
+            if (c.rim && !c.biome) bad.push(`Hecke ohne Fels ${x},${y}`); // `rim` mit Welt: Tiefeis der Eis-Welt (Issue 37)
             continue;
           }
           const beside = N8.map(([dx, dy]) => w.cell(x + dx, y + dy)).filter(open);
