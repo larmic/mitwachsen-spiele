@@ -56,6 +56,7 @@ export const SIGHT_OF: Record<PackEvent['type'], string | null> = {
   lantern: 'hoehle:laterne',
   chimegate: null, // Klingeltore liegen an der Strecke von Funkel: Dorthin führt sein Halt
   heave: null, // Hau-ruck am Höhlentor: Dorthin führt Tok
+  lapstone: 'grube:zahlensteine',
 };
 
 /** Womit ein Ding ruft: sein eigenes Ereignis (die Ansicht spielt dessen Klang leiser) oder die Melodie seines Steins */

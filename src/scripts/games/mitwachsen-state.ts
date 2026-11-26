@@ -93,6 +93,7 @@ export type State = Omit<Progress, 'position'> & {
   docked?: Partial<Record<RideId, 'home' | 'out'>>; // an welchem Halt ein Fahrzeug zuletzt ankam (beide Halte in einer Gegend; nicht gespeichert)
   dozing?: readonly RideId[]; // Fahrzeuge, denen ein Paket zum Fahren fehlt: Sie schlafen am Halt (`dozingOf`, je Befehl; nicht gespeichert)
   snored?: { id: RideId; at: number }; // zuletzt auf einen Druck schnarchendes Fahrzeug und wann (Drossel; nicht gespeichert)
+  laps?: Partial<Record<RideId, number>>; // gewählte Runden je Rundfahrt (Zahlensteine an Funkel; nicht gespeichert, ohne Wahl eine)
   alighted?: { id: RideId; at: number }; // Fahrzeug, aus dem die Figur zuletzt ausstieg, und wann (Bild: Tür kurz offen; nicht gespeichert)
   heraldDue: number; // Bote einer Welt (Tok): Takt, ab dem er auftaucht bzw. aufgetaucht ist (-1: nicht fällig; nicht gespeichert, mitwachsen-herald.ts)
   work?: Work; // Bote einer Welt baut (Tok: Bau 1), von Takt bis Takt; solange hüpft die Figur nur (nicht gespeichert, mitwachsen-herald.ts)

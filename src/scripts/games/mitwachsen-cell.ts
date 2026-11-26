@@ -59,6 +59,7 @@ export type Deco =
   | 'fishcrate' // Fischkiste im Gletscherkessel: Hineinlaufen fängt Fische ins Netz (fest wie ein Busch)
   | 'snowheap' // Schneehaufen im Gletscherkessel: Hineinlaufen lässt eine Kugel wachsen, bis ein Schneemann steht (fest)
   | 'icicle' // Eiszapfen des Glockenspiels am Klippenfuß im Gletschertal: Hinlaufen lässt ihn klingen (begehbar)
+  | 'lapstone' // Zahlenstein an einer Rundfahrt (fest; `note`: seine Zahl): Hineinlaufen wählt so viele Runden (zeichnet nur das Paket)
   // Fülle im Schnee des Gletschertals (flach, begehbar, nur Bild; zeichnet nur das Welt-Paket, solange es lädt: nichts)
   | 'snowdrift' // Schneewehe im Lee einer Tanne, mit bläulichem Schattenrand
   | 'iceflower' // Eisblumen: kleine Sterne in Hellblau oder Türkis (`note`: Farbe, ab 2 die Mitte eines Felds)

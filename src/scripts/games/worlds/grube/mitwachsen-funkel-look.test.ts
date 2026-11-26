@@ -2,21 +2,25 @@
 // der Tür bis zur ersten Fahrt, eigenes schmales Gleisbild, Töne in der Pentatonik
 import { describe, expect, it } from 'vitest';
 import type { Part } from '../../../../lib/games/front';
+import { DIGITS } from '../../../../data/games/mitwachsen-digits';
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
 import {
+  FENCE_CRYSTAL,
   FUNKEL_COLORS,
   GRUBE_RAIL,
   HALT_COLORS,
   HALT_SIGN,
   PLANK,
+  STONE_H,
   funkelParts,
+  lapStoneParts,
 } from '../../../../data/games/worlds/grube/mitwachsen-funkel-model';
 import type { RideEvent } from '../../mitwachsen-pack-types';
 import { withRidden } from '../../mitwachsen-ride-save';
 import type { RideAt } from '../../mitwachsen-ride-view';
 import { initialState, type State } from '../../mitwachsen-state';
 import { DUG, GRUBE_PACK, HOEHLE_PACK, worldOf } from '../../test-worlds';
-import { FUNKEL, funkelRoute } from './mitwachsen-funkel';
+import { FUNKEL, funkelRoute, lapStonesOf } from './mitwachsen-funkel';
 import { gangOf } from './mitwachsen-gang';
 import {
   BLINK_MS,
@@ -26,6 +30,7 @@ import {
   funkelScores,
   grubeRails,
   haltBodies,
+  lapScore,
   railShape,
 } from './mitwachsen-funkel-look';
 import { pack } from './index';
@@ -244,7 +249,8 @@ describe('Bahnsteig an Funkels Halt (Issue 39)', () => {
     expect(sign[0]).toMatchObject({ dir: 's', parts: HALT_SIGN });
     for (const b of bodies) {
       expect(b.id.startsWith('ride:')).toBe(false);
-      expect(gold(b.parts)).toBe(false);
+      // Gold tragen nur die Zahlensteine, die das Kind wählen kann (Issue 48)
+      if (!b.id.startsWith('grube:stein:')) expect(gold(b.parts)).toBe(false);
     }
     // flach: Die Planke ragt kaum über den Boden; das Schild ist höher als die Figur
     expect(Math.max(...PLANK.map((q) => q[2] + q[5]))).toBeLessThan(0.1);
@@ -254,5 +260,99 @@ describe('Bahnsteig an Funkels Halt (Issue 39)', () => {
     expect(haltBodies(inCave({}), world)).toEqual([]);
     expect(haltBodies(inCave(DUG, { player: { x: 0, y: 3, dir: 's' } }), world)).toEqual([]);
     expect(pack.view!.bodies!(inCave(), world, AT).some((b) => b.id === 'grube:schild')).toBe(true);
+  });
+});
+
+describe('Zahlensteine und Lichter auf dem Wagendach (Issue 48)', () => {
+  const stones = (state: State) => haltBodies(state, world).filter((b) => b.id.startsWith('grube:stein:'));
+
+  it('vier Steine auf ihren Feldern, zur Kamera, im Dunkel zu sehen; nur der gewählte ist Petrol, die anderen tragen Gold', () => {
+    const cells = lapStonesOf(world, { packs: DUG });
+    for (const chosen of [1, 2, 3, 4]) {
+      const bodies = stones(inCave(DUG, chosen === 1 ? {} : { laps: { grube: chosen } }));
+      expect(bodies.map((b) => [b.x, b.y])).toEqual(cells);
+      bodies.forEach((b, i) => {
+        const mine = i + 1 === chosen;
+        expect(b.dir).toBe('s');
+        expect(b.z).toBe(world.cell(b.x, b.y).h);
+        expect(b.glow, `Stein ${i + 1}, gewählt ${chosen}`).toBe(true); // im Dunkel der Grotte zu sehen
+        expect(gold(b.parts)).toBe(!mine); // Gold: Hier kann das Kind etwas tun
+        expect(colors(b.parts).has(FUNKEL_COLORS.petrol[0])).toBe(mine);
+        expect(b.parts).toEqual(lapStoneParts(i + 1, mine));
+      });
+    }
+    expect(stones(inCave({}))).toEqual([]); // vor dem Graben keine
+  });
+
+  it('jede Ziffer steht obenauf und vorn, mit so vielen Pixeln wie ihr Zeichen; der Stein bleibt in seinem Feld', () => {
+    const pixels = (n: number) => DIGITS[n]!.join('').split('#').length - 1;
+    for (const n of [1, 2, 3, 4] as const) {
+      const parts = lapStoneParts(n, false);
+      const ink = parts.filter((p) => p[6] === GOLD.top);
+      expect(ink.filter((p) => p[2] === STONE_H)).toHaveLength(pixels(n)); // obenauf
+      expect(ink.filter((p) => p[0] === 0.42)).toHaveLength(pixels(n)); // vorn
+      for (const [f, r, z, l, w, h] of parts) {
+        expect(Math.min(f, r)).toBeGreaterThanOrEqual(-0.5);
+        expect(l).toBeGreaterThan(0);
+        expect(Math.max(f + l, r + w)).toBeLessThanOrEqual(0.5);
+        expect(z).toBeGreaterThanOrEqual(0);
+        expect(z + h).toBeLessThanOrEqual(1);
+      }
+    }
+    expect(new Set([1, 2, 3, 4].map((n) => JSON.stringify(lapStoneParts(n, false)))).size).toBe(4);
+  });
+
+  it('Lichter auf dem Dach des zweiten Wagens: am Halt so viele wie gewählt, unterwegs so viele Runden wie noch kommen', () => {
+    const lit = (state: State) => {
+      const rear = funkelBodies(state, world, AT).find((b) => b.id === `${FUNKEL_ID}:rear`)!;
+      return rear.parts.filter((p) => p[2] === 0.76 && p[6] === FENCE_CRYSTAL).length;
+    };
+    const sockets = funkelParts({ kind: 'rear', lights: 2 }).filter((p) => p[2] === 0.76);
+    expect(sockets).toHaveLength(4); // immer vier Fassungen, die übrigen dunkel
+    expect(sockets.filter((p) => p[6] === FUNKEL_COLORS.window)).toHaveLength(2);
+    expect(lit(inCave())).toBe(1);
+    expect(lit(inCave(DUG, { laps: { grube: 3 } }))).toBe(3);
+    const ride = {
+      id: 'grube',
+      phase: 'go',
+      at: 0,
+      pos: 12,
+      speed: 0.5,
+      to: 'home',
+      feast: false,
+      jingleAt: 0,
+      greeted: [],
+    };
+    const riding = (laps?: number) =>
+      inCave(DUG, { laps: { grube: 4 }, ride: { ...ride, ...(laps && { laps }) } as State['ride'] });
+    expect([4, 3, 2].map((n) => lit(riding(n)))).toEqual([4, 3, 2]);
+    expect(lit(riding())).toBe(1); // die letzte Runde
+    // jedes Licht liegt mitten über einer Scheibe von Dach, Fensterband und Kasten: 2D reiht die Teile nach ihrer Mitte,
+    // sonst verschwände ein Licht vor der Mitte des Wagens unter ihm (so gesehen im Browser)
+    const rear = funkelParts({ kind: 'rear', lights: 4 });
+    const mid = (p: Part) => +(p[0] + p[3] / 2).toFixed(4);
+    for (const light of rear.filter((p) => p[6] === FENCE_CRYSTAL)) {
+      const under = rear.filter((p) => p !== light && mid(p) === mid(light) && p[2] < light[2]);
+      expect(under.map((p) => p[2]).sort()).toEqual([0.12, 0.18, 0.46, 0.7]); // Rahmen, Kasten, Fensterband, Dach
+      expect(rear.some((p) => p[3] > 0.5 && p[2] + p[5] > 0.2)).toBe(false); // kein langer Kasten über den Rädern
+    }
+    // der erste Wagen trägt keine Lichter: Dort schaut die Figur heraus und verdeckte sie
+    expect(funkelParts({ kind: 'seat', rider: true }).some((p) => p[6] === FENCE_CRYSTAL)).toBe(false);
+    const keys = new Set([1, 2, 3, 4].map((n) => funkelBodies(riding(n), world, AT)[2]!.key));
+    expect(keys.size).toBe(4); // je Zahl ein eigenes Bild
+  });
+
+  it('Töne: so viele wie die Zahl, aufwärts in der Pentatonik; nach jeder Runde ein heller Ton', () => {
+    for (const n of [1, 2, 3, 4]) {
+      const score = lapScore(n);
+      expect(score).toHaveLength(n);
+      expect(score.every(([hz]) => penta(hz))).toBe(true);
+      expect(score.every(([hz], i) => i === 0 || hz > score[i - 1]![0])).toBe(true);
+    }
+    const lap = funkelScores({ type: 'ride', what: 'lap', id: 'grube', x: 0, y: 0 });
+    expect(lap).toHaveLength(1);
+    expect(penta(lap[0]![0])).toBe(true);
+    expect(pack.view!.score!({ type: 'lapstone', x: 0, y: 0, n: 3 })).toHaveLength(3);
+    expect(pack.sights!.map((x) => x.id)).toContain('grube:zahlensteine');
   });
 });

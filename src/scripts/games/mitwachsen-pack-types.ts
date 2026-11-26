@@ -67,7 +67,8 @@ export type PackEvent =
   | { type: 'web'; x: number; y: number }
   | { type: 'chimegate'; x: number; y: number; answer: boolean }
   | { type: 'lantern'; x: number; y: number }
-  | { type: 'heave'; x: number; y: number; n: number; who?: string };
+  | { type: 'heave'; x: number; y: number; n: number; who?: string }
+  | { type: 'lapstone'; x: number; y: number; n: number }; // Zahlenstein an einer Rundfahrt gewählt: so viele Runden (Issue 48)
 
 /**
  * Was die Regeln einer Welt vom Zustand sehen und ändern dürfen: den gespeicherten Zustand der Welt-Pakete (`packs`, je
@@ -82,6 +83,7 @@ export type Ruled = {
   animals: { species: SpeciesId; x: number; y: number; dir: Dir; mode: string; rest: number }[];
   lamp?: RegionId; // die Figur trägt die Laterne dieser Gegend (Grotte: Kristall-Laterne; der Kern legt sie zurück)
   dozing?: readonly string[]; // Fahrzeuge, die am Halt schlafen (`State.dozing`, nur lesen)
+  laps?: Partial<Record<string, number>>; // gewählte Runden je Rundfahrt (`State.laps`, nicht gespeichert)
 };
 
 /**
@@ -108,6 +110,7 @@ export type Ride = {
   greeted: string[];
   stopover?: 'ahead' | 'done';
   from?: { end: 'home' | 'out'; pos: number };
+  laps?: number; // Rundfahrt: so viele Runden kommen noch, die laufende mitgezählt (fehlt: eine)
 };
 
 /**
@@ -140,7 +143,8 @@ export type RideEvent = {
     | 'farewell'
     | 'tunnel'
     | 'guest'
-    | 'snore';
+    | 'snore'
+    | 'lap'; // Rundfahrt: eine Runde ist um, es geht ohne Halt in die nächste
   id: RideId;
   x: number;
   y: number;

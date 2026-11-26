@@ -10,7 +10,8 @@
 // kündigt es ihn an. Am Ziel steigt die Figur nach 1 s aus (wohin, darf das Fahrzeug vorschlagen: `Vehicle.exit`).
 // Folgende Tiere fahren nie mit, sie warten am Halt. Fehlt ihm ein Paket (Ziel-Gegend, `Rider.dozing`), schläft es am
 // Halt: schnarcht, steigt niemanden ein, bis es da ist. Eine Schleife (`RideRoute.loop`, die Grubenbahn in der Grotte)
-// hat nur einen Halt: Sie fährt von ihm immer vorwärts einmal herum und kommt dort wieder an, ohne Fest.
+// hat nur einen Halt: Sie fährt von ihm immer vorwärts herum und kommt dort wieder an, ohne Fest; so viele Runden, wie
+// das Fahrzeug will (`Vehicle.laps`, höchstens `MAX_LAPS`; ohne: eine), immer zu Ende, zwischen den Runden ohne Halt.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Der Schlitten“ und „Tok und die Bahn“, Fahren)
 
 import { DIRS } from '../../../../lib/games/front';
@@ -36,15 +37,16 @@ import {
   type Parked,
 } from '../../mitwachsen-ride-kit';
 import { rank, stageOf, withRide } from '../../mitwachsen-ride-save';
-import type {
-  End,
-  MoveCmd,
-  RideEngine,
-  RideEvents,
-  RideRoute,
-  RideRules,
-  Rider,
-  Vehicle,
+import {
+  MAX_LAPS,
+  type End,
+  type MoveCmd,
+  type RideEngine,
+  type RideEvents,
+  type RideRoute,
+  type RideRules,
+  type Rider,
+  type Vehicle,
 } from '../../mitwachsen-rider';
 import { canStep, standHeight, type World } from '../../mitwachsen-world';
 
@@ -125,6 +127,29 @@ const speedOf = (spec: Vehicle['spec'], len: number, pos: number) => (len - pos)
 const firstHome = (c: Ctx, s: Rider) => stageOf(s.packs, c.id) === 'bereit' && c.v.spec.out === 'fest';
 
 /**
+ * So viele Runden fährt eine Rundfahrt jetzt (`Ride.laps`): wie das Fahrzeug will (Zahlensteine), 1 bis `MAX_LAPS`,
+ * immer zu Ende; leer bei einer Runde und bei Fahrzeugen ohne Schleife
+ */
+function lapsFor(c: Ctx, s: Rider, world: World): { laps?: number } {
+  const laps = c.r.loop ? Math.min(MAX_LAPS, Math.max(1, Math.floor(c.v.laps?.(s, world) ?? 1))) : 1;
+  return laps > 1 ? { laps } : {};
+}
+
+/** Kommen nach dieser Runde noch welche? */
+const moreLaps = (ride: Ride) => (ride.laps ?? 1) > 1;
+
+/**
+ * Rundfahrt: Ist die Runde um und kommen noch welche, geht es ohne Halt in die nächste (das letzte Feld der Strecke
+ * ist wieder das erste); Ereignis `lap`
+ */
+function nextLap(c: Ctx, s: Rider, ride: Ride, len: number, events: RideEvents) {
+  if (!moreLaps(ride) || ride.pos < len) return;
+  ride.laps!--;
+  ride.pos = 0;
+  events.push(ev(c, 'lap', [s.player.x, s.player.y]));
+}
+
+/**
  * Einsteigen: Die Figur setzt sich, folgende Tiere setzen sich auf die Warteplätze des Halts; dort warten sie, bis die
  * Figur wieder nah ist (`bench`) oder schläft. Gefahren wird zum Halt gegenüber, außer das Fahrzeug will von hier weiter
  * (`Vehicle.onward`, der Zug nach dem Hau-ruck aus der Bucht in die Höhle): dann ab dessen Fortschritt, mit echtem Start
@@ -151,6 +176,7 @@ function board(c: Ctx, s: Rider, world: World, at: Parked, events: RideEvents) {
     jingleAt: s.tick,
     greeted: [],
     ...(on && { from: { end: at.end, pos } }),
+    ...lapsFor(c, s, world),
   };
   const [ax, ay] = on ? at.pull : at.seat; // weiter: weg vom Nachbarfeld der Strecke, sonst darauf zu
   const [bx, by] = on ? at.seat : at.pull;
@@ -292,6 +318,7 @@ function tunnelAhead(c: Ctx, ride: Ride, from: number, to: number, here = from):
 function go(c: Ctx, s: Rider, world: World, events: RideEvents) {
   const ride = s.ride!;
   const len = c.r.path.length - 1;
+  nextLap(c, s, ride, len, events);
   const i = Math.floor(ride.pos + EPS);
   const [block] = ahead(c, s, ride, i + 1, reachOf(c, ride));
   if (block) {
@@ -316,7 +343,7 @@ function go(c: Ctx, s: Rider, world: World, events: RideEvents) {
   if (x !== p.x || y !== p.y) s.player = { x, y, dir: dirTo(x - p.x, y - p.y) };
   if (world.realm(x, y) !== realm) events.push({ type: 'realm', to: world.realm(x, y) });
   if (ride.feast) cheer(c, s, world, events, false);
-  if (ride.pos < len) return;
+  if (ride.pos < len || moreLaps(ride)) return; // es kommen noch Runden: im nächsten Takt weiter
   ride.phase = 'arrive';
   ride.at = s.tick;
   events.push(ev(c, 'arrive', [x, y]));

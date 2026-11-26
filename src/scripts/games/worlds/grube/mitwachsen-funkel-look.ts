@@ -17,6 +17,7 @@ import {
   HALT_SIGN,
   PLANK,
   funkelParts,
+  lapStoneParts,
   type FunkelLook,
 } from '../../../../data/games/worlds/grube/mitwachsen-funkel-model';
 import { dirTo } from '../../mitwachsen-free';
@@ -31,7 +32,7 @@ import type { World } from '../../mitwachsen-world';
 import type { Scored } from '../../sfx';
 import { DIG } from '../../../../data/games/worlds/grube/mitwachsen-dig-model';
 import { digAt } from './mitwachsen-dig';
-import { FUNKEL, funkelRoute, platformNear } from './mitwachsen-funkel';
+import { FUNKEL, funkelRoute, lapStonesOf, lapsOf, platformNear } from './mitwachsen-funkel';
 import { frameOf, gangOf } from './mitwachsen-gang';
 
 /** Kennung der Körper (`ride:` trifft das Antippen) */
@@ -103,6 +104,9 @@ function sideOf(world: World, spot: Spot): 1 | -1 {
   return world.cell(x + rx, y + ry).stop === FUNKEL.id ? 1 : -1;
 }
 
+/** Lichter auf dem Dach des zweiten Wagens: unterwegs so viele Runden, wie noch kommen, am Halt so viele, wie gewählt sind */
+const lightsOf = (state: State, riding: boolean) => (riding ? (state.ride?.laps ?? 1) : lapsOf(state));
+
 /**
  * Körper von Funkel je Bild: Lok, erster Wagen (mit der Figur während seiner Fahrt), zweiter Wagen; am Halt, solange die
  * Figur in der Grotte ist, oder unterwegs. Leer, solange der Gang nicht gegraben ist oder die Figur woanders ist. Nur
@@ -124,6 +128,7 @@ export function funkelBodies(state: State, world: World, at: RideAt, rang = -Inf
   const since = at.now - rang;
   const blink = !riding && since >= 0 && since < BLINK_MS && (at.reduced || Math.floor(since / BLINK_STEP) % 2 === 0);
   const lit = riding || at.lit || blink || rolling(state);
+  const lights = lightsOf(state, riding);
   const kinds = [
     ['loco', p + 1],
     ['seat', p],
@@ -137,8 +142,8 @@ export function funkelBodies(state: State, world: World, at: RideAt, rang = -Inf
         ? { kind, lit }
         : kind === 'seat'
           ? { kind, rider: riding, door: open ? side : 0, frame: gold ? side : 0 }
-          : { kind };
-    const k = `${FUNKEL_ID}:${kind}:${+!!look.lit}${+!!look.rider}${look.door ?? 0}${look.frame ?? 0}`;
+          : { kind, lights };
+    const k = `${FUNKEL_ID}:${kind}:${+!!look.lit}${+!!look.rider}${look.door ?? 0}${look.frame ?? 0}${look.lights ?? ''}`;
     const seat = kind === 'seat' && riding ? { seat: true as const } : {};
     // die Lampe leuchtet am Halt (am Abend): die Dunkelmaske öffnet dort ein kleines Loch (mitwachsen-mask.ts)
     const glow = kind === 'loco' && lit && !riding ? { glow: true as const } : {};
@@ -238,6 +243,8 @@ export function funkelScores(e: RideEvent): Scored[] {
         [A5, 0.12, 'triangle', 0.06, 1, 0],
         [1174.66, 0.24, 'triangle', 0.06, 1, 0.1],
       ];
+    case 'lap': // eine Runde ist um, weiter in die nächste: ein heller Ton, ein Licht auf dem Dach geht aus
+      return [[A5, 0.12, 'triangle', 0.04, 1, 0]];
     case 'snore': // es schläft, bis sein Paket da ist: ganz leise, gleitet hinab
       return [[D5, 0.5, 'sine', 0.02, 0.9, 0]];
     default: // ein Tier hüpft beiseite: das zeigt das Bild
@@ -269,7 +276,8 @@ export function funkelFx(e: RideEvent): RideFx | undefined {
 /**
  * Bahnsteig an Funkels Halt (Issue 39), sobald der Gang gegraben ist und die Figur in der Grotte ist: je Feld des
  * Bahnsteigs eine Planke flach auf dem Boden und ein Schild auf dem Feld, das am weitesten vom Sitz liegt (zur Kamera
- * gewandt). Nur Bild: Die Felder bleiben begehbar wie zuvor, die Warteplätze der Tiere bleiben
+ * gewandt). Nur Bild: Die Felder bleiben begehbar wie zuvor, die Warteplätze der Tiere bleiben. Dazu die vier
+ * Zahlensteine (Issue 48, feste Felder: `lapStones`), der gewählte in Petrol mit heller Ziffer, die anderen mit goldener
  */
 export function haltBodies(state: State, world: World): readonly RideBody[] {
   const r = funkelRoute(world, state);
@@ -281,5 +289,26 @@ export function haltBodies(state: State, world: World): readonly RideBody[] {
   return [
     ...cells.map((p, i): RideBody => ({ id: `grube:steg:${i}`, key: 'grube:steg', ...at(p), parts: PLANK })),
     ...(far ? [{ id: 'grube:schild', key: 'grube:schild', ...at(far), parts: HALT_SIGN }] : []),
+    ...lapStonesOf(world, state).map((p, i): RideBody => {
+      // Zahlensteine: Im Dunkel der Grotte hat jeder ein kleines Loch der Dunkelmaske (`glow`), der gewählte ist Petrol
+      const chosen = lapsOf(state) === i + 1;
+      const k = `grube:stein:${i + 1}:${+chosen}`;
+      return {
+        id: `grube:stein:${i + 1}`,
+        key: k,
+        ...at(p),
+        parts: stone(k, i + 1, chosen),
+        glow: true,
+      };
+    }),
   ];
 }
+
+const stoneMemo = new Map<string, ReturnType<typeof lapStoneParts>>();
+/** Teile eines Zahlensteins, je Schlüssel einmal */
+const stone = (k: string, n: number, chosen: boolean) =>
+  stoneMemo.get(k) ?? (stoneMemo.set(k, lapStoneParts(n, chosen)), stoneMemo.get(k)!);
+
+/** Töne eines Zahlensteins: so viele wie seine Zahl, aufwärts in der Pentatonik (D5, E5, G5, A5) */
+export const lapScore = (n: number): Scored[] =>
+  [D5, 659.25, 783.99, A5].slice(0, n).map((f, i): Scored => [f, 0.16, 'triangle', 0.05, 1, i * 0.17]);

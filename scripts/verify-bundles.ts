@@ -117,7 +117,7 @@ export const RULES: Rule[] = [
     // geben kann (Eistor offen); dazu das Schlafen am Halt, solange ein Paket fehlt (Vorladen), das Fest je Fahrzeug
     // (`Vehicle.feast`), das Aufwachen am neuen Spieltag (`schlaeft`) und die Schleife (`RideRoute.loop`, Grubenbahn)
     chunks: /\/welt-fahrt\.[\w-]+\.js$/,
-    // Gemessen 10,0 KB (mit der Schleife und ihrer Formprüfung `loopOk`)
+    // Gemessen 10,6 KB (mit der Schleife, ihrer Formprüfung `loopOk` und ihren Runden, Issue 48)
     budget: 11.0 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
@@ -128,11 +128,12 @@ export const RULES: Rule[] = [
     // darum kein eigener 3D-Teil), seine Strecke als Schleife, Modell, Körper und Töne; samt dem, was es mit den anderen
     // Fahrzeugen teilt (Spielstand packs.fahrt); dazu der Glitzergang mit den zwei Klingeltoren (Tore, Scheibe,
     // Wandkristalle, Wasserfall, Töne beim Durchfahren und zu Fuß, Licht im Gang) und der Maulwurf, der den Gang gräbt
-    // (Regel, Erdwelle, Töne, Klangstein am Halt), samt seinen zwei Sehenswürdigkeiten (Grubenhalt vor dem Graben, Funkels
-    // Halt). Kommt mit der Grotte
+    // (Regel, Erdwelle, Töne, Klangstein am Halt), samt seinen Sehenswürdigkeiten (Grubenhalt vor dem Graben, Funkels
+    // Halt, Zahlensteine), dazu die vier Zahlensteine am Halt und die Lichter auf dem Dach des zweiten Wagens (Issue 48).
+    // Kommt mit der Grotte
     chunks: /\/welt-grube\.[\w-]+\.js$/,
-    // Gemessen 19,1 KB
-    budget: 21.0 * 1024,
+    // Gemessen 23,0 KB (vorher 20,6): Grenze nach gemessen + 10 %
+    budget: 25.3 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {
