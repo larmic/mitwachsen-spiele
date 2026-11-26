@@ -117,4 +117,6 @@
   - [ ] Schritt 4: Stellplatz des Schlittens in die Linie von Stein und Pfad
   - [ ] Schritt 5: Bahnhof Bär an den Höhlen-Portalstein
   - [ ] Am Gerät ansehen: Folgt er einem Pfad, erkennt er die Materialien?
+- [x] Weltrand: eigene Antwort beim Dagegenlaufen (Issue 41, 26.11.2026): Ereignis `edge` statt `bump` an Hecke, Eisklippe und Grottenwand (`mitwachsen-edge.ts`), weicher tiefer Ton, Vogel in der Hecke, Glitzer am Eis, Echo in der Grotte, höchstens alle 1,5 s
+  - [ ] Am Gerät ansehen: Versteht er den Rand jetzt, stört der Ton?
 - [ ] Als Nächstes: Wasserwelt mit dem Boot (plant ihre Rundfahrt von Anfang an mit) (Konzept „Reisewege“ und „Gleisbauer und Höhlen-Welt“, Folgen für wasserwelt.html): Das Boot ruht, bis die Höhlen-Leiste voll ist und der Zug das Kind danach einmal heimgebracht hat; dann kommt der Otter als Bote ans Lichtungsbett; Hafenbecken und Kanal, dieselben Fahrregeln (Fahr-Engine `worlds/fahrt/`)
