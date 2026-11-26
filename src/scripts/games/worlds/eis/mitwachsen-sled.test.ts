@@ -274,8 +274,9 @@ describe('Fahrregeln des Schlittens (Eis-Welt)', () => {
     expect(waves.s.sleeping).toBe(false);
   });
 
-  // Tief die Seeds 1 bis 20 (eine ganze Welt je Seed, siehe mitwachsen-sled-route.test.ts)
-  it.each(seedChunks(seedsFor(seedRange(1, 20)), 10))(
+  // Tief die Seeds 1 bis 12 (eine ganze Welt je Seed, siehe mitwachsen-sled-route.test.ts; bis 20 waren es, bis der
+  // Bau des Tals mit Rodelberg und Runde länger wurde und test:deep in gates:ci bei 146 von 150 s lag)
+  it.each(seedChunks(seedsFor(seedRange(1, 12)), 6))(
     'die Fahrt dauert 150 bis 200 Takte, kommt immer an, die Glocke einmal je Gegendwechsel (Seeds $label)',
     ({ seeds }) => {
       const wrong: string[] = [];
@@ -417,8 +418,9 @@ describe('Fahrregeln des Schlittens (Eis-Welt)', () => {
     expect(stageOf(again.s.packs, 'schlitten')).toBe('fest');
   });
 
-  // Tief die Seeds 1 bis 20 (eine ganze Welt je Seed, siehe mitwachsen-sled-route.test.ts)
-  it.each(seedChunks(seedsFor(seedRange(1, 20)), 10))(
+  // Tief die Seeds 1 bis 12 (eine ganze Welt je Seed, siehe mitwachsen-sled-route.test.ts; bis 20 waren es, bis der
+  // Bau des Tals mit Rodelberg und Runde länger wurde und test:deep in gates:ci bei 146 von 150 s lag)
+  it.each(seedChunks(seedsFor(seedRange(1, 12)), 6))(
     'auf der Festfahrt winken die Eis-Tiere der Schneewiese beim Losfahren, jedes einmal (Seeds $label)',
     ({ seeds }) => {
       const wrong: string[] = [];

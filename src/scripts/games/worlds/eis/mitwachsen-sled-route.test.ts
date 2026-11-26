@@ -206,8 +206,9 @@ describe('Strecke des Schlittens (Eis-Welt)', () => {
   // Tief (MITWACHSEN_DEEP) Seeds 1 bis 20 in zwei Abschnitten, sonst die Stichprobe. Eine ganze Welt zu bauen kostet
   // gut 0,2 s, 500 Seeds sprengten die Frist des Jobs `static` (gemessen: über 1 bis 500 lief alles grün); erst 100, dann
   // 50, dann 25 Seeds brachten test:deep in gates:ci über 150 s, darum 20 wie die anderen Welt-Tests. Die Welten werden
-  // hier frisch gebaut (nicht `worldOf`), sonst blieben sie alle im Speicher
-  it.each(seedChunks(seedsFor(seedRange(1, 20)), 10))(
+  // hier frisch gebaut (nicht `worldOf`), sonst blieben sie alle im Speicher. Seit dem 26.11.2026 sind es 12: Mit
+  // Rodelberg und Runde der Schneeraupe baut ein Tal länger, test:deep lag in gates:ci bei 146 von 150 s
+  it.each(seedChunks(seedsFor(seedRange(1, 12)), 6))(
     'Strecke, Laternenpfahl und Halte: zusammenhängend und begehbar, neben der Rutschspur, fern von Platte, Warteplätzen und Plattformen, Halt im Bereich, Fußweg frei (Seeds $label)',
     ({ seeds }) => {
       const wrong: string[] = [];
