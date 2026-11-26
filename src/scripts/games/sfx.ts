@@ -77,6 +77,22 @@ export class Sfx {
   bump() {
     this.note(300, 0.22, 'sine', 0.1, 0.5);
   }
+  /**
+   * Der Rand einer Welt antwortet (Issue 41): weich und tief (G3, D3), nie ein Fehlerton; in der Grotte (`echo`) kommt
+   * er zweimal leiser zurück
+   */
+  edge(echo: boolean) {
+    for (const [at, gain] of echo
+      ? [
+          [0, 1],
+          [0.38, 0.45],
+          [0.76, 0.2],
+        ]
+      : [[0, 1]]) {
+      this.note(196, 0.3, 'sine', 0.07 * gain!, 0.92, at);
+      this.note(146.83, 0.36, 'sine', 0.05 * gain!, 1, at! + 0.08);
+    }
+  }
   call() {
     this.note(659.25, 0.14, 'sine', 0.12, 1.06);
     this.note(783.99, 0.2, 'sine', 0.12, 1.06, 0.16);

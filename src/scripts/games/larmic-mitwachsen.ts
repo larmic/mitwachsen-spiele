@@ -4,6 +4,7 @@
 // Spiel nach einem Seitenwechsel (View Transitions) niemanden.
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md
 
+import type { EdgeEvent } from './mitwachsen-edge';
 import { later } from '../../lib/games/later';
 import { chunkOf } from '../../lib/games/chunks';
 import { projection } from '../../lib/games/front';
@@ -11,7 +12,7 @@ import type { World3D as World3DType } from './mitwachsen-3d';
 import { GAME_COLORS, LOOK, SPECIES, TIRED_TALK, realmOfAnimal, type GateId } from '../../data/games/mitwachsen';
 import { LANTERN_SPARKS } from '../../data/games/mitwachsen-hoehle';
 import { Renderer, type Body, type Float, type Particle, type Scene } from './mitwachsen-render';
-import { SPARKS, fly, glints, sparks } from './mitwachsen-glyphs';
+import { SPARKS, fly, glints, sparks, BIRD_COLOR } from './mitwachsen-glyphs';
 import { Sfx } from './sfx';
 import { nightIn, tunnelNight } from './mitwachsen-dusk';
 import { plateToy } from './mitwachsen-plate-toy';
@@ -779,6 +780,16 @@ class LarmicMitwachsen extends HTMLElement {
     this.dispatchEvent(new CustomEvent(SLEEP_EVENT, { bubbles: true }));
   }
 
+  /** Der Rand einer Welt antwortet: weicher Ton; aus der Hecke schaut ein Vogel, vom Eis rieselt Glitzer, die Grotte hallt */
+  private edge(e: EdgeEvent, now: number) {
+    this.sfx.edge(e.kind === 'cave');
+    const at = { x: e.x, y: e.y, z: this.world.cell(e.x, e.y).h };
+    if (e.kind === 'ice') this.burst('', SPARKS.eis, 6, at, true);
+    // der Vogel sitzt vorn auf der Hecke (ein Zeichen schwebt 0,9 über seinem Ort), nicht oben auf dem Fels dahinter
+    if (e.kind === 'hedge')
+      this.floats.push({ kind: 'bird', who: 'spot', color: BIRD_COLOR, born: now, ...at, z: at.z - 1.1, age: 0 });
+  }
+
   private float(kind: Float['kind'], who: string, color: string, born: number) {
     if (this.reduced.matches && kind !== 'heart') return;
     this.floats.push({ kind, who, color, born, x: 0, y: 0, z: 0, age: 0 });
@@ -879,8 +890,9 @@ class LarmicMitwachsen extends HTMLElement {
    * spielt drei Töne (aus dem Paket der Grubenbahn); die Figur nimmt die
    * Kristall-Laterne (Ton aus dem Paket, sie hüpft, es glitzert)
    */
-  private chore(e: ChoreEvent | Extract<GameEvent, { type: PackEvent['type'] | 'bob' }>, now: number) {
+  private chore(e: ChoreEvent | Extract<GameEvent, { type: PackEvent['type'] | 'bob' | 'edge' }>, now: number) {
     if (e.type === 'bob') return void this.hops.set(e.id, now); // der Pinguin hüpft still neben der Torplatte
+    if (e.type === 'edge') return this.edge(e, now); // der Rand einer Welt antwortet (mitwachsen-edge.ts)
     if (reshapes(e)) this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]); // leer, wieder voll, gewachsen
     if (packed(e)) this.sfx.score(packScore(this.renderer.views.values(), e)); // Töne aus dem Paket der Welt des Ereignisses
     if (packOnly(e)) return; // Säule, Grottenolm, Netz, Klingeltor: Bild und Ton aus dem Paket

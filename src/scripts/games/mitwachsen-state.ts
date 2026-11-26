@@ -3,6 +3,7 @@
 // Ereignisse, die zurückkommen (Töne, Herzen, Speichern). Zufall kommt aus einer Folge im Zustand.
 // Spezifikation: docs/specs/mitwachsen.md
 
+import { bumpEdge, type EdgeEvent } from './mitwachsen-edge';
 import { chunkOf } from '../../lib/games/chunks';
 import { DIRS, type Dir } from '../../lib/games/front';
 import { cycle, nextRandom, pick } from '../../lib/games/rng';
@@ -93,6 +94,7 @@ export type State = Omit<Progress, 'position'> & {
   docked?: Partial<Record<RideId, 'home' | 'out'>>; // an welchem Halt ein Fahrzeug zuletzt ankam (beide Halte in einer Gegend; nicht gespeichert)
   dozing?: readonly RideId[]; // Fahrzeuge, denen ein Paket zum Fahren fehlt: Sie schlafen am Halt (`dozingOf`, je Befehl; nicht gespeichert)
   snored?: { id: RideId; at: number }; // zuletzt auf einen Druck schnarchendes Fahrzeug und wann (Drossel; nicht gespeichert)
+  edgeAt?: number; // Takt der letzten Antwort eines Weltrands (Drossel, mitwachsen-edge.ts; nicht gespeichert)
   laps?: Partial<Record<RideId, number>>; // gewählte Runden je Rundfahrt (Zahlensteine an Funkel; nicht gespeichert, ohne Wahl eine)
   alighted?: { id: RideId; at: number }; // Fahrzeug, aus dem die Figur zuletzt ausstieg, und wann (Bild: Tür kurz offen; nicht gespeichert)
   heraldDue: number; // Bote einer Welt (Tok): Takt, ab dem er auftaucht bzw. aufgetaucht ist (-1: nicht fällig; nicht gespeichert, mitwachsen-herald.ts)
@@ -125,6 +127,7 @@ export type Cmd = MoveCmd | { type: 'action' } | { type: 'tick'; held?: boolean 
 export type GameEvent =
   | { type: 'step'; climb: number }
   | { type: 'bump' }
+  | EdgeEvent // die Figur läuft gegen den Rand einer Welt (mitwachsen-edge.ts)
   | { type: 'sing'; id: string; species: SpeciesId; first: boolean }
   | { type: 'follow'; id: string }
   | { type: 'swap'; id: string }
@@ -512,7 +515,8 @@ function move(
   // Ins Bett laufen: Die Figur legt sich schlafen (nicht gleich nach dem Aufwachen, sonst schläft sie aus Versehen ein)
   if (world.cell(tx, ty).deco === 'bed' && s.tick - s.wokeAt >= WAKE_GRACE) return sleep(s, world, events);
   if (!move.walks) {
-    events.push({ type: 'bump' });
+    // der Rand einer Welt antwortet auf seine Art (mitwachsen-edge.ts), alles andere stößt sanft an
+    if (!bumpEdge(s, world.cell(tx, ty), tx, ty, events)) events.push({ type: 'bump' });
     return;
   }
   const climb = standHeight(world, s.openGates, tx, ty)! - standHeight(world, s.openGates, p.x, p.y)!;
