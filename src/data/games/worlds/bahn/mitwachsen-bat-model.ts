@@ -6,6 +6,7 @@
 // Spec: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 2)
 
 import type { Part } from '../../../../lib/games/front';
+import { HALT_NUMBER, numberBadge } from '../../mitwachsen-digits';
 import { BAT, ROOF_TOP, pixels, roofPlate, roofPosts } from './mitwachsen-train-model';
 
 /** Farben von Bahnhof Fledermaus und Lokschuppen: Schichten wie am Höhlentor, Kante und Schild lila, Kristalle */
@@ -56,4 +57,5 @@ export const BAT_POSTS: readonly Part[] = roofPosts(B.bands[0]);
 export const BAT_SIGN: readonly Part[] = [
   [-0.03, -0.44, 0.16, 0.06, 0.88, 0.88, B.sign, B.sign],
   ...pixels(BAT, B.bat, 0.03, 0, 0.94, 0.09),
+  ...numberBadge(HALT_NUMBER.fledermaus, 0.045, -0.31, 1.03), // oben rechts im Bild: Bahnhof 2 (Issue 40)
 ];

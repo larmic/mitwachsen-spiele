@@ -8,6 +8,7 @@
 // Spec: docs/specs/mitwachsen.md („Die Grubenbahn Funkel“)
 
 import type { Part } from '../../../../lib/games/front';
+import { HALT_NUMBER, numberBadge } from '../../mitwachsen-digits';
 import { LOOK, figureParts } from '../../mitwachsen';
 import { GOLD } from '../../mitwachsen-portals';
 
@@ -57,6 +58,7 @@ export const HALT_SIGN: readonly Part[] = [
   [SIGN_FACE.f, -0.2, SIGN_FACE.z + 0.2, 0.015, 0.2, 0.1, FENCE_CRYSTAL, FENCE_CRYSTAL], // Kristall: Raute aus drei Lagen
   [SIGN_FACE.f, -0.16, SIGN_FACE.z + 0.1, 0.015, 0.12, 0.1, FENCE_CRYSTAL, FENCE_CRYSTAL],
   [SIGN_FACE.f, -0.16, SIGN_FACE.z + 0.3, 0.015, 0.12, 0.1, FENCE_CRYSTAL, FENCE_CRYSTAL],
+  ...numberBadge(HALT_NUMBER.funkel, SIGN_FACE.f, 0.17, SIGN_FACE.z + SIGN_FACE.high - 0.03, 0.045), // Halt 3 (Issue 40)
 ];
 
 /** Länge eines Wagens (die Lok gleich lang): je Wagen ein Feld, mit Lücke */
