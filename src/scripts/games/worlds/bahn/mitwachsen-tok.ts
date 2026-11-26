@@ -24,7 +24,7 @@ import type { HeraldEvents as Events, HeraldRules, Heralded } from '../../mitwac
 import { dirTo, freeNear, occupied } from '../../mitwachsen-free';
 import { canStep, standHeight, type World } from '../../mitwachsen-world';
 import { BESIDE, plateRow } from '../../mitwachsen-bay';
-import { bayAt, bearSpots, centreOf, hutOf, rowsOf, type Station } from './mitwachsen-bear';
+import { bayAt, bearSpots, centreOf, rowsOf, type Station } from './mitwachsen-bear';
 import { builtOf } from './mitwachsen-built';
 import { beatTick, buildStep, building, canBuild, startBuild } from './mitwachsen-build';
 import { futureBear } from './mitwachsen-line';
@@ -84,9 +84,7 @@ export function postOf(world: World): Post | null {
     const far = (p: Point) => Math.hypot(p[0] - bed[0], p[1] - bed[1]);
     const stands = (p: Point) => standHeight(world, [], ...p) !== null && world.cell(...p).region === 'lichtung';
     const station = futureBear(world.seed) ?? null;
-    const hut = station && hutOf(station, bed)?.at;
-    const off = (p: Point) => !hut || p[0] !== hut[0] || p[1] !== hut[1]; // nicht auf dem Platz von Toks Häuschen
-    const platform = station?.platform.filter((p) => stands(p) && off(p)).sort((a, b) => far(a) - far(b))[0];
+    const platform = station?.platform.filter((p) => stands(p)).sort((a, b) => far(a) - far(b))[0];
     const ideal = bearSpots(g, bed)[0];
     const guess = ideal ? centreOf(ideal) : bayAt(g)(0, -6);
     const post =

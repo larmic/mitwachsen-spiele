@@ -8,7 +8,7 @@
 import type { Point, RegionId } from '../../../../data/games/mitwachsen';
 import { LINE } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import type { World } from '../../mitwachsen-world';
-import { hutOf, rowsOf } from './mitwachsen-bear';
+import { rowsOf } from './mitwachsen-bear';
 import { key } from './mitwachsen-ground';
 import { STEPS } from './mitwachsen-trace';
 import { lineOf } from './mitwachsen-train-line';
@@ -18,14 +18,13 @@ export type Row = { edge: Point; back: Point };
 
 /**
  * Ein Bahnsteig: das Gleis daneben (`lane`, von Bahnhof Bär aus in Reihe), seine Reihen (je Feld von `lane` eine), die
- * Richtung vom Gleis zum Bahnsteig (`side`), die beiden Reihen unter dem Dach (`roof`) und, an Bahnhof Bär, Toks Häuschen
+ * Richtung vom Gleis zum Bahnsteig (`side`) und die beiden Reihen unter dem Dach (`roof`)
  */
 export type Platform = {
   lane: Point[];
   rows: Row[];
   side: Point;
   roof: readonly [number, number];
-  hut?: { at: Point; row: number };
 };
 
 /**
@@ -64,12 +63,8 @@ export const underRoof = (st: Pick<Platform, 'rows' | 'roof'>, s: Standing): boo
     return !!back && back[0] === s.player.x && (back[1] === s.player.y || back[1] - 1 === s.player.y);
   });
 
-/**
- * Dach von Bahnhof Bär: über den Reihen 1 und 2, neben der Sitzreihe (`SEAT` = 3); steht Toks Häuschen in der letzten
- * Reihe, über den beiden davor
- */
-export const bearRoof = (n: number, hut?: number): readonly [number, number] =>
-  hut === n - 1 ? [n - 3, n - 2] : [1, 2];
+/** Dach von Bahnhof Bär: über den Reihen 1 und 2, neben der Sitzreihe (`SEAT` = 3) */
+export const BEAR_ROOF: readonly [number, number] = [1, 2];
 
 /**
  * Dach von Bahnhof Fledermaus: über den letzten beiden Reihen (5 und 6 der 7), am fernen Ende, weg von der Sitzreihe 3
@@ -85,7 +80,7 @@ const side = (rows: readonly Row[], lane: readonly Point[]): Point | undefined =
 const bears = new WeakMap<World, Platform | null>();
 /**
  * Bahnsteig von Bahnhof Bär aus den Feldern der Welt (je Welt einmal): die ersten `LINE.bear.long` Felder des Gleises
- * vom Prellbock an, die Felder des Bahnsteigs daneben, Toks Häuschen; null ohne Gleis oder Bahnsteig
+ * vom Prellbock an, die Felder des Bahnsteigs daneben; null ohne Gleis oder Bahnsteig
  */
 export function bearPlatform(world: World): Platform | null {
   if (bears.has(world)) return bears.get(world)!;
@@ -93,8 +88,7 @@ export function bearPlatform(world: World): Platform | null {
   const platform = stopsBy(world, lane);
   const rows = rowsOf({ lane, platform });
   const s = side(rows, lane);
-  const hut = s && hutOf({ lane, platform }, world.homes.lichtung.bed);
-  const found = s ? { lane, rows, side: s, roof: bearRoof(rows.length, hut?.row), ...(hut ? { hut } : {}) } : null;
+  const found = s ? { lane, rows, side: s, roof: BEAR_ROOF } : null;
   bears.set(world, found);
   return found;
 }
@@ -119,7 +113,7 @@ export function batPlatform(world: World): Platform | null {
 
 /**
  * Wohin die Figur am liebsten aussteigt, wenn der Sitz auf `seat` steht (Haken `Vehicle.exit`), die besten zuerst: die
- * Felder des Bahnsteigs außer den beiden Reihen unter dem Dach und Toks Häuschen, zuerst das Feld an der Kante neben dem
+ * Felder des Bahnsteigs außer den beiden Reihen unter dem Dach, zuerst das Feld an der Kante neben dem
  * Sitz (die Tür des mittleren Wagens), dann die nächsten, an der Kante vor dem hinteren bei gleichem Abstand. Leer, wenn
  * der Sitz nicht neben diesem Bahnsteig steht. Ob ein Feld frei ist, prüft die Fahr-Engine
  */
@@ -127,14 +121,13 @@ export function exitsOf(p: Platform, seat: Point): Point[] {
   const k = p.lane.findIndex(([x, y]) => x === seat[0] && y === seat[1]);
   const door = p.rows[k]?.edge;
   if (!door) return [];
-  const hut = p.hut && key(...p.hut.at);
   const spots = p.rows.flatMap((r, i) =>
     p.roof.includes(i)
       ? []
       : [
           { p: r.edge, back: 0 },
           { p: r.back, back: 1 },
-        ].filter((o) => key(...o.p) !== hut),
+        ],
   );
   const d = (o: { p: Point; back: number }) => Math.hypot(o.p[0] - door[0], o.p[1] - door[1]) + o.back * 1e-3;
   return spots.sort((a, b) => d(a) - d(b)).map((o) => o.p);

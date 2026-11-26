@@ -431,7 +431,7 @@ describe('Fahren mit der Höhlenbahn: Regeln (Fahr-Engine mit dem Zug)', () => {
     expect(pos(run.s)).toEqual(bat.rows[bat.lane.findIndex((q) => keyOf(q) === keyOf(r2.stops.home))]!.edge);
   });
 
-  it('Aussteigen sichtbar (Haken `exit`): auf den eigenen Bahnsteig, zuerst an der Tür, nie unter das Dach oder ins Häuschen; in der Bucht wie bei jedem Fahrzeug', () => {
+  it('Aussteigen sichtbar (Haken `exit`): auf den eigenen Bahnsteig, zuerst an der Tür, nie unter das Dach; in der Bucht wie bei jedem Fahrzeug', () => {
     const open = { openGates: ['hoehle' as const] };
     const r2 = trainRoute(W2, { packs: FAR, ...open })!;
     for (const [end, st] of [
@@ -448,8 +448,7 @@ describe('Fahren mit der Höhlenbahn: Regeln (Fahr-Engine mit dem Zug)', () => {
         exits.filter((q) => under.has(keyOf(q)) || W2.cell(...q).stop !== 'hoehle'),
         end,
       ).toEqual([]);
-      if (st.hut) expect(exits.map(keyOf), end).not.toContain(keyOf(st.hut.at));
-      expect(exits, end).toHaveLength(2 * (st.rows.length - 2) - (st.hut ? 1 : 0));
+      expect(exits, end).toHaveLength(2 * (st.rows.length - 2));
       expect(st.roof.includes(SEAT), end).toBe(false); // das Dach steht neben der Sitzreihe
     }
     expect(batPlatform(W2)!.roof).toEqual([5, 6]); // Bahnhof Fledermaus: über den letzten beiden der 7 Reihen

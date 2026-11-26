@@ -25,7 +25,7 @@ import { LINE } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import type { RideId } from '../../../../data/games/mitwachsen-rides';
 import type { Cell, Rail } from '../../mitwachsen-cell';
 import type { Door, Laid } from '../../mitwachsen-pack-types';
-import { aroundOf, bayAt, bearFits, bearSpots, hutOf, level, snapshot, wallOf, type Station } from './mitwachsen-bear';
+import { aroundOf, bayAt, bearFits, bearSpots, level, snapshot, wallOf, type Station } from './mitwachsen-bear';
 import { builtOf } from './mitwachsen-built';
 import { clearWay, footpath, kept, key, near, settle, standable, stepsTo, walk } from './mitwachsen-ground';
 import { LETTERS, STEPS, dirOf, gridOf, trace, type Grid, type Leg } from './mitwachsen-trace';
@@ -69,17 +69,11 @@ function gridAround(
 /**
  * Das Gleis als Felder schreiben: Richtungen in Reihe der Linie (zurück, vor), Ausbau, wie weit das Stück in seinem
  * Ausbau liegt (`along`, für die Gleiswelle beim Bau), was dort steht. Der Bahnsteig von Bahnhof Bär liegt eine Stufe
- * über dem Gleis (Holzplanken auf festgetretenem Boden, `path`), Toks Häuschen an seinem Kopf ist fest (`hutOf`); den
+ * über dem Gleis (Holzplanken auf festgetretenem Boden, `path`); den
  * Platz von Bahnhof Fledermaus markiert vor Bau 2 nur `Cell.stop`, ab Ausbau 2 liegt sein Bahnsteig wie der von Bahnhof
  * Bär eine Stufe über dem Gleis (Stein), und die Rückwand des Lokschuppens daneben ist fest (`shedOf`)
  */
-function write(
-  map: Map<string, Cell>,
-  line: Line,
-  parts: ReadonlyMap<number, Rail['part']>,
-  bed: Point,
-  built: number,
-) {
+function write(map: Map<string, Cell>, line: Line, parts: ReadonlyMap<number, Rail['part']>, built: number) {
   const { cells, buffer } = line;
   const rest = Math.max(1, cells.length - 1 - buffer);
   cells.forEach((p, i) => {
@@ -91,12 +85,19 @@ function write(
     const c = map.get(key(...p))!;
     map.set(key(...p), { ...c, ride: RIDE, rail });
   });
-  const hut = hutOf(line.bear, bed)?.at;
   for (const p of line.bear.platform) {
     const c = map.get(key(...p));
     const lane = map.get(key(...line.bear.lane[0]!))!;
-    const solid = !!hut && key(...p) === key(...hut);
-    if (c) map.set(key(...p), { ...c, h: lane.h + 1, ground: 'path', deco: null, tufts: undefined, solid, stop: RIDE });
+    if (c)
+      map.set(key(...p), {
+        ...c,
+        h: lane.h + 1,
+        ground: 'path',
+        deco: null,
+        tufts: undefined,
+        solid: false,
+        stop: RIDE,
+      });
   }
   const bat = line.bat;
   const laneH = bat && map.get(key(...bat.lane[0]!))?.h;
@@ -313,7 +314,7 @@ export function layLine({ seed, map, gates, beds, packs }: Laid): Line | null {
     [line.buffer, line.bat ? 'buffer' : 'end'],
   ]);
   if (line.bat) parts.set(line.cells.length - 1, 'end');
-  write(map, line, parts, home.bed, builtOf(packs));
+  write(map, line, parts, builtOf(packs));
   return line;
 }
 

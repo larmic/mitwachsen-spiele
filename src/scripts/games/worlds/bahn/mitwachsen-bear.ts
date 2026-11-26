@@ -230,13 +230,13 @@ export function rowsOf(s: Pick<Station, 'lane' | 'platform'>): { edge: Point; ba
 }
 
 /**
- * Toks Häuschen am Kopf des Bahnhofs Bär: auf dem Feld hinten (fern vom Gleis) in der ersten oder letzten Reihe, auf der,
- * die weiter vom Bett liegt, damit das Feld des Bahnsteigs nächst dem Bett frei bleibt (dort wartet Tok, und dorthin
- * zählen die Schritte vom Bett). Das Feld ist fest; undefined ohne Reihen
+ * Kopf des Bahnhofs Bär: das Feld hinten (fern vom Gleis) in der ersten oder letzten Reihe, in der, die weiter vom Bett
+ * liegt. In seiner Nähe steht der Klangstein des Bahnhofs (bis Issue 25 stand hier Toks Häuschen; das Feld ist seither
+ * ein Feld des Bahnsteigs wie jedes andere); undefined ohne Reihen
  */
-export function hutOf(s: Pick<Station, 'lane' | 'platform'>, bed: Point): { at: Point; row: number } | undefined {
+export function headOf(s: Pick<Station, 'lane' | 'platform'>, bed: Point): Point | undefined {
   const rows = rowsOf(s);
-  const ends = [0, rows.length - 1].flatMap((row) => (rows[row] ? [{ at: rows[row].back, row }] : []));
+  const ends = [0, rows.length - 1].flatMap((row) => (rows[row] ? [rows[row].back] : []));
   const far = (p: Point) => Math.hypot(p[0] - bed[0], p[1] - bed[1]);
-  return ends.sort((a, b) => far(b.at) - far(a.at))[0];
+  return ends.sort((a, b) => far(b) - far(a))[0];
 }
