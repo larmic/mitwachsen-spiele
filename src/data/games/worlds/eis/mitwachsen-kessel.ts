@@ -95,6 +95,14 @@ export const SNOWMAN_COLORS = {
 } as const;
 
 /**
+ * Rodelberg (worlds/eis/mitwachsen-hill.ts, Issue 50): ein Stufenberg aus Schnee mit Gipfel auf Höhe `top`, je Ring eine
+ * Stufe tiefer (`rings` Ringe); unten läuft die Bahn `runout` Felder aus. Sein Gipfel liegt `near` Felder (von bis)
+ * vom Schneebett; rings um Berg und Auslauf bleiben `keep` Felder frei von Schneehaufen, Kristallen, Kisten und
+ * Eiszapfen (die weichen nie; nur Tannen und Eisblöcke)
+ */
+export const HILL = { top: 7, rings: 6, runout: 8, near: [16, 70], keep: 3 } as const;
+
+/**
  * Fülle im Schnee (worlds/eis/mitwachsen-snow-fill.ts): flache, begehbare Zierde auf blankem Schnee, ganz zuletzt
  * gesetzt. Je Kästchen eines Rasters aus `every` Feldern höchstens eine Stelle (an zufälligem Platz darin), Anteil
  * `none` bleibt leer. `kinds`: Gewichte der Sorten. Eisblumen wachsen zu `flowers` Feldern (von bis), ein Eisfleck

@@ -21,6 +21,8 @@ import { stageAt } from './mitwachsen-snowman';
 import { snowBoxes } from './mitwachsen-snowman-look';
 import { chimeBoxes } from './mitwachsen-chime-look';
 import { SNOW_FILLS } from './mitwachsen-snow-fill';
+import { TUBE } from './mitwachsen-hill';
+import { stepBoxes } from './mitwachsen-tube-look';
 import { fillBoxes } from './mitwachsen-snow-fill-look';
 import { DEEP_ICE, crestBoxes } from './mitwachsen-ice-rim';
 
@@ -78,11 +80,13 @@ export const view3d: View3D = {
     icicle,
     rock: (_, c, x, y) => crestBoxes(c, x, y),
     snowdrift: fill,
+    hillstep: (_, c, x, y) => stepBoxes(c, x, y), // Treppe am Rodelberg
     ...Object.fromEntries(SNOW_FILLS.map((d) => [d, fill])),
   },
   ground(c, open) {
     if (c.biome !== 'eis' || c.region === 'wild') return null;
     if (c.slide && open.includes('eis')) return SLIDE;
+    if (c.ride === TUBE) return SLIDE; // Bahn am Rodelberg: glänzendes Eis
     if (c.rim) return DEEP; // innerste Reihe der Klippen: Tiefeis statt Schnee (mitwachsen-ice-rim.ts)
     if (c.color && (c.region === 'border' || c.ground === 'ice')) return fall(c.color); // Eisfall, Stufen des Eisbergs
     return c.region === 'border' || c.ground === 'snow' ? KESSEL : null;

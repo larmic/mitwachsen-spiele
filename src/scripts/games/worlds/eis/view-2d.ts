@@ -22,6 +22,8 @@ import { SNOW_FILLS } from './mitwachsen-snow-fill';
 import { fillBoxes } from './mitwachsen-snow-fill-look';
 import { plateHint } from './mitwachsen-plate-hint';
 import { SLED_ID, rideFx, sledBodies, sledGoodNight, sledMarks } from './mitwachsen-sled-look';
+import { TUBE } from './mitwachsen-hill';
+import { runBox, stepBoxes, tubeBodies, tubeFx } from './mitwachsen-tube-look';
 
 /** Iglu, Eisschale, Eistrog: Quader wie in 3D */
 const look: DrawDeco = (world, c, x, y) => iceBoxes(world, c, x, y);
@@ -90,6 +92,7 @@ export const view: View2D = {
     icicle,
     rock: (_, c, x, y) => crestBoxes(c, x, y),
     snowdrift: fill,
+    hillstep: (_, c, x, y) => stepBoxes(c, x, y), // Treppe am Rodelberg
     ...Object.fromEntries(SNOW_FILLS.map((d) => [d, fill])),
   },
   // Rutschspur zum Schneebett: glänzt, sobald das Eistor offen ist
@@ -98,7 +101,9 @@ export const view: View2D = {
       ? [x, y, 0, 1, 1, c.h, DEEP_ICE.side, DEEP_ICE.top] // innerste Reihe der Klippen: Tiefeis (mitwachsen-ice-rim.ts)
       : c.slide && open
         ? [x + 0.12, y, c.h, 0.76, 1, 0.02, ...ICE_COLORS.slide]
-        : null,
+        : c.ride === TUBE
+          ? runBox(c, x, y) // Bahn am Rodelberg
+          : null,
   // Wetter und Bild der Weltgrenze der Eis-Welt in der Form, die der Kern kennt (`Sky` in mitwachsen-view.ts)
   sky: { weather: iceWeather, aurora, waitArrow, realmSign, turnAlbum, guestAt, gateScore },
   // Fußspuren im Schnee, die langsam verwehen (mitwachsen-prints.ts)
@@ -119,8 +124,9 @@ export const view: View2D = {
   // „noch nicht“: Steht die Figur auf der Scholle, ohne dass der Pinguin führt, zeigt das Tor, was fehlt
   hint: plateHint(),
   // Schlitten mit Schlittenrentier und Laternenpfahl, Schneespur und Fleck am Halt, Ton und Freude (mitwachsen-sled-look.ts)
-  bodies: sledBodies,
+  // dazu Rodelreifen und Fahne am Rodelberg (mitwachsen-tube-look.ts)
+  bodies: (state, world, at) => [...sledBodies(state, world, at), ...tubeBodies(state, world, at)],
   marks: sledMarks,
   goodNight: sledGoodNight, // „Gute Nacht, Fahrzeuge“
-  rideFx: (e, state) => (e.id === SLED_ID.slice(5) ? rideFx(e, state) : undefined), // nur seine Ereignisse
+  rideFx: (e, state) => (e.id === SLED_ID.slice(5) ? rideFx(e, state) : tubeFx(e)), // je Fahrzeug nur seine Ereignisse
 };

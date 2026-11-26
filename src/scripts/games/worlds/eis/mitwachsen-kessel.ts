@@ -27,6 +27,7 @@ import { PLATFORM_HALF, platformCells, ringSpots, type Portal } from '../../mitw
 import { findSpawns } from '../../mitwachsen-spawns';
 import { OBSTACLE_GAP, eisCell } from '../../mitwachsen-world';
 import { adornKessel } from './mitwachsen-snow-fill';
+import { buildHill } from './mitwachsen-hill';
 import { frost, type Wild } from './mitwachsen-frost';
 import { chimes } from './mitwachsen-chime';
 import { haunts } from './mitwachsen-haunts';
@@ -131,6 +132,8 @@ export function buildKessel(
   frost(seed, wild, map); // Kristalle, Schneewehen und Schneehaufen nach Tannen und Eisblöcken
   chimes(seed, wild, map); // zuletzt das Glockenspiel am Klippenfuß, nur auf blankem Schnee: sonst bleibt alles, wo es war
   const sled = sledGround(gang, place, map); // ganz zuletzt Strecke und freier Platz des Schlittens: nichts wird neu gewürfelt
+  // der Rodelberg, nach allem Gewürfelten: Nur Tannen und Eisblöcke weichen; auf ihm wohnt kein Tier
+  const off = new Set([...sled, ...buildHill(place.bed, wild, map, sled)]);
   markIceRim(place.cells, map); // innerste Reihe der Klippen: dunkles Tiefeis mit Zacken (nur Bild, Höhen bleiben)
   // Eis-Welt: der ganze Kessel und der Gang ab seiner Mitte (dort wechselt auch die Tieranzeige)
   let inner = gang.depth + 1;
@@ -138,7 +141,7 @@ export function buildKessel(
   for (let t = gang.depth + 1 + Math.floor((inner - gang.depth - 1) / 2); t < centre; t++)
     for (let u = -gang.half - gang.wall; u <= gang.half + gang.wall; u++) realm.add(key(...gang.at(u, t)));
   const stone: Point = [place.bed[0] + ICE_STONE[0], place.bed[1] + ICE_STONE[1]];
-  const spots = spotsOf(place, map, sled);
+  const spots = spotsOf(place, map, off);
   const eis = haunts(place.cells, map, (p) => gang.at(...uv(centre, p)), place.bed); // Lieblingsorte nur hier
   const spawns = findSpawns(seed, eis, spots, place.bed);
   adornKessel(seed, place.cells, map, sled); // Fülle im Schnee, nach allem anderen: Nichts wird neu gewürfelt

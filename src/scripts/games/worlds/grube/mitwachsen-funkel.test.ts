@@ -33,7 +33,7 @@ describe('Grubenbähnchen Funkel', () => {
       color: '#2f8f83',
       loop: true,
     });
-    expect(RIDES.map((r) => r.id)).toEqual(['schlitten', 'hoehle', 'grube']);
+    expect(RIDES.map((r) => r.id)).toEqual(['schlitten', 'hoehle', 'grube', 'rodel']);
     expect(funkel.spec).toBe(FUNKEL);
     expect('ready' in funkel).toBe(false); // es erscheint nie von selbst: der Maulwurf gräbt den Gang
     expect('needs' in funkel).toBe(false); // es braucht nur seine eigene Welt
