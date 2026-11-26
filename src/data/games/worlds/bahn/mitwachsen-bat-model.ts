@@ -1,14 +1,14 @@
 // Modelle von Bahnhof Fledermaus und Lokschuppen in der Grotte, nur im Paket der Bahn (Teile wie in `front.ts`: vorn,
 // rechts, unten, Länge, Breite, Höhe, Farbe, oben; eigene Voxel-Grafik, keine Lore, keine Druse). Mit Bau 2 entstehen
 // sie: der Bahnsteig aus lila geschichtetem Stein (in den Schichten des Höhlentors, `BANDS`), eine Stufe über dem Gleis,
-// mit heller lila Kante; ein Steindach auf vier Pfosten mit Kristall-Lampen obendrauf (nur hell gefärbt, kein Licht) und
+// mit heller lila Kante; ein kleines, hohes Steindach auf zwei Pfosten hinten mit Kristall-Lampen obendrauf (nur hell gefärbt, kein Licht) und
 // dem Schild „Fledermaus auf Lila“ (ohne Text); daneben der Lokschuppen, vorn zum Gleis offen, hinten eine Wand aus
 // demselben Stein, ein Dach mit Kristallfirst, darunter wohnt Tok (und der Siebenschläfer schläft dort). Kein Gold: Hier
 // gibt es nichts zu tun.
 // Spec: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 2)
 
 import type { Part } from '../../../../lib/games/front';
-import { BAT, pixels } from './mitwachsen-train-model';
+import { BAT, ROOF_TOP, pixels, roofPlate, roofPosts } from './mitwachsen-train-model';
 
 /** Farben von Bahnhof Fledermaus und Lokschuppen: Schichten wie am Höhlentor, Kante und Schild lila, Kristalle */
 export const BAT_COLORS = {
@@ -35,20 +35,24 @@ export const batRowParts = (odd: boolean): Part[] => [
   ...[0, 1, 2].map((k): Part => [-1.03, -0.5, -1 + k * 0.34, 0.04, 1, 0.34, B.bands[(k + +odd) % B.bands.length]!]),
 ];
 
-/** Kristall-Lampe auf dem Dach: kleiner Kristall in einer Farbe mit hellem Schein obendrauf */
+/** Kristall-Lampe auf dem Dach (auf der Oberkante der Platte): kleiner Kristall in einer Farbe mit hellem Schein obendrauf */
 const lamp = (f: number, r: number, c: string): Part[] => [
-  [f, r, 0, 0.14, 0.14, 0.22, c, B.glow],
-  [f + 0.03, r + 0.03, 0.22, 0.08, 0.08, 0.1, B.glow, B.glow],
+  [f, r, ROOF_TOP, 0.14, 0.14, 0.22, c, B.glow],
+  [f + 0.03, r + 0.03, ROOF_TOP + 0.22, 0.08, 0.08, 0.1, B.glow, B.glow],
 ];
 
-/** Steindach über zwei Reihen (Mitte in der Mitte der vier Felder) auf vier Pfosten, obendrauf drei Kristall-Lampen */
+/**
+ * Steindach von Bahnhof Fledermaus: die Platte hinten über den zwei Dachreihen (klein und hoch wie an Bahnhof Bär,
+ * `ROOF_SIZE`), obendrauf drei Kristall-Lampen: zwei an den Enden, eine vorn in der Mitte (das Schild steht dazwischen)
+ */
 export const BAT_ROOF: readonly Part[] = [
-  ...[-0.92, 0.8].flatMap((f) => [-0.92, 0.8].map((r): Part => [f, r, 0.04, 0.12, 0.12, 1.5, B.bands[0]])),
-  [-1.08, -1.08, 1.54, 2.16, 2.16, 0.2, ...B.roof],
-  ...lamp(-0.9, -0.07, B.crystal[0]),
-  ...lamp(-0.07, -0.07, B.crystal[1]),
-  ...lamp(0.76, -0.07, B.crystal[2]),
+  roofPlate(...B.roof),
+  ...lamp(0.47, -1, B.crystal[0]),
+  ...lamp(0.04, -0.07, B.crystal[1]),
+  ...lamp(0.47, 0.86, B.crystal[2]),
 ];
+/** Unter dem Steindach: zwei Pfosten am hinteren Rand; die Kante am Gleis bleibt frei */
+export const BAT_POSTS: readonly Part[] = roofPosts(B.bands[0]);
 
 /** Schild auf dem Dach, zur Kamera: Fledermaus auf Lila, ohne Text */
 export const BAT_SIGN: readonly Part[] = [

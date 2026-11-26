@@ -30,7 +30,10 @@ import { BUILD } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
 import {
   CAR,
   ROOF,
+  ROOF_POSTS,
+  ROOF_TOP,
   SIGN,
+  signAt,
   carParts,
   puffParts,
   rowParts,
@@ -181,7 +184,10 @@ export function stationBodies(state: State, world: World, at: RideAt): readonly 
   return [...stationParts(st, world, work, at.reduced), ...trainParts(st, world, state, work, at), ...batBodies(world)];
 }
 
-/** Bahnsteig, Dach mit Bank, Schild und Häuschen; beim Bau erst ab `pop`, dann wachsen sie kurz aus dem Boden */
+/**
+ * Bahnsteig, Dachplatte (ein eigener Körper), Pfosten mit Bank, Schild und Häuschen; beim Bau erst ab `pop`, dann
+ * wachsen sie kurz aus dem Boden
+ */
 function stationParts(st: BearStation, world: World, work: number | undefined, reduced: boolean): RideBody[] {
   if (work !== undefined && work < BUILD.pop) return [];
   const rise = work === undefined || reduced ? 0 : Math.max(0, 1 - (work - BUILD.pop) / POP_FOR) * -0.9;
@@ -206,7 +212,8 @@ function stationParts(st: BearStation, world: World, work: number | undefined, r
     const z = world.cell(...under[0]!).h + rise;
     out.push(
       { id: 'bahn:dach', key: 'bahn:dach', x, y, z, dir, parts: ROOF },
-      { id: 'bahn:schild', key: 'bahn:schild', x, y, z: z + 1.74, dir: 's', parts: SIGN },
+      { id: 'bahn:pfosten', key: 'bahn:pfosten', x, y, z, dir, parts: ROOF_POSTS },
+      { id: 'bahn:schild', key: 'bahn:schild', ...signAt(x, y, st.side), z: z + ROOF_TOP, dir: 's', parts: SIGN },
     );
   }
   return out;

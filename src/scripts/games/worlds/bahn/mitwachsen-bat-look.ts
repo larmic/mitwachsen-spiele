@@ -1,5 +1,5 @@
 // Bahnhof Fledermaus und der Lokschuppen im Bild – rein, ohne DOM, gleich für 2D und 3D (Körper über den Haken
-// `View2D.bodies`, wie Bahnhof Bär): die Reihen des Bahnsteigs aus lila geschichtetem Stein, das Steindach mit
+// `View2D.bodies`, wie Bahnhof Bär): die Reihen des Bahnsteigs aus lila geschichtetem Stein, das kleine, hohe Steindach (Platte als eigener Körper, zwei Pfosten hinten) mit
 // Kristall-Lampen und dem Schild „Fledermaus auf Lila“ über den letzten beiden Reihen am fernen Ende (weg von der
 // Sitzreihe, dort steigt die Figur aus, `batRoof` in mitwachsen-platform.ts), daneben der Lokschuppen, vorn zum Gleis
 // offen. Sie stehen, sobald die Welt mit Ausbau 2 gebaut ist (Bau 2: zum Augenblick `pop` wird sie neu gebaut, der
@@ -9,7 +9,14 @@
 
 import { dirTo } from '../../mitwachsen-free';
 import type { Point } from '../../../../data/games/mitwachsen';
-import { BAT_ROOF, BAT_SIGN, batRowParts, shedParts } from '../../../../data/games/worlds/bahn/mitwachsen-bat-model';
+import {
+  BAT_POSTS,
+  BAT_ROOF,
+  BAT_SIGN,
+  batRowParts,
+  shedParts,
+} from '../../../../data/games/worlds/bahn/mitwachsen-bat-model';
+import { ROOF_TOP, signAt } from '../../../../data/games/worlds/bahn/mitwachsen-train-model';
 import type { Part } from '../../../../lib/games/front';
 import type { RideBody } from '../../mitwachsen-ride-view';
 import type { World } from '../../mitwachsen-world';
@@ -45,7 +52,15 @@ export function batBodies(world: World): RideBody[] {
     const z = world.cell(...under[0]!).h;
     out.push(
       { id: 'bahn:felsdach', key: 'bahn:felsdach', x, y, z, dir, parts: BAT_ROOF },
-      { id: 'bahn:felsschild', key: 'bahn:felsschild', x, y, z: z + 1.74, dir: 's', parts: BAT_SIGN },
+      { id: 'bahn:felspfosten', key: 'bahn:felspfosten', x, y, z, dir, parts: BAT_POSTS },
+      {
+        id: 'bahn:felsschild',
+        key: 'bahn:felsschild',
+        ...signAt(x, y, st.side),
+        z: z + ROOF_TOP,
+        dir: 's',
+        parts: BAT_SIGN,
+      },
     );
   }
   return [...out, ...shedBody(world)];

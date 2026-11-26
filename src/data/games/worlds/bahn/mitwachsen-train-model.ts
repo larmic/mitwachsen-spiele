@@ -237,10 +237,43 @@ const HUT: readonly Part[] = [
 /** Reihe des Bahnsteigs (`hut`: mit Toks Häuschen hinten) */
 export const rowParts = (odd: boolean, hut: boolean): Part[] => [...row(odd), ...(hut ? HUT : [])];
 
-/** Grasdach über zwei Reihen (Mitte in der Mitte der vier Felder) auf vier Pfosten, hinten die Bank */
-export const ROOF: readonly Part[] = [
-  ...[-0.92, 0.8].flatMap((f) => [-0.92, 0.8].map((r): Part => [f, r, 0.04, 0.12, 0.12, 1.5, SC.wood])),
-  [-1.08, -1.08, 1.54, 2.16, 2.16, 0.2, ...SC.roof],
+/**
+ * Maße des Dachs beider Bahnhöfe (Issue 15: kleiner und höher, damit man die Figur darunter sieht und die Kante frei
+ * ist): Unterkante der Platte `z` über dem Bahnsteig, Dicke `h`, wie weit sie vom hinteren Rand zum Gleis reicht (`deep`:
+ * nur die hintere Hälfte der zwei Dachreihen), Breite entlang des Gleises (`wide`, um die Mitte der zwei Reihen)
+ */
+export const ROOF_SIZE = { z: 2, h: 0.2, deep: 1.08, wide: 2.16 } as const;
+/** Oberkante der Dachplatte über dem Bahnsteig: Dort sitzt das Schild (und an Bahnhof Fledermaus die Lampen) */
+export const ROOF_TOP = ROOF_SIZE.z + ROOF_SIZE.h;
+/** Die Dachplatte in einer Farbe: hinten über den zwei Dachreihen, vorn = vom Gleis weg (Mitte in der Mitte der vier Felder) */
+export const roofPlate = (side: string, top: string): Part => [
+  0,
+  -ROOF_SIZE.wide / 2,
+  ROOF_SIZE.z,
+  ROOF_SIZE.deep,
+  ROOF_SIZE.wide,
+  ROOF_SIZE.h,
+  side,
+  top,
+];
+/** Zwei Pfosten am hinteren Rand des Bahnsteigs, vom Bahnsteig bis unter die Platte */
+export const roofPosts = (color: string): Part[] =>
+  [-0.92, 0.8].map((r): Part => [0.8, r, 0.04, 0.12, 0.12, ROOF_SIZE.z - 0.04, color]);
+
+/**
+ * Wo das Schild steht: mitten auf der Dachplatte, also von der Mitte der vier Dachfelder (x, y) die halbe Tiefe der
+ * Platte vom Gleis weg (`side`: Richtung vom Gleis zum Bahnsteig)
+ */
+export const signAt = (x: number, y: number, side: readonly [number, number]) => ({
+  x: x + (side[0] * ROOF_SIZE.deep) / 2,
+  y: y + (side[1] * ROOF_SIZE.deep) / 2,
+});
+
+/** Grasdach von Bahnhof Bär: nur die Platte, ein eigener Körper (ein späterer Durchblick träfe nur sie) */
+export const ROOF: readonly Part[] = [roofPlate(...SC.roof)];
+/** Unter dem Grasdach: zwei Pfosten am hinteren Rand, davor die Bank (Lehne hinten); die Kante am Gleis bleibt frei */
+export const ROOF_POSTS: readonly Part[] = [
+  ...roofPosts(SC.wood),
   [0.36, -0.6, 0.3, 0.4, 1.2, 0.08, SC.bench, SC.bench],
   [0.7, -0.6, 0.38, 0.06, 1.2, 0.3, SC.bench],
   ...[-0.5, 0.42].flatMap((r) => [0.4, 0.66].map((f): Part => [f, r, 0.04, 0.07, 0.07, 0.26, SC.wood])),
