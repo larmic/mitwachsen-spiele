@@ -75,7 +75,7 @@ describe('Haken der 2D-Ansicht für Welt-Pakete (drawDeco)', () => {
     expect(mapColor(crystal)).toBe(crystal.color);
     const plain: Cell = { ...crystal, deco: null, solid: false, color: undefined };
     expect(mapColor(crystal)).not.toBe(mapColor(plain)); // hebt sich vom Schnee ab
-    const [, , drift] = find('cloudpuff');
+    const [, , drift] = find('snowdrift');
     expect(mapColor(drift)).toBe(mapColor({ ...drift, deco: null })); // nur Bild, auf der Karte nicht zu sehen
     const cave: Cell = {
       h: 1,

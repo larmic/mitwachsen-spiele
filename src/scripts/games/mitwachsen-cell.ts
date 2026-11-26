@@ -59,6 +59,12 @@ export type Deco =
   | 'fishcrate' // Fischkiste im Gletscherkessel: Hineinlaufen fängt Fische ins Netz (fest wie ein Busch)
   | 'snowheap' // Schneehaufen im Gletscherkessel: Hineinlaufen lässt eine Kugel wachsen, bis ein Schneemann steht (fest)
   | 'icicle' // Eiszapfen des Glockenspiels am Klippenfuß im Gletschertal: Hinlaufen lässt ihn klingen (begehbar)
+  // Fülle im Schnee des Gletschertals (flach, begehbar, nur Bild; zeichnet nur das Welt-Paket, solange es lädt: nichts)
+  | 'snowdrift' // Schneewehe im Lee einer Tanne, mit bläulichem Schattenrand
+  | 'iceflower' // Eisblumen: kleine Sterne in Hellblau oder Türkis (`note`: Farbe, ab 2 die Mitte eines Felds)
+  | 'iceglint' // Eisfleck: kleine blanke Stelle, die ab und zu glitzert (der Boden bleibt Schnee)
+  | 'pebbles' // graue Kiesel im Schnee (`note` 1: drei statt einem)
+  | 'tundra' // Tundra-Büschel nah an Tannen und Wiese (`note` 1: mit Beeren)
   // Kristallgrotte (zeichnet nur ihr Welt-Paket, solange es lädt: ein Block in Kartenfarbe)
   | 'shroombowl' // Pilzschale auf der Mooswiese am Höhlenbett (Futter, fest)
   | 'stonetrough' // Steintrog am Höhlenbett (Wasser, fest)

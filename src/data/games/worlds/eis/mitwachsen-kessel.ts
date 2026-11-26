@@ -95,6 +95,23 @@ export const SNOWMAN_COLORS = {
 } as const;
 
 /**
+ * Fülle im Schnee (worlds/eis/mitwachsen-snow-fill.ts): flache, begehbare Zierde auf blankem Schnee, ganz zuletzt
+ * gesetzt. Je Kästchen eines Rasters aus `every` Feldern höchstens eine Stelle (an zufälligem Platz darin), Anteil
+ * `none` bleibt leer. `kinds`: Gewichte der Sorten. Eisblumen wachsen zu `flowers` Feldern (von bis), ein Eisfleck
+ * hat mit Chance `twin` einen zweiten daneben. Tundra-Büschel stehen nur bis `green.near` Felder um Tannen und
+ * Schneewiese, dort mit Chance `green.chance` statt einer anderen Sorte. Zusammen mit Tannen, Kristallen und
+ * Schneewehen ergibt das etwa 10 Dinge je 100 Felder Schnee (entschieden am 26.11.2026, vorher 4 bis 6).
+ */
+export const SNOW_FILL = {
+  every: 4,
+  none: 0.33,
+  kinds: { iceflower: 3, pebbles: 3, iceglint: 2 },
+  flowers: [1, 3],
+  twin: 0.35,
+  green: { near: 2, chance: 0.7 },
+} as const;
+
+/**
  * Lieblingsorte der Eis-Tiere: Seen (glattes Eis und Eislöcher), Tannen, Eisblöcke, der Eisfall am Talende, das Iglu
  */
 export type IceHaunt = 'lake' | 'pines' | 'blocks' | 'fall' | 'igloo';

@@ -100,7 +100,7 @@ function crystals(seed: number, wild: readonly Wild[], map: Map<string, Cell>) {
 }
 
 /**
- * Schneewehen: kleine weiße Häufchen (`'cloudpuff'`, begehbar, nur Bild) im Lee jeder Tanne, also rechts daneben
+ * Schneewehen: kleine weiße Häufchen (`'snowdrift'`, begehbar, nur Bild; eigene Art des Tals, so bleiben die Wolken, wie sie sind) im Lee jeder Tanne, also rechts daneben
  * (dorthin weht der Pustewind), manchmal ein zweites dahinter
  */
 function drifts(seed: number, wild: readonly Wild[], map: Map<string, Cell>) {
@@ -108,7 +108,7 @@ function drifts(seed: number, wild: readonly Wild[], map: Map<string, Cell>) {
   const drift = (x: number, y: number) => {
     const c = map.get(key(x, y));
     if (!inWild.has(key(x, y)) || !bare(c)) return false;
-    map.set(key(x, y), { ...c, deco: 'cloudpuff' });
+    map.set(key(x, y), { ...c, deco: 'snowdrift' });
     return true;
   };
   for (const { x, y } of wild) {

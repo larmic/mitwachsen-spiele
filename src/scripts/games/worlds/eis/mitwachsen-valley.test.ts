@@ -230,7 +230,7 @@ describe('Gletschertal im Kessel (Eis-Welt)', () => {
       const ring = RING_1.filter(([dx, dy]) => dx || dy).map(([dx, dy]) => [p[0] + dx, p[1] + dy] as const);
       if (ring.some(([x, y]) => standHeight(w, ['eis'], x, y) !== c.h)) wrong.push(`ohne Lücke ${at}`);
     }
-    for (const p of pick((c) => c.deco === 'cloudpuff')) {
+    for (const p of pick((c) => c.deco === 'snowdrift')) {
       const at = `Schneewehe ${p.join(',')}`;
       if (standHeight(w, ['eis'], ...p) === null) wrong.push(`nicht begehbar ${at}`);
       if (w.cell(...p).ground !== 'snow' || w.cell(...p).slide) wrong.push(`nicht auf Schnee ${at}`);
@@ -249,7 +249,7 @@ describe('Gletschertal im Kessel (Eis-Welt)', () => {
       const kessel = kesselPlace(seed, EIS_PACK).cells.filter(([x, y]) => w.cell(x, y).region === 'eis');
       const wrong = frostFaults(w, kessel);
       const crystals = kessel.filter(([x, y]) => w.cell(x, y).deco === 'crystal');
-      const drifts = kessel.filter(([x, y]) => w.cell(x, y).deco === 'cloudpuff');
+      const drifts = kessel.filter(([x, y]) => w.cell(x, y).deco === 'snowdrift');
       if (crystals.length < FROST.least) wrong.push(`nur ${crystals.length} Kristalle`);
       if (crystals.length > FROST.groups * FROST.size + FROST.least) wrong.push(`${crystals.length} Kristalle`);
       if (!drifts.length) wrong.push('keine Schneewehe');
@@ -538,20 +538,21 @@ describe('Gletschertal im Kessel (Eis-Welt)', () => {
     for (const seed of PORTAL_SEEDS) expect(icePortalFaults(worldOf(seed, ICE)), `Seed ${seed}`).toEqual([]);
   });
 
-  it(`Gletschertal: Dichte 4 bis 6 Dinge je 100 Felder; Wege wie auf der Lichtung: Tor → Schneebett kurz, das fernste Feld weit (${VALLEY_SEEDS.length} Seeds)`, () => {
+  it(`Gletschertal: Dichte etwa 10 Dinge je 100 Felder samt Fülle; Wege wie auf der Lichtung: Tor → Schneebett kurz, das fernste Feld weit (${VALLEY_SEEDS.length} Seeds)`, () => {
     let things = 0,
       walk = 0;
     for (const seed of VALLEY_SEEDS) {
       const w = worldOf(seed, ICE);
       const floor = kesselPlace(seed, EIS_PACK).cells.filter(([x, y]) => w.cell(x, y).region === 'eis');
       const open = floor.filter(([x, y]) => standHeight(w, ['eis'], x, y) !== null);
-      // Dinge: Tannen, Eisblöcke, Kristalle, Schneewehen, Fischkisten (nicht Bett, Wiese und Plattformen)
+      // Dinge: Tannen, Eisblöcke, Kristalle, Schneewehen, Fischkisten und die Fülle im Schnee (nicht Bett, Wiese und
+      // Plattformen)
       const n = floor.filter(([x, y]) => {
         const c = w.cell(x, y);
         return (!!c.deco && !c.garden && !c.portal) || isBlock(c);
       }).length;
-      expect(n / open.length, `Seed ${seed}`).toBeGreaterThan(0.035);
-      expect(n / open.length, `Seed ${seed}`).toBeLessThan(0.07);
+      expect(n / open.length, `Seed ${seed}`).toBeGreaterThan(0.085);
+      expect(n / open.length, `Seed ${seed}`).toBeLessThan(0.13);
       things += n;
       walk += open.length;
       // Laufwege (Schritte, Tor offen): vom ersten Feld hinter dem Tor zum Schneebett und vom Bett zum fernsten Feld
@@ -595,7 +596,7 @@ describe('Gletschertal im Kessel (Eis-Welt)', () => {
       expect(mouth, `Seed ${seed}: Mündung → Schneebett`).toBeGreaterThanOrEqual(25);
       expect(mouth, `Seed ${seed}: Mündung → Schneebett`).toBeLessThanOrEqual(36);
     }
-    expect(things / walk).toBeGreaterThan(0.04);
-    expect(things / walk).toBeLessThan(0.06);
+    expect(things / walk).toBeGreaterThan(0.095);
+    expect(things / walk).toBeLessThan(0.115);
   });
 });

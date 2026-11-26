@@ -78,10 +78,15 @@ describe('Haken der 3D-Ansicht für Welt-Pakete (Views3D)', () => {
       'fishcrate',
       'floe',
       'icebowl',
+      'iceflower',
+      'iceglint',
       'icicle',
       'igloo',
-      'rock', // Zackenkamm auf dem Tiefeis am Rand (Issue 37)
+      'pebbles',
+      'rock',
+      'snowdrift',
       'snowheap',
+      'tundra',
       'watertrough',
     ]);
     // Leuchten: ohne Polarlicht wie gebaut, mit ihm heller (aus dem Paket)
