@@ -46,6 +46,7 @@ export type Rider = Guided & {
   dozing?: readonly RideId[];
   snored?: { id: RideId; at: number };
   alighted?: { id: RideId; at: number };
+  laps?: Partial<Record<RideId, number>>; // gewählte Runden je Rundfahrt (Zahlensteine; nicht gespeichert, ohne Wahl eine)
   work?: { from: number; to: number; laid?: true }; // ein Bote baut (`Work` in mitwachsen-herald.ts; Bau 2 wartet auf den Zug)
 };
 
@@ -101,6 +102,9 @@ export type RideRoute = {
   loop?: true;
 };
 
+/** So viele Runden fährt eine Rundfahrt höchstens am Stück (Zahlensteine 1 bis 4) */
+export const MAX_LAPS = 4;
+
 /** Wer auf der Festfahrt außer den Tieren noch winkt (Eis-Welt: Schneemänner) */
 export type Fan = { who: string; x: number; y: number };
 
@@ -138,6 +142,8 @@ export type Vehicle = {
   feast?(s: Rider, world: World): boolean;
   exit?(s: Rider, world: World, end: End): readonly Point[];
   onward?(s: Rider, world: World, at: End): { to: End; pos: number } | undefined;
+  /** Rundfahrt (`RideRoute.loop`): so viele Runden fährt sie beim nächsten Einsteigen (1 bis `MAX_LAPS`; ohne: eine) */
+  laps?(s: Rider, world: World): number;
 };
 
 /** Die Fahr-Engine (Paket der Fahrzeuge, `WorldRules.ride`): macht aus den Fahrzeugen der geladenen Pakete ihre Regeln */

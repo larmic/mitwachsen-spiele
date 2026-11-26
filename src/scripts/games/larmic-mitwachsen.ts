@@ -81,9 +81,9 @@ const PACKED: ReadonlySet<string> = new Set<PackEvent['type']>([
   'heave',
 ]);
 const packed = (e: { type: string }): e is PackEvent => PACKED.has(e.type);
-/** Davon zeigt und spielt das Paket alles selbst (Säule, Grottenolm, Netz, Klingeltor) */
-type PackOnly = Extract<PackEvent, { type: 'column' | 'olm' | 'web' | 'chimegate' }>;
-const PACK_ONLY: ReadonlySet<string> = new Set<PackOnly['type']>(['column', 'olm', 'web', 'chimegate']);
+/** Davon zeigt und spielt das Paket alles selbst (Säule, Grottenolm, Netz, Klingeltor, Zahlenstein) */
+type PackOnly = Extract<PackEvent, { type: 'column' | 'olm' | 'web' | 'chimegate' | 'lapstone' }>;
+const PACK_ONLY: ReadonlySet<string> = new Set<PackOnly['type']>(['column', 'olm', 'web', 'chimegate', 'lapstone']);
 const packOnly = (e: { type: string }): e is PackOnly => PACK_ONLY.has(e.type);
 
 class LarmicMitwachsen extends HTMLElement {
