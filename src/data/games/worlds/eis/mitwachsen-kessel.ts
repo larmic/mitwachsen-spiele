@@ -103,6 +103,13 @@ export const SNOWMAN_COLORS = {
 export const HILL = { top: 7, rings: 6, runout: 8, near: [16, 70], keep: 3 } as const;
 
 /**
+ * Runde der Schneeraupe (worlds/eis/mitwachsen-loop.ts, Issue 54): eine Ellipse nördlich vom Schneebett, Mitte `out`
+ * Felder hinter der Mitte des Tals, Halbachsen `across` (quer) und `along` (längs), abgetastet in `points` Punkten; der
+ * erste liegt dem Bett am nächsten (dort ist der Halt). Jeder Punkt rückt auf das nächste erlaubte Feld bis `reach` weit, um das auch `room` Felder ringsum erlaubt sind
+ */
+export const CAT_LOOP = { out: 12, across: 20, along: 42, points: 14, reach: 10, room: 2 } as const;
+
+/**
  * Spielorte im Tal (worlds/eis/mitwachsen-places.ts, Issue 52). `flags`: so viele Zahlen-Fähnchen am Hauptweg vom
  * Schneebett zum Eisfall, `across` Felder neben der Mitte, das erste `every` Felder hinter dem Bett, dann alle `every`
  * Felder; jedes auf dem nächsten blanken Feld bis `reach` weit, mindestens `apart` Felder von den Eiszapfen des

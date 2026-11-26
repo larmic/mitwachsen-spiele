@@ -27,6 +27,13 @@ const bare = (c: Cell | undefined): c is Cell =>
   !c.ride &&
   !c.stop;
 
+/**
+ * Plätze der Fähnchen am Hauptweg, vom Bett weg (`PLACES.flags`); `at`: Feld für eine Lage (quer, vom Tor weg) vom
+ * Schneebett aus
+ */
+export const flagSpots = (at: (across: number, out: number) => Point): Point[] =>
+  Array.from({ length: PLACES.flags.count }, (_, i) => at(PLACES.flags.across, PLACES.flags.every * (i + 1)));
+
 /** Kein Eiszapfen des Glockenspiels bis `PLACES.flags.apart` Felder (Schachbrett): Dort klingt schon etwas */
 function apart([x, y]: Point, map: ReadonlyMap<string, Cell>): boolean {
   const r = PLACES.flags.apart;

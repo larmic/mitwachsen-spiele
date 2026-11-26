@@ -8,6 +8,7 @@ import { HILL, KESSEL, KESSEL_COLORS } from '../../../../data/games/worlds/eis/m
 import { KESSEL_WILDS } from './mitwachsen-kessel';
 import { FROST, HEAPS } from './mitwachsen-frost';
 import { hillOf } from './mitwachsen-hill';
+import { loopOf, simple } from './mitwachsen-loop';
 import { bergPeak } from './mitwachsen-ice-sky';
 import { ICE_CRYSTALS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import { crossings } from '../../mitwachsen-border';
@@ -725,5 +726,41 @@ describe('Gletschertal im Kessel (Eis-Welt)', () => {
 
   it(`Spielorte: neun Zahlen-Fähnchen in Reihenfolge vom Bett weg auf blankem Schnee, acht bis zwölf Laternen-Tannen weit verteilt (${VALLEY_SEEDS.length} Seeds)`, () => {
     expect(VALLEY_SEEDS.flatMap(placeFaults)).toEqual([]);
+  });
+
+  /** Was an der Runde der Schneeraupe eines Tals nicht stimmt (Issue 54); ohne Runde nichts (dann gibt es keine Raupe) */
+  function loopFaults(seed: number): string[] {
+    const w = worldOf(seed, ICE);
+    const loop = loopOf(w);
+    if (!loop.length) return [];
+    const wrong: string[] = [];
+    if (!simple(loop)) wrong.push('berührt sich oder schließt sich nicht');
+    if (loop.length < 200 || loop.length > 380) wrong.push(`${loop.length} Felder`);
+    const bed = w.homes.eis.bed;
+    const far = ([x, y]: readonly [number, number]) => Math.hypot(x - bed[0], y - bed[1]);
+    if (far(loop[0]!) > 34) wrong.push(`Halt ${far(loop[0]!).toFixed(0)} Felder vom Bett`);
+    if (w.cell(...loop[0]!).stop !== 'raupe') wrong.push('Halt ohne Markierung');
+    const kept = ['snowheap', 'crystal', 'fishcrate', 'icicle'];
+    const spots = new Set(w.spotsOf('eis').map(keyOf));
+    loop.forEach((p, i) => {
+      const c = w.cell(...p);
+      const next = w.cell(...loop[(i + 1) % loop.length]!);
+      if (c.ride !== 'raupe' || c.solid || c.deco || c.ground !== 'snow' || c.slide || c.garden || c.portal)
+        wrong.push(`Feld ${p.join(',')}`);
+      if (Math.abs(next.h - c.h) > 1) wrong.push(`Stufe bei ${p.join(',')}`);
+      if (spots.has(keyOf(p))) wrong.push(`Wohnplatz auf der Runde ${p.join(',')}`);
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++)
+          if (kept.includes(w.cell(p[0] + dx, p[1] + dy).deco!)) wrong.push(`Geschütztes an der Runde ${p.join(',')}`);
+    });
+    const hill = hillOf(w)?.top;
+    if (hill && loop.some((p) => chebTo(hill, p) <= HILL.rings)) wrong.push('Runde über den Rodelberg');
+    return wrong.slice(0, 5).map((m) => `Seed ${seed}: ${m}`);
+  }
+
+  it(`Schneeraupe: die Runde schließt sich, berührt sich nie, 200 bis 380 Felder, keine Stufe über eins, Halt nah am Bett, nichts Geschütztes daneben; in fast jedem Tal eine (${VALLEY_SEEDS.length} Seeds)`, () => {
+    expect(VALLEY_SEEDS.flatMap(loopFaults)).toEqual([]);
+    const with_ = VALLEY_SEEDS.filter((seed) => loopOf(worldOf(seed, ICE)).length).length;
+    expect(with_ / VALLEY_SEEDS.length).toBeGreaterThanOrEqual(0.8); // gemessen über 60 Täler: 59
   });
 });

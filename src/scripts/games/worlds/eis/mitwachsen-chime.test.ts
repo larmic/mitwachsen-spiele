@@ -219,7 +219,8 @@ describe('Eiszapfen-Glockenspiel (Eis-Welt): Regel', () => {
   });
 
   it('kein Spielstand außer „gefunden“: Zustand der Pakete und alles Gespeicherte bleiben; nur das Hinführen merkt sich den ersten Ton (Issue 28)', () => {
-    const s = at(WX - 1, WY);
+    // der erste Besuch des Tals ist schon gemerkt (`gast`, mitwachsen-cat.ts): Die Zapfen ändern daran nichts
+    const s: State = { ...at(WX - 1, WY), packs: { eis: { v: 1, snow: {}, gast: 1 } } };
     let t = s;
     for (let i = 0; i < ROW.length; i++) t = walk(t, 'e').state;
     expect(t.packs).toBe(s.packs);

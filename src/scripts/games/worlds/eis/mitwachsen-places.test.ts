@@ -149,7 +149,7 @@ describe('Zahlen-Fähnchen', () => {
     expect(rings).toEqual([0, 1, 0, 0, 0]);
     expect(s.player.x).toBe(fx + 2);
     expect(of(move(s, 'w').events, 'numflag')).toHaveLength(1); // wieder herein: es bimmelt wieder
-    expect(progressOf(s).packs).toEqual({}); // kein Spielstand
+    expect(progressOf(s).packs).toEqual({ eis: { v: 1, snow: {}, gast: 1 } }); // kein Spielstand der Fähnchen: nur der erste Besuch des Tals
   });
 
   it('placeFlags: jedes auf dem nächsten blanken Feld, nie auf Gesperrtem, nie am Glockenspiel; ohne Platz fehlt die Nummer', () => {

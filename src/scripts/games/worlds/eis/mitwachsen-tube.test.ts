@@ -67,9 +67,9 @@ const whats = (events: readonly GameEvent[]) =>
 describe('Rodelreifen: Fahrt nur bergab', () => {
   it('Eintrag und Paket: nur bergab, kurz, ohne Wimpel; die Eis-Welt meldet Schlitten und Rodelreifen an', () => {
     expect(TUBE_SPEC).toMatchObject({ id: 'rodel', gate: 'eis', slide: true, ticks: [40, 60], pace: 0.6 });
-    expect(RIDES.at(-1)).toBe(TUBE_SPEC);
+    expect(RIDES.find((r) => r.slide)).toBe(TUBE_SPEC);
     expect(TUBE_SPEC.signal.every(penta)).toBe(true);
-    expect(vehiclesOf([EIS_PACK, FAHRT_PACK])).toEqual([sled, tube]);
+    expect(vehiclesOf([EIS_PACK, FAHRT_PACK]).slice(0, 2)).toEqual([sled, tube]);
     expect('ready' in tube).toBe(false); // er erscheint nicht: Er ist immer da
     expect(EIS_PACK.sights!.map((x) => x.id)).toContain('halt:rodel');
   });

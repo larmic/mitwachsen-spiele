@@ -3545,6 +3545,118 @@ test(
   },
 );
 
+// Schneeraupe, die Rundfahrt der Eis-Welt (Issue 54, `?entwickler=eis`, fester Seed 3; @3d, weil Raupe und Runde auch in
+// 3D gezeichnet werden und die Kamera ihr folgt): Der Test spielt den zweiten Besuch vor (ab dann steht sie am Halt).
+// Die Figur steigt ein, fährt einmal um das Tal, immer auf der Runde, und steigt am selben Halt wieder aus. Alles über
+// die Test-Uhr, gespeichert wird im Blick hinein nichts
+test(
+  'Spiel: Schneeraupe: am Halt einsteigen, eine Runde um das Tal, am selben Halt aussteigen, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    type Cell = { stop?: string; ride?: string; solid?: boolean; deco?: string | null };
+    type Game = {
+      world: { seed: number; homes: Record<string, { bed: [number, number] }>; cell(x: number, y: number): Cell };
+      state: {
+        player: { x: number; y: number; dir: string };
+        animals: unknown[];
+        packs: Record<string, object>;
+        ride?: { id: string; pos: number; phase: string };
+      };
+      rides: { id: string; key: string; x: number; y: number; seat?: true }[];
+      apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+    };
+    await page.addInitScript(() => {
+      const real = crypto.getRandomValues.bind(crypto);
+      const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+        a instanceof Uint32Array && a.length === 1 ? a.fill(3) : real(a);
+      Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    });
+    const game = await openGame(page, { clock: true, dev: 'eis' });
+    await expectView(page);
+    expect(await game.evaluate((node) => (node as unknown as Game).world.seed)).toBe(3);
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    await ticks(page, 5);
+    // den zweiten Besuch vorspielen und neben den Halt stellen
+    const halt = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const [bx, by] = el.world.homes.eis!.bed;
+      const dirs: [string, number, number][] = [
+        ['e', 1, 0],
+        ['w', -1, 0],
+        ['s', 0, 1],
+        ['n', 0, -1],
+      ];
+      for (let y = by - 60; y <= by + 60; y++)
+        for (let x = bx - 60; x <= bx + 60; x++) {
+          if (el.world.cell(x, y).stop !== 'raupe') continue;
+          const [dir, dx, dy] = dirs.find(([, ax, ay]) => {
+            const c = el.world.cell(x - ax, y - ay);
+            return !c.solid && !c.ride && !c.deco;
+          })!;
+          const packs = {
+            ...el.state.packs,
+            eis: { v: 1, snow: {}, gast: 2 },
+            fahrt: { ...el.state.packs.fahrt, raupe: { stage: 'bereit' } },
+          };
+          el.state = { ...el.state, animals: [], packs, player: { x: x - dx, y: y - dy, dir } };
+          return { x, y, dir };
+        }
+      return null;
+    });
+    expect(halt).not.toBeNull();
+    const cat = () =>
+      game.evaluate((node) => {
+        const b = (node as unknown as Game).rides.find((r) => r.id === 'ride:raupe');
+        return b ? { x: Math.round(b.x), y: Math.round(b.y), key: b.key, seat: !!b.seat } : null;
+      });
+    // sie steht am Halt; der goldene Tritt kommt, sobald die Fahr-Engine nachgeladen ist
+    await expect
+      .poll(async () => {
+        await ticks(page, 1);
+        await render(page);
+        return await cat();
+      })
+      .toMatchObject({ x: halt!.x, y: halt!.y, seat: false, key: expect.stringMatching(/:.10$/) });
+    await game.evaluate((node, dir) => (node as unknown as Game).apply({ type: 'move', dir, fresh: true }), halt!.dir);
+    await render(page, 2);
+    expect(await game.evaluate((node) => (node as unknown as Game).state.ride?.id)).toBe('raupe');
+    const seen = new Set<string>();
+    let last = -1;
+    for (let i = 0; i < 60; i++) {
+      await ticks(page, 10);
+      await render(page, 1);
+      const now = await game.evaluate((node) => {
+        const el = node as unknown as Game;
+        const p = el.state.player;
+        return el.state.ride ? { pos: el.state.ride.pos, at: `${p.x},${p.y}`, on: el.world.cell(p.x, p.y).ride } : null;
+      });
+      if (!now) break;
+      expect(now.on).toBe('raupe'); // immer auf der Runde
+      expect(now.pos).toBeGreaterThanOrEqual(last); // immer vorwärts
+      last = now.pos;
+      seen.add(now.at);
+    }
+    expect(seen.size).toBeGreaterThan(20); // weit herumgekommen
+    expect(last).toBeGreaterThan(200); // eine lange Runde
+    const done = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const p = el.state.player;
+      return { ride: el.state.ride?.id ?? null, on: el.world.cell(p.x, p.y).ride ?? null, x: p.x, y: p.y };
+    });
+    expect(done.ride).toBeNull();
+    expect(done.on).toBeNull(); // neben der Runde ausgestiegen
+    expect(Math.max(Math.abs(done.x - halt!.x), Math.abs(done.y - halt!.y))).toBeLessThanOrEqual(2); // am selben Halt
+    await render(page, 2);
+    expect(await cat()).toMatchObject({ x: halt!.x, y: halt!.y, seat: false });
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
+      [],
+    );
+    expect(errors).toEqual([]);
+  },
+);
+
 // Spielorte im Eis (Issue 52, `?entwickler=eis`, fester Seed 1; @3d, weil Fähnchen und Laternen auch in 3D gezeichnet
 // werden): Neun Zahlen-Fähnchen stehen im Tal. Die Figur läuft in eine Laternen-Tanne: Ihre Laterne geht an und bleibt
 // an (im Zustand der Eis-Welt gemerkt), noch einmal hinein stößt sie nur an. Über die Test-Uhr; im Blick hinein wird
