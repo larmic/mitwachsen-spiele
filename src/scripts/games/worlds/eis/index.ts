@@ -26,6 +26,7 @@ import { rules as snowman } from './mitwachsen-snowman';
 import { rules as chime } from './mitwachsen-chime';
 import { sled } from './mitwachsen-sled';
 import { tube } from './mitwachsen-tube';
+import { cat, visit } from './mitwachsen-cat';
 import { rules as places } from './mitwachsen-places';
 import { PLACE_SIGHTS } from './mitwachsen-places-look';
 import { SIGHTS } from './mitwachsen-sights';
@@ -41,11 +42,14 @@ export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules
   // zuletzt); der Schlitten mit dem Schlittenrentier (mitwachsen-sled.ts; seine Fahrregeln bringt das Paket der Fahrzeuge)
   // dazu der Rodelreifen am Rodelberg (mitwachsen-tube.ts): nur bergab, immer da
   rules: {
-    bump: (...a) => shut(...a) || snowman.bump(...a) || places.bump(...a) || chime.bump(...a),
+    // zuerst zählt `visit` die Besuche (nie ein Halt): Ab dem zweiten steht die Schneeraupe an ihrem Halt
+    bump: (...a) => visit(...a) || shut(...a) || snowman.bump(...a) || places.bump(...a) || chime.bump(...a),
     vehicle: sled,
-    more: [tube],
+    more: [tube, cat], // Rodelreifen am Rodelberg, Schneeraupe auf ihrer Runde
   },
-  sights: [...SIGHTS, haltSight(sled), haltSight(tube), ...PLACE_SIGHTS], // dazu Fähnchen und Laternen-Tannen // der Schlitten bis zur ersten Fahrt; Schneehaufen und Eiszapfen-Glockenspiel locken, bis sie gefunden sind
+  // Schneehaufen und Eiszapfen-Glockenspiel locken, bis sie gefunden sind; Schlitten, Rodelreifen und Schneeraupe bis zur
+  // ersten Fahrt; dazu Fähnchen und Laternen-Tannen
+  sights: [...SIGHTS, haltSight(sled), haltSight(tube), haltSight(cat), ...PLACE_SIGHTS],
   view,
   view3d: () => import('./view-3d').then((m) => m.view3d),
   models: ICE_MODELS,

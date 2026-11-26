@@ -133,7 +133,11 @@ describe('Schleife (RideRoute.loop, die Grubenbahn)', () => {
     expect(RIDES.filter((r) => r.slide).map((r) => [r.id, r.out, r.pennant, r.loop])).toEqual([
       ['rodel', undefined, undefined, undefined],
     ]);
-    expect(RIDES.filter((r) => r.loop).map((r) => [r.id, r.out, r.pennant])).toEqual([['grube', undefined, undefined]]);
+    // zwei Rundfahrten: Funkel in der Grotte, die Schneeraupe im Eis
+    expect(RIDES.filter((r) => r.loop).map((r) => [r.id, r.out, r.pennant])).toEqual([
+      ['grube', undefined, undefined],
+      ['raupe', undefined, undefined],
+    ]);
   });
 
   it('stopsOf: beide Enden sind derselbe Halt, Sitz auf dem ersten Feld, Zugtier auf dem zweiten', () => {

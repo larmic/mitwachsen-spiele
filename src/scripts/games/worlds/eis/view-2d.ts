@@ -25,6 +25,8 @@ import { SLED_ID, rideFx, sledBodies, sledGoodNight, sledMarks } from './mitwach
 import { TUBE } from './mitwachsen-hill';
 import { runBox, stepBoxes, tubeBodies, tubeFx } from './mitwachsen-tube-look';
 import { LAMP_SCORE, flagBoxes, flagScore, lampBodies } from './mitwachsen-places-look';
+import { CAT } from './mitwachsen-loop';
+import { catBodies, catFx, pisteBox } from './mitwachsen-cat-look';
 
 /** Iglu, Eisschale, Eistrog: Quader wie in 3D */
 const look: DrawDeco = (world, c, x, y) => iceBoxes(world, c, x, y);
@@ -105,7 +107,9 @@ export const view: View2D = {
         ? [x + 0.12, y, c.h, 0.76, 1, 0.02, ...ICE_COLORS.slide]
         : c.ride === TUBE
           ? runBox(c, x, y) // Bahn am Rodelberg
-          : null,
+          : c.ride === CAT
+            ? pisteBox(c, x, y) // Runde der Schneeraupe
+            : null,
   // Wetter und Bild der Weltgrenze der Eis-Welt in der Form, die der Kern kennt (`Sky` in mitwachsen-view.ts)
   sky: { weather: iceWeather, aurora, waitArrow, realmSign, turnAlbum, guestAt, gateScore },
   // Fußspuren im Schnee, die langsam verwehen (mitwachsen-prints.ts)
@@ -135,9 +139,10 @@ export const view: View2D = {
   bodies: (state, world, at) => [
     ...sledBodies(state, world, at),
     ...tubeBodies(state, world, at),
+    ...catBodies(state, world, at), // die Schneeraupe an ihrem Halt oder auf ihrer Runde
     ...lampBodies(state, world),
   ],
   marks: sledMarks,
   goodNight: sledGoodNight, // „Gute Nacht, Fahrzeuge“
-  rideFx: (e, state) => (e.id === SLED_ID.slice(5) ? rideFx(e, state) : tubeFx(e)), // je Fahrzeug nur seine Ereignisse
+  rideFx: (e, state) => (e.id === SLED_ID.slice(5) ? rideFx(e, state) : (tubeFx(e) ?? catFx(e))), // je Fahrzeug nur seine Ereignisse
 };

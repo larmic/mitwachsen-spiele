@@ -15,9 +15,9 @@ import type { GateId } from './mitwachsen';
 /**
  * Fahrzeuge: der Schlitten der Eis-Welt, die Höhlenbahn (`'hoehle'`, das Gleis von der Lichtung in die Grotte), die
  * Grubenbahn Funkel (`'grube'`, eine Schleife in der Grotte), der Rodelreifen (`'rodel'`, nur bergab am Rodelberg der
- * Eis-Welt)
+ * Eis-Welt), die Schneeraupe (`'raupe'`, die Rundfahrt der Eis-Welt)
  */
-export type RideId = 'schlitten' | 'hoehle' | 'grube' | 'rodel';
+export type RideId = 'schlitten' | 'hoehle' | 'grube' | 'rodel' | 'raupe';
 
 /**
  * Vorladen am Halt (`RIDE_PRELOAD`, Konzept „Reisewege“): Steht die Figur höchstens so viele Felder (Schachbrett) vor
@@ -116,5 +116,17 @@ export const RIDES: readonly [RideSpec, ...RideSpec[]] = [
     signal: [1318.51, 1046.5, 880],
     color: '#e8504a',
     slide: true,
+  },
+  // Schneeraupe der Eis-Welt: eine kleine Pistenraupe in Mint mit dunklen Ketten; eine große Runde durch das Tal (260
+  // bis 340 Felder, mit 9 Feldern je s etwa 30 bis 37 s: die Rundfahrt der Eis-Welt, länger als die Fahrten, die
+  // irgendwohin bringen); Signal C5 → E5
+  {
+    id: 'raupe',
+    gate: 'eis',
+    ticks: [250, 380],
+    pace: 0.9,
+    signal: [523.25, 659.25],
+    color: '#3fbfa8',
+    loop: true,
   },
 ];

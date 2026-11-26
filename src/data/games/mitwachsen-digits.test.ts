@@ -32,7 +32,7 @@ describe('Ziffern auf den Schildern', () => {
   });
 
   it('Bahnhof Bär trägt die 1, Bahnhof Fledermaus die 2, Funkels Halt die 3; jede Marke liegt auf ihrer Tafel', () => {
-    expect(HALT_NUMBER).toEqual({ baer: 1, fledermaus: 2, funkel: 3 });
+    expect(HALT_NUMBER).toEqual({ baer: 1, fledermaus: 2, funkel: 3, raupe: 4 });
     for (const [sign, n] of [
       [SIGN, 1],
       [BAT_SIGN, 2],

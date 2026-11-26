@@ -102,10 +102,10 @@ describe('Schlafende Fahrzeuge (dozingOf)', () => {
     expect(dozingOf([BAHN_PACK, FAHRT_PACK], ALONE2, { ...FAR, tick: 20, work })).toEqual(['hoehle']);
   });
 
-  it('Schlitten und Rodelreifen brauchen nur die Fahr-Engine', () => {
+  it('Schlitten, Rodelreifen und Schneeraupe brauchen nur die Fahr-Engine', () => {
     const w = worldOf(1, [EIS_PACK]);
     expect(dozingOf([EIS_PACK, FAHRT_PACK], w, { packs: {}, tick: 0 })).toEqual([]);
-    // ohne Fahr-Engine schlafen beide Fahrzeuge der Eis-Welt: der Schlitten und der Rodelreifen (`rules.more`)
-    expect(dozingOf([EIS_PACK], w, { packs: {}, tick: 0 })).toEqual(['schlitten', 'rodel']);
+    // ohne Fahr-Engine schlafen alle Fahrzeuge der Eis-Welt: Schlitten, Rodelreifen und Schneeraupe (`rules.more`)
+    expect(dozingOf([EIS_PACK], w, { packs: {}, tick: 0 })).toEqual(['schlitten', 'rodel', 'raupe']);
   });
 });

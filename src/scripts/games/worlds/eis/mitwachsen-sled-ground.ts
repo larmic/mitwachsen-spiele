@@ -192,7 +192,7 @@ function yardSpots(
  * Eisblöcke geweicht sind): jedes Feld 1, Tanne oder Eisblock darauf `CLEAR`, neben Haufen, Kristall, Kiste oder
  * Zapfen `BESIDE_THING`, Höhenwechsel 1 mehr. Ohne Weg undefined.
  */
-function cheapest(
+export function cheapest(
   from: Point,
   to: Point,
   no: (x: number, y: number) => boolean,

@@ -6,7 +6,7 @@
 import type { Part } from '../../lib/games/front';
 
 /** Nummern der Halte auf ihren Schildern */
-export const HALT_NUMBER = { baer: 1, fledermaus: 2, funkel: 3 } as const;
+export const HALT_NUMBER = { baer: 1, fledermaus: 2, funkel: 3, raupe: 4 } as const;
 
 /** Ziffern 1 bis 9, je fünf Zeilen zu drei Pixeln (`#` gesetzt) */
 export const DIGITS: Readonly<Record<number, readonly string[]>> = {

@@ -15,7 +15,7 @@
 import { fromKey } from '../../../../lib/games/chunks';
 import { hash, rand01, valueNoise } from '../../../../lib/games/rng';
 import type { Point } from '../../../../data/games/mitwachsen';
-import { KESSEL, KESSEL_COLORS, PLACES } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
+import { KESSEL, KESSEL_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
 import { HOMES } from '../../../../data/games/mitwachsen-homes';
 import { ICE_PORTAL } from '../../../../data/games/mitwachsen-portals';
 import { ICE_STONE } from '../../../../data/games/mitwachsen-stories';
@@ -28,7 +28,8 @@ import { findSpawns } from '../../mitwachsen-spawns';
 import { OBSTACLE_GAP, eisCell } from '../../mitwachsen-world';
 import { adornKessel } from './mitwachsen-snow-fill';
 import { buildHill } from './mitwachsen-hill';
-import { hangLamps, placeFlags } from './mitwachsen-places';
+import { buildLoop, ringOf } from './mitwachsen-loop';
+import { flagSpots, hangLamps, placeFlags } from './mitwachsen-places';
 import { frost, type Wild } from './mitwachsen-frost';
 import { chimes } from './mitwachsen-chime';
 import { haunts } from './mitwachsen-haunts';
@@ -134,7 +135,10 @@ export function buildKessel(
   chimes(seed, wild, map); // zuletzt das Glockenspiel am Klippenfuß, nur auf blankem Schnee: sonst bleibt alles, wo es war
   const sled = sledGround(gang, place, map); // ganz zuletzt Strecke und freier Platz des Schlittens: nichts wird neu gewürfelt
   // der Rodelberg, nach allem Gewürfelten: Nur Tannen und Eisblöcke weichen; auf ihm wohnt kein Tier
-  const off = new Set([...sled, ...buildHill(place.bed, wild, map, sled)]);
+  const taken = new Set([...sled, ...buildHill(place.bed, wild, map, sled)]);
+  // die Runde der Schneeraupe, nach dem Rodelberg: einmal um das Tal, nördlich vom Bett; auf ihr wohnt kein Tier
+  const ring = ringOf((u, v) => gang.at(u, centre + v));
+  const off = new Set([...taken, ...buildLoop(ring, wild, map, taken)]);
   markIceRim(place.cells, map); // innerste Reihe der Klippen: dunkles Tiefeis mit Zacken (nur Bild, Höhen bleiben)
   // Eis-Welt: der ganze Kessel und der Gang ab seiner Mitte (dort wechselt auch die Tieranzeige)
   let inner = gang.depth + 1;
@@ -146,12 +150,8 @@ export function buildKessel(
   const eis = haunts(place.cells, map, (p) => gang.at(...uv(centre, p)), place.bed); // Lieblingsorte nur hier
   const spawns = findSpawns(seed, eis, spots, place.bed);
   // Spielorte, nach allem anderen und vor der Fülle: Fähnchen am Hauptweg (vom Bett zum Eisfall), Laternen an Tannen
-  const { count, every, across } = PLACES.flags;
-  placeFlags(
-    Array.from({ length: count }, (_, i) => gang.at(...uv(centre, [across, every * (i + 1)]))),
-    map,
-    off,
-  );
+  const flags = flagSpots((across, out) => gang.at(...uv(centre, [across, out])));
+  placeFlags(flags, map, off);
   hangLamps(seed, place.cells, map);
   adornKessel(seed, place.cells, map, sled); // Fülle im Schnee, nach allem anderen: Nichts wird neu gewürfelt
   return { bed: place.bed, realm, spots, spawns, stone, portal: [ICE_PORTAL, portal] };

@@ -24,6 +24,8 @@ import { SNOW_FILLS } from './mitwachsen-snow-fill';
 import { TUBE } from './mitwachsen-hill';
 import { stepBoxes } from './mitwachsen-tube-look';
 import { flagBoxes } from './mitwachsen-places-look';
+import { CAT } from './mitwachsen-loop';
+import { CAT_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-cat-model';
 import { fillBoxes } from './mitwachsen-snow-fill-look';
 import { DEEP_ICE, crestBoxes } from './mitwachsen-ice-rim';
 
@@ -43,6 +45,8 @@ const fall = (color: string): Ground => ({
 const SLIDE: Ground = { tiles: ['ice', 'ice', 'ice'], top: ICE_COLORS.slide[1] };
 /** Innerste Reihe der Klippen: dunkles Tiefeis, kein Schnee obenauf */
 const DEEP: Ground = { tiles: ['ice', 'ice', 'ice'], top: DEEP_ICE.top, side: DEEP_ICE.side };
+/** Die Runde der Schneeraupe: gewalzter Schnee, eine Spur dunkler als der Schnee ringsum */
+const PISTE: Ground = { tiles: ['snowTop', 'ice', 'ice'], top: CAT_COLORS.piste[0] };
 /** Rahmen des Betts aus Schnee */
 const SNOW_FRAME: Frame = [...ICE_COLORS.snow, 'white'];
 
@@ -89,6 +93,7 @@ export const view3d: View3D = {
     if (c.biome !== 'eis' || c.region === 'wild') return null;
     if (c.slide && open.includes('eis')) return SLIDE;
     if (c.ride === TUBE) return SLIDE; // Bahn am Rodelberg: glänzendes Eis
+    if (c.ride === CAT) return PISTE; // Runde der Schneeraupe: gewalzter Schnee
     if (c.rim) return DEEP; // innerste Reihe der Klippen: Tiefeis statt Schnee (mitwachsen-ice-rim.ts)
     if (c.color && (c.region === 'border' || c.ground === 'ice')) return fall(c.color); // Eisfall, Stufen des Eisbergs
     return c.region === 'border' || c.ground === 'snow' ? KESSEL : null;
