@@ -178,6 +178,7 @@ export type WorldRules<Ride = never, Herald = never, Vehicle = never> = {
   herald?: Herald;
   ritual?: Herald;
   vehicle?: Vehicle;
+  more?: readonly Vehicle[]; // weitere Fahrzeuge derselben Welt (Eis-Welt: der Rodelreifen neben dem Schlitten)
 };
 
 /** Liegt ein Feld ganz hinter dem Felsring der Lichtung? */

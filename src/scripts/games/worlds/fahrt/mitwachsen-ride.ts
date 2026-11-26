@@ -12,6 +12,8 @@
 // Halt: schnarcht, steigt niemanden ein, bis es da ist. Eine Schleife (`RideRoute.loop`, die Grubenbahn in der Grotte)
 // hat nur einen Halt: Sie fährt von ihm immer vorwärts herum und kommt dort wieder an, ohne Fest; so viele Runden, wie
 // das Fahrzeug will (`Vehicle.laps`, höchstens `MAX_LAPS`; ohne: eine), immer zu Ende, zwischen den Runden ohne Halt.
+// Ein Fahrzeug nur bergab (`RideSpec.slide`, der Rodelreifen) ist immer da und steht immer oben an `home`: Es fährt
+// hinab ans Ende seiner Strecke, die Figur steigt aus, und es steht wieder oben.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Der Schlitten“ und „Tok und die Bahn“, Fahren)
 
 import { DIRS } from '../../../../lib/games/front';
@@ -462,7 +464,8 @@ export function rideRules(v: Vehicle): One {
       const c = ctx(world, s);
       if (!c) return;
       if (s.ride) return drive(c, s, world, events);
-      if (!stageOf(s.packs, id)) return v.ready ? due(c, s, world, events) : undefined;
+      // noch nicht da (ein Fahrzeug nur bergab ist immer da, ohne Eintrag im Spielstand)
+      if (!stageOf(s.packs, id) && !v.spec.slide) return v.ready ? due(c, s, world, events) : undefined;
       const at = parked(v.spec, c.r, s, world);
       if (!at || s.sleeping) return; // nachts ist es still (auch `come` fällt dann aus)
       if (dozes(c, s)) {
@@ -490,7 +493,7 @@ export function rideRules(v: Vehicle): One {
     },
     blocks(s, world, a, x, y) {
       const stage = stageOf(s.packs, id);
-      const r = stage && v.route(world, s);
+      const r = (stage || v.spec.slide) && v.route(world, s);
       if (!r) return false;
       const at = stopsOf(r);
       const k = key(x, y);

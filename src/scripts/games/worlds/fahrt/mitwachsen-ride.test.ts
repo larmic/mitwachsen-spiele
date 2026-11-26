@@ -127,8 +127,12 @@ describe('Schleife (RideRoute.loop, die Grubenbahn)', () => {
     expect(loop.loop).toBe(true);
     expect(loop.out).toBeUndefined();
     expect(loop.pennant).toBeUndefined();
-    // Schlitten und Zug pendeln, nur Funkel (die Grubenbahn) fährt eine Schleife
-    expect(RIDES.filter((r) => r.id !== 'grube').every((r) => !r.loop && !!r.out && !!r.pennant)).toBe(true);
+    // Schlitten und Zug pendeln, nur Funkel (die Grubenbahn) fährt eine Schleife; der Rodelreifen fährt nur bergab
+    expect(RIDES.filter((r) => !r.loop && !r.slide).map((r) => r.id)).toEqual(['schlitten', 'hoehle']);
+    expect(RIDES.filter((r) => !r.loop && !r.slide).every((r) => !!r.out && !!r.pennant)).toBe(true);
+    expect(RIDES.filter((r) => r.slide).map((r) => [r.id, r.out, r.pennant, r.loop])).toEqual([
+      ['rodel', undefined, undefined, undefined],
+    ]);
     expect(RIDES.filter((r) => r.loop).map((r) => [r.id, r.out, r.pennant])).toEqual([['grube', undefined, undefined]]);
   });
 
