@@ -2,7 +2,9 @@
 // Grabens, wie nah die Figur am Grubenhalt sein muss, damit es beginnt, und das Bild der Erdwelle (Teile wie in
 // `front.ts`: vorn, rechts, unten, Länge, Breite, Höhe, Farbe, oben; eigene Voxel-Grafik). Die Erdwelle ist ein kleiner
 // Erdhügel, der unter dem Boden entlang der künftigen Runde läuft, wie ein Maulwurf eben gräbt; darin glitzern zwei
-// Kristallkrümel. Kein Gold (die Welle ist keine Aktion), kein Gesicht, nichts Spitzes.
+// Kristallkrümel. Hinter ihm bleibt liegen, was er baut (Issue 14, damit das Kind sieht, dass hier eine Bahn entsteht):
+// auf der offenen Strecke ein Bett frischer Erde, auf das die Ansicht das schmale Gleis legt (`BED_PART`), auf dem Fels
+// des Gangs Glitzerkrümel (`CRUMB_PARTS`). Kein Gold (die Welle ist keine Aktion), kein Gesicht, nichts Spitzes.
 // Spec: docs/specs/mitwachsen.md („Die Grubenbahn Funkel“, Der Maulwurf gräbt)
 
 import type { Part } from '../../../../lib/games/front';
@@ -54,3 +56,22 @@ export const MOUND_PARTS: readonly Part[] = [
   [-0.06, 0.08, 0.3, 0.08, 0.08, 0.1, K[0], K[1]],
   [0.06, -0.12, 0.26, 0.07, 0.07, 0.08, K[0], K[1]],
 ];
+
+/** So hoch (Felder) liegt das Bett frischer Erde, auf dem das wachsende Gleis liegt */
+export const BED_H = 0.03;
+/** Bett frischer Erde unter einem Stück Gleis, das der Erdhügel eben gelegt hat (fast das ganze Feld, flach) */
+export const BED_PART: Part = [-0.45, -0.45, 0, 0.9, 0.9, BED_H, D[0], D[1]];
+
+/** Glitzerkrümel, die der Erdhügel auf dem Fels des Gangs liegen lässt, bis der Gang aufgeht: Erde und Kristall */
+export const CRUMB_PARTS: readonly Part[] = [
+  [-0.22, -0.2, 0, 0.2, 0.2, 0.08, E[0], E[1]],
+  [0.06, 0.04, 0, 0.16, 0.16, 0.06, C[0], C[1]],
+  [-0.1, 0.16, 0, 0.1, 0.1, 0.12, K[0], K[1]],
+  [0.14, -0.2, 0, 0.08, 0.08, 0.1, K[0], K[1]],
+];
+
+/**
+ * So weit (Felder, Schachbrett) um die Figur zeichnet die Ansicht, was der Erdhügel liegen lässt: Sie steht am Halt und
+ * hüpft nur, weiter weg ist es nicht im Bild (die Runde hat rund 160 Felder)
+ */
+export const DIG_SEEN = 14;

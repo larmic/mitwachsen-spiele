@@ -3630,6 +3630,7 @@ test(
       if (!now.dig) break;
     }
     expect(seen.has('grube-erde')).toBe(true); // die Erdwelle war zu sehen
+    expect([...seen].some((id) => id.startsWith('grube-bau:'))).toBe(true); // hinter ihr wuchs das Gleis mit
     const dug = await game.evaluate((node) => {
       const el = node as unknown as Game;
       const stone = el.world.stones.get('grube');
