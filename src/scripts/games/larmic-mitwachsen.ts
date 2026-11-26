@@ -70,20 +70,33 @@ const SPEED = (1000 / STEP_MS) * 1.1; // Felder pro Sekunde beim Gleiten: etwas 
 
 const noop = () => {};
 /** Ereignisse aus den Regeln einer Welt (`PackEvent`): Ihre Töne kommen aus dem Paket dieser Welt (`packScore`) */
-const PACKED: ReadonlySet<string> = new Set<PackEvent['type']>([
-  'snowman',
-  'icicle',
+// als Tabelle über alle Arten: Fehlt eine neue, bricht die Typprüfung (am 26.11.2026 fehlte `lapstone`, der Zahlenstein
+// blieb im Spiel stumm)
+const PACK_TYPES: Record<PackEvent['type'], true> = {
+  snowman: true,
+  icicle: true,
+  column: true,
+  olm: true,
+  web: true,
+  chimegate: true,
+  lantern: true,
+  heave: true,
+  lapstone: true,
+  numflag: true,
+  treelamp: true,
+};
+const PACKED: ReadonlySet<string> = new Set(Object.keys(PACK_TYPES));
+const packed = (e: { type: string }): e is PackEvent => PACKED.has(e.type);
+/** Davon zeigt und spielt das Paket alles selbst (Säule, Grottenolm, Netz, Klingeltor, Zahlenstein) */
+type PackOnly = Extract<PackEvent, { type: 'column' | 'olm' | 'web' | 'chimegate' | 'lapstone' | 'numflag' }>;
+const PACK_ONLY: ReadonlySet<string> = new Set<PackOnly['type']>([
   'column',
   'olm',
   'web',
   'chimegate',
-  'lantern',
-  'heave',
+  'lapstone',
+  'numflag',
 ]);
-const packed = (e: { type: string }): e is PackEvent => PACKED.has(e.type);
-/** Davon zeigt und spielt das Paket alles selbst (Säule, Grottenolm, Netz, Klingeltor, Zahlenstein) */
-type PackOnly = Extract<PackEvent, { type: 'column' | 'olm' | 'web' | 'chimegate' | 'lapstone' }>;
-const PACK_ONLY: ReadonlySet<string> = new Set<PackOnly['type']>(['column', 'olm', 'web', 'chimegate', 'lapstone']);
 const packOnly = (e: { type: string }): e is PackOnly => PACK_ONLY.has(e.type);
 
 class LarmicMitwachsen extends HTMLElement {
@@ -862,6 +875,7 @@ class LarmicMitwachsen extends HTMLElement {
     if (reshapes(e)) this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]); // leer, wieder voll, gewachsen
     if (packed(e)) this.sfx.score(packScore(this.renderer.views.values(), e)); // Töne aus dem Paket der Welt des Ereignisses
     if (packOnly(e)) return; // Säule, Grottenolm, Netz, Klingeltor: Bild und Ton aus dem Paket
+    if (e.type === 'treelamp') return void this.save(); // Laternen-Tanne angezündet: Sie bleibt an (Bild und Ton aus dem Paket)
     if (e.type === 'heave') {
       // Hau-ruck am Höhlentor: Figur und Tok lehnen sich an den Stein (Bild und Ton aus dem Paket der Höhlenwelt)
       if (e.n > 0) this.hops.set('player', now);

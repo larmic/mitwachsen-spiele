@@ -59,6 +59,7 @@ export type Deco =
   | 'fishcrate' // Fischkiste im Gletscherkessel: Hineinlaufen fängt Fische ins Netz (fest wie ein Busch)
   | 'snowheap' // Schneehaufen im Gletscherkessel: Hineinlaufen lässt eine Kugel wachsen, bis ein Schneemann steht (fest)
   | 'icicle' // Eiszapfen des Glockenspiels am Klippenfuß im Gletschertal: Hinlaufen lässt ihn klingen (begehbar)
+  | 'numflag' // Zahlen-Fähnchen am Hauptweg der Eis-Welt (flach, begehbar; `note`: seine Zahl 1 bis 9; zeichnet nur das Paket)
   | 'hillstep' // Stufe der Treppe am Rodelberg der Eis-Welt (flach, begehbar; zeichnet nur das Paket)
   | 'lapstone' // Zahlenstein an einer Rundfahrt (fest; `note`: seine Zahl): Hineinlaufen wählt so viele Runden (zeichnet nur das Paket)
   // Fülle im Schnee des Gletschertals (flach, begehbar, nur Bild; zeichnet nur das Welt-Paket, solange es lädt: nichts)
@@ -116,6 +117,7 @@ export type Cell = {
   tint?: string; // Farbe, mit der Gras und Blätter auf der Lichtung getönt sind (Stimmung der Richtung)
   story?: StoryId; // Klangstein dieser Geschichte
   note?: number; // Tonhöhe eines Eiszapfens im Glockenspiel: 0 tief (lang) … 6 hoch (kurz); Kristallgrotte: Ton einer Säule, Teil, Höhe oder Ende des Stegs, Mitte eines Kristallfelds, Richtung einer Ader, Seite der Wand am Leuchtmoos
+  lamp?: true; // Laternen-Tanne der Eis-Welt: Die Tanne trägt eine Kristall-Laterne zum Anzünden (zeichnet nur das Paket)
   light?: number; // so viel heller (0 … 0,5) ist das Feld in der Grotte: Lichtschacht, Kristall oder Leuchtpilz daneben
   shaft?: number; // Lichtfleck dieses Lichtschachts der Grotte liegt hier (0 über dem Bett, 1 Kristallhalle, 2 am See): abends golden-orange, Fledermaus-Runden
   dim?: number; // so viel dunkler (0 … 0,3) ist das Feld in der Grotte: Felswand oder Boden nah an ihr (nie auf Wegen, am Bett, im Licht)

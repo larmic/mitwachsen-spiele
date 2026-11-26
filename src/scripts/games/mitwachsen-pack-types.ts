@@ -68,7 +68,9 @@ export type PackEvent =
   | { type: 'chimegate'; x: number; y: number; answer: boolean }
   | { type: 'lantern'; x: number; y: number }
   | { type: 'heave'; x: number; y: number; n: number; who?: string }
-  | { type: 'lapstone'; x: number; y: number; n: number }; // Zahlenstein an einer Rundfahrt gewählt: so viele Runden (Issue 48)
+  | { type: 'lapstone'; x: number; y: number; n: number } // Zahlenstein an einer Rundfahrt gewählt: so viele Runden (Issue 48)
+  | { type: 'numflag'; x: number; y: number; n: number } // Zahlen-Fähnchen der Eis-Welt bimmelt (Issue 52)
+  | { type: 'treelamp'; x: number; y: number }; // Laternen-Tanne der Eis-Welt angezündet (bleibt an, gleich gespeichert)
 
 /**
  * Was die Regeln einer Welt vom Zustand sehen und ändern dürfen: den gespeicherten Zustand der Welt-Pakete (`packs`, je

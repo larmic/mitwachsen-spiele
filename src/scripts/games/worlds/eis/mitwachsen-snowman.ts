@@ -61,7 +61,8 @@ const bump: WorldRules['bump'] = (s, c: Cell, x, y, events) => {
   const stage = (snow[`${x},${y}`] ?? 0) + 1;
   if (stage > SNOWMAN) return false;
   const next: EisSave = { v: 1, snow: { ...snow, [`${x},${y}`]: stage } };
-  s.packs = { ...s.packs, eis: next };
+  // was die Eis-Welt sonst noch merkt (angezündete Laternen, mitwachsen-places.ts), bleibt
+  s.packs = { ...s.packs, eis: { ...(typeof s.packs.eis === 'object' ? s.packs.eis : {}), ...next } };
   lookUp(s, WATCH);
   events.push({ type: 'snowman', x, y, stage });
   return true;

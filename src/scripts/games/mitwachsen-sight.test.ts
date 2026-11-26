@@ -114,7 +114,9 @@ describe('Hinführen: Ziel', () => {
     const s = at(bed[0], bed[1] + 2);
     const goals = goalsOf(s, world, SIGHTS);
     // der Rodelreifen steht vom ersten Besuch an auf seinem Berg und lockt bis zur ersten Abfahrt
-    expect(goals.map((g) => g.sight.id).sort()).toEqual(['eis:glockenspiel', 'eis:schneehaufen', 'halt:rodel']);
+    // dazu die Spielorte: Zahlen-Fähnchen und Laternen-Tannen (Issue 52)
+    const all = ['eis:faehnchen', 'eis:glockenspiel', 'eis:laternen', 'eis:schneehaufen', 'halt:rodel'];
+    expect(goals.map((g) => g.sight.id).sort()).toEqual(all);
     for (const g of goals) expect(world.realm(...g.at)).toBe('eis');
     const far = (id: string) =>
       Math.min(
@@ -122,12 +124,10 @@ describe('Hinführen: Ziel', () => {
           .cells(world, s)
           .map(([x, y]) => Math.hypot(x - bed[0], y - bed[1])),
       );
-    expect(goals.map((g) => g.sight.id)).toEqual(
-      ['eis:glockenspiel', 'eis:schneehaufen', 'halt:rodel'].sort((a, b) => far(a) - far(b)),
-    );
-    expect(goalsOf({ ...s, found: ['eis:glockenspiel', 'halt:rodel'] }, world, SIGHTS).map((g) => g.sight.id)).toEqual([
-      'eis:schneehaufen',
-    ]);
+    expect(goals.map((g) => g.sight.id)).toEqual([...all].sort((a, b) => far(a) - far(b)));
+    expect(
+      goalsOf({ ...s, found: all.filter((id) => id !== 'eis:schneehaufen') }, world, SIGHTS).map((g) => g.sight.id),
+    ).toEqual(['eis:schneehaufen']);
     const lazy: Sight = { ...only('eis:glockenspiel')[0]!, ready: () => false };
     expect(goalsOf(s, world, [lazy])).toEqual([]);
     // auf der Lichtung lockt nichts aus der Eis-Welt

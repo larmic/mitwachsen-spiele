@@ -3545,6 +3545,80 @@ test(
   },
 );
 
+// Spielorte im Eis (Issue 52, `?entwickler=eis`, fester Seed 1; @3d, weil Fähnchen und Laternen auch in 3D gezeichnet
+// werden): Neun Zahlen-Fähnchen stehen im Tal. Die Figur läuft in eine Laternen-Tanne: Ihre Laterne geht an und bleibt
+// an (im Zustand der Eis-Welt gemerkt), noch einmal hinein stößt sie nur an. Über die Test-Uhr; im Blick hinein wird
+// nichts gespeichert
+test(
+  'Spiel: Spielorte im Eis: neun Zahlen-Fähnchen, eine Laternen-Tanne geht an und bleibt an, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    type Cell = { deco?: string | null; note?: number; lamp?: true; solid?: boolean; ground?: string; region?: string };
+    type Game = {
+      world: { homes: Record<string, { bed: [number, number] }>; cell(x: number, y: number): Cell };
+      state: { player: { x: number; y: number; dir: string }; animals: unknown[]; packs: { eis?: { lit?: string[] } } };
+      rides: { id: string; key: string }[];
+      apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+    };
+    await page.addInitScript(() => {
+      const real = crypto.getRandomValues.bind(crypto);
+      const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+        a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+      Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    });
+    const game = await openGame(page, { clock: true, dev: 'eis' });
+    await expectView(page);
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    await ticks(page, 5);
+    // Fähnchen zählen und die nächste Laternen-Tanne mit freiem Feld südlich davon suchen; dorthin stellen
+    const found = await game.evaluate((node) => {
+      const el = node as unknown as Game;
+      const [bx, by] = el.world.homes.eis!.bed;
+      const flags: number[] = [];
+      let lamp: [number, number] | undefined;
+      for (let y = by - 140; y <= by + 140; y++)
+        for (let x = bx - 100; x <= bx + 100; x++) {
+          const c = el.world.cell(x, y);
+          if (c.deco === 'numflag') flags.push(c.note!);
+          const south = el.world.cell(x, y + 1);
+          const free = !south.solid && !south.deco && south.ground === 'snow' && south.region === 'eis';
+          const nearer = !lamp || Math.hypot(x - bx, y - by) < Math.hypot(lamp[0] - bx, lamp[1] - by);
+          if (c.lamp && free && nearer) lamp = [x, y];
+        }
+      if (lamp) el.state = { ...el.state, animals: [], player: { x: lamp[0], y: lamp[1] + 1, dir: 'n' } };
+      return { flags: flags.sort((a, b) => a - b), lamp };
+    });
+    expect(found.flags).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(found.lamp).toBeDefined();
+    await render(page, 2);
+    const id = `eis:laterne:${found.lamp!.join(',')}`;
+    const look = () =>
+      game.evaluate((node, want) => (node as unknown as Game).rides.find((r) => r.id === want)?.key, id);
+    expect(await look()).toBe('eis:laterne:aus');
+    const bump = () =>
+      game.evaluate((node) => {
+        const el = node as unknown as Game;
+        const before = { ...el.state.player };
+        el.apply({ type: 'move', dir: 'n', fresh: true });
+        return {
+          stayed: el.state.player.x === before.x && el.state.player.y === before.y,
+          lit: el.state.packs.eis?.lit,
+        };
+      });
+    expect(await bump()).toEqual({ stayed: true, lit: [found.lamp!.join(',')] });
+    await ticks(page, 3);
+    await render(page, 2);
+    expect(await look()).toBe('eis:laterne:an');
+    expect(await bump()).toEqual({ stayed: true, lit: [found.lamp!.join(',')] }); // brennt schon: nur anstoßen
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
+      [],
+    );
+    expect(errors).toEqual([]);
+  },
+);
+
 // Rodelberg in der Eis-Welt (Issue 50, `?entwickler=eis`, fester Seed 1; @3d, weil Berg, Treppe, Bahn und Reifen auch in
 // 3D gezeichnet werden und die Kamera dem Reifen folgt): Der Reifen steht vom ersten Besuch an oben auf dem Gipfel. Die
 // Figur steht oben auf der Treppe und läuft hinein: Sie sitzt im Reifen, 2 s später geht es die Bahn hinab, nie bergauf,
