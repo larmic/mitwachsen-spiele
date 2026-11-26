@@ -5,7 +5,10 @@
 // Höhe des Gleises); eine Kurve kostet `turn` Felder mehr, eine Stufe eines. Teil des Pakets der Bahn.
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Gleis als Boden)
 
+import { Heap } from '../../../../lib/games/heap';
 import type { Point } from '../../../../data/games/mitwachsen';
+
+export { Heap }; // der Haufen liegt im Unterbau (src/lib/games/heap.ts), auch die Wegsuche des Kerns nutzt ihn
 
 /** Richtungen 0 rechts (e), 1 unten (s), 2 links (w), 3 oben (n) */
 export const STEPS: readonly Point[] = [
@@ -70,44 +73,6 @@ export function gridOf(
       [height[i], extra[i]] = v;
     }
   return { x0, y0, w, h, open, height, extra };
-}
-
-/** Kleinster Haufen über Zahlen */
-export class Heap {
-  private a: number[] = [];
-  get size() {
-    return this.a.length;
-  }
-  push(v: number) {
-    const a = this.a;
-    a.push(v);
-    for (let i = a.length - 1; i > 0;) {
-      const p = (i - 1) >> 1;
-      if (a[p]! <= v) break;
-      a[i] = a[p]!;
-      a[p] = v;
-      i = p;
-    }
-  }
-  pop(): number {
-    const a = this.a;
-    const top = a[0]!;
-    const last = a.pop()!;
-    if (a.length) {
-      a[0] = last;
-      for (let i = 0; ;) {
-        const l = 2 * i + 1,
-          r = l + 1;
-        let m = i;
-        if (l < a.length && a[l]! < a[m]!) m = l;
-        if (r < a.length && a[r]! < a[m]!) m = r;
-        if (m === i) break;
-        [a[i], a[m]] = [a[m]!, a[i]!];
-        i = m;
-      }
-    }
-    return top;
-  }
 }
 
 /** Höchste Höhe, die ein Gleis haben kann (Hügel bis 3, ein Stein darauf eine mehr) */
