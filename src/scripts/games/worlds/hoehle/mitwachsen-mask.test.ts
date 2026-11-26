@@ -214,7 +214,7 @@ describe('Dunkelmaske: Löcher', () => {
     expect(pathBands(bare)).toEqual([]);
   });
 
-  it('zuerst das Loch um die Figur (mit Laterne größer), dann die nächsten; feste Löcher an Schächten, Wiese, Bahnhof, Mündung und Netzen', () => {
+  it('zuerst das Loch um die Figur (mit Laterne größer), dann die nächsten; feste Löcher an Schächten, Wiese, Bahnhof, Mündung, Netzen und am Kristallbogen', () => {
     const holes = maskHoles(w, lit(bed), at);
     expect(holes[0]).toMatchObject({ x: bed[0] + 0.5, y: bed[1] + 0.5, r: D.hole, open: 1 });
     expect(maskHoles(w, lit(bed, { lamp: 'hoehle' }), at)[0]!.r).toBe(D.lantern);
@@ -227,9 +227,12 @@ describe('Dunkelmaske: Löcher', () => {
       D.fixed.station,
       D.fixed.mouth,
       ...webs(w).map(() => D.fixed.web), // je Netz der Tupfspinnen eins: die Spinne lebt nur im Licht
+      D.fixed.arch, // der Kristallbogen der Halle: Dort hängen die Fledermäuse (Issue 30)
     ]);
     expect(webs(w).length).toBeGreaterThanOrEqual(GROTTE.web.least);
-    expect(fixed.slice(6).map((h) => [h.x - 0.5, h.y - 0.5])).toEqual(webs(w));
+    expect(fixed.slice(6, -1).map((h) => [h.x - 0.5, h.y - 0.5])).toEqual(webs(w));
+    const arch = w.cell(fixed.at(-1)!.x - 0.5, fixed.at(-1)!.y - 0.5);
+    expect([arch.deco, arch.note, arch.perch !== undefined]).toEqual(['crystalarch', 2, true]); // die Mitte des Bogens
     expect(fixed[3]).toMatchObject({ x: bed[0] + 0.5, y: bed[1] + 0.5 });
     expect(fixed.every((h) => holes.some((g) => g.x === h.x && g.y === h.y && g.r === h.r))).toBe(true);
     // nach dem ersten nach Abstand (bis zum Rand des Lochs)

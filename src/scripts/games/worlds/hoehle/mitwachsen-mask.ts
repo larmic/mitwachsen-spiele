@@ -169,16 +169,30 @@ const centre = (world: Pick<World, 'cell'>, [x, y]: Point, r: number): Hole => (
   open: 1,
 });
 
+/** Mitte des Kristallbogens der Halle (das mittlere seiner fünf Felder, `note` 2); ohne Halle keine */
+function archOf(world: Cave): Point[] {
+  const frame = caveFrame(world);
+  const [hx, hy] = frame ? frame.at(GROTTE.hall.across, GROTTE.hall.out) : [0, 0];
+  const r = GROTTE.hall.r + 2;
+  for (let y = hy - r; frame && y <= hy + r; y++)
+    for (let x = hx - r; x <= hx + r; x++) {
+      const c = world.cell(x, y);
+      if (c.deco === 'crystalarch' && c.note === 2) return [[x, y]];
+    }
+  return [];
+}
+
 const fixedOf = new WeakMap<object, Hole[]>();
 /**
- * Feste Löcher: die drei Lichtschächte, die Wiese am Bett, Bahnhof Fledermaus, die Mündung des Gangs und jedes Netz der
- * Tupfspinnen (die Spinne lebt nur im Licht); je Welt einmal
+ * Feste Löcher: die drei Lichtschächte, die Wiese am Bett, Bahnhof Fledermaus, die Mündung des Gangs, jedes Netz der
+ * Tupfspinnen (die Spinne lebt nur im Licht) und die Mitte des Kristallbogens in der Halle (dort hängen die
+ * Fledermäuse, Issue 30); je Welt einmal
  */
 export function fixedHoles(world: Cave): Hole[] {
   const known = fixedOf.get(world);
   if (known) return known;
   const frame = caveFrame(world);
-  const { shaft, meadow, station, mouth, web } = D.fixed;
+  const { shaft, meadow, station, mouth, web, arch } = D.fixed;
   const S = GROTTE.station;
   const holes = frame
     ? [
@@ -187,6 +201,7 @@ export function fixedHoles(world: Cave): Hole[] {
         centre(world, frame.at(S.side + S.wide / 2, S.out + S.long / 2), station),
         centre(world, frame.at(0, 1), mouth),
         ...webs(world).map((p) => centre(world, p, web)),
+        ...archOf(world).map((p) => centre(world, p, arch)),
       ]
     : [];
   fixedOf.set(world, holes);
