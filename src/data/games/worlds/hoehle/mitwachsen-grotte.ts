@@ -78,7 +78,7 @@ export const GROTTE = {
    * für ein tiefes Nachtlila, unter dem Fels und Nebel unter 0,08 fielen; die hellere Farbe braucht 0,87 für denselben
    * Boden. Lichtloch um die Figur `hole` Felder, mit Laterne `lantern` (wächst in `circle.grow` ms), im Fahrzeug um den
    * Sitz `seat`, an den Lampen vorn `lamp`. Feste Löcher (`fixed`, Radius in Feldern): Lichtschächte, Wiese am Bett,
-   * Bahnhof Fledermaus, Mündung des Gangs, jedes Netz der Tupfspinnen (`web`). Kleine Löcher (`small`) nur bis `near` Felder um die Figur (die letzten zwei
+   * Bahnhof Fledermaus, Mündung des Gangs, jedes Netz der Tupfspinnen (`web`), der Kristallbogen der Halle (`arch`, Issue 30: Dort hängen die Fledermäuse). Kleine Löcher (`small`) nur bis `near` Felder um die Figur (die letzten zwei
    * weich; Leuchtmoos `moss`, die Mitte eines Kristallfelds `field`, der Wasserfall `fall`); Wege als Bänder, `band` Felder breit. Höchstens `most` Löcher je Bild. Im Gang blendet sie mit dem Weg aus,
    * `gang` Felder von der Mündung ist sie weg, und nie schneller als in `fade` ms; ist die Nacht bei `night`, ist sie ganz
    * weg (Maske × (1 − Nacht / `night`))
@@ -92,7 +92,7 @@ export const GROTTE = {
     lantern: 6.5,
     seat: 3.5,
     lamp: 1.2,
-    fixed: { shaft: 3.5, meadow: 6, station: 4, mouth: 3, web: 2 },
+    fixed: { shaft: 3.5, meadow: 6, station: 4, mouth: 3, web: 2, arch: 3 },
     small: { crystal: 0.8, column: 1, lamp: 1, bed: 1.2, spring: 1.2, animal: 1, moss: 0.6, field: 1.1, fall: 1.2 },
     near: 9,
     band: 2.5,
@@ -138,7 +138,7 @@ export const GROTTE = {
    * und Klangstein stehen in Weltrichtung um die Mitte der Halle (`hallStage`), nicht im Raster der Grotte.
    * Radius `r` 10 (früher 12): Platz für den Hinweg der Grubenbahn zwischen Halle und Wand
    */
-  hall: { across: 25, out: 57, r: 10, columns: [5, 4.5, 4, 3.5, 3], arch: 8 },
+  hall: { across: 25, out: 57, r: 10, columns: [5, 4.5, 4, 3.5, 3], arch: 3 },
   /**
    * Kleine Lichtgeister in der Kristallhalle (Schritt 11 der Rückmeldung, Regeln in mitwachsen-ghost.ts): `count` Geister,
    * jeder in einem Versteck seitlich an einer Säule (`side` Felder neben ihrer Mitte nach Osten oder Westen, `back` ein

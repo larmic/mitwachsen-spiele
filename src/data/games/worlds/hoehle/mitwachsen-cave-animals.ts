@@ -28,7 +28,7 @@ export const CAVE_ANIMALS: readonly { species: CaveSpeciesId; near: CaveHaunt; a
   { species: 'grottenolm', near: 'jetty', at: [0, 109] },
   { species: 'eidechse', near: 'scree', at: [22, 112] },
   { species: 'siebenschlaefer', near: 'floor', at: [9, 13] },
-  { species: 'fledermaus', near: 'arch', at: [25, 62] },
+  { species: 'fledermaus', near: 'arch', at: [25, 57] },
   { species: 'murmeltier', near: 'scree', at: [28, 120] },
   { species: 'gluehwuermchen', near: 'shrooms', at: [-22, 50] },
 ];
