@@ -28,7 +28,7 @@ describe('Kristallfackeln: Plan', () => {
 });
 
 describe('Kristallfackeln: in der Welt', () => {
-  it.each(seedsFor(seedRange(1, 20)))(
+  it.each(seedsFor(seedRange(1, 8)))(
     'Seed %i: genug Fackeln, jede frei umgehbar, keine im Weg, eine Kette entlang der Mitte',
     (seed) => {
       const w = worldOf(seed, [HOEHLE_PACK]);

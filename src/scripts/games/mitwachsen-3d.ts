@@ -31,6 +31,7 @@ import {
   PerspectiveCamera,
   Scene as ThreeScene,
   Vector3,
+  Vector4,
   WebGLRenderer,
 } from 'three';
 import { CHUNK, chunkOf, fromKey, withNeighbours } from '../../lib/games/chunks';
@@ -64,7 +65,7 @@ import type { Scene } from './mitwachsen-render';
 import { SHEER } from './mitwachsen-ride-view';
 import type { State } from './mitwachsen-state';
 import type { Cell, World } from './mitwachsen-world';
-import { homeAt } from './mitwachsen-home';
+import { PILZ_OVER, homeAt, openRoof } from './mitwachsen-home';
 import { turnHead } from './mitwachsen-air';
 import { drawDeco, type DecoAt } from './mitwachsen-view';
 import { Views3D, type Air } from './mitwachsen-view-3d';
@@ -152,6 +153,8 @@ export class World3D {
     // Durchblick: Was zwischen Kamera und Figur steht, wird dort halb durchsichtig
     mwEye: { value: new Vector3() },
     mwTarget: { value: new Vector3() },
+    // Unterstand am Zuhause: Mitte (x, z), Radius, wie weit offen (`openRoof`); Dach darüber wird zum Gitter
+    mwRoof: { value: new Vector4() },
     // Wind: Grasbüschel wiegen sich
     mwTime: { value: 0 },
     mwWind: { value: 0 },
@@ -268,7 +271,7 @@ export class World3D {
         );
       shader.fragmentShader =
         'uniform sampler2D mwFogMap;\nuniform vec2 mwFogOrigin;\nuniform float mwFogSize;\nuniform vec3 mwFogTint;\n' +
-        'uniform vec3 mwEye;\nuniform vec3 mwTarget;\nvarying vec3 vMwWorld;\n' +
+        'uniform vec3 mwEye;\nuniform vec3 mwTarget;\nuniform vec4 mwRoof;\nvarying vec3 vMwWorld;\n' +
         shader.fragmentShader
           .replace(
             '#include <clipping_planes_fragment>',
@@ -279,10 +282,14 @@ export class World3D {
                   '  float mwLen = distance(mwTarget, mwEye);\n' +
                   '  float mwT = dot(vMwWorld - mwEye, mwDir);\n' +
                   '  float mwD = distance(vMwWorld, mwEye + mwDir * mwT);\n' +
+                  '  float mwBayer = (mod(floor(gl_FragCoord.x), 2.0) * 2.0 + mod(floor(gl_FragCoord.y), 2.0)) / 4.0;\n' +
                   '  if (mwT < mwLen - 0.8 && vMwWorld.y > mwTarget.y - 0.7) {\n' +
                   '    float mwCut = 0.75 * smoothstep(1.7, 0.9, mwD);\n' +
-                  '    float mwBayer = (mod(floor(gl_FragCoord.x), 2.0) * 2.0 + mod(floor(gl_FragCoord.y), 2.0)) / 4.0;\n' +
                   '    if (mwBayer < mwCut) discard;\n' +
+                  '  }\n' +
+                  '  if (distance(vMwWorld.xz, mwRoof.xy) < mwRoof.z && vMwWorld.y > mwTarget.y + 0.3) {\n' +
+                  '    float mwChk = mod(floor(gl_FragCoord.x) + floor(gl_FragCoord.y), 2.0);\n' +
+                  '    if (mwRoof.w > 0.5 ? mwChk < 0.5 : (mwRoof.w > 0.0 && mwBayer < 0.25)) discard;\n' +
                   '  }',
           )
           .replace(
@@ -377,6 +384,8 @@ export class World3D {
     this.camera.lookAt(...look);
     this.fogUniforms.mwEye.value.copy(this.camera.position);
     this.fogUniforms.mwTarget.value.set(tx, ty + 0.9, tz);
+    const roof = openRoof(this.world!, Math.round(tx - 0.5), Math.round(tz - 0.5));
+    this.fogUniforms.mwRoof.value.set(roof.x, roof.y, roof.r, roof.open);
     this.fogUniforms.mwTime.value = sc.now / 1000;
     this.fogUniforms.mwWind.value = sc.wind;
     // Sonne von links oben vorn, dreht mit der Kamera (ohne Pendeln); Schatten folgen dem Blick, im Lichtraum auf
@@ -869,26 +878,26 @@ export class World3D {
       redTop = '#e0574a';
     g.box(x + 0.15, h, y + 0.15, 0.7, 3.2, 0.7, stem, stemTop);
     g.box(x - 0.05, h + 2.2, y - 0.05, 1.1, 0.25, 1.1, stem, stemTop); // Kragen
-    const [cx0, cx1] = [x0 - 0.6, x1 + 1.6],
-      [cz0, cz1] = [y0 - 0.8, y1 + 1.8];
+    const [cx0, cx1] = [x0 - PILZ_OVER, x1 + 1 + PILZ_OVER], // der Hut ragt nur wenig über (vorher 0,6 und 0,8)
+      [cz0, cz1] = [y0 - PILZ_OVER, y1 + 1 + PILZ_OVER];
     canopy.box(cx0, h + 3.2, cz0, cx1 - cx0, 0.45, cz1 - cz0, red, redTop); // Hutrand
     canopy.box(cx0 + 0.9, h + 3.65, cz0 + 0.7, cx1 - cx0 - 1.8, 0.45, cz1 - cz0 - 1.4, red, redTop);
     canopy.box(cx0 + 2.0, h + 4.1, cz0 + 1.3, cx1 - cx0 - 4.0, 0.35, cz1 - cz0 - 2.6, red, redTop); // Kuppe
     canopy.box(cx0 + 0.05, h + 3.15, cz0 + 0.05, cx1 - cx0 - 0.1, 0.06, cz1 - cz0 - 0.1, '#f3e6c8'); // Lamellen unten
     // weiße Tupfen auf den Stufen des Huts und vorn am Rand
     for (const [dx, dz, step] of [
-      [0.3, 0.3, 0],
-      [7.6, 0.4, 0],
-      [0.4, 4.6, 0],
-      [7.5, 4.5, 0],
-      [1.4, 1.0, 1],
-      [5.6, 1.2, 1],
-      [2.0, 3.6, 1],
-      [5.2, 3.8, 1],
-      [3.6, 2.2, 2],
+      [0.2, 0.2, 0],
+      [6.7, 0.25, 0],
+      [0.25, 2.7, 0],
+      [6.6, 2.65, 0],
+      [1.4, 0.9, 1],
+      [5.0, 1.0, 1],
+      [2.0, 1.9, 1],
+      [4.4, 2.0, 1],
+      [3.4, 1.5, 2],
     ] as const)
       canopy.box(cx0 + dx, h + 3.65 + step * 0.45, cz0 + dz, 0.5, 0.06, 0.5, '#ffffff');
-    for (const dx of [0.8, 2.6, 4.6, 6.6]) canopy.box(cx0 + dx, h + 3.3, cz1 - 0.02, 0.5, 0.3, 0.04, '#ffffff');
+    for (const dx of [0.6, 2.4, 4.4, 6.2]) canopy.box(cx0 + dx, h + 3.3, cz1 - 0.02, 0.5, 0.3, 0.04, '#ffffff');
   }
 
   private fence(g: Geo, x: number, y: number, h: number) {

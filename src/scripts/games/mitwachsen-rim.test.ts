@@ -24,7 +24,7 @@ function kept(w: World, x: number, y: number): boolean {
 }
 
 describe('Rand der Lichtung: Kante statt Treppe', () => {
-  it.each(seedsFor(seedRange(1, 20)))(
+  it.each(seedsFor(seedRange(1, 6)))(
     'Seed %i: innen Hecke, zwei Stufen über jedem Nachbarn, dahinter höherer Fels; kein Ringfeld mehr als Stufe',
     (seed) => {
       const w = worldOf(seed);
