@@ -1,15 +1,15 @@
-// Der Maulwurf gräbt den Glitzergang (Rückmeldung zur Höhle, Schritt 17) – rein, ohne DOM: Der erste Maulwurf, der mit
-// Bau 2 der Bahn am Bahnhof Fledermaus einzieht (`FIRST_MOLE` im Spielstand `garden`), ist der Bote der Grubenbahn. Am
-// nächsten echten Spieltag nach seinem Einzug (dieselbe Regel wie in mitwachsen-tired.ts: mehr als `BREAK` Pause,
-// `WorldPack.dawn`) ist das Graben fällig (`packs.fahrt.grube`, Stufe `faellig`); alte Spielstände, in denen er schon
-// zu Hause wohnt, bekommen es genauso am nächsten echten Spieltag. Kommt die wache Figur dann in die Nähe des
-// Grubenhalts (`DIG_NEAR`), hüpft der Maulwurf aus der Erde neben den Halt und klopft, eine Erdwelle läuft einmal die
+// Der Maulwurf gräbt den Glitzergang (Rückmeldung zur Höhle, Schritt 17; ohne Wartezeit seit Issue 14) – rein, ohne DOM:
+// Der erste Maulwurf, der mit Bau 2 der Bahn am Bahnhof Fledermaus einzieht (`FIRST_MOLE` im Spielstand `garden`), ist
+// der Bote der Grubenbahn. Sobald er zu Hause wohnt und Funkel keinen Eintrag hat, ist das Graben fällig (`digDue`,
+// keine Uhr, kein neuer Spieltag; alte Spielstände mit der Stufe `faellig` genauso). Es beginnt, wenn die wache Figur
+// wirklich am Grubenhalt steht (`DIG_NEAR`) und der Maulwurf auf seiner Wiese angekommen ist (so springt er nie
+// sichtbar): Er hüpft aus der Erde neben den Halt und klopft, eine Erdwelle läuft einmal die
 // künftige Runde entlang (8 s wie die Gleiswelle, `DIG`), aus Fels werden Rinne und Tore, das Gleis liegt (die Stufe
 // `bereit` wird gespeichert und die Welt neu gebaut, `relay`), und Funkel rollt aus dem Gang an seinen Halt. Solange
 // hüpft die Figur auf jeden Pfeil nur (`hold`: auch kein Einsteigen). Wie weit das Graben ist, steht nur im Zustand
 // (`State.dig`, nicht gespeichert): Wer vor dem Augenblick `pop` neu lädt, sieht es noch einmal; danach ist der Gang
 // gegraben. Danach läuft der Maulwurf von selbst zurück auf seinen Platz am Höhlenbett. Teil des Pakets der Grubenbahn
-// (`rules.herald`, `dawn`); Bild und Ton in mitwachsen-dig-look.ts.
+// (`rules.herald`); Bild und Ton in mitwachsen-dig-look.ts.
 // Spezifikation: docs/specs/mitwachsen.md („Die Grubenbahn Funkel“, Der Maulwurf gräbt)
 
 import type { Point } from '../../../../data/games/mitwachsen';
@@ -21,22 +21,19 @@ import type { HeraldEvents as Events, HeraldRules, Heralded } from '../../mitwac
 import { rideOf, withRide } from '../../mitwachsen-ride-save';
 import type { MoveCmd } from '../../mitwachsen-rider';
 import { canStep, type World } from '../../mitwachsen-world';
-import { FUNKEL, SEAT, laneOf } from './mitwachsen-funkel';
+import { FUNKEL, SEAT, dug, laneOf } from './mitwachsen-funkel';
 
 /** Wohnt der erste Maulwurf zu Hause am Höhlenbett (er zog mit Bau 2 ein)? */
 export const moleHome = (garden: readonly { id: string }[]): boolean => garden.some((a) => a.id === FIRST_MOLE);
 
 /**
- * Ein neuer echter Spieltag (`WorldPack.dawn`): Wohnt der erste Maulwurf zu Hause und hat Funkel noch keinen Eintrag,
- * ist heute das Graben fällig (Stufe `faellig`). Sonst bleibt alles, wie es ist (auch ein schon fälliges Graben)
+ * Ist das Graben fällig (der Gang ist noch Fels)? Sobald der erste Maulwurf zu Hause wohnt und Funkel noch keinen
+ * Eintrag hat, ohne Uhr und ohne neuen Spieltag; ebenso mit der Stufe `faellig` (alte Spielstände, Entwickler-Schalter)
  */
-export function digDawn(packs: Readonly<Record<string, unknown>>, garden: readonly { id: string }[]) {
-  return !rideOf(packs)[FUNKEL.id] && moleHome(garden) ? withRide(packs, FUNKEL.id, 'faellig') : { ...packs };
+export function digDue(packs: Readonly<Record<string, unknown>>, garden: readonly { id: string }[]): boolean {
+  const ride = rideOf(packs)[FUNKEL.id];
+  return ride ? ride.stage === 'faellig' : moleHome(garden);
 }
-
-/** Ist das Graben fällig (Stufe `faellig`, der Gang ist noch Fels)? */
-export const digDue = (packs: Readonly<Record<string, unknown>>): boolean =>
-  rideOf(packs)[FUNKEL.id]?.stage === 'faellig';
 
 /** Takt eines Augenblicks im Graben, das um `from` begann */
 export const digBeat = (from: number, beat: number) => from + Math.round(beat * DIG.ticks);
@@ -55,14 +52,25 @@ export function digAt(s: Pick<Heralded, 'tick' | 'dig'>, frac = 0): number | und
 export const haltOf = (world: World): Point | undefined => laneOf(world)[SEAT];
 
 /**
+ * Ist der Maulwurf auf seiner Wiese angekommen (oder gar nicht als Tier zu Hause unterwegs: ein altes Paket)? Solange er
+ * nach dem Einzug noch dorthin läuft, beginnt das Graben nicht, sonst spränge er sichtbar an den Halt
+ */
+export function moleSettled(s: Pick<Heralded, 'animals'>, world: World): boolean {
+  const mole = s.animals.find((a) => a.id === FIRST_MOLE && a.mode === 'home');
+  return !mole || world.cell(mole.x, mole.y).garden === true;
+}
+
+/**
  * Beginnt jetzt das Graben? Es ist fällig, die wache Figur steht in der Grotte höchstens `DIG_NEAR` Felder (Schachbrett)
- * vom Sitz am Grubenhalt, sie fährt nicht, und kein Bote arbeitet gerade
+ * vom Sitz am Grubenhalt (wirklich am Halt, damit sie zusieht), sie fährt nicht, kein Bote arbeitet gerade (Bau 2), und
+ * der Maulwurf ist auf seiner Wiese angekommen
  */
 export function canDig(s: Heralded & { ride?: unknown }, world: World): boolean {
-  if (s.dig || s.work || s.ride || s.sleeping || !digDue(s.packs)) return false;
+  if (s.dig || s.work || s.ride || s.sleeping || !digDue(s.packs, s.garden)) return false;
   const seat = haltOf(world);
   if (!seat || world.realm(s.player.x, s.player.y) !== 'hoehle') return false;
-  return Math.max(Math.abs(s.player.x - seat[0]), Math.abs(s.player.y - seat[1])) <= DIG_NEAR;
+  if (Math.max(Math.abs(s.player.x - seat[0]), Math.abs(s.player.y - seat[1])) > DIG_NEAR) return false;
+  return moleSettled(s, world);
 }
 
 const paws = new WeakMap<World, ReadonlySet<string>>();
@@ -128,7 +136,7 @@ export function startDig(s: Heralded, world: World, events: Events) {
 
 /**
  * Nach jedem Befehl, solange gegraben wird: zum Augenblick `pop` ist der Gang gegraben (Stufe `bereit`, gleich
- * gespeichert, die Welt wird neu gebaut, `relay`; die Stufe bleibt, wie sie war, wenn sie schon weiter ist), am Ende
+ * gespeichert, auch ohne Eintrag davor, die Welt wird neu gebaut, `relay`; die Stufe bleibt, wie sie war, wenn sie schon weiter ist), am Ende
  * steht Funkel am Halt und das Graben ist vorbei (`State.dig` fällt weg)
  */
 export function digOn(s: Heralded, world: World, events: Events) {
@@ -137,7 +145,7 @@ export function digOn(s: Heralded, world: World, events: Events) {
   const [x, y] = haltOf(world) ?? [s.player.x, s.player.y];
   if (!d.laid && s.tick >= digBeat(d.from, DIG.pop)) {
     s.dig = { ...d, laid: true };
-    if (digDue(s.packs)) s.packs = withRide(s.packs, FUNKEL.id, 'bereit');
+    if (!dug(s.packs)) s.packs = withRide(s.packs, FUNKEL.id, 'bereit');
     events.push({ type: 'herald', what: 'dug', id: FIRST_MOLE, x, y, relay: true, persist: true });
   }
   if (s.tick >= d.to) {

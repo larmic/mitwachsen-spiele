@@ -211,8 +211,7 @@ export type Laid = {
  * Welt gelten (Eis-Welt: Schneehaufen wachsen zu Schneemännern, `vehicle`: der Schlitten; Bahn: `herald`, Tok, und
  * `vehicle`, der Zug; Fahrzeuge: `ride`, die Fahr-Engine), `step` hereingereicht.
  * `dawn`: Ein neuer echter Spieltag beginnt (mehr als `BREAK` Pause, mitwachsen-tired.ts): neuer Zustand der Pakete (Bahn:
- * Tok, der am Abend schlafend kam, wacht auf; Grubenbahn: Wohnt der erste Maulwurf zu Hause, ist heute das Graben fällig,
- * dafür die Tiere zu Hause, `garden`); die Spielseite fragt es beim Start und nach langer Pause.
+ * Tok, der am Abend schlafend kam, wacht auf); die Spielseite fragt es beim Start und nach langer Pause.
  * `away`: Tiere, die nach dem Spielstand der Pakete gerade nicht in ihrer Welt wohnen (Bahn: der erste Maulwurf sitzt
  * bis Bau 2 auf Toks Helm); die Welt merkt sie sich (`World.away`), sie werden nicht verteilt. `solos`: Modell einer
  * Art ohne den, der auf ihr sitzt (Tok ohne den Maulwurf), für Tiere mit `solo`.
@@ -244,7 +243,7 @@ export type WorldPack<
   lays?(packs: Readonly<Record<string, unknown>>): boolean;
   lead?: Rules;
   rules?: WorldRules<Ride, Herald, Vehicle>;
-  dawn?(packs: Readonly<Record<string, unknown>>, garden: readonly { id: string }[]): Record<string, unknown>;
+  dawn?(packs: Readonly<Record<string, unknown>>): Record<string, unknown>;
   away?(packs: Readonly<Record<string, unknown>>): readonly string[];
   view?: View;
   view3d?: () => Promise<View3>;

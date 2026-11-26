@@ -1452,7 +1452,10 @@ test('Spiel: Bahn und Höhle für das Kind – Tok, Bau 1, erste Fahrt, Hau-ruck
       seed: number;
       homes: Record<string, { bed: [number, number] }>;
       gates: Map<string, { mid: [number, number]; out: [number, number] }>;
-      cell(x: number, y: number): { solid: boolean; ground: string; stop?: string; plate?: string };
+      cell(
+        x: number,
+        y: number,
+      ): { solid: boolean; ground: string; stop?: string; plate?: string; lane?: { at?: number }; garden?: boolean };
       realm(x: number, y: number): string;
     };
     state: {
@@ -1463,6 +1466,7 @@ test('Spiel: Bahn und Höhle für das Kind – Tok, Bau 1, erste Fahrt, Hau-ruck
       garden: { id: string }[];
       packs: { bahn?: { built?: number }; fahrt?: Record<string, unknown> };
       work?: unknown;
+      dig?: unknown;
       ride?: { id: string };
       heave?: unknown;
       heraldDue: number;
@@ -1652,6 +1656,56 @@ test('Spiel: Bahn und Höhle für das Kind – Tok, Bau 1, erste Fahrt, Hau-ruck
     };
   });
   expect(saved).toEqual({ open: ['eis', 'hoehle'], bahn: { built: 2 }, stage: 'offen', mole: true });
+
+  // 8. Ohne Wartezeit (Issue 14): Am Bahnhof Fledermaus gräbt noch niemand. Die Figur geht an den Grubenhalt; sobald der
+  // Maulwurf auf seiner Wiese angekommen ist, klopft er dort, ohne neuen Spieltag, ohne Neuladen, ohne `graben=1`
+  expect(await game.evaluate((node) => !!(node as unknown as Game).state.dig)).toBe(false);
+  const halt = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    const [bx, by] = el.world.homes.hoehle!.bed;
+    let seat: [number, number] | undefined;
+    for (let y = by - 30; y <= by + 30 && !seat; y++)
+      for (let x = bx - 30; x <= bx + 30 && !seat; x++) if (el.world.cell(x, y).lane?.at === 5) seat = [x, y];
+    const dirs: [number, number][] = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ];
+    const [dx, dy] = dirs.find(([dx, dy]) => el.world.cell(seat![0] - dx, seat![1] - dy).stop === 'grube')!;
+    el.state = { ...el.state, player: { x: seat![0] - dx, y: seat![1] - dy, dir: 's' } };
+    el.fog.reveal(seat![0], seat![1], 10);
+    return { grube: el.state.packs.fahrt?.grube ?? null, funkel: el.rides.some((r) => r.id.startsWith('ride:grube:')) };
+  });
+  expect(halt).toEqual({ grube: null, funkel: false }); // noch Fels, kein Eintrag im Spielstand
+  const digging = () => game.evaluate((node) => !!(node as unknown as Game).state.dig);
+  for (let i = 0; i < 60 && !(await digging()); i++) await ticks(page, 5); // der Maulwurf läuft erst zu seiner Wiese
+  expect(await digging()).toBe(true);
+  const settled = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    return el.state.animals.filter((a) => a.id === 'hoehle:maulwurf').length;
+  });
+  expect(settled).toBe(1);
+  for (let i = 0; i < 30 && (await digging()); i++) {
+    await ticks(page, 5);
+    await render(page);
+  }
+  expect(await digging()).toBe(false);
+  await render(page, 2);
+  const funkel = await game.evaluate((node) => {
+    const el = node as unknown as Game;
+    return { grube: el.state.packs.fahrt?.grube, seat: el.rides.some((r) => r.id === 'ride:grube:seat') };
+  });
+  expect(funkel).toEqual({ grube: { stage: 'bereit' }, seat: true });
+  await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+  const kept = await page.evaluate(() => {
+    const index = JSON.parse(localStorage.getItem('larmic.games.index') ?? '{}') as { current?: string };
+    const w = JSON.parse(localStorage.getItem(`larmic.games.world.${index.current}`) ?? '{}') as {
+      packs?: { fahrt?: { grube?: unknown } };
+    };
+    return w.packs?.fahrt?.grube;
+  });
+  expect(kept).toEqual({ stage: 'bereit' }); // der Gang bleibt nach dem Neuladen
   expect(errors).toEqual([]);
 });
 
@@ -3483,7 +3537,7 @@ test(
 
 // Der Maulwurf gräbt den Glitzergang (Schritt 17, `?entwickler=grube&graben=1`, fester Seed 1; @3d, weil die Welt mitten
 // im Spiel neu gebaut wird und Erdwelle, Gang und Bähnchen auch in 3D gezeichnet werden): Der erste Maulwurf wohnt zu
-// Hause, das Graben ist fällig, der Gang ist noch Fels und Funkel nicht da. Die Figur geht an den Grubenhalt: Der Maulwurf
+// Hause, das Graben ist fällig (hier über die alte Stufe `faellig`), der Gang ist noch Fels und Funkel nicht da. Die Figur geht an den Grubenhalt: Der Maulwurf
 // hüpft neben den Halt, die Erdwelle läuft, die Figur hüpft dabei nur; dann sind Gang, Gleis und der Klangstein `grube`
 // da (Stufe `bereit`), und Funkel steht an seinem Halt. Danach eine ganze Runde vom Bahnsteig zum Bahnsteig, alles über
 // die Test-Uhr. Gespeichert wird im Blick hinein nichts

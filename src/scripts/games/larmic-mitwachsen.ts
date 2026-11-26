@@ -273,11 +273,10 @@ class LarmicMitwachsen extends HTMLElement {
     // kommt), schon für den Bau der Welt
     let progress = progressFrom(this.saved);
     if (this.dev) progress = devProgress(this.glimpse.packs, location.search, progress);
-    // Start nach mehr als `BREAK` Pause, ein neuer echter Spieltag: Was am Abend schlafend kam (Tok), wacht auf, und
-    // wohnt der erste Maulwurf zu Hause, gräbt er heute den Glitzergang (`WorldPack.dawn`; die Uhr des Kinds läuft erst
-    // nach dem Start weiter, beim Wechsel der Welt ist es nie so)
+    // Start nach mehr als `BREAK` Pause, ein neuer echter Spieltag: Was am Abend schlafend kam (Tok), wacht auf
+    // (`WorldPack.dawn`; die Uhr des Kinds läuft erst nach dem Start weiter, beim Wechsel der Welt ist es nie so)
     this.dawned = newDay(this.tired, Date.now()); // auch für Pakete, die erst später kommen (`arrive`)
-    if (this.dawned) progress.packs = dawnOf(this.packs.loaded, progress.packs, progress.garden);
+    if (this.dawned) progress.packs = dawnOf(this.packs.loaded, progress.packs);
     this.world = createWorld(this.saved.seed, this.packs.loaded, progress.packs);
     this.seenAt = '';
     this.state = initialState(this.world, progress, this.saved.seed ^ this.saved.visits);
@@ -326,9 +325,8 @@ class LarmicMitwachsen extends HTMLElement {
     if (!(this.world as World | undefined)) return; // entsteht gleich mit ihm; sonst immer einbauen (zweimal: egal)
     const { world, chunks } = this.world.attach(pack);
     this.world = world;
-    // kam es nach einem neuen echten Spieltag (Start oder lange Pause), gilt sein Haken `dawn` noch (Tok wacht auf, der
-    // Maulwurf gräbt)
-    if (this.dawned && pack.dawn) this.state = { ...this.state, packs: pack.dawn(this.state.packs, this.state.garden) };
+    // kam es nach einem neuen echten Spieltag (Start oder lange Pause), gilt sein Haken `dawn` noch (Tok wacht auf)
+    if (this.dawned && pack.dawn) this.state = { ...this.state, packs: pack.dawn(this.state.packs) };
     this.state = attachPack(this.state, world);
     this.gl3d?.adopt(world, chunks);
   }
@@ -401,7 +399,7 @@ class LarmicMitwachsen extends HTMLElement {
     // nach mehr als `BREAK` Pause (Seite lange im Hintergrund) beginnt ein neuer echter Spieltag: Tok wacht auf
     if (newDay(this.tired, Date.now())) {
       this.dawned = true;
-      this.state = { ...this.state, packs: dawnOf(this.packs.loaded, this.state.packs, this.state.garden) };
+      this.state = { ...this.state, packs: dawnOf(this.packs.loaded, this.state.packs) };
     }
     // Liest oder döst die Figur, spielt gerade niemand: Die Uhr fürs Müdewerden läuft dann nicht
     const { tired, event } = advance(this.tired, Date.now(), !this.state.sleeping && this.pose === 'stand');

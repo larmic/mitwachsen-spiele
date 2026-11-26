@@ -1,6 +1,6 @@
-// Der Maulwurf gräbt den Glitzergang (Rückmeldung zur Höhle, Schritt 17): fällig am nächsten echten Spieltag nach seinem
-// Einzug (`dawn`, auch für alte Spielstände), das Graben über `step` mit den Paketen wie im Spiel (Erdwelle, Gang
-// gegraben, Funkel rollt an den Halt, die Figur hüpft nur), Bild und Ton
+// Der Maulwurf gräbt den Glitzergang (Rückmeldung zur Höhle, Schritt 17; ohne Wartezeit seit Issue 14): fällig, sobald er
+// zu Hause wohnt (keine Uhr, auch alte Spielstände), Beginn erst am Grubenhalt, das Graben über `step` mit den Paketen
+// wie im Spiel (Erdwelle, Gang gegraben, Funkel rollt an den Halt, die Figur hüpft nur), Bild und Ton
 import { describe, expect, it } from 'vitest';
 import { DIRS, type Dir } from '../../../../lib/games/front';
 import type { Point } from '../../../../data/games/mitwachsen';
@@ -13,7 +13,7 @@ import { stageOf } from '../../mitwachsen-ride-save';
 import { initialState, step, type Cmd, type GameEvent, type State } from '../../mitwachsen-state';
 import type { World } from '../../mitwachsen-world';
 import { BAHN_PACK, FAHRT_PACK, GRUBE_PACK, HOEHLE_PACK, worldOf } from '../../test-worlds';
-import { DIG_RULES, canDig, digAt, digDawn, digDue, haltOf, moleHome } from './mitwachsen-dig';
+import { DIG_RULES, canDig, digAt, digDue, haltOf, moleHome, moleSettled } from './mitwachsen-dig';
 import { MOUND_ID, MOUND_STAGES, digBodies, digFx, digScore, moundAt } from './mitwachsen-dig-look';
 import { FUNKEL, funkelRoute, laneOf } from './mitwachsen-funkel';
 import { funkelAt, funkelBodies } from './mitwachsen-funkel-look';
@@ -30,7 +30,7 @@ const AT = { now: 0, frac: 0, reduced: false, lit: false };
 const caveOf = (seed = 1) => worldOf(seed, [HOEHLE_PACK, GRUBE_PACK]);
 
 /** Wach, Höhlentor offen, der erste Maulwurf zu Hause (als einziges Tier), die Figur `gap` Felder vom Sitz am Halt */
-function ready(world: World, packs: Record<string, unknown> = DUE, gap = 3): State {
+function ready(world: World, packs: Record<string, unknown> = {}, gap = 3): State {
   const s = initialState(world, { packs, garden: [MOLE], openGates: ['eis', 'hoehle'] });
   const [sx, sy] = haltOf(world)!;
   const at = freeAround(world, [sx, sy], gap);
@@ -73,44 +73,67 @@ const heralds = (events: readonly GameEvent[]) =>
 const ticks = (n: number) => Array.from({ length: n }, () => TICK);
 
 describe('Der Maulwurf gräbt den Glitzergang', () => {
-  it('fällig am nächsten echten Spieltag nach seinem Einzug (`dawn`), auch in alten Spielständen; sonst nichts', () => {
-    expect(pack.dawn?.({}, [MOLE])).toEqual(digDawn({}, [MOLE]));
+  it('fällig, sobald der erste Maulwurf zu Hause wohnt: ohne Uhr und ohne neuen Spieltag, auch in alten Spielständen', () => {
+    expect('dawn' in pack).toBe(false); // kein Haken mehr für den neuen Spieltag
     expect(pack.rules?.herald).toBe(DIG_RULES);
     expect(moleHome([MOLE])).toBe(true);
     expect(moleHome([])).toBe(false);
-    // wohnt er zu Hause und hat Funkel noch keinen Eintrag (eben eingezogen oder ein alter Spielstand): heute graben
-    expect(digDawn({}, [MOLE])).toEqual(DUE);
-    expect(digDawn({ bahn: { built: 2 } }, [MOLE])).toEqual({ bahn: { built: 2 }, ...DUE });
-    expect(digDue(digDawn({}, [MOLE]))).toBe(true);
-    // ohne ihn, schon fällig oder schon gegraben: bleibt
-    expect(digDawn({}, [])).toEqual({});
-    expect(digDawn(DUE, [MOLE])).toEqual(DUE);
-    const dug = { fahrt: { grube: { stage: 'bereit', gefahren: true } } };
-    expect(digDawn(dug, [MOLE])).toEqual(dug);
-    // zusammen mit dem Haken der Bahn (Tok wacht auf), in beiden Reihen der Pakete
+    // wohnt er zu Hause und hat Funkel noch keinen Eintrag (eben eingezogen oder ein alter Spielstand): fällig
+    expect(digDue({}, [MOLE])).toBe(true);
+    expect(digDue({ bahn: { built: 2 } }, [MOLE])).toBe(true);
+    // ein alter Spielstand mit der Stufe `faellig` (oder der Entwickler-Schalter) bleibt fällig
+    expect(digDue(DUE, [MOLE])).toBe(true);
+    expect(digDue(DUE, [])).toBe(true);
+    // ohne ihn oder schon gegraben: nicht
+    expect(digDue({}, [])).toBe(false);
+    expect(digDue({ fahrt: { grube: { stage: 'bereit', gefahren: true } } }, [MOLE])).toBe(false);
+    // ein neuer echter Spieltag ändert daran nichts; Tok wacht weiter erst dann auf
     const tok = { fahrt: { hoehle: { stage: 'offen', schlaeft: true } } };
-    const want = { fahrt: { hoehle: { stage: 'offen' }, grube: { stage: 'faellig' } } };
-    expect(dawnOf([BAHN_PACK, GRUBE_PACK], tok, [MOLE])).toEqual(want);
-    expect(dawnOf([GRUBE_PACK, BAHN_PACK], tok, [MOLE])).toEqual(want);
+    const want = { fahrt: { hoehle: { stage: 'offen' } } };
+    expect(dawnOf([BAHN_PACK, GRUBE_PACK], tok)).toEqual(want);
+    expect(dawnOf([GRUBE_PACK, BAHN_PACK], tok)).toEqual(want);
+    // am Halt gräbt er gleich am Tag des Einzugs, ohne Eintrag im Spielstand
+    const world = caveOf();
+    expect(heralds(play(ready(world), world, [TICK]).events)).toEqual(['dig']);
+    expect(heralds(play(ready(world, DUE), world, [TICK]).events)).toEqual(['dig']);
+    // auch aus der alten Stufe `faellig` wird beim Graben `bereit`
+    const old = play(ready(world, DUE), world, ticks(1 + Math.round(DIG.pop * DIG.ticks)));
+    expect(stageOf(old.s.packs, FUNKEL.id)).toBe('bereit');
   });
 
-  it('am Tag des Einzugs nicht: ohne fälligen Eintrag gräbt er nie, auch direkt am Halt', () => {
+  it('nicht ohne den Maulwurf zu Hause, nicht während Bau 2, nicht im Zug, nicht im Schlaf, nicht solange er noch zur Wiese läuft', () => {
     const world = caveOf();
-    const r = play(ready(world, {}), world, ticks(30));
-    expect(r.s.dig).toBeUndefined();
-    expect(heralds(r.events)).toEqual([]);
-    expect(r.s.packs).toEqual({});
+    const s = ready(world);
+    expect(canDig(s, world)).toBe(true);
+    // ohne ihn zu Hause gräbt nie jemand, auch direkt am Halt
+    const none = play({ ...s, garden: [], animals: [] }, world, ticks(30));
+    expect(none.s.dig).toBeUndefined();
+    expect(heralds(none.events)).toEqual([]);
+    expect(none.s.packs).toEqual({});
+    expect(canDig({ ...s, work: { from: 0, to: Infinity } }, world)).toBe(false); // Bau 2 wartet auf den Zug
+    expect(canDig({ ...s, ride: {} }, world)).toBe(false);
+    expect(canDig({ ...s, sleeping: true }, world)).toBe(false);
+    // eben eingezogen läuft er erst zu seiner Wiese: Solange spränge er sichtbar an den Halt, also noch nicht
+    const mole = s.animals.find((a) => a.id === FIRST_MOLE)!;
+    expect(world.cell(mole.x, mole.y).garden).toBe(true);
+    const walking = { ...s, animals: [{ ...mole, x: s.player.x + 1, y: s.player.y }] };
+    expect(world.cell(s.player.x + 1, s.player.y).garden).toBeUndefined();
+    expect(moleSettled(walking, world)).toBe(false);
+    expect(canDig(walking, world)).toBe(false);
+    expect(moleSettled(s, world)).toBe(true);
+    expect(moleSettled({ animals: [] }, world)).toBe(true); // er folgt der Figur oder fehlt: Es klopft trotzdem am Halt
   });
 
   it('beginnt erst nah am Grubenhalt, wach, nicht im Fahrzeug, nicht im Schlaf', () => {
     const world = caveOf();
-    const near = ready(world, DUE, DIG_NEAR);
+    const near = ready(world, {}, DIG_NEAR);
     expect(canDig(near, world)).toBe(true);
-    expect(canDig(ready(world, DUE, DIG_NEAR + 1), world)).toBe(false);
+    expect(canDig(ready(world, {}, DIG_NEAR + 1), world)).toBe(false);
+    expect(DIG_NEAR).toBeLessThanOrEqual(6); // wirklich am Halt: Das Kind sieht zu
     expect(canDig({ ...near, sleeping: true }, world)).toBe(false);
     expect(canDig({ ...near, work: { from: 0, to: 10 } }, world)).toBe(false);
     expect(canDig({ ...near, ride: {} }, world)).toBe(false);
-    expect(canDig({ ...near, packs: {} }, world)).toBe(false);
+    expect(canDig({ ...near, packs: { fahrt: { grube: { stage: 'bereit' } } } }, world)).toBe(false);
     const [bx, by] = world.homes.lichtung.bed;
     expect(canDig({ ...near, player: { x: bx, y: by, dir: 's' } }, world)).toBe(false); // nicht in der Grotte
     // ein Pfeil allein beginnt es nicht (nur der Takt), damit es nie mitten im Schritt losgeht
@@ -144,7 +167,7 @@ describe('Der Maulwurf gräbt den Glitzergang', () => {
     // bis zum Augenblick `pop`: Der Gang ist gegraben, Stufe `bereit` gleich gespeichert, die Welt neu gebaut
     const popAt = Math.round(DIG.pop * DIG.ticks);
     r = play(r.s, r.world, ticks(popAt - 1));
-    expect(stageOf(r.s.packs, FUNKEL.id)).toBe('faellig');
+    expect(stageOf(r.s.packs, FUNKEL.id)).toBeUndefined(); // bis dahin ist nichts gespeichert
     r = play(r.s, r.world, [TICK]);
     const dugEvent = r.events.find((e): e is HeraldEvent => e.type === 'herald' && e.what === 'dug')!;
     expect(dugEvent).toMatchObject({ relay: true, persist: true, x: seat[0], y: seat[1] });
@@ -171,14 +194,15 @@ describe('Der Maulwurf gräbt den Glitzergang', () => {
     const gap = (a: typeof home) => Math.abs(a.x - a.spawn[0]) + Math.abs(a.y - a.spawn[1]);
     expect(gap(later)).toBeLessThan(gap(home));
     // nur einmal: Danach ist nichts mehr fällig
-    expect(digDue(r.s.packs)).toBe(false);
+    expect(digDue(r.s.packs, r.s.garden)).toBe(false);
   });
 
   it('wer vor dem Augenblick `pop` neu lädt, sieht es noch einmal (`State.dig` wird nicht gespeichert); danach ist der Gang gegraben', () => {
     const world = caveOf();
     let r = play(ready(world), world, ticks(10));
     expect(r.s.dig).toBeDefined();
-    expect(digDue(r.s.packs)).toBe(true); // gespeichert ist noch nichts
+    expect(r.s.packs).toEqual({}); // gespeichert ist noch nichts
+    expect(digDue(r.s.packs, r.s.garden)).toBe(true);
     const reloaded = ready(world, r.s.packs);
     r = play(reloaded, world, [TICK]);
     expect(heralds(r.events)).toEqual(['dig']);

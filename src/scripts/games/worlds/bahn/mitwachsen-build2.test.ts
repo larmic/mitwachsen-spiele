@@ -217,6 +217,7 @@ describe('Bau 2: bei der nächsten Fahrt nach dem Hau-ruck (mitwachsen-build2.ts
     const homes = run.events.filter((e) => e.type === 'home');
     expect(homes).toEqual([{ type: 'home', id: FIRST_MOLE, species: 'maulwurf' }]); // gespeichert wie jedes Tier
     expect(run.s.garden.map((a) => a.id)).toContain(FIRST_MOLE);
+    expect(run.s.met).toContain(FIRST_MOLE); // er gilt als gefunden: kein Fragezeichen über ihm
     const mole = run.s.animals.find((a) => a.id === FIRST_MOLE)!;
     expect(mole).toMatchObject({ mode: 'home', realm: 'hoehle' });
     const tok = run.s.animals.find((a) => a.id === TOK)!;

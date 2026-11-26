@@ -7,8 +7,8 @@
 // sein Bild und seine Töne für 2D und 3D (mitwachsen-funkel-look.ts; Modell in
 // src/data/games/worlds/grube/mitwachsen-funkel-model.ts), dazu den Glitzergang mit seinen zwei Klingeltoren (Schritt 16:
 // mitwachsen-gang.ts, rein; Bild und Ton in mitwachsen-gang-look.ts, Modelle in mitwachsen-gang-model.ts; zu Fuß klingt
-// ein Tor über `rules.bump`, `ringGate`) und den Maulwurf, der den Gang am nächsten echten Spieltag nach seinem Einzug
-// gräbt (Schritt 17: `rules.herald` und `dawn` aus mitwachsen-dig.ts, rein; Erdwelle und Töne in mitwachsen-dig-look.ts,
+// ein Tor über `rules.bump`, `ringGate`) und den Maulwurf, der den Gang gräbt, sobald er zu Hause wohnt und die Figur am
+// Grubenhalt steht (Schritt 17, ohne Wartezeit seit Issue 14: `rules.herald` aus mitwachsen-dig.ts, rein; Erdwelle und Töne in mitwachsen-dig-look.ts,
 // Modell und Zeitplan in mitwachsen-dig-model.ts; mit dem Gang kommt der Klangstein `grube` am Halt). Ein 3D-Teil mit
 // Three.js ist nicht nötig: Gleis und Körper
 // sind Quader wie in 2D, darum kommt `view3d` aus derselben Datei. Geladen wird es mit der Grotte (`ALONG` in
@@ -23,7 +23,7 @@ import type { WorldPack } from '../../mitwachsen-pack-types';
 import type { RideEngine, Vehicle } from '../../mitwachsen-rider';
 import type { View2D } from '../../mitwachsen-view';
 import type { View3D } from '../../mitwachsen-view-3d';
-import { DIG_RULES, digDawn } from './mitwachsen-dig';
+import { DIG_RULES } from './mitwachsen-dig';
 import { digBodies, digFx } from './mitwachsen-dig-look';
 import { dug, funkel, layGrube, ringGate } from './mitwachsen-funkel';
 import { funkelBodies, funkelFx, grubeRails } from './mitwachsen-funkel-look';
@@ -54,7 +54,6 @@ export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules
   lay: layGrube,
   lays: dug, // vor dem Graben kein Neubau, wenn das Paket mit der Grotte ankommt
   rules: { bump: ringGate, vehicle: funkel, herald: DIG_RULES },
-  dawn: digDawn, // am nächsten echten Spieltag nach dem Einzug des Maulwurfs ist das Graben fällig
   view,
   view3d: () => Promise.resolve(view3d),
 };

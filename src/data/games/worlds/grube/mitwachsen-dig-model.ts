@@ -21,8 +21,11 @@ export const DIG = {
   roll: [0.76, 0.96],
 } as const;
 
-/** So nah (Felder, Schachbrett) muss die wache Figur am Sitz des Grubenhalts sein, damit der Maulwurf zu graben beginnt */
-export const DIG_NEAR = 12;
+/**
+ * So nah (Felder, Schachbrett) muss die wache Figur am Sitz des Grubenhalts sein, damit der Maulwurf zu graben beginnt:
+ * wirklich am Halt, damit das Kind zusieht (bis Issue 14 waren es 12 Felder, da begann es oft außerhalb des Bilds)
+ */
+export const DIG_NEAR = 5;
 
 /** Farben der Erdwelle, je Seite und Oberseite: Erde (graubraun, gedeckt, damit sie sich nicht als Gold liest), Krümel, Kristall */
 export const DIG_COLORS = {

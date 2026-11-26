@@ -22,14 +22,11 @@ export type LoadedPack = WorldPack<GuideRules, View2D, View3D, RideEngine, Heral
 
 /**
  * Ein neuer echter Spieltag (mehr als `BREAK` Pause, mitwachsen-tired.ts): Zustand der Pakete nach den Haken `dawn` der
- * geladenen Pakete (Bahn: Tok, der am Abend schlafend kam, wacht auf; Grubenbahn: Wohnt der erste Maulwurf zu Hause
- * (`garden`), gräbt er heute den Glitzergang); ohne Haken bleibt er, wie er ist
+ * geladenen Pakete (Bahn: Tok, der am Abend schlafend kam, wacht auf); ohne Haken bleibt er, wie er ist. Der Maulwurf
+ * der Grubenbahn wartet seit Issue 14 auf keinen Spieltag mehr
  */
-export const dawnOf = (
-  packs: readonly Pick<LoadedPack, 'dawn'>[],
-  saved: Record<string, unknown>,
-  garden: readonly { id: string }[],
-) => packs.reduce((p, pack) => pack.dawn?.(p, garden) ?? p, saved);
+export const dawnOf = (packs: readonly Pick<LoadedPack, 'dawn'>[], saved: Record<string, unknown>) =>
+  packs.reduce((p, pack) => pack.dawn?.(p) ?? p, saved);
 
 /** So lange wartet der Start höchstens auf ein Paket, das die Welt gleich braucht; dann geht es ohne los */
 export const PACK_WAIT_MS = 4000;
