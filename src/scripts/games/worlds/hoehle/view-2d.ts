@@ -100,6 +100,7 @@ export const view: View2D & { fx: CaveFx } = {
     stonetrough: bowl,
     shed: look,
     cavelamp: look,
+    torch: look,
     column,
     crystalarch: look,
     glowshroom: look,

@@ -88,8 +88,8 @@ export const RULES: Rule[] = [
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Welt
       { chunks: /\/welt-hoehle-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-hoehle)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 66,8 KB (mit den Tupfspinnen)
-    budget: 74 * 1024,
+    // Gemessen 73,3 KB (mit Sehenswürdigkeiten, Lichtloch am Kristallbogen und Kristallfackeln)
+    budget: 80.6 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

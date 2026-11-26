@@ -20,6 +20,8 @@ import { POST_H } from './mitwachsen-lantern';
 import { webBoxes } from './mitwachsen-spider-look';
 
 const C = GROTTE_COLORS;
+/** Helle Spitze der Kristallflamme einer Fackel */
+const TORCH_TIP = '#f3ecff';
 const [KR, KT] = C.crystals;
 /** Höhe der Kristallwand und des Dachs des Unterstands am Bett */
 export const SHED_H = 2.2;
@@ -114,6 +116,17 @@ const FILL: readonly Cell['deco'][] = ['crystalbush', 'boulder', 'mosstop', 'cla
 /** Fülle der Grotte (mitwachsen-fill.ts, `adornGrotte`): flach und begehbar */
 const ADORN: readonly Cell['deco'][] = ['crystalfield', 'vein', 'glowmoss', 'shore'];
 /** Wer die Quader dieser Dinge baut */
+/** Kristallfackel: schmaler Pfosten, obenauf eine Kristallflamme in drei Stufen, die Spitze hell */
+function torchBoxes(c: Cell, x: number, y: number): Box[] {
+  const [h, color] = [c.h, c.color ?? KR];
+  return [
+    [x + 0.41, y + 0.41, h, 0.18, 0.18, 1.1, ...C.rock],
+    [x + 0.27, y + 0.3, h + 1.1, 0.46, 0.4, 0.26, color, color],
+    [x + 0.34, y + 0.36, h + 1.36, 0.32, 0.28, 0.26, color, TORCH_TIP],
+    [x + 0.42, y + 0.43, h + 1.62, 0.16, 0.14, 0.22, TORCH_TIP, TORCH_TIP],
+  ];
+}
+
 const OWN = new Map<Cell['deco'], (c: Cell, x: number, y: number) => Box[] | null>([
   ...SUPPLIES.map((d) => [d, supplyBoxes] as const),
   ...FILL.map((d) => [d, fillBoxes] as const),
@@ -122,6 +135,7 @@ const OWN = new Map<Cell['deco'], (c: Cell, x: number, y: number) => Box[] | nul
   ...ADORN.map((d) => [d, adornBoxes] as const),
   ['waterfall', (c: Cell, x: number, y: number) => (c.region === 'hoehle' ? waterfallBoxes(c, x, y) : null)],
   ['web', webBoxes], // Netz der Tupfspinne (mitwachsen-spider-look.ts)
+  ['torch', torchBoxes],
 ]);
 
 /**

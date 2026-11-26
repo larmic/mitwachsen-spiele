@@ -40,6 +40,7 @@ import { adornGrotte, corridorAt, crystalOf, fillGrotte, shadeGrotte, tipOf } fr
 import { dimGrotte } from './mitwachsen-glow';
 import { clayOf, laneMarks, lanePlan, laneSide, type LaneMarks } from './mitwachsen-lane';
 import { HALL_STAGE, hallStage } from './mitwachsen-hall';
+import { plantTorches } from './mitwachsen-torch';
 import { siteOf, type Site } from './mitwachsen-site';
 import { spinWebs } from './mitwachsen-spider';
 
@@ -143,6 +144,8 @@ export function buildGrotte(
   shadeGrotte(seed, site, (u, v) => Math.abs(u) <= 3 || nearStation(u, v), map); // Moos und Farn unter den Schächten
   adornGrotte(seed, site, free, map); // Fülle: Kristallfelder, Adern, Leuchtmoos an den Wänden, Wasserfall am See
   level(realm, map);
+  const way = pathsOf(site, bed, ringHome);
+  plantTorches(map, at, (x, y) => way(...site.uv(x, y))); // Kristallfackeln an den Wegen, ganz zuletzt: nie im Weg
   const reach = reachOf(home.wake, map);
   for (const k of realm) {
     // was man nicht erreichen kann, wird Fels: keine Ecke, die man sieht, aber nie betritt
@@ -150,7 +153,7 @@ export function buildGrotte(
     if (c && c.region === 'hoehle' && !c.solid && c.ground !== 'water' && !reach.has(k))
       map.set(k, { ...cliff(Math.max(2, c.h + 1)), region: 'hoehle' });
   }
-  const path = pathsOf(site, bed, ringHome);
+  const path = way;
   spinWebs(seed, (u, v) => site.at(u, v), path, fromMouth([0, GROTTE.bed]), map); // Netze der Tupfspinnen statt einiger Stalagmiten
   light(realm, at, map);
   markStation(realm, site, map);
@@ -596,6 +599,7 @@ function light(realm: ReadonlySet<string>, at: (p: readonly [number, number]) =>
     c.deco === 'shroombed' ||
     c.deco === 'column' ||
     c.deco === 'cavelamp' ||
+    c.deco === 'torch' ||
     c.deco === 'crystalbush' ||
     c.deco === 'web';
   for (const k of realm) {

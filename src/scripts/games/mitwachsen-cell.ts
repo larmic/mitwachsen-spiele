@@ -64,6 +64,7 @@ export type Deco =
   | 'stonetrough' // Steintrog am Höhlenbett (Wasser, fest)
   | 'shed' // feste Rückwand des Unterstands am Höhlenbett, die Kristallwand (die Mitte zeichnet Dach und Pfosten)
   | 'cavelamp' // Kristall-Lampe im Lampengang hinter der Mündung (fest)
+  | 'torch' // Kristallfackel an einem Weg der Grotte: schmaler Pfosten mit Kristallflamme, Farbe in `color` (fest, leuchtet immer)
   | 'column' // Kristallsäule des Säulen-Glockenspiels, `note` ist ihr Ton 0 = C5 … 4 = A5 (fest; Höhe aus `GROTTE.hall.columns`)
   | 'crystalarch' // Kristallbogen: `note` 0 und 4 die Pfeiler (fest), 1 bis 3 der Bogen darüber (begehbar)
   | 'glowshroom' // kleiner weiß-blauer Deko-Pilz, Farbe in `color` (nur Zierde, begehbar)
