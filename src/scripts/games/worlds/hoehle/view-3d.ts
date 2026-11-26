@@ -37,6 +37,7 @@ export const view3d: View3D = {
     stonetrough: bowl,
     shed: look,
     cavelamp: look,
+    torch: look,
     column: look,
     crystalarch: look,
     glowshroom: look,

@@ -40,6 +40,7 @@ import {
   type MaskFx,
 } from './mitwachsen-mask';
 import { webs } from './mitwachsen-spider';
+import { torchesOf } from './mitwachsen-torch';
 import { Olm } from './mitwachsen-olm-look';
 import { flatColors } from '../../mitwachsen-ground-2d';
 import { CAVE_KEY, caveBright, toggleCave } from '../../mitwachsen-menu';
@@ -214,7 +215,7 @@ describe('Dunkelmaske: Löcher', () => {
     expect(pathBands(bare)).toEqual([]);
   });
 
-  it('zuerst das Loch um die Figur (mit Laterne größer), dann die nächsten; feste Löcher an Schächten, Wiese, Bahnhof, Mündung, Netzen und am Kristallbogen', () => {
+  it('zuerst das Loch um die Figur (mit Laterne größer), dann die nächsten; feste Löcher an Schächten, Wiese, Bahnhof, Mündung, Netzen, am Kristallbogen und an den Kristallfackeln', () => {
     const holes = maskHoles(w, lit(bed), at);
     expect(holes[0]).toMatchObject({ x: bed[0] + 0.5, y: bed[1] + 0.5, r: D.hole, open: 1 });
     expect(maskHoles(w, lit(bed, { lamp: 'hoehle' }), at)[0]!.r).toBe(D.lantern);
@@ -228,10 +229,14 @@ describe('Dunkelmaske: Löcher', () => {
       D.fixed.mouth,
       ...webs(w).map(() => D.fixed.web), // je Netz der Tupfspinnen eins: die Spinne lebt nur im Licht
       D.fixed.arch, // der Kristallbogen der Halle: Dort hängen die Fledermäuse (Issue 30)
+      ...torchesOf(w).map(() => D.fixed.torch), // jede Kristallfackel an den Wegen (Issue 31)
     ]);
+    const nWeb = webs(w).length;
+    expect(torchesOf(w).length).toBeGreaterThan(6);
+    expect(fixed.slice(7 + nWeb).map((h) => [h.x - 0.5, h.y - 0.5])).toEqual(torchesOf(w));
     expect(webs(w).length).toBeGreaterThanOrEqual(GROTTE.web.least);
-    expect(fixed.slice(6, -1).map((h) => [h.x - 0.5, h.y - 0.5])).toEqual(webs(w));
-    const arch = w.cell(fixed.at(-1)!.x - 0.5, fixed.at(-1)!.y - 0.5);
+    expect(fixed.slice(6, 6 + nWeb).map((h) => [h.x - 0.5, h.y - 0.5])).toEqual(webs(w));
+    const arch = w.cell(fixed[6 + nWeb]!.x - 0.5, fixed[6 + nWeb]!.y - 0.5);
     expect([arch.deco, arch.note, arch.perch !== undefined]).toEqual(['crystalarch', 2, true]); // die Mitte des Bogens
     expect(fixed[3]).toMatchObject({ x: bed[0] + 0.5, y: bed[1] + 0.5 });
     expect(fixed.every((h) => holes.some((g) => g.x === h.x && g.y === h.y && g.r === h.r))).toBe(true);

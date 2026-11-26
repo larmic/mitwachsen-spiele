@@ -31,6 +31,7 @@ import { flatColors } from '../../mitwachsen-ground-2d';
 import type { World } from '../../mitwachsen-world';
 import { caveFrame, type Cave, type Frame } from './mitwachsen-frame';
 import { webs } from './mitwachsen-spider';
+import { torchesOf } from './mitwachsen-torch';
 
 const D = GROTTE.dark;
 
@@ -186,13 +187,13 @@ const fixedOf = new WeakMap<object, Hole[]>();
 /**
  * Feste Löcher: die drei Lichtschächte, die Wiese am Bett, Bahnhof Fledermaus, die Mündung des Gangs, jedes Netz der
  * Tupfspinnen (die Spinne lebt nur im Licht) und die Mitte des Kristallbogens in der Halle (dort hängen die
- * Fledermäuse, Issue 30); je Welt einmal
+ * Fledermäuse, Issue 30), dazu jede Kristallfackel an den Wegen (Issue 31); je Welt einmal
  */
 export function fixedHoles(world: Cave): Hole[] {
   const known = fixedOf.get(world);
   if (known) return known;
   const frame = caveFrame(world);
-  const { shaft, meadow, station, mouth, web, arch } = D.fixed;
+  const { shaft, meadow, station, mouth, web, arch, torch } = D.fixed;
   const S = GROTTE.station;
   const holes = frame
     ? [
@@ -202,6 +203,7 @@ export function fixedHoles(world: Cave): Hole[] {
         centre(world, frame.at(0, 1), mouth),
         ...webs(world).map((p) => centre(world, p, web)),
         ...archOf(world).map((p) => centre(world, p, arch)),
+        ...torchesOf(world).map((p) => centre(world, p, torch)),
       ]
     : [];
   fixedOf.set(world, holes);

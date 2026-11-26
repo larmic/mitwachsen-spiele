@@ -22,6 +22,12 @@ export const GROTTE = {
   /** Lampengang: bis so weit hinter der Mündung stehen links und rechts Kristall-Lampen, alle `every` Felder */
   lamps: { to: 6, every: 2 },
   /**
+   * Kristallfackeln an den Wegen (Issue 31, mitwachsen-torch.ts): Paare links und rechts des Wegs durch die Mitte,
+   * `side` Felder neben ihr, alle `every` Felder, vom Lampengang bis `shore` Felder vor den stillen See; an den Abzweigen
+   * zu Kristallhalle und Pilzgarten alle `side` Felder, bis `zone` Felder vor deren Mitte
+   */
+  torch: { side: 4, every: 8, shore: 4, zone: 9 },
+  /**
    * Platz für den Bahnhof Fledermaus (kommt mit dem Zug): ein ebener, freier Streifen neben dem Weg, `out` Felder hinter
    * der Mündung, `long` Felder lang (vom Tor weg) und `wide` breit, `side` Felder neben der Mitte
    */
@@ -78,7 +84,7 @@ export const GROTTE = {
    * für ein tiefes Nachtlila, unter dem Fels und Nebel unter 0,08 fielen; die hellere Farbe braucht 0,87 für denselben
    * Boden. Lichtloch um die Figur `hole` Felder, mit Laterne `lantern` (wächst in `circle.grow` ms), im Fahrzeug um den
    * Sitz `seat`, an den Lampen vorn `lamp`. Feste Löcher (`fixed`, Radius in Feldern): Lichtschächte, Wiese am Bett,
-   * Bahnhof Fledermaus, Mündung des Gangs, jedes Netz der Tupfspinnen (`web`), der Kristallbogen der Halle (`arch`, Issue 30: Dort hängen die Fledermäuse). Kleine Löcher (`small`) nur bis `near` Felder um die Figur (die letzten zwei
+   * Bahnhof Fledermaus, Mündung des Gangs, jedes Netz der Tupfspinnen (`web`), der Kristallbogen der Halle (`arch`, Issue 30: Dort hängen die Fledermäuse), jede Kristallfackel an den Wegen (`torch`, Issue 31). Kleine Löcher (`small`) nur bis `near` Felder um die Figur (die letzten zwei
    * weich; Leuchtmoos `moss`, die Mitte eines Kristallfelds `field`, der Wasserfall `fall`); Wege als Bänder, `band` Felder breit. Höchstens `most` Löcher je Bild. Im Gang blendet sie mit dem Weg aus,
    * `gang` Felder von der Mündung ist sie weg, und nie schneller als in `fade` ms; ist die Nacht bei `night`, ist sie ganz
    * weg (Maske × (1 − Nacht / `night`))
@@ -92,7 +98,7 @@ export const GROTTE = {
     lantern: 6.5,
     seat: 3.5,
     lamp: 1.2,
-    fixed: { shaft: 3.5, meadow: 6, station: 4, mouth: 3, web: 2, arch: 3 },
+    fixed: { shaft: 3.5, meadow: 6, station: 4, mouth: 3, web: 2, arch: 3, torch: 1.8 },
     small: { crystal: 0.8, column: 1, lamp: 1, bed: 1.2, spring: 1.2, animal: 1, moss: 0.6, field: 1.1, fall: 1.2 },
     near: 9,
     band: 2.5,
