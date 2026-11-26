@@ -98,7 +98,7 @@ export const RULES: Rule[] = [
     parts: [
       // Gleis der Höhlenbahn auf Lichtung und Grotte: Trassen-Suche, Bahnhof Bär, Zeichenteile der 2D-Ansicht; Tok, der
       // Bote der Höhlenwelt (Regeln, Modell, Bild und Ton); Bau 1 mit Bahnhof Bär und Zug (Modelle, Körper, Töne); der Zug
-      // als Fahrzeug (Strecke, Bild beim Fahren, Ton, Licht im Tunnel); Bau 2 mit Bahnhof Fledermaus und Lokschuppen;
+      // als Fahrzeug (Strecke, Bild beim Fahren, Ton, Licht im Tunnel); Bau 2 mit Bahnhof Fledermaus;
       // Schmuck mit Zug (Pfeif-Gruß, Laternenfahrt mit Glühwürmchen und Kristall-Wimpel, warmes Licht, Gute Nacht);
       // geholt, sobald das Eistor offen ist
       { chunks: /\/welt-bahn\.[\w-]+\.js$/ },
