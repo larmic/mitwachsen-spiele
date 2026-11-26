@@ -27,6 +27,7 @@ import type { GuideRules } from '../../mitwachsen-guide';
 import type { HeraldRules } from '../../mitwachsen-herald';
 import type { WorldPack } from '../../mitwachsen-pack-types';
 import type { RideEngine, Vehicle } from '../../mitwachsen-rider';
+import type { Sight } from '../../mitwachsen-sight';
 import type { View2D } from '../../mitwachsen-view';
 import type { View3D } from '../../mitwachsen-view-3d';
 import { TOK_MODEL, TOK_SOLO } from '../../../../data/games/worlds/bahn/mitwachsen-tok-model';
@@ -37,12 +38,14 @@ import { layStones } from './mitwachsen-stones';
 import { TOK_RULES } from './mitwachsen-tok';
 import { wakeRides } from '../../mitwachsen-ride-save';
 import { train } from './mitwachsen-train';
+import { haltSight } from '../../mitwachsen-ride-kit';
 import { view } from './view-2d';
 
-export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle> = {
+export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle, Sight> = {
   id: 'bahn',
   lay: (laid) => layStones(laid, layLine(laid)),
   rules: { bump: () => false, herald: TOK_RULES, vehicle: train },
+  sights: [haltSight(train)], // der Zug am Halt lockt bis zur ersten Fahrt (solange Tok wartet, führt er)
   dawn: wakeRides,
   away: (packs) => (builtOf(packs) < 2 ? [FIRST_MOLE] : []), // er sitzt bis Bau 2 auf Toks Helm
   models: { tok: TOK_MODEL },

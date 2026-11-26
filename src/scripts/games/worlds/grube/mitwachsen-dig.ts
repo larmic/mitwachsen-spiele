@@ -18,10 +18,11 @@ import { DIG, DIG_NEAR } from '../../../../data/games/worlds/grube/mitwachsen-di
 import { DIRS } from '../../../../lib/games/front';
 import { dirTo, freeNear, type Crowd } from '../../mitwachsen-free';
 import type { HeraldEvents as Events, HeraldRules, Heralded } from '../../mitwachsen-herald';
-import { rideOf, withRide } from '../../mitwachsen-ride-save';
+import { rideOf, ridden, withRide } from '../../mitwachsen-ride-save';
 import type { MoveCmd } from '../../mitwachsen-rider';
+import type { Sight } from '../../mitwachsen-sight';
 import { canStep, type World } from '../../mitwachsen-world';
-import { FUNKEL, SEAT, dug, laneOf } from './mitwachsen-funkel';
+import { FUNKEL, SEAT, dug, funkelRoute, laneOf } from './mitwachsen-funkel';
 
 /** Wohnt der erste Maulwurf zu Hause am Höhlenbett (er zog mit Bau 2 ein)? */
 export const moleHome = (garden: readonly { id: string }[]): boolean => garden.some((a) => a.id === FIRST_MOLE);
@@ -170,3 +171,33 @@ export function digHold(s: Heralded, cmd: Pick<MoveCmd, 'dir'>, events: Events):
 
 /** Der Maulwurf als Bote der Grubenbahn (`pack.rules.herald`); hineinlaufen tut nichts Eigenes (`meet`) */
 export const DIG_RULES: HeraldRules = { step: digStep, meet: () => false, hold: digHold };
+
+/**
+ * Sehenswürdigkeit Grubenhalt (`WorldPack.sights`, mitwachsen-sight.ts): Solange das Graben fällig ist, lockt der Halt,
+ * denn der Maulwurf gräbt erst, wenn die Figur dort steht (`canDig`, Issue 14). Gefunden ist er, sobald gegraben ist;
+ * danach lockt Funkels Halt, bis das Kind einmal gefahren ist (der Kern trägt ihn ein). Der Ruf ist das Graben
+ */
+export const DIG_SIGHT: Sight = {
+  id: 'grube:graben',
+  cells: (world) => {
+    const halt = haltOf(world);
+    return halt ? [halt] : [];
+  },
+  ready: (s) => digDue(s.packs, s.garden),
+  done: (s) => dug(s.packs),
+  call: (_, [x, y]) => ({ type: 'herald', what: 'dig', id: FIRST_MOLE, x, y }),
+};
+
+/**
+ * Sehenswürdigkeit Funkels Halt: wie `haltSight` (mitwachsen-ride-kit.ts), hier ohne den Baukasten der Fahrzeuge, weil
+ * Funkel eine Schleife mit einem Halt fährt: Sein Sitz lockt, sobald gegraben ist und er wach ist, bis zur ersten Fahrt
+ */
+export const FUNKEL_SIGHT: Sight = {
+  id: `halt:${FUNKEL.id}`,
+  cells: (world, s) => {
+    const r = dug(s.packs) && !s.dozing?.includes(FUNKEL.id) && funkelRoute(world, s);
+    return r ? [r.stops.home] : [];
+  },
+  done: (s) => ridden(s.packs, FUNKEL.id),
+  call: (_, [x, y]) => ({ type: 'ride', what: 'nudge', id: FUNKEL.id, x, y }),
+};

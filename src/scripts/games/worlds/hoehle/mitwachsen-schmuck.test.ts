@@ -80,13 +80,17 @@ describe('Säulen-Glockenspiel (Kristallgrotte): Regel', () => {
       expect(columns.map(({ c }) => c.note).sort()).toEqual([0, 1, 2, 3, 4]);
     });
 
-    it(`Seed ${seed}: kein Spielstand; ohne die Regeln des Pakets ist eine Säule nur fest`, () => {
+    it(`Seed ${seed}: kein Spielstand außer „gefunden“ (Hinführen, Issue 28); ohne die Regeln des Pakets ist eine Säule nur fest`, () => {
       const { p } = columns[0]!;
       const from = besideOf(w, p);
       const s = at(w, ...from.at, from.dir);
       const r = walk(w, s, from.dir);
       expect(r.state.packs).toBe(s.packs);
-      expect({ ...progressOf(r.state), position: null }).toEqual({ ...progressOf(s), position: null });
+      expect({ ...progressOf(r.state), position: null }).toEqual({
+        ...progressOf(s),
+        position: null,
+        found: ['hoehle:saeulen'],
+      });
       const bare = step(s, w, { type: 'move', dir: from.dir });
       expect(bare.events.map((e) => e.type)).toEqual(['bump']);
     });

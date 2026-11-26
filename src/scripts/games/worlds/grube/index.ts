@@ -21,9 +21,10 @@ import type { GuideRules } from '../../mitwachsen-guide';
 import type { HeraldRules } from '../../mitwachsen-herald';
 import type { WorldPack } from '../../mitwachsen-pack-types';
 import type { RideEngine, Vehicle } from '../../mitwachsen-rider';
+import type { Sight } from '../../mitwachsen-sight';
 import type { View2D } from '../../mitwachsen-view';
 import type { View3D } from '../../mitwachsen-view-3d';
-import { DIG_RULES } from './mitwachsen-dig';
+import { DIG_RULES, DIG_SIGHT, FUNKEL_SIGHT } from './mitwachsen-dig';
 import { digBodies, digFx } from './mitwachsen-dig-look';
 import { dug, funkel, layGrube, ringGate } from './mitwachsen-funkel';
 import { funkelBodies, funkelFx, grubeRails } from './mitwachsen-funkel-look';
@@ -49,11 +50,12 @@ const view: View2D = {
 };
 const view3d: View3D = { decos: {}, ground: () => null, rails: grubeRails };
 
-export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle> = {
+export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle, Sight> = {
   id: 'grube',
   lay: layGrube,
   lays: dug, // vor dem Graben kein Neubau, wenn das Paket mit der Grotte ankommt
   rules: { bump: ringGate, vehicle: funkel, herald: DIG_RULES },
+  sights: [DIG_SIGHT, FUNKEL_SIGHT], // vor dem Graben lockt der Grubenhalt (erst dort gräbt der Maulwurf), danach Funkel bis zur ersten Fahrt
   view,
   view3d: () => Promise.resolve(view3d),
 };

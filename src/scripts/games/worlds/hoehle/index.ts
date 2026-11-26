@@ -20,20 +20,23 @@ import type { GuideRules } from '../../mitwachsen-guide';
 import type { HeraldRules } from '../../mitwachsen-herald';
 import type { WorldPack } from '../../mitwachsen-pack-types';
 import type { RideEngine, Vehicle } from '../../mitwachsen-rider';
+import type { Sight } from '../../mitwachsen-sight';
 import type { View2D } from '../../mitwachsen-view';
 import type { View3D } from '../../mitwachsen-view-3d';
 import { buildGrotte, placeGrotte } from './mitwachsen-grotte';
 import { rules } from './mitwachsen-cave-rules';
 import { HEAVE } from './mitwachsen-heave';
+import { SIGHTS } from './mitwachsen-sights';
 import { view } from './view-2d';
 import { BAT_ROOST, CAVE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
 
-export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle> = {
+export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle, Sight> = {
   id: 'hoehle',
   gate: 'hoehle',
   build: buildGrotte,
   place: placeGrotte,
   rules: { ...rules, ritual: HEAVE }, // Säulen-Glockenspiel, Grottenolm am Steg, Netze der Tupfspinnen, Kristall-Laterne; Hau-ruck am Höhlentor
+  sights: SIGHTS, // Laterne, Säulen-Glockenspiel, Netze und Steg locken, bis sie gefunden sind
   view,
   view3d: () => import('./view-3d').then((m) => m.view3d),
   models: CAVE_MODELS,

@@ -218,12 +218,16 @@ describe('Eiszapfen-Glockenspiel (Eis-Welt): Regel', () => {
     expect(r.events.map((e) => e.type)).toEqual(['bump']);
   });
 
-  it('kein Spielstand: Zustand der Pakete und alles Gespeicherte bleiben, wie sie waren', () => {
+  it('kein Spielstand außer „gefunden“: Zustand der Pakete und alles Gespeicherte bleiben; nur das Hinführen merkt sich den ersten Ton (Issue 28)', () => {
     const s = at(WX - 1, WY);
     let t = s;
     for (let i = 0; i < ROW.length; i++) t = walk(t, 'e').state;
     expect(t.packs).toBe(s.packs);
-    expect({ ...progressOf(t), position: null }).toEqual({ ...progressOf(s), position: null });
+    expect({ ...progressOf(t), position: null }).toEqual({
+      ...progressOf(s),
+      position: null,
+      found: ['eis:glockenspiel'],
+    });
   });
 
   it('kein Halt, kein Neubau in 3D: `icicle` ist keine Begegnung und ändert kein Feld', () => {
