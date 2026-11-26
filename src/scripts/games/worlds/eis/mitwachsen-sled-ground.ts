@@ -199,7 +199,14 @@ export function cheapest(
   map: ReadonlyMap<string, Cell>,
   height: (x: number, y: number) => number,
 ): Point[] | undefined {
+  const costs = new Map<string, number>(); // je Feld einmal: Die Suche fragt jedes von bis zu vier Seiten
   const cost = (x: number, y: number) => {
+    const k = key(x, y);
+    let n = costs.get(k);
+    if (n === undefined) costs.set(k, (n = weigh(x, y)));
+    return n;
+  };
+  const weigh = (x: number, y: number) => {
     const c = map.get(key(x, y))!;
     let n = 1 + (blocked(c) ? CLEAR : 0) + (c.deco === 'snowdrift' ? 1 : 0);
     for (let dy = -1; dy <= 1; dy++)
