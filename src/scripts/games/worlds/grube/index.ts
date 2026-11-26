@@ -27,7 +27,7 @@ import type { View3D } from '../../mitwachsen-view-3d';
 import { DIG_RULES, DIG_SIGHT, FUNKEL_SIGHT } from './mitwachsen-dig';
 import { digBodies, digFx } from './mitwachsen-dig-look';
 import { dug, funkel, layGrube, ringGate } from './mitwachsen-funkel';
-import { funkelBodies, funkelFx, grubeRails } from './mitwachsen-funkel-look';
+import { funkelBodies, funkelFx, grubeRails, haltBodies } from './mitwachsen-funkel-look';
 import { GangFx, gangBodies, gangDim } from './mitwachsen-gang-look';
 
 /** Was am Glitzergang zuletzt klang (je Spielseite eins) */
@@ -41,6 +41,7 @@ const view: View2D = {
     ...funkelBodies(state, world, at, fx.rangAt),
     ...gangBodies(state, world, at, fx),
     ...digBodies(state, world, at), // die Erdwelle, solange der Maulwurf gräbt
+    ...haltBodies(state, world), // Planken und Schild am Halt
   ],
   rideFx: funkelFx,
   heraldFx: digFx, // der Maulwurf gräbt

@@ -33,6 +33,32 @@ export const GRUBE_RAIL = {
 /** Zaunkristalle zur Höhle hin am Glitzergang (Kristallbusch der Grotte, lila wie die Kristalle der Halle) */
 export const FENCE_CRYSTAL = '#cbacff';
 
+/** Farben des Bahnsteigs an Funkels Halt (Issue 39): Planken aus Holz, Pfosten aus Schiefer, Tafel in Petrol */
+export const HALT_COLORS = {
+  plank: ['#b98a58', '#c99a66'],
+  seam: '#8a633c',
+  post: ['#5d5870', '#6c6680'],
+  board: FUNKEL_COLORS.petrol,
+} as const;
+/** Eine Planke des Bahnsteigs: flach auf dem Boden ihres Felds (Mitte in der Mitte), zwei Fugen quer */
+export const PLANK: readonly Part[] = [
+  [-0.5, -0.5, 0, 1, 1, 0.06, ...HALT_COLORS.plank],
+  [-0.5, -0.18, 0.06, 1, 0.03, 0.006, HALT_COLORS.seam],
+  [-0.5, 0.15, 0.06, 1, 0.03, 0.006, HALT_COLORS.seam],
+];
+/**
+ * Schild am Halt (zur Kamera, ohne Text): Pfosten, Tafel in Petrol, darauf ein Kristall in der Farbe der Zaunkristalle.
+ * `SIGN_FACE`: Lage der Vorderseite der Tafel (vorn, unten, Breite, Höhe), für eine Zahl darauf
+ */
+export const SIGN_FACE = { f: 0.06, z: 1.02, wide: 0.64, high: 0.5 } as const;
+export const HALT_SIGN: readonly Part[] = [
+  [-0.05, -0.05, 0, 0.1, 0.1, 1.05, ...HALT_COLORS.post],
+  [0, -SIGN_FACE.wide / 2, SIGN_FACE.z, SIGN_FACE.f, SIGN_FACE.wide, SIGN_FACE.high, ...HALT_COLORS.board],
+  [SIGN_FACE.f, -0.2, SIGN_FACE.z + 0.2, 0.015, 0.2, 0.1, FENCE_CRYSTAL, FENCE_CRYSTAL], // Kristall: Raute aus drei Lagen
+  [SIGN_FACE.f, -0.16, SIGN_FACE.z + 0.1, 0.015, 0.12, 0.1, FENCE_CRYSTAL, FENCE_CRYSTAL],
+  [SIGN_FACE.f, -0.16, SIGN_FACE.z + 0.3, 0.015, 0.12, 0.1, FENCE_CRYSTAL, FENCE_CRYSTAL],
+];
+
 /** Länge eines Wagens (die Lok gleich lang): je Wagen ein Feld, mit Lücke */
 export const CAR = 0.86;
 const L = CAR;

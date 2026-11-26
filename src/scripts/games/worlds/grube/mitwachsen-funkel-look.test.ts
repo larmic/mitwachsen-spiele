@@ -3,7 +3,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Part } from '../../../../lib/games/front';
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
-import { FUNKEL_COLORS, GRUBE_RAIL, funkelParts } from '../../../../data/games/worlds/grube/mitwachsen-funkel-model';
+import {
+  FUNKEL_COLORS,
+  GRUBE_RAIL,
+  HALT_COLORS,
+  HALT_SIGN,
+  PLANK,
+  funkelParts,
+} from '../../../../data/games/worlds/grube/mitwachsen-funkel-model';
 import type { RideEvent } from '../../mitwachsen-pack-types';
 import { withRidden } from '../../mitwachsen-ride-save';
 import type { RideAt } from '../../mitwachsen-ride-view';
@@ -18,6 +25,7 @@ import {
   funkelFx,
   funkelScores,
   grubeRails,
+  haltBodies,
   railShape,
 } from './mitwachsen-funkel-look';
 import { pack } from './index';
@@ -213,5 +221,38 @@ describe('Töne von Funkel', () => {
     expect(funkelFx(ev('shoo', { who: 'a' }))).toMatchObject({ who: 'a' });
     expect(funkelFx(ev('snore'))).toMatchObject({ zzz: true });
     expect(pack.view?.rideFx === funkelFx).toBe(true);
+  });
+});
+
+describe('Bahnsteig an Funkels Halt (Issue 39)', () => {
+  it('Planken auf jedem Feld des Bahnsteigs und ein Schild zur Kamera, erst wenn gegraben ist und die Figur in der Grotte ist; kein Gold, nicht antippbar', () => {
+    const bodies = haltBodies(inCave(), world);
+    const planks = bodies.filter((b) => b.id.startsWith('grube:steg:'));
+    const sign = bodies.filter((b) => b.id === 'grube:schild');
+    expect(planks.length).toBeGreaterThanOrEqual(4);
+    expect(sign).toHaveLength(1);
+    for (const b of planks) {
+      const c = world.cell(b.x, b.y);
+      expect([c.stop, c.solid, !!c.ride]).toEqual(['grube', false, false]); // begehbar wie zuvor
+      expect(b.z).toBe(c.h);
+      expect(b.parts).toBe(PLANK);
+    }
+    expect(new Set(planks.map((b) => `${b.x},${b.y}`)).size).toBe(planks.length);
+    // das Schild steht auf dem Feld des Bahnsteigs, das am weitesten vom Sitz liegt
+    const far = (b: { x: number; y: number }) => Math.hypot(b.x - route.stops.home[0], b.y - route.stops.home[1]);
+    expect(far(sign[0]!)).toBe(Math.max(...planks.map(far)));
+    expect(sign[0]).toMatchObject({ dir: 's', parts: HALT_SIGN });
+    for (const b of bodies) {
+      expect(b.id.startsWith('ride:')).toBe(false);
+      expect(gold(b.parts)).toBe(false);
+    }
+    // flach: Die Planke ragt kaum über den Boden; das Schild ist höher als die Figur
+    expect(Math.max(...PLANK.map((q) => q[2] + q[5]))).toBeLessThan(0.1);
+    expect(Math.max(...HALT_SIGN.map((q) => q[2] + q[5]))).toBeGreaterThan(1.4);
+    expect(colors(HALT_SIGN).has(HALT_COLORS.board[0])).toBe(true);
+    // vor dem Graben und von der Lichtung aus nichts
+    expect(haltBodies(inCave({}), world)).toEqual([]);
+    expect(haltBodies(inCave(DUG, { player: { x: 0, y: 3, dir: 's' } }), world)).toEqual([]);
+    expect(pack.view!.bodies!(inCave(), world, AT).some((b) => b.id === 'grube:schild')).toBe(true);
   });
 });
