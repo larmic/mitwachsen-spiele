@@ -113,7 +113,7 @@
 - [ ] Weltpfade und Stellplätze am Portalstein (Review Punkte 7 und 14, entschieden am 26.11.2026: kein gemeinsamer Bahnhof)
   - [x] Schritt 1: Wegsuche in den Kern und messen (Issue 59)
   - [x] Schritt 2: Weltpfade als Boden (Issue 61, `mitwachsen-worldpath.ts`, 2 ms je Welt); `test:deep` entlastet (Schlitten-Tests 12 statt 20 Seeds, wilde Läufe 6 statt 8)
-  - [ ] Schritt 3: schlafende Wegsteine und Lichterkette beim Öffnen eines Tors
+  - [x] Schritt 3: schlafende Wegsteine und Lichterkette beim Öffnen eines Tors (Issue 65, `mitwachsen-waystone.ts`; am Gerät ansehen steht aus)
   - [ ] Schritt 4: Stellplatz des Schlittens in die Linie von Stein und Pfad
   - [ ] Schritt 5: Bahnhof Bär an den Höhlen-Portalstein
   - [ ] Am Gerät ansehen: Folgt er einem Pfad, erkennt er die Materialien?
