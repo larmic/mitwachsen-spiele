@@ -3240,9 +3240,11 @@ const sledStage = (game: Locator) =>
   game.evaluate((el) => (el as unknown as SledGame).state.packs.fahrt?.schlitten?.stage ?? 'fehlt');
 
 /**
- * Die Figur wach `gap` Felder neben den Sitz des Schlittens stellen (quer zur Strecke, nicht aufs Zugtier und nicht in
- * den Laternenpfahl dahinter), auf freie, begehbare Felder, von denen sie Schritt für Schritt zum Sitz kommt. Liefert die
- * Pfeiltaste zum Sitz und die zurück (null: kein Platz, dann scheitert der Test mit dem Seed)
+ * Die Figur wach `gap` Felder neben den Sitz des Schlittens stellen (zuerst quer zur Strecke, sonst hinter ihn auf den
+ * freien Platz; nie aufs Zugtier), auf freie, begehbare Felder, von denen sie Schritt für Schritt zum Sitz kommt. In
+ * etwa einer von hundert Welten stehen auf beiden Seiten Kristalle oder Tannen (gemessen über 400 Seeds am 26.11.2026):
+ * Seit dort kein Schuppen mehr steht (Issue 25), ist das Feld dahinter frei. Liefert die Pfeiltaste zum Sitz und die
+ * zurück (null: kein Platz, dann scheitert der Test mit dem Seed)
  */
 const besideSeat = (page: Page, game: Locator, gap: 1 | 2) =>
   render(page).then(() =>
@@ -3270,13 +3272,15 @@ const besideSeat = (page: Page, game: Locator, gap: 1 | 2) =>
           '-1,0': 'ArrowLeft',
           '1,0': 'ArrowRight',
         };
-        for (const [dx, dy] of [
+        const behind = ([dx, dy]: readonly [number, number]) => +(sx - dx === px && sy - dy === py);
+        const around = [
           [1, 0],
           [-1, 0],
           [0, 1],
           [0, -1],
-        ] as const) {
-          if ((sx + dx === px && sy + dy === py) || (sx - dx === px && sy - dy === py)) continue; // längs der Strecke
+        ] as const;
+        for (const [dx, dy] of [...around].sort((a, b) => behind(a) - behind(b))) {
+          if (sx + dx === px && sy + dy === py) continue; // dort steht das Zugtier
           const cells = Array.from({ length: n }, (_, i) => [sx + dx * (i + 1), sy + dy * (i + 1)] as const);
           if (!cells.every(([x, y]) => free(x, y))) continue;
           const chain = [...cells].reverse().concat([[sx, sy] as const]);
