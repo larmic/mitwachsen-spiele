@@ -20,7 +20,7 @@ Jede Welt hat ein Alter, das die Eltern im Menü einstellen. Das Alter schaltet 
 | --- | --- | --- | --- |
 | ab 3 | laufen, die Lichtung im Nebel erkunden, Tiere entdecken, schlafen gehen | spielbar (MVP) | [mitwachsen.md](mitwachsen.md) |
 | ab 4 | Idee: Blöcke bauen und abbauen, Vorlagen nachbauen | – | – |
-| ab 5 | Idee: kleine Aufgaben, Zählen | – | – |
+| ab 5 | Idee: kleine Aufgaben, Zählen (vorgezogen sind seit dem 26.11.2026 nur die Ziffern 1 bis 4 an Funkels Zahlensteinen) | – | – |
 
 ## Gemeinsame Regeln
 
