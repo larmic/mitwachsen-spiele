@@ -51,6 +51,8 @@ import {
 import { carried, carryKey } from './mitwachsen-carry';
 import { Geo, atlas, snapToShadowTexel, type Tile, type V3 } from './mitwachsen-geo';
 import { grown } from './mitwachsen-growth';
+import { isRing } from './mitwachsen-rim';
+import { RIM_COLORS, rimBlossoms } from './mitwachsen-rim-look';
 import type { Parts } from './mitwachsen-gatehouse';
 import { GateHouses } from './mitwachsen-gatehouses-3d';
 import { Platforms3D } from './mitwachsen-platform-3d';
@@ -116,6 +118,8 @@ const GROUND_TILES: Record<Exclude<Cell['ground'], 'water' | 'lava' | 'sky'>, [T
   moss: ['mossTop', 'mossSide', 'dirt'],
   grotto: ['stone', 'stone', 'stone'], // Kristallgrotte: färbt der 3D-Teil ihres Pakets
 };
+/** Kacheln der Hecke am Rand der Lichtung (`Cell.rim`) */
+const HEDGE_TILES: [Tile, Tile, Tile] = ['leaves', 'leaves', 'leaves'];
 /** Rahmen des Betts: aus Holz (Seite, oben, Kachel); in einer Welt hinter einem Tor sagt es ihr Paket */
 const WOOD_FRAME: readonly [string, string | null, Tile] = [GAME_COLORS.bed.frame, null, 'planks'];
 const SKY = new Color('#9fd6f0');
@@ -668,10 +672,15 @@ export class World3D {
     const h = c.h;
     const stone = c.ground === 'stone';
     const own = this.views.ground(c, this.opened); // Boden einer Welt hinter einem Tor (Eis-Welt: Schnee und Eis, Rutschspur)
-    const [topTile, sideTop, below] = own?.tiles ?? GROUND_TILES[c.ground];
+    const ring = isRing(c); // Rand der Lichtung: dunkler Schiefer, innen Hecke (mitwachsen-rim-look.ts)
+    const [topTile, sideTop, below] = own?.tiles ?? (c.rim ? HEDGE_TILES : GROUND_TILES[c.ground]);
     const shade = stone ? 0 : (c.shade ?? 0);
     // Seiten eines Bodens einer Welt getönt (`side`, Eisfall), sonst Farbflecken im Boden
-    const tint = own?.side ? new Color(own.side) : new Color(1, 1, 1).multiplyScalar(0.93 + shade * 0.07);
+    const tint = own?.side
+      ? new Color(own.side)
+      : ring
+        ? new Color(c.rim ? RIM_COLORS.hedge : RIM_COLORS.rock)
+        : new Color(1, 1, 1).multiplyScalar(0.93 + shade * 0.07);
     if (c.tint && c.ground === 'grass') tint.multiply(new Color(c.tint)); // Stimmung der Richtung
     const top = own?.top ? new Color(own.top) : tint.clone();
     if (own?.light) top.multiplyScalar(1 + own.light); // Lichtfleck (Grotte): Licht in den Farben der Ecken
@@ -694,6 +703,7 @@ export class World3D {
         else g.quad([x, y0, y], [x, y0, y + 1], [x, y1, y + 1], [x, y1, y], n, tile, tint);
       }
     }
+    if (c.rim) for (const [bx, by, bz, w, d, bh, color] of rimBlossoms(x, y, h)) g.box(bx, bz, by, w, bh, d, color);
   }
 
   /**

@@ -96,6 +96,7 @@ export type Cell = {
   solid: boolean; // Deko versperrt das Feld (Baum, Busch, Fischkiste, Pilzbeet, Schneehaufen, Fels, Zaun, Bett, Tafel)
   gate?: GateId; // Tor oder Brücke: begehbar, sobald offen
   sign?: GateId; // Tafel zu diesem Tor
+  rim?: true; // innerste Reihe des Rands der Lichtung: dichte Hecke, zwei Stufen über dem Boden davor (fest wie der Fels dahinter; mitwachsen-rim.ts)
   garden?: true; // Wiese ums Bett: Hier sind gefundene Tiere zu Hause
   roof?: true; // unter dem Unterstand auf der Wiese
   tree?: TreeKind; // Baumart bei deco 'tree'
