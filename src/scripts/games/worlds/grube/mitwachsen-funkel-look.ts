@@ -12,7 +12,13 @@
 
 import type { Dir } from '../../../../lib/games/front';
 import type { Point } from '../../../../data/games/mitwachsen';
-import { GRUBE_RAIL, funkelParts, type FunkelLook } from '../../../../data/games/worlds/grube/mitwachsen-funkel-model';
+import {
+  GRUBE_RAIL,
+  HALT_SIGN,
+  PLANK,
+  funkelParts,
+  type FunkelLook,
+} from '../../../../data/games/worlds/grube/mitwachsen-funkel-model';
 import { dirTo } from '../../mitwachsen-free';
 import type { Cell } from '../../mitwachsen-cell';
 import type { RideEvent } from '../../mitwachsen-pack-types';
@@ -25,7 +31,7 @@ import type { World } from '../../mitwachsen-world';
 import type { Scored } from '../../sfx';
 import { DIG } from '../../../../data/games/worlds/grube/mitwachsen-dig-model';
 import { digAt } from './mitwachsen-dig';
-import { FUNKEL, funkelRoute } from './mitwachsen-funkel';
+import { FUNKEL, funkelRoute, platformNear } from './mitwachsen-funkel';
 import { frameOf, gangOf } from './mitwachsen-gang';
 
 /** Kennung der Körper (`ride:` trifft das Antippen) */
@@ -258,4 +264,22 @@ export function funkelFx(e: RideEvent): RideFx | undefined {
     default:
       return { score };
   }
+}
+
+/**
+ * Bahnsteig an Funkels Halt (Issue 39), sobald der Gang gegraben ist und die Figur in der Grotte ist: je Feld des
+ * Bahnsteigs eine Planke flach auf dem Boden und ein Schild auf dem Feld, das am weitesten vom Sitz liegt (zur Kamera
+ * gewandt). Nur Bild: Die Felder bleiben begehbar wie zuvor, die Warteplätze der Tiere bleiben
+ */
+export function haltBodies(state: State, world: World): readonly RideBody[] {
+  const r = funkelRoute(world, state);
+  const seat = r?.stops.home;
+  if (!seat || world.realm(state.player.x, state.player.y) !== world.realm(...seat)) return [];
+  const cells = platformNear(world, seat);
+  const far = cells.at(-1);
+  const at = ([x, y]: Point) => ({ x, y, z: world.cell(x, y).h, dir: 's' as const });
+  return [
+    ...cells.map((p, i): RideBody => ({ id: `grube:steg:${i}`, key: 'grube:steg', ...at(p), parts: PLANK })),
+    ...(far ? [{ id: 'grube:schild', key: 'grube:schild', ...at(far), parts: HALT_SIGN }] : []),
+  ];
 }

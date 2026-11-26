@@ -152,7 +152,7 @@ function trackOf(world: World, laid = true): Point[] {
 }
 
 /** Warteplätze auf dem Bahnsteig (`Cell.stop` `'grube'`), die nächsten zum Sitz zuerst */
-function platformNear(world: World, [sx, sy]: Point): Point[] {
+export function platformNear(world: World, [sx, sy]: Point): Point[] {
   const out: { p: Point; d: number }[] = [];
   for (let dy = -4; dy <= 4; dy++)
     for (let dx = -4; dx <= 4; dx++) {
