@@ -60,7 +60,7 @@ import { guideGate, type Hint } from './mitwachsen-guide';
 import { moodLife } from './mitwachsen-sky';
 import { turnHead } from './mitwachsen-air';
 import { Album } from './mitwachsen-album';
-import { ASK, HEART, NOTE, ZZZ, sprite, type Particle } from './mitwachsen-glyphs';
+import { ASK, BIRD, BIRD_EYE, HEART, NOTE, ZZZ, sprite, type Particle } from './mitwachsen-glyphs';
 import { byRow, drawRide, type RideBody } from './mitwachsen-ride-view';
 import { hangAt, labelHeight } from './mitwachsen-roost';
 import { isRing } from './mitwachsen-rim';
@@ -69,7 +69,14 @@ import { workOf } from './mitwachsen-herald';
 
 /** Gleitende Position eines Wesens auf dem Bildschirm (in Feldern), dazu Hüpfer und Blickrichtung */
 export type Body = { x: number; y: number; z: number; hop: number; puff?: number }; // puff: Haltung im Iglu (Größe)
-export type Float = { kind: 'note' | 'heart' | 'zzz'; x: number; y: number; z: number; age: number; color: string };
+export type Float = {
+  kind: 'note' | 'heart' | 'zzz' | 'bird';
+  x: number;
+  y: number;
+  z: number;
+  age: number;
+  color: string;
+};
 export type { Particle };
 
 export type Scene = {
@@ -911,7 +918,12 @@ export class Renderer {
       const lift = sc.reduced ? 0 : t * 40 * sc.zoom;
       if (f.kind === 'heart') sprite(ctx, HEART, f.color, x + 14 * sc.zoom, y - lift, 4 * sc.zoom);
       else if (f.kind === 'note') sprite(ctx, NOTE, f.color, x - 14 * sc.zoom, y - lift, 4 * sc.zoom);
-      else sprite(ctx, ZZZ, f.color, x + (10 + t * 14) * sc.zoom, y - lift, 4 * sc.zoom);
+      else if (f.kind === 'bird') {
+        // der Vogel in der Hecke steigt nicht auf: Er schüttelt den Kopf (bei reduzierter Bewegung schaut er still)
+        const shake = sc.reduced ? 0 : Math.sin(t * 26) * 3 * sc.zoom * (1 - t);
+        sprite(ctx, BIRD, f.color, x + shake, y, 6 * sc.zoom);
+        sprite(ctx, BIRD_EYE, '#1d2838', x + shake, y - 12 * sc.zoom, 6 * sc.zoom);
+      } else sprite(ctx, ZZZ, f.color, x + (10 + t * 14) * sc.zoom, y - lift, 4 * sc.zoom);
       ctx.globalAlpha = 1;
     }
     for (const p of sc.particles) {

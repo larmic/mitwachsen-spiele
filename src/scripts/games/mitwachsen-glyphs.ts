@@ -19,6 +19,11 @@ export type Particle = {
 export const HEART = ['.rr.rr.', 'rrrrrrr', 'rrrrrrr', '.rrrrr.', '..rrr..', '...r...'];
 export const NOTE = ['..kkkk', '..k..k', '..k..k', 'kkk.kk', 'kkk.kk'];
 export const ZZZ = ['zzzz', '..z.', '.z..', 'zzzz'];
+/** Kleiner Vogel, der aus der Hecke am Rand der Lichtung schaut (Issue 41), und sein Auge */
+export const BIRD = ['.###..', '######', '.####.', '..##..'];
+export const BIRD_EYE = ['......', '.#....'];
+/** Seine Farbe: warmes Braun, kein Gold */
+export const BIRD_COLOR = '#8a5a34';
 export const ASK = ['.qqq.', 'q...q', '...q.', '..q..', '.....', '..q..']; // Fragezeichen über verlorenen Tieren
 
 /**
