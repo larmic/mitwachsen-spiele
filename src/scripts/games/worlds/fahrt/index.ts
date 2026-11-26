@@ -14,12 +14,13 @@ import type { GuideRules } from '../../mitwachsen-guide';
 import type { HeraldRules } from '../../mitwachsen-herald';
 import type { WorldPack } from '../../mitwachsen-pack-types';
 import type { RideEngine, Vehicle } from '../../mitwachsen-rider';
+import type { Sight } from '../../mitwachsen-sight';
 import type { View2D } from '../../mitwachsen-view';
 import type { View3D } from '../../mitwachsen-view-3d';
 import { wakeRides } from '../../mitwachsen-ride-save';
 import { rides } from './mitwachsen-ride';
 
-export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle> = {
+export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle, Sight> = {
   id: 'fahrt',
   rules: { bump: () => false, ride: rides },
   dawn: wakeRides, // ein neuer echter Spieltag: Wer am Abend schlafend kam, wacht auf (`schlaeft` bei jedem Fahrzeug)

@@ -17,6 +17,7 @@ import { nightIn, tunnelNight } from './mitwachsen-dusk';
 import { plateToy } from './mitwachsen-plate-toy';
 import { postcard } from './mitwachsen-plate';
 import { NOTE_COLORS, StoryPlayer } from './mitwachsen-story';
+import { FriendLook, SIGHT_SPARKS, sightScore } from './mitwachsen-sight-look';
 import {
   DEFAULT_FIGURE,
   cleanName,
@@ -101,6 +102,7 @@ class LarmicMitwachsen extends HTMLElement {
   private sitUntil = 0; // bis dahin sitzt die müde Figur
   private dawned = false; // in dieser Welt begann ein neuer echter Spieltag (`WorldPack.dawn` auch für spät geladene)
   private tiredLater: TiredEvent | null = null; // Gähnen oder „ins Bett“ während einer Fahrt: kommt nach dem Aussteigen
+  private friend = new FriendLook(); // der Funkelfreund des Hinführens (mitwachsen-sight-look.ts)
   private rides: readonly RideBody[] = []; // Körper eines Fahrzeugs in diesem Bild (aus dem Welt-Paket)
   private tickAt = 0; // wann der letzte Takt lief (das Fahrzeug gleitet zwischen den Takten weiter)
   private lastInput = 0; // letzte Eingabe: Spielt lange niemand, setzt sich die Figur und liest
@@ -657,7 +659,8 @@ class LarmicMitwachsen extends HTMLElement {
    * Ein Fahrzeug oder Bote aus einem Welt-Paket (Schlitten, Tok): Töne, Hüpfer, Herz und Funken, wie seine Ansicht sagt
    * (`View2D.rideFx`, `View2D.heraldFx`; Funken nicht bei reduzierter Bewegung); was zählt (erschienen, Fest), gleich speichern
    */
-  private effect(e: Extract<GameEvent, { type: 'ride' | 'herald' }>, now: number) {
+  private effect(e: Extract<GameEvent, { type: 'ride' | 'herald' | 'sight' }>, now: number) {
+    if (e.type === 'sight') return this.sight(e);
     const fx = this.renderer.first((v) =>
       e.type === 'ride' ? v.rideFx?.(e, this.state) : v.heraldFx?.(e, this.state),
     );
@@ -672,6 +675,16 @@ class LarmicMitwachsen extends HTMLElement {
     }
     if (e.type === 'herald' && e.relay) this.relay();
     if (e.persist) this.save();
+  }
+
+  /**
+   * Hinführen (mitwachsen-sight-look.ts): Ein Ding ruft leise mit seinem eigenen Klang; der Funkelfreund erscheint,
+   * freut sich oder fliegt fort, mit Zwitschern und ein paar Funken. Gefunden wird gleich gespeichert
+   */
+  private sight(e: Extract<GameEvent, { type: 'sight' }>) {
+    this.sfx.score(sightScore(e, [...this.renderer.views.values()], this.state));
+    if (e.what !== 'call') this.burst('', SIGHT_SPARKS, 10, { x: e.x, y: e.y, z: this.world.cell(e.x, e.y).h + 0.6 });
+    if (e.what === 'found') this.save();
   }
 
   /**
@@ -716,7 +729,7 @@ class LarmicMitwachsen extends HTMLElement {
     this.rides = ownSeat(
       this.renderer.all((v) => v.bodies?.(this.state, this.world, at) ?? []),
       this.state.ride?.id,
-    );
+    ).concat(this.friend.bodies(this.state.lure, (x, y) => this.world.cell(x, y).h, t, at.reduced));
   }
 
   /**

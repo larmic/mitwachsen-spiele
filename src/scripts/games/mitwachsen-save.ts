@@ -39,6 +39,7 @@ export type SavedWorld = {
   day: number; // Tage der Welt (jedes Schlafen einer), Blumen und Pilze wachsen damit
   explored: Record<string, string>; // Nebel: erkundete Felder je Stück (Base64), siehe mitwachsen-fog.ts
   heard: StoryId[]; // Geschichten, deren Klangstein schon erklungen ist
+  found: string[]; // gefundene Sehenswürdigkeiten: Sie locken nie wieder (mitwachsen-sight.ts). Ältere Stände ohne: []
   // Zustand der Welt-Pakete je Kennung (`packs.eis`: gebaute Schneemänner). Jedes Paket liest und migriert seinen Eintrag
   // selbst (worlds/eis/mitwachsen-snowman.ts); hier wird er nur getragen, auch wenn das Paket fehlt. Ältere Stände ohne: {}
   packs: Record<string, unknown>;
@@ -92,6 +93,7 @@ export function newWorld(
     explored: {},
     portals: [],
     heard: [],
+    found: [],
     packs: {},
   };
 }
@@ -192,6 +194,7 @@ export function migrate(input: unknown): SavedWorld | null {
     day: typeof raw.day === 'number' && raw.day >= 0 && Number.isFinite(raw.day) ? Math.floor(raw.day) : 0,
     portals: strings(raw.portals).filter((p): p is PortalId => portals.has(p)),
     heard: [...new Set(strings(raw.heard))].filter((id): id is StoryId => Object.hasOwn(STORIES, id)).sort(),
+    found: [...new Set(strings(raw.found))].sort(),
     packs: isRecord(raw.packs) ? { ...raw.packs } : {},
     explored: isRecord(raw.explored)
       ? Object.fromEntries(Object.entries(raw.explored).filter(([, v]) => typeof v === 'string') as [string, string][])
@@ -274,6 +277,7 @@ export const withProgress = (world: SavedWorld, p: Progress): SavedWorld => ({
   position: [...p.position],
   day: p.day,
   heard: [...p.heard],
+  found: [...p.found],
   packs: { ...p.packs },
 });
 
@@ -286,5 +290,6 @@ export const progressFrom = (w: SavedWorld): Progress => ({
   position: [...w.position],
   day: w.day,
   heard: [...w.heard],
+  found: [...w.found],
   packs: { ...w.packs },
 });

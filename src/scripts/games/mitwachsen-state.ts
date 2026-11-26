@@ -35,6 +35,7 @@ import type { PackEvent, Ride, RideEvent, WorldRules } from './mitwachsen-pack-t
 import type { MoveCmd, RideEngine, RideRules, Vehicle } from './mitwachsen-rider';
 import type { RideId } from '../../data/games/mitwachsen-rides';
 import { hooksOf, type HeraldEvent, type HeraldRules, type Work } from './mitwachsen-herald';
+import { sightStep, sightsOf, type Lure, type Sight, type SightEvent } from './mitwachsen-sight';
 import { dozingOf } from './mitwachsen-preload';
 import { listen } from './mitwachsen-listen';
 import { roostAt } from './mitwachsen-roost';
@@ -96,6 +97,7 @@ export type State = Omit<Progress, 'position'> & {
   heraldDue: number; // Bote einer Welt (Tok): Takt, ab dem er auftaucht bzw. aufgetaucht ist (-1: nicht fällig; nicht gespeichert, mitwachsen-herald.ts)
   work?: Work; // Bote einer Welt baut (Tok: Bau 1), von Takt bis Takt; solange hüpft die Figur nur (nicht gespeichert, mitwachsen-herald.ts)
   dig?: Work; // der Maulwurf gräbt den Glitzergang der Grubenbahn, von Takt bis Takt; solange hüpft die Figur nur (nicht gespeichert, worlds/grube/mitwachsen-dig.ts)
+  lure?: Lure; // Hinführen zu Sehenswürdigkeiten: Versuche, Ruhe, der Funkelfreund (nicht gespeichert, mitwachsen-sight.ts)
   late: boolean; // Abend: Die Uhr des Kinds hat `BED_AT` erreicht (die Komponente setzt es, mitwachsen-tired.ts; nicht gespeichert)
 };
 
@@ -108,6 +110,7 @@ export type Progress = {
   position: [number, number];
   day: number; // Tage, die die Welt schon erlebt hat (jedes Schlafen zählt einen); Blumen wachsen damit
   heard: StoryId[]; // Geschichten, deren Klangstein schon einmal erklungen ist
+  found: string[]; // Sehenswürdigkeiten, die das Kind schon einmal gefunden hat: Sie locken nie wieder (mitwachsen-sight.ts)
   // Zustand der Welt-Pakete je Kennung, in ihrem eigenen Format (Eis-Welt: gebaute Schneemänner); der Kern trägt ihn nur,
   // auch solange ein Paket fehlt (`WorldRules` in mitwachsen-pack-types.ts)
   packs: Record<string, unknown>;
@@ -132,6 +135,7 @@ export type GameEvent =
   | ChoreEvent // Handgriffe: pflücken, fangen, nachwachsen, füttern, schöpfen, tränken (mitwachsen-chores.ts)
   | BorderEvent // Weltgrenze am Tor: warten, wieder einreihen, Gegend wechseln (mitwachsen-border.ts)
   | GuideEvent // der verlaufene Pinguin taucht auf und piept (mitwachsen-guide.ts)
+  | SightEvent // Hinführen: eine Sehenswürdigkeit ruft, der Funkelfreund erscheint, gefunden (mitwachsen-sight.ts)
   | PackEvent // Regeln einer Welt aus ihrem Paket: Schneehaufen wächst, Eiszapfen klingt (mitwachsen-pack-types.ts)
   | RideEvent // Fahrzeug aus einem Welt-Paket: erscheint, einsteigen, fahren, ankommen (mitwachsen-pack-types.ts)
   | HeraldEvent // Bote einer Welt aus ihrem Paket (Tok): taucht auf, kommt an, ruft, schläft (mitwachsen-herald.ts)
@@ -207,6 +211,7 @@ export function initialState(world: World, saved: Partial<Progress> = {}, rngSee
     day: saved.day ?? 0,
     dayStart: 0,
     heard: (saved.heard ?? []).filter((id) => Object.hasOwn(STORIES, id)),
+    found: [...(saved.found ?? [])],
     calm: -1,
     guideDue: -1,
     ritual: -1,
@@ -276,6 +281,7 @@ export const progressOf = (s: State): Progress => ({
   position: s.held ? [...s.held] : [s.player.x, s.player.y],
   day: s.day,
   heard: [...s.heard],
+  found: [...s.found],
   packs: { ...s.packs },
 });
 
@@ -298,7 +304,7 @@ export function step(
   cmd: Cmd,
   explored: Explored = EVERYWHERE,
   guide?: GuideRules,
-  rules: readonly { rules?: WorldRules<RideEngine, HeraldRules, Vehicle> }[] = [],
+  rules: readonly { rules?: WorldRules<RideEngine, HeraldRules, Vehicle>; sights?: readonly Sight[] }[] = [],
 ): Step {
   // Flache Kopie: Tiere werden beim Ändern ersetzt, nie verändert – alte Zustände bleiben gültig
   const s: State = {
@@ -349,6 +355,7 @@ export function step(
   guide?.guide(s, world, cmd.type, events, explored); // der verlaufene Pinguin taucht auf und führt
   herald.step(s, world, cmd.type, events, explored); // der Bote einer Welt (Tok) taucht auf und wartet
   keepLamp(s, world);
+  sightStep(s, world, cmd.type, events, sightsOf(rules)); // Hinführen: Ruf und Funkelfreund, gefunden merken
   return { state: s, events };
 }
 

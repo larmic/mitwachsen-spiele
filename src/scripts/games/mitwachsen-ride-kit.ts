@@ -8,8 +8,9 @@
 import type { Point } from '../../data/games/mitwachsen';
 import type { RideSpec } from '../../data/games/mitwachsen-rides';
 import type { Ride } from './mitwachsen-pack-types';
-import { rank, stageOf } from './mitwachsen-ride-save';
-import type { End, RideRoute, Rider } from './mitwachsen-rider';
+import { rank, ridden, stageOf } from './mitwachsen-ride-save';
+import type { End, RideRoute, Rider, Vehicle } from './mitwachsen-rider';
+import type { Sight } from './mitwachsen-sight';
 import type { World } from './mitwachsen-world';
 
 export const DUE = 20; // so viele Takte, nachdem die Welt es will (`ready`), erscheint es (wie der Pinguin)
@@ -145,4 +146,22 @@ export function bedSight(
   if (r.loop || !s.sleeping || s.player.x !== bx || s.player.y !== by) return undefined;
   const at = parked(spec, r, s, world);
   return at && cheb(...at.seat, bx, by) <= SIGHT ? at : undefined;
+}
+
+/**
+ * Sehenswürdigkeit Halt eines Fahrzeugs (`WorldPack.sights`, mitwachsen-sight.ts; jedes Paket mit Fahrzeug trägt sie ein): Es lockt sein Sitz, solange es in der Gegend der Figur am Halt steht, wach ist und die Figur
+ * noch nie gefahren hat (so lange hat seine Tür den goldenen Rahmen). Der Ruf ist sein Anstoß-Ton
+ */
+export function haltSight(v: Vehicle): Sight {
+  const id = v.spec.id;
+  return {
+    id: `halt:${id}`,
+    cells: (world, s) => {
+      const r = v.route(world, s);
+      const at = r && !s.dozing?.includes(id) && parked(v.spec, r, s, world);
+      return at ? [at.seat] : [];
+    },
+    done: (s) => ridden(s.packs, id),
+    call: (_, [x, y]) => ({ type: 'ride', what: 'nudge', id, x, y }),
+  };
 }

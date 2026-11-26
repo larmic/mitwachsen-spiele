@@ -12,13 +12,14 @@ import type { GuideRules, Hint } from './mitwachsen-guide';
 import { bahnWanted, fahrtWanted, needsPack, type GateAt, type Need } from './mitwachsen-pack';
 import type { PackId, WorldPack } from './mitwachsen-pack-types';
 import type { RideEngine, Vehicle } from './mitwachsen-rider';
+import type { Sight } from './mitwachsen-sight';
 import type { HeraldRules } from './mitwachsen-herald';
 import type { View2D } from './mitwachsen-view';
 import type { View3D } from './mitwachsen-view-3d';
 import { beyondRing } from './mitwachsen-world';
 
 /** Ein geladenes Welt-Paket mit den Regeln und Zeichenteilen, die es der Ansicht mitbringt (3D-Teil auf Abruf) */
-export type LoadedPack = WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle>;
+export type LoadedPack = WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle, Sight>;
 
 /**
  * Ein neuer echter Spieltag (mehr als `BREAK` Pause, mitwachsen-tired.ts): Zustand der Pakete nach den Haken `dawn` der

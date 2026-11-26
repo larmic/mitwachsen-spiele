@@ -82,6 +82,7 @@ describe('Welten speichern', () => {
       position: [3, 4] as [number, number],
       day: 5,
       heard: ['bett' as const, 'eis' as const],
+      found: ['eis:glockenspiel'],
       packs: { eis: { v: 1, snow: { '3,4': 2 } } },
     };
     expect(progressFrom(withProgress(w, p))).toEqual(p);
@@ -226,8 +227,9 @@ describe('Eis-Portal im Spielstand', () => {
     store.setItem(worldKey('k7'), JSON.stringify(old));
     // nur die Version ändert sich: Der Nebel liegt auf der Lichtung, nicht im Land der Eis-Welt
     // … und ohne Zustand der Welt-Pakete (gespeichert vor den Schneemännern) gibt es eben keinen
-    expect(loadWorld(store, 'k7')).toEqual({ ...old, v: 5, packs: {} });
-    expect(migrate(old)).toEqual({ ...old, v: 5, packs: {} });
+    // … und ohne gefundene Sehenswürdigkeiten (gespeichert vor dem Hinführen, Issue 28): eine leere Liste
+    expect(loadWorld(store, 'k7')).toEqual({ ...old, v: 5, packs: {}, found: [] });
+    expect(migrate(old)).toEqual({ ...old, v: 5, packs: {}, found: [] });
   });
 });
 
@@ -437,7 +439,7 @@ describe('Umzug ins Gletschertal (Version 5)', () => {
     const w = loadWorld(store, 'kessel')!;
     const { explored, ...rest } = w;
     const { explored: before, ...oldRest } = OLD;
-    expect(rest).toEqual({ ...oldRest, v: 5, packs: {} });
+    expect(rest).toEqual({ ...oldRest, v: 5, packs: {}, found: [] });
     const was = Fog.from(before),
       now = Fog.from(explored);
     const world = worldOf(OLD.seed);

@@ -27,8 +27,8 @@ export const RULES: Rule[] = [
     name: 'Spiel lädt 3D erst bei Bedarf',
     pages: /^spielen\//,
     // Kern: Regeln, Welt, 2D-Ansicht und Daten des Spiels; 3D (Three.js) und die Welt-Pakete kommen erst per import().
-    // Gemessen 150,7 KB (Bahn und Höhle freigeschaltet, Schale und Trog der Grotte zeigen voll)
-    budget: 162 * 1024,
+    // Gemessen 157,8 KB (mit dem Hinführen zu Sehenswürdigkeiten: Regeln, Funkelfreund, Ruf)
+    budget: 173.6 * 1024,
     // Probe: Der Höhlenhimmel der Grotte steht nur in ihrem Welt-Paket (GROTTE_COLORS.sky)
     forbidden: /WebGLRenderer|three\.module|#4a4370/,
   },
@@ -128,10 +128,11 @@ export const RULES: Rule[] = [
     // darum kein eigener 3D-Teil), seine Strecke als Schleife, Modell, Körper und Töne; samt dem, was es mit den anderen
     // Fahrzeugen teilt (Spielstand packs.fahrt); dazu der Glitzergang mit den zwei Klingeltoren (Tore, Scheibe,
     // Wandkristalle, Wasserfall, Töne beim Durchfahren und zu Fuß, Licht im Gang) und der Maulwurf, der den Gang gräbt
-    // (Regel, Erdwelle, Töne, Klangstein am Halt). Kommt mit der Grotte
+    // (Regel, Erdwelle, Töne, Klangstein am Halt), samt seinen zwei Sehenswürdigkeiten (Grubenhalt vor dem Graben, Funkels
+    // Halt). Kommt mit der Grotte
     chunks: /\/welt-grube\.[\w-]+\.js$/,
-    // Gemessen 17,7 KB
-    budget: 18.9 * 1024,
+    // Gemessen 19,1 KB
+    budget: 21.0 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

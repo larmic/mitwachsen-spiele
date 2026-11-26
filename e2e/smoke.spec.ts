@@ -2238,7 +2238,13 @@ test(
     await stand();
     await render(page);
     // Jeder Zapfen klingt beim Hinlaufen, die Figur läuft ohne Halt weiter: eine Tonleiter von tief nach hoch
-    expect(await walkRow()).toEqual(SCALE.slice(0, row.length)); // genau die Töne der Zapfen, kein anderer
+    // genau die Töne der Zapfen; nach dem allerersten zwitschert einmal der Funkelfreund: Das Glockenspiel ist gefunden
+    // (Hinführen, Issue 28) und lockt nie wieder. Beim zweiten Mal unten klingt nur noch die Tonleiter
+    const FOUND_CHIRP = 1318.5;
+    expect(await walkRow()).toEqual([SCALE[0], FOUND_CHIRP, ...SCALE.slice(1, row.length)]);
+    expect(await game.evaluate((node) => (node as unknown as { state: { found: string[] } }).state.found)).toEqual([
+      'eis:glockenspiel',
+    ]);
     // gegen die Wand gedrückt klingt der letzte Zapfen noch einmal, die Figur bleibt
     await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 'n' }));
     expect(await game.evaluate((node) => (node as unknown as Game & { heard: number[] }).heard.at(-1))).toBe(
@@ -3821,5 +3827,53 @@ test('Spiel: Funkel durch den Glitzergang: Klingeltor zu Fuß, Tore und Echo bei
   // beim Durchfahren: Röhren aufwärts, Tuten mit zwei Echos, Röhren abwärts (je 6) und die Töne von Funkel
   expect(ride.notes - foot.notes).toBeGreaterThanOrEqual(18);
   expect(ride.most).toBeLessThanOrEqual(6);
+  expect(errors).toEqual([]);
+});
+
+// Hinführen zu Sehenswürdigkeiten (Issue 28, in 2D): In einer neuen Welt ruft nach den ersten 20 s der Klangstein am
+// Bett, und der Funkelfreund erscheint als kleiner Körper zwischen Figur und Stein. Läuft die Figur in den Stein, erklingt
+// seine Geschichte, und der Freund ist fort: Der Stein lockt nie wieder. Regeln je Fall: mitwachsen-sight.test.ts
+test('Spiel: Hinführen – der Funkelfreund zeigt zum Klangstein am Bett und verschwindet, wenn er gehört ist, ohne Fehler', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  type Game = {
+    state: {
+      player: { x: number; y: number; dir: string };
+      heard: string[];
+      lure?: { goal?: { id: string }; friend?: { id: string; x: number; y: number; at: [number, number] } };
+    };
+    rides: { id: string; x: number; y: number }[];
+    world: { stones: Map<string, [number, number]> };
+    apply(cmd: { type: 'move'; dir: string }): void;
+  };
+  const game = await openGame(page, { clock: true });
+  await expectView(page);
+  await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+  const friend = () =>
+    game.evaluate((node) => {
+      const el = node as unknown as Game;
+      return { lure: el.state.lure?.friend, body: el.rides.find((r) => r.id === 'freund') };
+    });
+  await ticks(page, 150);
+  await render(page);
+  expect((await friend()).body).toBeUndefined(); // in den ersten 20 s lockt nichts
+  await ticks(page, 80);
+  await render(page);
+  const shown = await friend();
+  expect(shown.lure?.id).toBe('klangstein');
+  const stone = await game.evaluate((node) => (node as unknown as Game).world.stones.get('bett')!);
+  expect(shown.lure!.at).toEqual(stone);
+  expect(shown.body).toBeDefined(); // im Bild, als Körper wie die Fahrzeuge
+  // neben den Stein und hinein: Die Geschichte erklingt, der Stein ist gehört
+  await game.evaluate((node, [x, y]) => {
+    const el = node as unknown as Game;
+    el.state = { ...el.state, player: { x: x + 1, y, dir: 'w' } };
+    el.apply({ type: 'move', dir: 'w' });
+  }, stone);
+  expect(await game.evaluate((node) => (node as unknown as Game).state.heard)).toContain('bett');
+  await ticks(page, 10);
+  await render(page);
+  expect(await friend()).toEqual({ lure: undefined, body: undefined });
   expect(errors).toEqual([]);
 });

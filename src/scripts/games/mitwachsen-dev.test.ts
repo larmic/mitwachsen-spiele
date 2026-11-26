@@ -72,6 +72,7 @@ describe('Entwickler-Schalter', () => {
     position: [3, 4],
     day: 2,
     heard: [],
+    found: [],
     packs: { eis: { snowmen: 1 }, fahrt: { hoehle: { stage: 'faellig' } } },
   };
 

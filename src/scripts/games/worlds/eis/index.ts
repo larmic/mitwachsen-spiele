@@ -14,6 +14,7 @@ import type { GuideRules } from '../../mitwachsen-guide';
 import type { HeraldRules } from '../../mitwachsen-herald';
 import type { WorldPack } from '../../mitwachsen-pack-types';
 import type { RideEngine, Vehicle } from '../../mitwachsen-rider';
+import type { Sight } from '../../mitwachsen-sight';
 import type { View2D } from '../../mitwachsen-view';
 import type { View3D } from '../../mitwachsen-view-3d';
 import { buildKessel, placeKessel } from './mitwachsen-kessel';
@@ -24,8 +25,10 @@ import { shut } from './mitwachsen-ritual';
 import { rules as snowman } from './mitwachsen-snowman';
 import { rules as chime } from './mitwachsen-chime';
 import { sled } from './mitwachsen-sled';
+import { SIGHTS } from './mitwachsen-sights';
+import { haltSight } from '../../mitwachsen-ride-kit';
 
-export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle> = {
+export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle, Sight> = {
   id: 'eis',
   gate: 'eis',
   build: buildKessel,
@@ -34,6 +37,7 @@ export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules
   // Tür im Vorspiel des Eistors (die Flügel sind noch zu); Schneemänner bauen; Eiszapfen klingen (ohne Halt, darum
   // zuletzt); der Schlitten mit dem Schlittenrentier (mitwachsen-sled.ts; seine Fahrregeln bringt das Paket der Fahrzeuge)
   rules: { bump: (...a) => shut(...a) || snowman.bump(...a) || chime.bump(...a), vehicle: sled },
+  sights: [...SIGHTS, haltSight(sled)], // der Schlitten bis zur ersten Fahrt; Schneehaufen und Eiszapfen-Glockenspiel locken, bis sie gefunden sind
   view,
   view3d: () => import('./view-3d').then((m) => m.view3d),
   models: ICE_MODELS,
