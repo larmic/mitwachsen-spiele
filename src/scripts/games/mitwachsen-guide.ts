@@ -86,6 +86,7 @@ export type Guided = Omit<Crowd, 'player' | 'animals' | 'openGates'> & {
     bench?: true; // wartet am Halt eines Fahrzeugs (mitwachsen-border.ts, `BENCH`)
   }[];
   garden: { id: string; species: SpeciesId }[];
+  met: string[]; // gefundene Tiere (wer einzieht, ohne dass die Figur ihn anlief, gilt als gefunden)
   followers: string[];
   day: number;
   calm: number; // Tag, an dem der Pinguin eingezogen ist: an ihm kein Pustewind

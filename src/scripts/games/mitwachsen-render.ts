@@ -244,8 +244,9 @@ export class Renderer {
         if (!sc.reduced) sprite(ctx, ZZZ, GAME_COLORS.note, hx + 6 * z, hy + Math.sin(sc.now / 700) * 3 * z, 2 * z);
       } else if (a.mode === 'wait')
         ice?.waitArrow(ctx, world, P, a, b, [hx, hy], 3 * z); // Pfeil zum Tor
-      else if (!state.met.includes(a.id)) {
-        // Verloren: ein Fragezeichen schwebt über dem Kopf
+      else if (a.mode !== 'home' && !state.met.includes(a.id)) {
+        // Verloren: ein Fragezeichen schwebt über dem Kopf (nie über einem Tier, das zu Hause wohnt: der erste Maulwurf
+        // zog ein, ohne dass die Figur ihn anlief)
         const bob = sc.reduced ? 0 : Math.sin(sc.now / 400 + b.x) * 2 * z;
         sprite(ctx, ASK, GAME_COLORS.lost, hx, hy + bob, 2.5 * z);
       } else if (a.mode === 'home' && !sc.reduced) {

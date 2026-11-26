@@ -25,8 +25,8 @@
 // Die Grubenbahn (`grube`; für das Kind gräbt der Maulwurf ihren Gang erst später) holt die Grotte und die Fahr-Engine
 // mit, die Figur wacht im Höhlenbett auf, und das Grubenbähnchen Funkel steht an seinem Halt (Stufe `bereit`, `withFunkel`):
 // Gleis und Gang liegen, die Figur kann einsteigen und eine Runde fahren. Mit `&graben=1` ist der Gang noch Fels, der
-// erste Maulwurf wohnt zu Hause und das Graben ist fällig (Stufe `faellig`, `withDig`): Geht die Figur zum Grubenhalt,
-// gräbt er ihn.
+// erste Maulwurf wohnt zu Hause und das Graben ist fällig (`withDig`; im Spiel ist es das, sobald er eingezogen ist):
+// Geht die Figur zum Grubenhalt, gräbt er ihn.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Die Kristallgrotte“, Entwickler-Schalter, und „Tok und die Bahn“)
 
 import { REGIONS, animalId, type RegionId } from '../../data/games/mitwachsen';
@@ -162,7 +162,7 @@ function withFunkel(p: Progress): Progress {
 
 /**
  * Mit der Grubenbahn und `&graben=1`: Der erste Maulwurf wohnt zu Hause, das Graben ist fällig (`packs.fahrt.grube`,
- * Stufe `faellig`, wie am nächsten echten Spieltag nach seinem Einzug); der Gang ist noch Fels
+ * Stufe `faellig`; im Spiel reicht dafür sein Einzug, ohne Eintrag); der Gang ist noch Fels
  */
 function withDig(p: Progress): Progress {
   const fahrt = typeof p.packs.fahrt === 'object' && p.packs.fahrt !== null ? p.packs.fahrt : {};

@@ -2,14 +2,27 @@
 // `View2D.bodies` und `heraldFx`) – rein, ohne DOM und Three.js. Die Erdwelle ist ein kleiner Erdhügel mit zwei
 // Kristallkrümeln, der einmal die künftige Runde entlangläuft, vom Grubenhalt bis zurück zum Halt (unter dem Fels des
 // Gangs auf seiner Oberkante); er glimmt ein wenig (`beacon`: kleines Loch der Dunkelmaske mitten auf ihm, ohne
-// Grenze der Entfernung zur Figur), damit man ihn im Dunkel sieht. Bei
+// Grenze der Entfernung zur Figur), damit man ihn im Dunkel sieht. Er startet und endet langsam (am Halt, wo das Kind
+// zusieht) und ist in der Mitte der Runde schnell (`moundAt`); hinter ihm bleibt Stück für Stück liegen, was er baut
+// (`laidBodies`, Issue 14): auf der offenen Strecke das schmale Gleis auf frischer Erde, auf dem Fels des Gangs
+// Glitzerkrümel, bis zum Augenblick `pop`, dann liegt das echte Gleis in der Welt. Bei
 // reduzierter Bewegung steht er in drei festen Bildern, statt zu gleiten. Töne, alle in der C-Pentatonik und über C5:
 // Der Maulwurf klopft dreimal leise, die Erde brummelt dreimal weich hinab, der Gang geht auf und seine Klingeltore singen
 // hinauf wie beim Durchfahren, Funkel kommt an seinem Halt an (sein Signal abwärts). Funkel rollt dabei aus dem Gang an
 // den Halt (`funkelAt` in mitwachsen-funkel-look.ts).
 // Spezifikation: docs/specs/mitwachsen.md („Die Grubenbahn Funkel“, Der Maulwurf gräbt)
 
-import { DIG, DIG_CRUMBS, MOUND_PARTS } from '../../../../data/games/worlds/grube/mitwachsen-dig-model';
+import type { Point } from '../../../../data/games/mitwachsen';
+import {
+  BED_H,
+  BED_PART,
+  CRUMB_PARTS,
+  DIG,
+  DIG_CRUMBS,
+  DIG_SEEN,
+  MOUND_PARTS,
+} from '../../../../data/games/worlds/grube/mitwachsen-dig-model';
+import { DIRS, type Dir, type Part } from '../../../../lib/games/front';
 import type { HeraldEvent } from '../../mitwachsen-herald';
 import type { RideAt, RideBody, RideFx } from '../../mitwachsen-ride-view';
 import type { State } from '../../mitwachsen-state';
@@ -17,6 +30,7 @@ import type { World } from '../../mitwachsen-world';
 import { RULE_TICK_MS } from '../../mitwachsen-turn-pace';
 import type { Scored } from '../../sfx';
 import { laneOf } from './mitwachsen-funkel';
+import { railShape } from './mitwachsen-funkel-look';
 import { gateScore } from './mitwachsen-gang-look';
 import { digAt } from './mitwachsen-dig';
 
@@ -25,26 +39,83 @@ export const MOUND_ID = 'grube-erde';
 /** Feste Bilder der Erdwelle bei reduzierter Bewegung */
 export const MOUND_STAGES = 3;
 
+/** Kennung dessen, was der Erdhügel liegen lässt (Gleis auf frischer Erde, Glitzerkrümel; nie antippbar) */
+export const LAID_ID = 'grube-bau';
+
+/** Langsam los, in der Mitte schnell, langsam an (kubisch): Anfang und Ende der Runde liegen am Halt, dort sieht das Kind zu */
+const ease = (f: number) => (f < 0.5 ? 4 * f * f * f : 1 - (2 - 2 * f) ** 3 / 2);
+
 /**
  * Wo die Erdwelle bei Fortschritt `w` (0 … 1) des Grabens auf der künftigen Runde der Länge `n` ist, als Index (vom
- * ersten Feld des Halts an); undefined vor und nach ihr. Bei reduzierter Bewegung die Mitte einer von drei Stufen
+ * ersten Feld des Halts an); undefined vor und nach ihr. Sie startet und endet langsam und ist in der Mitte schnell
+ * (`ease`). Bei reduzierter Bewegung die Mitte einer von drei Stufen
  */
 export function moundAt(w: number, n: number, reduced: boolean): number | undefined {
   const [from, to] = DIG.wave;
   if (w < from || w >= to || n < 2) return undefined;
   const f = (w - from) / (to - from);
-  if (!reduced) return f * n;
+  if (!reduced) return ease(f) * n;
   const k = Math.min(MOUND_STAGES - 1, Math.floor(f * MOUND_STAGES));
   return ((k + 0.5) / MOUND_STAGES) * n;
 }
 
-/** Körper je Bild, solange gegraben wird: der Erdhügel der Erdwelle auf der künftigen Runde (sonst nichts) */
+/** Richtung von `a` zum Nachbarfeld `b` als Buchstabe (leer, wenn sie nicht nebeneinander liegen) */
+const dirOf = (a: Point, b: Point) =>
+  (Object.keys(DIRS) as Dir[]).find((d) => a[0] + DIRS[d][0] === b[0] && a[1] + DIRS[d][1] === b[1]) ?? '';
+
+const beds = new Map<string, readonly Part[]>();
+/**
+ * Ein Stück wachsendes Gleis für die Richtungen `to` als Modell (Blick nach vorn, `s`): dieselben Quader wie das echte
+ * Gleis (`railShape`), auf einem Bett frischer Erde. Undefined, wenn die Richtungen kein Gleis ergeben
+ */
+export function laidParts(to: string): readonly Part[] | undefined {
+  const known = beds.get(to);
+  if (known) return known;
+  const shape = railShape(to);
+  if (!shape) return undefined;
+  const parts: Part[] = [
+    BED_PART,
+    ...shape.map(([x, y, z, w, d, h, side, top]): Part => [y - 0.5, 0.5 - x - w, z + BED_H, d, w, h, side, top]),
+  ];
+  beds.set(to, parts);
+  return parts;
+}
+
+/**
+ * Was der Erdhügel hinter sich liegen lässt, wenn er `upto` Felder der künftigen Runde `lane` geschafft hat: auf der
+ * offenen Strecke je Feld ein Stück Gleis auf frischer Erde, auf dem Fels des Gangs auf jedem zweiten Feld Glitzerkrümel
+ * (dort geht erst zum Augenblick `pop` der Gang auf). Nur, was höchstens `DIG_SEEN` Felder von der Figur liegt
+ */
+export function laidBodies(world: World, lane: readonly Point[], upto: number, player: State['player']): RideBody[] {
+  const out: RideBody[] = [];
+  const n = lane.length;
+  for (let k = 0; k < Math.min(n, Math.floor(upto)); k++) {
+    const [x, y] = lane[k]!;
+    if (Math.max(Math.abs(x - player.x), Math.abs(y - player.y)) > DIG_SEEN) continue;
+    const c = world.cell(x, y);
+    const at = { id: `${LAID_ID}:${k}`, x, y, z: c.h, dir: 's' as const };
+    if (c.lane?.part === 'gang') {
+      if (k % 2 === 0) out.push({ ...at, key: `${LAID_ID}:kruemel`, parts: CRUMB_PARTS });
+      continue;
+    }
+    const to = [dirOf(lane[k]!, lane[(k + n - 1) % n]!), dirOf(lane[k]!, lane[(k + 1) % n]!)].sort().join('');
+    const parts = laidParts(to);
+    if (parts) out.push({ ...at, key: `${LAID_ID}:${to}`, parts });
+  }
+  return out;
+}
+
+/**
+ * Körper je Bild, solange gegraben wird, bis zum Augenblick `pop` (dann liegt das echte Gleis in der Welt): der Erdhügel
+ * der Erdwelle auf der künftigen Runde und, was er hinter sich liegen lässt; nach der Welle liegt alles
+ */
 export function digBodies(state: State, world: World, at: Pick<RideAt, 'frac' | 'reduced'>): readonly RideBody[] {
   const w = digAt(state, at.frac);
-  if (w === undefined) return [];
+  if (w === undefined || w < DIG.wave[0] || w >= DIG.pop || state.dig?.laid) return [];
   const lane = laneOf(world);
   const i = moundAt(w, lane.length, at.reduced);
-  if (i === undefined) return [];
+  const laid = laidBodies(world, lane, i ?? lane.length, state.player);
+  if (i === undefined) return laid;
   const [a, b] = [lane[Math.floor(i) % lane.length]!, lane[(Math.floor(i) + 1) % lane.length]!];
   const f = i - Math.floor(i);
   const [ha, hb] = [world.cell(...a).h, world.cell(...b).h];
@@ -59,6 +130,7 @@ export function digBodies(state: State, world: World, at: Pick<RideAt, 'frac' | 
       parts: MOUND_PARTS,
       beacon: true, // die Kristallkrümel glimmen: ein kleines Loch der Dunkelmaske mitten auf ihm, wie weit die Figur auch weg ist
     },
+    ...laid,
   ];
 }
 

@@ -307,7 +307,7 @@ describe('Tok erscheint: am Abend schlafend', () => {
     expect(tokIn(r.s)?.nap).toBe(true);
     expect(heralds(r.events)).toEqual([]); // still: Er lag schon da
     // ein neuer echter Spieltag (`WorldPack.dawn`, mitwachsen-tired.ts `newDay`)
-    const packs = dawnOf([BAHN_PACK], r.s.packs, r.s.garden);
+    const packs = dawnOf([BAHN_PACK], r.s.packs);
     expect(tokOf(packs)).toEqual({ stage: 'faellig' });
     r = play({ ...r.s, packs }, world, [TICK]);
     expect(tokIn(r.s)?.nap).toBeUndefined();
@@ -426,7 +426,7 @@ describe('Tok erscheint: nach dem Laden und anderswo', () => {
   it('nach dem Laden schläft die Figur: Er wartet wach neben dem Bett, morgens ruft er einmal und geht an seinen Platz', () => {
     // so auch am ersten Start nach langer Pause: `dawn` hat `schlaeft` schon vor dem Bau der Welt gestrichen
     const start = ready(world, {
-      packs: dawnOf([BAHN_PACK], withTok(SLED_HOME, { stage: 'faellig', schlaeft: true }), []),
+      packs: dawnOf([BAHN_PACK], withTok(SLED_HOME, { stage: 'faellig', schlaeft: true })),
     });
     let r = play(start, world, [TICK]);
     const t = tokIn(r.s)!;

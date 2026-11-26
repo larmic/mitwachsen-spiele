@@ -250,6 +250,7 @@ export function moleHome(s: Rider, world: World, events: RideEvents) {
   const taken = new Set(s.animals.filter((a) => a.mode === 'home').map((a) => key(...a.spawn)));
   const spawn = spots.find((p) => !taken.has(key(...p))) ?? spots[0]!;
   s.garden.push({ id: FIRST_MOLE, species: 'maulwurf' });
+  if (!s.met.includes(FIRST_MOLE)) s.met = [...s.met, FIRST_MOLE].sort(); // kein Fragezeichen über ihm, er ist ja da
   const dir = dirTo(spawn[0] - at[0], spawn[1] - at[1]);
   const home = { kind: 'garden' } as const;
   s.animals.push({
