@@ -30,6 +30,19 @@ import { lanternBodies, lanternScore } from './mitwachsen-lantern';
 import { heaveAjar, heaveBodies, heaveScore, openScore } from './mitwachsen-heave-look';
 import { webs } from './mitwachsen-spider';
 import { SpiderFx } from './mitwachsen-spider-look';
+import { awake, towerAt } from './mitwachsen-cave-places';
+import {
+  ECHO_SCORE,
+  SHROOM_SCORE,
+  echoBoxes,
+  echoGlow,
+  glowBodies,
+  shroomBoxes,
+  stoneBoxes,
+  stoneScore,
+  towerBoxes,
+  towerScore,
+} from './mitwachsen-cave-places-look';
 
 /** Dinge der Grotte: Quader wie in 3D */
 const look: DrawDeco = (world, c, x, y) => caveBoxes(world, c, x, y);
@@ -92,10 +105,18 @@ const fall: DrawDeco = (_world, c, x, y, { now, reduced }) => waterfallBoxes(c, 
 /** Kristallsäule: leuchtet kurz heller, nachdem sie geklungen hat */
 const column: DrawDeco = (_world, c, x, y, { now }) => columnBoxes(c, x, y, fx.chime.glow(x, y, now));
 
+/** Spielorte (Issue 56): Leuchtpilz wach oder schlafend, Türmchen in seiner Stufe, je aus dem Zustand des Pakets */
+const shroom: DrawDeco = (_world, c, x, y, { packs }) => shroomBoxes(c, x, y, awake(packs, x, y));
+const tower: DrawDeco = (_world, c, x, y, { packs }) => towerBoxes(c, x, y, towerAt(packs, x, y));
+
 /** Zeichenteile der Grotte; `fx` dazu, damit die Browser-Tests den Lichtkreis sehen */
 export const view: View2D & { fx: CaveFx } = {
   fx,
   decos: {
+    sleepshroom: shroom,
+    crystalheap: tower,
+    numstone: (_, c, x, y) => stoneBoxes(c, x, y),
+    echostone: (_, c, x, y) => echoBoxes(c, x, y),
     shroombowl: bowl,
     stonetrough: bowl,
     shed: look,
@@ -134,6 +155,10 @@ export const view: View2D & { fx: CaveFx } = {
     if (e.type === 'olm') return fx.olm.surface(e.x, e.y, performance.now());
     if (e.type === 'web') return spider.pluck(e.x, e.y, performance.now()); // Harfe, die Spinne grüßt
     if (e.type === 'heave') return heaveScore(e.n); // Hau-ruck: Trommel, Geröll
+    if (e.type === 'caveshroom') return [...SHROOM_SCORE]; // ein Leuchtpilz wacht auf
+    if (e.type === 'cavetower') return towerScore(e.stage); // ein Türmchen wächst
+    if (e.type === 'numstone') return stoneScore(e.n); // ein Zahlen-Kristall klingt
+    if (e.type === 'echo') return [...ECHO_SCORE]; // die Echo-Wand antwortet
     if (e.type !== 'lantern') return undefined; // die anderen Ereignisse gehören anderen Welten
     fx.light.since = performance.now();
     return lanternScore();
@@ -144,6 +169,8 @@ export const view: View2D & { fx: CaveFx } = {
     ...lanternBodies(state, world),
     ...heaveBodies(state, world, at),
     ...spider.bodies(world, webs, at.now, at.reduced, !!at.warm || state.sleeping),
+    ...glowBodies(state, world), // Lichtinseln wacher Pilze und fertiger Türmchen
+    ...echoGlow(state, world), // und immer an der Echo-Wand
   ],
   ajar: (state, reduced) => heaveAjar(state, reduced), // der Rollstein in Dritteln
   // die verschlafene Fledermaus auf ihrer Runde hängt solange nicht an ihrem Sitzplatz

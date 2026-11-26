@@ -8,6 +8,7 @@
 import { jettyEnd } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import { cellsOf, type Sight } from '../../mitwachsen-sight';
 import { lanternSpot } from './mitwachsen-lantern';
+import { CAVE_PLACE_SIGHTS } from './mitwachsen-cave-places-look';
 import { webs } from './mitwachsen-spider';
 
 export const SIGHTS: readonly Sight[] = [
@@ -39,4 +40,5 @@ export const SIGHTS: readonly Sight[] = [
     call: (_, [x, y]) => ({ type: 'olm', x, y }),
     color: '#6fd6f0',
   },
+  ...CAVE_PLACE_SIGHTS, // Leuchtpilze, Kristalltürmchen, Zahlen-Kristalle, Echo-Wand (Issue 56)
 ];

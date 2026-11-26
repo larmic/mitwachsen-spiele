@@ -70,7 +70,11 @@ export type PackEvent =
   | { type: 'heave'; x: number; y: number; n: number; who?: string }
   | { type: 'lapstone'; x: number; y: number; n: number } // Zahlenstein an einer Rundfahrt gewählt: so viele Runden (Issue 48)
   | { type: 'numflag'; x: number; y: number; n: number } // Zahlen-Fähnchen der Eis-Welt bimmelt (Issue 52)
-  | { type: 'treelamp'; x: number; y: number }; // Laternen-Tanne der Eis-Welt angezündet (bleibt an, gleich gespeichert)
+  | { type: 'treelamp'; x: number; y: number } // Laternen-Tanne der Eis-Welt angezündet (bleibt an, gleich gespeichert)
+  | { type: 'caveshroom'; x: number; y: number } // schlafender Leuchtpilz der Grotte geweckt (bleibt an, gleich gespeichert; Issue 56)
+  | { type: 'cavetower'; x: number; y: number; stage: number } // Kristalltürmchen um eine Stufe gewachsen (gleich gespeichert)
+  | { type: 'numstone'; x: number; y: number; n: number } // Zahlen-Kristall der Grotte klingt
+  | { type: 'echo'; x: number; y: number }; // Echo-Wand der Grotte antwortet
 
 /**
  * Was die Regeln einer Welt vom Zustand sehen und ändern dürfen: den gespeicherten Zustand der Welt-Pakete (`packs`, je

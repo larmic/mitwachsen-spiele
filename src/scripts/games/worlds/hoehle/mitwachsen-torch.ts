@@ -57,7 +57,7 @@ const NUDGE: readonly (readonly [number, number])[] = [
  * Passt hier eine Fackel: freier, leerer Grottenboden ohne Merkmal (kein Weg, keine Wiese, kein Halt, keine Schleife),
  * ringsum alle acht Nachbarn begehbar, gleich hoch und ohne Schleife, und keine andere Fackel näher als zwei Felder
  */
-function fits(map: ReadonlyMap<string, Cell>, [x, y]: Point): boolean {
+export function fits(map: ReadonlyMap<string, Cell>, [x, y]: Point): boolean {
   const c = map.get(key(x, y));
   const plain = (n: Cell | undefined): n is Cell =>
     !!n && n.region === 'hoehle' && !n.solid && n.ground === 'grotto' && !n.lane && !n.stop && !n.garden && !n.portal;

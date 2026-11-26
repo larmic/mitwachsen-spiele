@@ -15,6 +15,8 @@ import type { Cell } from '../../mitwachsen-cell';
 import type { DrawDeco } from '../../mitwachsen-view';
 import type { Ground, View3D } from '../../mitwachsen-view-3d';
 import { band, caveBoxes } from './mitwachsen-cave-look';
+import { awake, towerAt } from './mitwachsen-cave-places';
+import { echoBoxes, shroomBoxes, stoneBoxes, towerBoxes } from './mitwachsen-cave-places-look';
 import { darken, isWall } from './mitwachsen-glow';
 
 const look: DrawDeco = (world, c, x, y) => caveBoxes(world, c, x, y);
@@ -33,6 +35,11 @@ export const view3d: View3D = {
   // Das Höhlentor hat keine Flügel und keine Eiszapfen (Rollstein, mitwachsen-gate-hoehle.ts); die Platte bleibt Stein
   look: { door: () => [], icicle: () => '#ffffff' },
   decos: {
+    // Spielorte (Issue 56), wie in 2D: Wächst etwas, baut die 3D-Ansicht sein Stück neu
+    sleepshroom: (_, c, x, y, { packs }) => shroomBoxes(c, x, y, awake(packs, x, y)),
+    crystalheap: (_, c, x, y, { packs }) => towerBoxes(c, x, y, towerAt(packs, x, y)),
+    numstone: (_, c, x, y) => stoneBoxes(c, x, y),
+    echostone: (_, c, x, y) => echoBoxes(c, x, y),
     shroombowl: bowl,
     stonetrough: bowl,
     shed: look,

@@ -254,6 +254,9 @@ const PACKED: ReadonlySet<Deco> = new Set<Deco>([
   'lantern',
   'waterfall',
   'web',
+  'sleepshroom',
+  'crystalheap',
+  'echostone',
 ]);
 
 /**

@@ -3545,6 +3545,87 @@ test(
   },
 );
 
+// Spielorte in der Grotte (Issue 56, `?entwickler=hoehle`, fester Seed 1; @3d, weil Pilze, Türmchen und Zahlen-Kristalle
+// auch in 3D gezeichnet werden und die 3D-Ansicht gewachsene Dinge neu baut): Die Figur weckt einen schlafenden
+// Leuchtpilz (er bleibt wach und bekommt eine Lichtinsel), baut ein Kristalltürmchen in drei Stößen und lässt die
+// Echo-Wand antworten. Über die Test-Uhr; im Blick hinein wird nichts gespeichert
+test(
+  'Spiel: Spielorte in der Grotte: Leuchtpilz wecken, Kristalltürmchen bauen, Echo-Wand, ohne Fehler',
+  { tag: '@3d' },
+  async ({ page }) => {
+    const errors = watchErrors(page);
+    type Cell = { deco?: string | null; note?: number; solid?: boolean };
+    type Save = { lit?: string[]; towers?: Record<string, number> };
+    type Game = {
+      world: { homes: Record<string, { bed: [number, number] }>; cell(x: number, y: number): Cell };
+      state: { player: { x: number; y: number; dir: string }; animals: unknown[]; packs: { hoehle?: Save } };
+      rides: { id: string; beacon?: true }[];
+      apply(cmd: { type: 'move'; dir: string; fresh?: boolean }): void;
+    };
+    await page.addInitScript(() => {
+      const real = crypto.getRandomValues.bind(crypto);
+      const fixed = (a: ArrayBufferView<ArrayBuffer>) =>
+        a instanceof Uint32Array && a.length === 1 ? a.fill(1) : real(a);
+      Object.defineProperty(crypto, 'getRandomValues', { value: fixed });
+    });
+    const game = await openGame(page, { clock: true, dev: 'hoehle' });
+    await expectView(page);
+    await game.evaluate((node) => (node as unknown as Game).apply({ type: 'move', dir: 's' })); // aufwachen
+    await ticks(page, 5);
+    /** Das nächste Ding dieser Art am Bett suchen, die Figur südlich davor stellen und `times`-mal hineinlaufen */
+    const into = (deco: string, times: number) =>
+      game.evaluate(
+        (node, [kind, n]) => {
+          const el = node as unknown as Game;
+          const [bx, by] = el.world.homes.hoehle!.bed;
+          let at: [number, number] | undefined;
+          let count = 0;
+          for (let y = by - 150; y <= by + 150; y++)
+            for (let x = bx - 150; x <= bx + 150; x++) {
+              if (el.world.cell(x, y).deco !== kind) continue;
+              count++;
+              if (!at || Math.hypot(x - bx, y - by) < Math.hypot(at[0] - bx, at[1] - by)) at = [x, y];
+            }
+          if (!at) return null;
+          el.state = { ...el.state, animals: [], player: { x: at[0], y: at[1] + 1, dir: 'n' } };
+          for (let i = 0; i < n; i++) el.apply({ type: 'move', dir: 'n', fresh: true });
+          const p = el.state.player;
+          return {
+            key: `${at[0]},${at[1]}`,
+            count,
+            stayed: p.x === at[0] && p.y === at[1] + 1,
+            save: el.state.packs.hoehle,
+          };
+        },
+        [deco, times] as const,
+      );
+    const lights = () =>
+      game.evaluate((node) => (node as unknown as Game).rides.filter((r) => r.id.startsWith('hoehle:licht:')).length);
+    const shroom = await into('sleepshroom', 1);
+    expect(shroom).toMatchObject({ count: 12, stayed: true });
+    expect(shroom!.save?.lit).toEqual([shroom!.key]);
+    await ticks(page, 3);
+    await render(page, 2);
+    expect(await lights()).toBe(1); // der wache Pilz hat seine Lichtinsel
+    const tower = await into('crystalheap', 4); // drei Stufen, der vierte Stoß ändert nichts mehr
+    expect(tower).toMatchObject({ count: 10, stayed: true });
+    expect(tower!.save).toEqual({ v: 1, lit: [shroom!.key], towers: { [tower!.key]: 3 } });
+    await ticks(page, 3);
+    await render(page, 2);
+    expect(await lights()).toBeGreaterThanOrEqual(1); // das fertige Türmchen leuchtet
+    const echo = await into('echostone', 2);
+    expect(echo).toMatchObject({ count: 1, stayed: true });
+    expect(echo!.save).toEqual(tower!.save); // die Echo-Wand merkt sich nichts
+    await ticks(page, 3);
+    await render(page, 2);
+    await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
+      [],
+    );
+    expect(errors).toEqual([]);
+  },
+);
+
 // Schneeraupe, die Rundfahrt der Eis-Welt (Issue 54, `?entwickler=eis`, fester Seed 3; @3d, weil Raupe und Runde auch in
 // 3D gezeichnet werden und die Kamera ihr folgt): Der Test spielt den zweiten Besuch vor (ab dann steht sie am Halt).
 // Die Figur steigt ein, fährt einmal um das Tal, immer auf der Runde, und steigt am selben Halt wieder aus. Alles über

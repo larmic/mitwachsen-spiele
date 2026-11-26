@@ -325,25 +325,41 @@ describe('Hinführen: was die Pakete eintragen', () => {
 
   it('Grotte: Laterne (nur solange sie auf dem Sockel steht), Säulen, Netze, Steg; vom Höhlenbett nach hinten die Laterne zuerst', () => {
     const goals = goalsOf(cave(), world, SIGHTS);
+    // dazu die vier Spielorte (Issue 56): Echo-Wand, Leuchtpilze, Kristalltürmchen, Zahlen-Kristalle
     expect(goals.map((g) => g.sight.id).sort()).toEqual([
+      'hoehle:echo',
       'hoehle:laterne',
+      'hoehle:leuchtpilze',
       'hoehle:netze',
       'hoehle:saeulen',
       'hoehle:steg',
+      'hoehle:tuermchen',
+      'hoehle:zahlen',
     ]);
     expect(goals[0]!.sight.id).toBe('hoehle:laterne');
     const decos = Object.fromEntries(goals.map((g) => [g.sight.id, world.cell(...g.at).deco]));
     expect(decos).toEqual({
+      'hoehle:echo': 'echostone',
       'hoehle:laterne': 'lantern',
+      'hoehle:leuchtpilze': 'sleepshroom',
       'hoehle:netze': 'web',
       'hoehle:saeulen': 'column',
       'hoehle:steg': 'jetty',
+      'hoehle:tuermchen': 'crystalheap',
+      'hoehle:zahlen': 'numstone',
     });
     for (const g of goals)
       expect(g.sight.call(world, g.at).type).toBe(
-        { 'hoehle:laterne': 'lantern', 'hoehle:netze': 'web', 'hoehle:saeulen': 'column', 'hoehle:steg': 'olm' }[
-          g.sight.id
-        ],
+        {
+          'hoehle:echo': 'echo',
+          'hoehle:laterne': 'lantern',
+          'hoehle:leuchtpilze': 'caveshroom',
+          'hoehle:netze': 'web',
+          'hoehle:saeulen': 'column',
+          'hoehle:steg': 'olm',
+          'hoehle:tuermchen': 'cavetower',
+          'hoehle:zahlen': 'numstone',
+        }[g.sight.id],
       );
     expect(goalsOf(cave({ lamp: 'hoehle' }), world, SIGHTS).map((g) => g.sight.id)).not.toContain('hoehle:laterne');
     // ohne Grotte keine Laterne

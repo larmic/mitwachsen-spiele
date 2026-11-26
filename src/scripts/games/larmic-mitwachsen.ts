@@ -84,11 +84,18 @@ const PACK_TYPES: Record<PackEvent['type'], true> = {
   lapstone: true,
   numflag: true,
   treelamp: true,
+  caveshroom: true,
+  cavetower: true,
+  numstone: true,
+  echo: true,
 };
 const PACKED: ReadonlySet<string> = new Set(Object.keys(PACK_TYPES));
 const packed = (e: { type: string }): e is PackEvent => PACKED.has(e.type);
 /** Davon zeigt und spielt das Paket alles selbst (Säule, Grottenolm, Netz, Klingeltor, Zahlenstein) */
-type PackOnly = Extract<PackEvent, { type: 'column' | 'olm' | 'web' | 'chimegate' | 'lapstone' | 'numflag' }>;
+type PackOnly = Extract<
+  PackEvent,
+  { type: 'column' | 'olm' | 'web' | 'chimegate' | 'lapstone' | 'numflag' | 'numstone' | 'echo' }
+>;
 const PACK_ONLY: ReadonlySet<string> = new Set<PackOnly['type']>([
   'column',
   'olm',
@@ -96,6 +103,8 @@ const PACK_ONLY: ReadonlySet<string> = new Set<PackOnly['type']>([
   'chimegate',
   'lapstone',
   'numflag',
+  'numstone',
+  'echo',
 ]);
 const packOnly = (e: { type: string }): e is PackOnly => PACK_ONLY.has(e.type);
 
@@ -875,7 +884,8 @@ class LarmicMitwachsen extends HTMLElement {
     if (reshapes(e)) this.gl3d?.rebuild([chunkOf(e.x, e.y).join(',')]); // leer, wieder voll, gewachsen
     if (packed(e)) this.sfx.score(packScore(this.renderer.views.values(), e)); // Töne aus dem Paket der Welt des Ereignisses
     if (packOnly(e)) return; // Säule, Grottenolm, Netz, Klingeltor: Bild und Ton aus dem Paket
-    if (e.type === 'treelamp') return void this.save(); // Laternen-Tanne angezündet: Sie bleibt an (Bild und Ton aus dem Paket)
+    // Laternen-Tanne angezündet, Leuchtpilz geweckt, Türmchen gewachsen: Es bleibt (Bild und Ton aus dem Paket)
+    if (e.type === 'treelamp' || e.type === 'caveshroom' || e.type === 'cavetower') return void this.save();
     if (e.type === 'heave') {
       // Hau-ruck am Höhlentor: Figur und Tok lehnen sich an den Stein (Bild und Ton aus dem Paket der Höhlenwelt)
       if (e.n > 0) this.hops.set('player', now);

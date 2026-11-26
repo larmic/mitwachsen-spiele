@@ -41,6 +41,7 @@ import { dimGrotte } from './mitwachsen-glow';
 import { clayOf, laneMarks, lanePlan, laneSide, type LaneMarks } from './mitwachsen-lane';
 import { HALL_STAGE, hallStage } from './mitwachsen-hall';
 import { plantTorches } from './mitwachsen-torch';
+import { caveKeep, placeCave } from './mitwachsen-cave-places';
 import { siteOf, type Site } from './mitwachsen-site';
 import { spinWebs } from './mitwachsen-spider';
 
@@ -146,6 +147,7 @@ export function buildGrotte(
   level(realm, map);
   const way = pathsOf(site, bed, ringHome);
   plantTorches(map, at, (x, y) => way(...site.uv(x, y))); // Kristallfackeln an den Wegen, ganz zuletzt: nie im Weg
+  placeCave(seed, realm, map, at, caveKeep(site, way, free)); // Spielorte (Issue 56), nach Füllung und Fackeln
   const reach = reachOf(home.wake, map);
   for (const k of realm) {
     // was man nicht erreichen kann, wird Fels: keine Ecke, die man sieht, aber nie betritt
