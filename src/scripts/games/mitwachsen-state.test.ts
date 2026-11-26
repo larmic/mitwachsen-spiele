@@ -54,6 +54,7 @@ function fakeWorld(cells: Record<string, Partial<Cell>> = {}, home: Partial<Home
     climate: () => ({ id: 'eis', strength: 0 }),
     portals: new Map(),
     stones: new Map(),
+    waystones: new Map(),
     attach: () => ({ world, chunks: [] }),
     relay: () => ({ world, chunks: [] }),
   };

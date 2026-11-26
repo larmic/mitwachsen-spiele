@@ -25,6 +25,7 @@ import { sharpenRim } from './mitwachsen-rim';
 import { behind, hullOf, landOf, roomBehind, straightCentre, type Behind } from './mitwachsen-behind';
 import { PLATFORM_HALF, platformCells, ringSpots, type Portal, type PortalId } from './mitwachsen-portal';
 import { findSpawns } from './mitwachsen-spawns';
+import { layStones, stoneOf } from './mitwachsen-waystone';
 import { layPaths } from './mitwachsen-worldpath';
 import { GATE_FLOOR, forecourt } from './mitwachsen-apron';
 
@@ -63,6 +64,8 @@ export type World = Realms & {
   readonly gates: ReadonlyMap<GateId, GatePlace>;
   /** Klangsteine: einer am Bett, einer vor jedem großen Tor, einer am Bett jeder Welt aus einem Paket (Schneebett, Höhlenbett), dazu die, die ein Paket ohne eigene Welt legt (Bahn: Bahnhof Bär, Lokschuppen) */
   readonly stones: ReadonlyMap<StoryId, Point>;
+  /** Wegsteine neben den Weltpfaden der Lichtung, je Tor vom Bett zum Tor (mitwachsen-waystone.ts) */
+  readonly waystones: ReadonlyMap<GateId, readonly Point[]>;
   /** Stimmung an einem Ort: Richtung des nächsten Tors und wie stark (0 am Bett … 1 am Felsring) */
   climate(x: number, y: number): Climate;
   /**
@@ -206,6 +209,7 @@ type Start = {
   spots: Point[];
   inner: Map<RegionId, Behind>;
   laid: [StoryId, Point][];
+  waystones: Map<GateId, Point[]>;
 };
 
 /** Lichtung als feste Karte: Bett in der Mitte, Hügel, Teiche, Wäldchen, Blumenwiesen, Steine, Felsring, große Tore */
@@ -337,7 +341,8 @@ function buildStart(
         if (c && (c.region === 'lichtung' || c.deco === 'rock')) set(x, y, { ...grass('lichtung'), h: c.h || 1 });
       }
   smooth(map);
-  layPaths(map, LICHTUNG_HOME.bed, portalsOf(places)); // Weltpfade: vom Portalstein am Bett zu jedem Tor (nur Boden)
+  // Weltpfade: vom Portalstein am Bett zu jedem Tor (nur Boden), daneben schlafende Wegsteine
+  const waystones = layStones(map, layPaths(map, LICHTUNG_HOME.bed, portalsOf(places)));
   // Pakete ohne eigene Welt legen jetzt nach ihrem Spielstand etwas in die Karte (Bahn: Gleis, Klangsteine)
   const at = { seed, map, gates: gatesOf(places), beds: bedsOf(inner), packs: saved };
   const laid = packs.flatMap((p) => p.lay?.(at) ?? []);
@@ -353,7 +358,13 @@ function buildStart(
     ...findSpawns(seed, lichtung, spots, LICHTUNG_HOME.bed),
     ...[...inner.values()].flatMap((b) => [...b.spawns]),
   ]);
-  return { map, spawns, spots, inner, laid };
+  // nur Steine, die man am Ende sieht (nicht unter Gleis oder Fels)
+  for (const [id, stones] of waystones)
+    waystones.set(
+      id,
+      stones.filter((p) => stoneOf(map.get(key(...p)))),
+    );
+  return { map, spawns, spots, inner, laid, waystones };
 }
 
 /**
@@ -736,7 +747,7 @@ function build(
 ): { world: World; chunks: readonly string[] } {
   const places = layouts(seed);
   const built = [...packs]; // gebaut mit diesen Paketen (die Liste draußen kann danach noch wachsen)
-  const { map: regions, spawns, spots, inner, laid } = buildStart(seed, places, built, saved);
+  const { map: regions, spawns, spots, inner, laid, waystones } = buildStart(seed, places, built, saved);
   const realms = realmsOf(inner);
   const worlds = [...inner.values()];
   const cache = new ChunkCache<Cell>((cx, cy) => {
@@ -779,6 +790,7 @@ function build(
     away: new Set(built.flatMap((p) => p.away?.(saved) ?? [])),
     spotsOf: (realm) => (realm === lichtung.id ? spots : (inner.get(realm)?.spots ?? [])),
     portals: new Map([...portalsOf(places), ...worlds.flatMap((b) => b.portals)]),
+    waystones,
     stones: new Map<StoryId, Point>([...stonesOf(places), ...worlds.flatMap((b) => b.stones), ...laid]),
     // In der Welt hinter einem Tor überall ihr Licht wie ganz nah an ihrem Tor (Eis-Welt: kühles Licht)
     climate: (x, y) => {
