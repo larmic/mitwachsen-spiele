@@ -243,27 +243,25 @@ describe('Bau 2: bei der nächsten Fahrt nach dem Hau-ruck (mitwachsen-build2.ts
     );
   });
 
-  it('Bahnhof Fledermaus und Lokschuppen stehen ab Ausbau 2 in der Welt (Bahnsteig eine Stufe hoch, feste Rückwand); vorher nichts', () => {
+  it('Bahnhof Fledermaus steht ab Ausbau 2 in der Welt (Bahnsteig eine Stufe hoch), vorher nichts; kein Lokschuppen daneben (Issue 25): kein Körper, kein festes Feld auf Toks Platz', () => {
     expect(batOf(W1)).toBeNull();
     expect(batBodies(W1, AWAY)).toEqual([]);
     const st = batOf(W2)!;
     expect(st.rows).toHaveLength(7);
     const bodies = batBodies(W2, AWAY).map((b) => b.id);
-    expect(bodies).toEqual(
-      expect.arrayContaining(['bahn:fels:0', 'bahn:felsdach', 'bahn:felsschild', 'bahn:schuppen']),
-    );
+    expect(bodies).toEqual(expect.arrayContaining(['bahn:fels:0', 'bahn:felsdach', 'bahn:felsschild']));
+    expect(bodies).not.toContain('bahn:schuppen');
     const shed = shedIn(W2);
-    expect(shed.wall.length).toBeGreaterThan(0);
-    expect(shed.wall.every((p) => W2.cell(...p).solid)).toBe(true);
-    expect(shed.wall.every((p) => !W1.cell(...p).solid)).toBe(true); // bei Ausbau 1 frei
+    expect(shed.cells.length).toBeGreaterThan(0);
+    for (const w of [W1, W2]) expect(shed.cells.every((p) => !w.cell(...p).solid)).toBe(true); // freier Boden
     expect(W2.cell(...shed.home!).solid).toBe(false);
-    // der Siebenschläfer schläft vorn im Lokschuppen
+    // der Siebenschläfer schläft vorn auf Toks Platz
     const dormouse = W2.spawns.get(animalId('hoehle', 'siebenschlaefer'))!;
     expect(W2.cell(...dormouse).shed).toBe('hoehle');
     expect(W2.cell(...dormouse).solid).toBe(false);
     // die Körper kommen mit dem Bild der Station (2D und 3D gleich)
     const s = { ...initialState(W2, { packs: withBuilt(OPENED, 2), openGates: [...OPEN_GATES] }) };
-    expect(stationBodies(s, W2, AT).some((b) => b.id === 'bahn:schuppen')).toBe(true);
+    expect(stationBodies(s, W2, AT).some((b) => b.id === 'bahn:schuppen')).toBe(false);
   });
 
   it('der Prellbock im Bild: versinkt mit Bau 2, bei reduzierter Bewegung auf einmal; danach eine Gerade', () => {

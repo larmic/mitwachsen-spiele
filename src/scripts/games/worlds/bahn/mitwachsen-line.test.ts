@@ -613,23 +613,23 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
       expect(bad, `Seed ${seed}`).toEqual([]);
     });
 
-    it(`Seed ${seed}: Bau 2: Bahnhof Fledermaus eine Stufe über dem Gleis, Lokschuppen daneben mit fester Rückwand, Toks Platz und der Siebenschläfer darin erreichbar`, () => {
+    it(`Seed ${seed}: Bau 2: Bahnhof Fledermaus eine Stufe über dem Gleis, daneben Toks Platz ohne Lokschuppen (kein festes Feld, kein Körper), Tok und der Siebenschläfer dort erreichbar`, () => {
       const bad: string[] = [];
       const st = batOf(w);
       if (!st || st.rows.length !== LINE.bear.long) bad.push('kein Bahnsteig');
       const shed = shedIn(w);
-      if (!shed.cells.length || !shed.wall.length) bad.push('kein Lokschuppen');
-      if (shed.wall.some((p) => !w.cell(...p).solid)) bad.push('Rückwand nicht fest');
+      if (!shed.cells.length || !shed.wall.length) bad.push('kein Platz für Tok');
+      if (shed.cells.some((p) => w.cell(...p).solid)) bad.push('festes Feld auf Toks Platz');
       const track = new Set(laid.cells.map(key));
       const free = reach(w, w.homes.hoehle.wake, track);
       if (!shed.home || !free.has(key(shed.home))) bad.push('Toks Platz nicht erreichbar');
-      if (shed.cells.some((p) => track.has(key(p)))) bad.push('Lokschuppen auf dem Gleis');
+      if (shed.cells.some((p) => track.has(key(p)))) bad.push('Toks Platz auf dem Gleis');
       const dormouse = w.spawns.get('hoehle:siebenschlaefer');
       if (!dormouse || w.cell(...dormouse).shed !== 'hoehle' || !free.has(key(dormouse)))
-        bad.push('Siebenschläfer nicht im Schuppen');
+        bad.push('Siebenschläfer nicht auf Toks Platz');
       if (dormouse && shed.home && key(dormouse) === key(shed.home)) bad.push('Siebenschläfer auf Toks Platz');
-      if (!batBodies(w, { player: { x: 1e6, y: 1e6 } }).some((b) => b.id === 'bahn:schuppen'))
-        bad.push('Lokschuppen nicht im Bild');
+      if (batBodies(w, { player: { x: 1e6, y: 1e6 } }).some((b) => b.id === 'bahn:schuppen'))
+        bad.push('Lokschuppen im Bild');
       expect(bad, `Seed ${seed}`).toEqual([]);
     });
 

@@ -71,7 +71,7 @@ function gridAround(
  * Ausbau liegt (`along`, für die Gleiswelle beim Bau), was dort steht. Der Bahnsteig von Bahnhof Bär liegt eine Stufe
  * über dem Gleis (Holzplanken auf festgetretenem Boden, `path`); den
  * Platz von Bahnhof Fledermaus markiert vor Bau 2 nur `Cell.stop`, ab Ausbau 2 liegt sein Bahnsteig wie der von Bahnhof
- * Bär eine Stufe über dem Gleis (Stein), und die Rückwand des Lokschuppens daneben ist fest (`shedOf`)
+ * Bär eine Stufe über dem Gleis (Stein); Toks Platz daneben (`shedOf`) bleibt freier Boden
  */
 function write(map: Map<string, Cell>, line: Line, parts: ReadonlyMap<number, Rail['part']>, built: number) {
   const { cells, buffer } = line;
@@ -107,16 +107,17 @@ function write(map: Map<string, Cell>, line: Line, parts: ReadonlyMap<number, Ra
       map.set(key(...p), { ...c, h: laneH + 1, ground: 'stone', deco: null, solid: false, stop: RIDE });
     else if (c) map.set(key(...p), { ...c, stop: RIDE });
   }
-  if (bat && built >= 2)
-    for (const p of shedOf(map, bat).wall) map.set(key(...p), { ...map.get(key(...p))!, solid: true });
 }
 
-/** Der Lokschuppen neben Bahnhof Fledermaus, aus dem Platz, den die Grotte frei hält (`Cell.shed`) */
+/**
+ * Toks Platz neben Bahnhof Fledermaus, aus dem Platz, den die Grotte frei hält (`Cell.shed`). Bis Issue 25 stand hier
+ * der Lokschuppen, daher die Namen; heute steht dort kein Bau mehr
+ */
 export type Shed = { cells: Point[]; wall: Point[]; home?: Point; dir: Point };
 
 /**
- * Lokschuppen: die Felder seines Platzes (`Cell.shed`, gleich neben dem Gleis von Bahnhof Fledermaus), die Rückwand (die
- * Reihe fern vom Gleis, fest), Toks Platz darunter (`home`: das Feld in der Mitte, nicht in der vorderen Reihe, dort
+ * Toks Platz: die Felder des Platzes (`Cell.shed`, gleich neben dem Gleis von Bahnhof Fledermaus), die Reihe fern vom
+ * Gleis (`wall`, begehbar wie die anderen), Toks Feld (`home`: das Feld in der Mitte, nicht in der vorderen Reihe, dort
  * schläft der Siebenschläfer) und vom Gleis weg
  * (`dir`). Leer ohne Platz
  */

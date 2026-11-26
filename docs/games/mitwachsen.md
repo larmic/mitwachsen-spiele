@@ -290,9 +290,9 @@ Das Kind kann noch nicht lesen, darum erzählen die Geschichten Klangsteine. Ein
 
 > In der Grotte wohnen kleine Lichtgeister. Sie spielen so gern Verstecken. Hast du die Laterne dabei, kannst du sie sehen. Hörst du sie kichern?
 
-**Im Lokschuppen** (`lokschuppen`, Toks Geschichte: Klangstein neben dem Lokschuppen am Bahnhof Fledermaus, kommt mit Bau 2 der Bahn)
+**Bei Tok** (`lokschuppen`, Toks Geschichte: Klangstein neben Toks Platz am Bahnhof Fledermaus, kommt mit Bau 2 der Bahn; bis Issue 25 „Im Lokschuppen“)
 
-> Tok hat eine Spitzhacke, aber er haut damit nichts kaputt. Er klopft nur die Nägel in die Schienen: pink, pink, pink. Sein bester Freund ist der Maulwurf. Der sitzt immer oben auf Toks Helm und zeigt, wo es langgeht, denn unter der Erde kennt er sich aus. Abends fährt die kleine Bahn in den Schuppen, und der Siebenschläfer schläft schon im Wagen.
+> Tok hat eine Spitzhacke, aber er haut damit nichts kaputt. Er klopft nur die Nägel in die Schienen: pink, pink, pink. Sein bester Freund ist der Maulwurf. Der sitzt immer oben auf Toks Helm und zeigt, wo es langgeht, denn unter der Erde kennt er sich aus. Abends hält die kleine Bahn am Bahnhof, und der Siebenschläfer schläft schon im Wagen.
 
 **Am Bahnhof Bär** (`bahnhof`, Klangstein neben Toks Häuschen am Bahnhof Bär, kommt mit Bau 1 der Bahn)
 

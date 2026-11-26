@@ -182,7 +182,7 @@ export const STORIES: Record<StoryId, Story> = {
     },
   },
   lokschuppen: {
-    // dreimal klopft Tok die Nägel ein (pink, pink, pink), dann schaukelt die kleine Bahn in den Schuppen
+    // dreimal klopft Tok die Nägel ein (pink, pink, pink), dann schaukelt die kleine Bahn an den Bahnhof
     melody: {
       wave: 'triangle',
       gap: 0.08,
