@@ -51,7 +51,7 @@ export type Rider = Guided & {
 
 /**
  * Ereignisse, die ein Fahrzeug ausgibt: seine eigenen, dazu Warten der folgenden Tiere, Wechsel der Gegend, `bump`
- * (gegen den Schuppen gelaufen, wie gegen jede Wand), `home` (ein Tier zieht nach der Fahrt ein: der Maulwurf nach
+ * (gegen den Laternenpfahl gelaufen, wie gegen jede Wand), `home` (ein Tier zieht nach der Fahrt ein: der Maulwurf nach
  * Bau 2) und, was ein Bote dabei tut (`herald`, `sink`: Tok beginnt Bau 2 am Prellbock; `HeraldEvent` in
  * mitwachsen-herald.ts, das diese Datei nicht importiert)
  */
@@ -72,7 +72,7 @@ export type RideEvents = {
  * erscheinen, fahren). `move`: vor allem anderen; true, wenn der Zug damit erledigt ist (einsteigen, anstoßen, während
  * der Fahrt immer; ein Antippen eines Fahrzeugs immer, sobald es eine Strecke hat: gelaufen wird per Antippen nie;
  * ein angetippter Bote, `MoveCmd.who`, gehört nicht den Fahrzeugen).
- * `blocks`: Darf das Tier `a` nicht auf (x, y) gehen (Halte, Fahrzeug, Schuppen, Strecke)?
+ * `blocks`: Darf das Tier `a` nicht auf (x, y) gehen (Halte, Fahrzeug, Laternenpfahl, Strecke)?
  */
 export type RideRules = {
   tick(s: Rider, world: World, events: RideEvents): void;
@@ -82,7 +82,7 @@ export type RideRules = {
 
 /**
  * Strecke eines Fahrzeugs in einer Welt: `path` die Felder des Sitzes vom Halt in der Welt (`home`) bis zum Halt auf der
- * Lichtung (`out`), `stops` beide Sitze, `shed` sein Schuppen (am Halt `home`), `seats` feste Warteplätze je Halt für
+ * Lichtung (`out`), `stops` beide Sitze, `shed` feste Felder am Halt `home` (der Laternenpfahl des Schlittens), `seats` feste Warteplätze je Halt für
  * folgende Tiere, `on` alle Felder der Strecke. Ein Fahrzeug mit Wagen (der Zug) belegt am Halt mehrere Felder (`cars`,
  * jedes davon ist zum Einsteigen da, es gibt kein Zugtier), vor ihm müssen `ahead` Felder frei sein (sonst 2: dort geht
  * das Zugtier); `dark`: Felder im Tunnel (Tunnelportal, Einschnitt, Gang), davor kündigt es ihn an. `loop`: eine

@@ -15,9 +15,7 @@ import { dawnOf } from '../../mitwachsen-packs';
 import { initialState, progressOf, step, type Cmd, type GameEvent, type State } from '../../mitwachsen-state';
 import { createWorld, standHeight, type World } from '../../mitwachsen-world';
 import { arrowTo } from '../../mitwachsen-map';
-import { hutOf } from './mitwachsen-bear';
 import { futureBear } from './mitwachsen-line';
-import { stationOf } from './mitwachsen-station-look';
 import { BAHN_PACK, EIS_PACK, REGRESSION_SEEDS, SAMPLE_SEEDS, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import { CALL_EVERY, COME, SIGHT, TOK, TOK_NEAR, postOf, tokWanted } from './mitwachsen-tok';
 import { heraldFx, juhu, lacks, pink } from './mitwachsen-tok-look';
@@ -209,8 +207,6 @@ describe('Tok erscheint: ankommen und warten', () => {
       const { post } = postOf(world)!;
       // sein Platz liegt am künftigen Bahnsteig (gerechnet auf der Kopie der Karte, frisch gebaut über `worldOf`)
       expect(futureBear(seed)?.platform.map(key), `Seed ${seed}`).toContain(key(post));
-      // nie auf dem Platz von Toks Häuschen (Bau 1 macht ihn fest)
-      expect(key(hutOf(futureBear(seed)!, world.homes.lichtung.bed)!.at), `Seed ${seed}`).not.toBe(key(post));
       // ein Feld je `PACE.lead` Takte: höchstens 120 Takte, bis er dort steht
       for (let i = 0; i < 12 && key([tokIn(r.s)!.x, tokIn(r.s)!.y]) !== key(post); i++) r = play(r.s, world, ticks(10));
       const t = tokIn(r.s)!;
@@ -575,9 +571,9 @@ describe('Bau 1: wer im Weg stünde, rückt zur Seite', () => {
   const FAELLIG = withTok(SLED_HOME, { stage: 'faellig' });
   // nur die Seeds, deren Welt mit Ausbau 1 hier ohnehin gebaut wird (1 und 11, „Bahnhof Bär, den Tok erwartet …“): Jede
   // weitere ganze Welt kostet test:deep gut 0,15 s, und es liegt schon knapp unter seiner Frist von 150 s in gates:ci.
-  // Seit Bahnhof Bär die Seite weg von der Kamera vorzieht, wohnt in den Seeds 1 bis 140 kein Tier mehr dort, wo das
-  // Häuschen hinkommt (vorher die Biene in Seed 39 und 80); dass Bau 1 jemanden verdrängen kann, stellt der Test unten
-  // darum selbst her
+  // Seit Bahnhof Bär die Seite weg von der Kamera vorzieht, wohnt in den Seeds 1 bis 140 kein Tier mehr dort, wo
+  // Bau 1 ein festes Feld setzt (nur noch der Klangstein am Bahnhof; Toks Häuschen gibt es seit Issue 25 nicht mehr); dass Bau 1 jemanden
+  // verdrängen kann, stellt der Test unten darum selbst her
   const SEEDS = [SAMPLE_SEEDS[0]!, ...REGRESSION_SEEDS];
   const stuck = (s: State, w: World) => [
     ...s.animals.flatMap((a) => [
@@ -596,13 +592,13 @@ describe('Bau 1: wer im Weg stünde, rückt zur Seite', () => {
     expect(stuck(unstick(s, after), after), `Seed ${seed}`).toEqual([]);
   });
 
-  it('Seed 1: ein Tier der Lichtung, das auf dem Häuschen wohnt und steht, rückt, die Figur auf dem Häuschen auch', () => {
+  it('Seed 1: ein Tier der Lichtung, das auf dem Feld des Klangsteins wohnt und steht, rückt, die Figur dort auch', () => {
     // wie ein Spielstand, in dem jemand dort steht, wo Bahnhof Bär nun liegt (er ist umgezogen, oder Bau 1 kommt dorthin)
     const before = worldOf(1, BAHN);
     const after = worldOf(1, BAHN, { bahn: { built: 1 } });
-    const hut = stationOf(after)!.hut!.at;
+    const hut = after.stones.get('bahnhof')!;
     const s0 = initialState(before, { packs: FAELLIG });
-    // absichtlich gestellt: in den Seeds 1 bis 140 wohnt seit dem Umzug kein Tier mehr auf dem Häuschen
+    // absichtlich gestellt: in den Seeds 1 bis 140 wohnt seit dem Umzug kein Tier mehr auf einem solchen Feld
     const animal = s0.animals.find((a) => a.realm === 'lichtung' && a.mode === 'wander');
     expect(animal?.realm).toBe('lichtung');
     const s = {
@@ -610,7 +606,7 @@ describe('Bau 1: wer im Weg stünde, rückt zur Seite', () => {
       player: { x: hut[0], y: hut[1], dir: 's' as Dir },
       animals: s0.animals.map((a) => (a === animal ? { ...a, x: hut[0], y: hut[1], spawn: hut } : a)),
     };
-    expect(standHeight(after, s.openGates, ...hut)).toBeNull(); // das Häuschen ist fest
+    expect(standHeight(after, s.openGates, ...hut)).toBeNull(); // der Klangstein ist fest
     expect(stuck(s, after).length).toBeGreaterThan(1);
     const moved = unstick(s, after);
     expect(stuck(moved, after)).toEqual([]);

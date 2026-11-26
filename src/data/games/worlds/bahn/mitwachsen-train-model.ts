@@ -3,7 +3,7 @@
 // Lok und zwei Wagen, Silber mit lila Fensterband und türkisem Leuchtstreifen, vorn im Zielfenster eine Fledermaus, an den
 // Seiten der Lok eine Kristall-Raute, weiße Dampfwölkchen; im hinteren Wagen sitzt Tok, sobald er eingestiegen ist, und
 // dort geht die Tür auf. Bahnhof Bär: Bahnsteig aus Holzplanken mit heller Kante, eine Stufe über dem Gleis; Grasdach auf
-// vier Pfosten mit Bank für wartende Tiere, darauf das Schild „Bär auf Grün“ (ohne Text); Toks Häuschen am Kopf. Fahren:
+// vier Pfosten mit Bank für wartende Tiere, darauf das Schild „Bär auf Grün“ (ohne Text). Fahren:
 // Die Figur sitzt im mittleren Wagen (das Dach dort ist offen, Kopf und Schultern schauen heraus), seine Tür hat bis zur
 // ersten Fahrt einen goldenen Rahmen (nur dort kann das Kind etwas tun: einsteigen), im Tunnel und am Abend leuchten die
 // Lampen. Sonst kein Gold.
@@ -39,10 +39,6 @@ export const STATION_COLORS = {
   wood: '#8a5a34',
   bench: '#b07a48',
   roof: ['#5c9e34', '#73b746'],
-  hut: '#d9b48a',
-  hutRoof: ['#b5523f', '#c4634f'],
-  door: '#6e4a30',
-  glass: '#bfe3f5',
   sign: '#7cbf4a',
   bear: { b: '#8a5a34', k: '#2e2b33', l: '#e8c9a0' },
 } as const;
@@ -227,15 +223,8 @@ const row = (odd: boolean): Part[] => [
   [-1, -0.5, 0.04, 0.1, 1, 0.015, SC.edge, SC.edge],
   [-1.03, -0.5, -1, 0.04, 1, 1.02, SC.wood],
 ];
-/** Toks Häuschen auf dem hinteren Feld der Reihe, die Tür zum Gleis */
-const HUT: readonly Part[] = [
-  [0.08, -0.42, 0.04, 0.84, 0.84, 0.95, SC.hut],
-  [0.02, -0.48, 0.99, 0.96, 0.96, 0.18, ...SC.hutRoof],
-  [0.06, -0.16, 0.04, 0.03, 0.32, 0.6, SC.door],
-  [0.06, 0.2, 0.46, 0.03, 0.16, 0.18, SC.glass],
-];
-/** Reihe des Bahnsteigs (`hut`: mit Toks Häuschen hinten) */
-export const rowParts = (odd: boolean, hut: boolean): Part[] => [...row(odd), ...(hut ? HUT : [])];
+/** Reihe des Bahnsteigs */
+export const rowParts = (odd: boolean): Part[] => [...row(odd)];
 
 /**
  * Maße des Dachs beider Bahnhöfe (Issue 15: kleiner und höher, damit man die Figur darunter sieht und die Kante frei

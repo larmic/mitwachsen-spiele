@@ -23,7 +23,7 @@ import {
   seedsFor,
   worldOf,
 } from '../../test-worlds';
-import { bayAt, bearSpots, besideRay, centreOf, facesCamera, hutOf } from './mitwachsen-bear';
+import { bayAt, bearSpots, besideRay, centreOf, facesCamera, headOf } from './mitwachsen-bear';
 import { APPROACH, PORTAL_T, clean, joined } from './mitwachsen-line';
 import { STONE_GAPS } from './mitwachsen-stones';
 import { OPEN_TICKS, stationOf, stationBodies } from './mitwachsen-station-look';
@@ -334,7 +334,7 @@ function stoneFaults(
 
 /**
  * Was an den Klangsteinen der Bahn nicht stimmt: am Bahnhof Bär zwei Felder von Bahnsteig und Gleis (notfalls drei oder
- * vier, `STONE_GAPS`), am Kopf bei Toks Häuschen; am Lokschuppen ein Feld daneben; beide erreichbar und frei umgehbar
+ * vier, `STONE_GAPS`), am Kopf des Bahnhofs fern vom Bett; am Lokschuppen ein Feld daneben; beide erreichbar und frei umgehbar
  */
 function trainStoneFaults(w: World, laid: Laid) {
   const bear = stationOf(w);
@@ -343,21 +343,28 @@ function trainStoneFaults(w: World, laid: Laid) {
     ...stoneFaults(w, laid, 'bahnhof', reach(w, w.homes.lichtung.wake, new Set()), station, STONE_GAPS),
     ...stoneFaults(w, laid, 'lokschuppen', reach(w, w.homes.hoehle.wake, new Set()), shedIn(w).cells, [1]),
   ];
-  // am Kopf des Bahnhofs bei Toks Häuschen, fern vom Bett: näher am Häuschen als am anderen Ende des Bahnsteigs
+  // am Kopf des Bahnhofs, fern vom Bett: näher an diesem Ende des Bahnsteigs als am anderen
   const stone = w.stones.get('bahnhof');
-  const hut = bear?.hut;
-  const other = hut && bear.rows[hut.row === 0 ? bear.rows.length - 1 : 0]?.back;
+  const bed = w.homes.lichtung.bed;
+  const ends = bear ? [bear.rows[0]!.back, bear.rows.at(-1)!.back] : [];
   const dist = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-  if (!stone || !hut || !other || dist(stone, hut.at) >= dist(stone, other)) bad.push('bahnhof: nicht am Häuschen');
+  const [head, other] = ends.sort((a, b) => dist(b, bed) - dist(a, bed));
+  if (!stone || !head || !other || dist(stone, head) >= dist(stone, other)) bad.push('bahnhof: nicht am Kopf');
+  if (
+    bear &&
+    head &&
+    key(headOf({ lane: bear.line.slice(0, LINE.bear.long), platform: station.slice(LINE.bear.long) }, bed)!) !==
+      key(head)
+  )
+    bad.push('bahnhof: Kopf falsch');
   return bad;
 }
 
 /** Was an einem Feld von Bahnhof Bär nicht stimmt: Lichtung, trocken, frei, außerhalb des Portalrings, nichts Gemiedenes nah */
-function siteFaults(laid: Laid, p: Point, bed: Point, hut?: Point): string[] {
+function siteFaults(laid: Laid, p: Point, bed: Point): string[] {
   const bad: string[] = [];
   const cell = laid.c(p);
-  const solid = cell.solid && (!hut || key(p) !== key(hut)); // Toks Häuschen ist fest
-  if (cell.ground === 'water' || solid || cell.region !== 'lichtung') bad.push(`Feld ${key(p)}`);
+  if (cell.ground === 'water' || cell.solid || cell.region !== 'lichtung') bad.push(`Feld ${key(p)}`);
   if (Math.hypot(p[0] - bed[0], p[1] - bed[1]) < LINE.bear.ring) bad.push(`${key(p)} im Portalring`);
   const near = [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => laid.c([p[0] + dx, p[1] + dy])));
   if (near.some((n) => n.portal || n.garden || n.plate || n.deco === 'klangstein' || n.ground === 'water'))
@@ -467,15 +474,12 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
       if (!lane.every((p) => platform.some((q) => cheb(p, q) === 1 && (p[0] === q[0] || p[1] === q[1]))))
         bad.push('Gleis nicht am Bahnsteig');
       const station = [...lane, ...platform];
-      // das Gleis eben, der Bahnsteig eine Stufe darüber, Toks Häuschen am Kopf fest (hinten, am Ende fern vom Bett)
+      // das Gleis eben, der Bahnsteig eine Stufe darüber, kein Feld fest (kein Häuschen, Issue 25)
       const h = laid.c(lane[0]!).h;
       if (!lane.every((p) => laid.c(p).h === h)) bad.push('Gleis am Bahnhof nicht eben');
       if (!platform.every((p) => laid.c(p).h === h + 1)) bad.push('Bahnsteig nicht eine Stufe über dem Gleis');
-      const hut = hutOf({ lane, platform }, bed);
       const solid = platform.filter((p) => laid.c(p).solid).map(key);
-      if (!hut || solid.join() !== key(hut.at))
-        bad.push(`fest: ${solid.join(' ')} statt Häuschen ${hut && key(hut.at)}`);
-      if (hut && ![0, LINE.bear.long - 1].includes(hut.row)) bad.push('Häuschen nicht am Kopf');
+      if (solid.length) bad.push(`fest: ${solid.join(' ')}`);
       const c = centreOf({ lane, platform });
       const r = Math.hypot(c[0] - bed[0], c[1] - bed[1]);
       const deg = besideRay(c, g, bed);
@@ -484,16 +488,16 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
         bad.push(`Mitte ${r.toFixed(1)} Felder, ${deg.toFixed(0)}°`);
       const steps = stepsTo(w, LICHTUNG_HOME.wake, new Set(platform.map(key)));
       if (steps < bear.steps[0] || steps > bear.steps[1]) bad.push(`${steps} Schritte vom Bett`);
-      bad.push(...station.flatMap((p) => siteFaults(laid, p, bed, hut?.at)));
+      bad.push(...station.flatMap((p) => siteFaults(laid, p, bed)));
       expect(bad.slice(0, 5), `Seed ${seed}`).toEqual([]);
     });
 
-    it(`Seed ${seed}: Bahnhof Bär im Bild: 7 Reihen, Häuschen am Kopf, der Zug hält am Bahnsteig, das Tunnelportal liegt dahinter`, () => {
+    it(`Seed ${seed}: Bahnhof Bär im Bild: 7 Reihen, kein Häuschen, der Zug hält am Bahnsteig, das Tunnelportal liegt dahinter`, () => {
       const st = stationOf(w);
       if (!st) return expect(st, `Seed ${seed}`).not.toBeNull();
       const bad: string[] = [];
       if (st.rows.length !== LINE.bear.long) bad.push(`${st.rows.length} Reihen`);
-      if (!st.hut || !w.cell(...st.hut.at).solid) bad.push('Häuschen nicht fest');
+      if (st.rows.some((r) => w.cell(...r.edge).solid || w.cell(...r.back).solid)) bad.push('Bahnsteig fest');
       if (!(st.portal! > LINE.bear.long)) bad.push(`Tunnelportal bei ${st.portal}`);
       // der Zug am Bahnsteig (Ausbau 1, Tok im Wagen): alle Wagen über dem Gleis neben dem Bahnsteig
       // was das Bild vom Zustand liest (ohne `initialState`, das alle Tiere der Welt aufstellt)
@@ -609,27 +613,27 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
       expect(bad, `Seed ${seed}`).toEqual([]);
     });
 
-    it(`Seed ${seed}: Bau 2: Bahnhof Fledermaus eine Stufe über dem Gleis, Lokschuppen daneben mit fester Rückwand, Toks Platz und der Siebenschläfer darin erreichbar`, () => {
+    it(`Seed ${seed}: Bau 2: Bahnhof Fledermaus eine Stufe über dem Gleis, daneben Toks Platz ohne Lokschuppen (kein festes Feld, kein Körper), Tok und der Siebenschläfer dort erreichbar`, () => {
       const bad: string[] = [];
       const st = batOf(w);
       if (!st || st.rows.length !== LINE.bear.long) bad.push('kein Bahnsteig');
       const shed = shedIn(w);
-      if (!shed.cells.length || !shed.wall.length) bad.push('kein Lokschuppen');
-      if (shed.wall.some((p) => !w.cell(...p).solid)) bad.push('Rückwand nicht fest');
+      if (!shed.cells.length || !shed.wall.length) bad.push('kein Platz für Tok');
+      if (shed.cells.some((p) => w.cell(...p).solid)) bad.push('festes Feld auf Toks Platz');
       const track = new Set(laid.cells.map(key));
       const free = reach(w, w.homes.hoehle.wake, track);
       if (!shed.home || !free.has(key(shed.home))) bad.push('Toks Platz nicht erreichbar');
-      if (shed.cells.some((p) => track.has(key(p)))) bad.push('Lokschuppen auf dem Gleis');
+      if (shed.cells.some((p) => track.has(key(p)))) bad.push('Toks Platz auf dem Gleis');
       const dormouse = w.spawns.get('hoehle:siebenschlaefer');
       if (!dormouse || w.cell(...dormouse).shed !== 'hoehle' || !free.has(key(dormouse)))
-        bad.push('Siebenschläfer nicht im Schuppen');
+        bad.push('Siebenschläfer nicht auf Toks Platz');
       if (dormouse && shed.home && key(dormouse) === key(shed.home)) bad.push('Siebenschläfer auf Toks Platz');
-      if (!batBodies(w, { player: { x: 1e6, y: 1e6 } }).some((b) => b.id === 'bahn:schuppen'))
-        bad.push('Lokschuppen nicht im Bild');
+      if (batBodies(w, { player: { x: 1e6, y: 1e6 } }).some((b) => b.id === 'bahn:schuppen'))
+        bad.push('Lokschuppen im Bild');
       expect(bad, `Seed ${seed}`).toEqual([]);
     });
 
-    it(`Seed ${seed}: Klangsteine der Bahn: am Bahnhof Bär neben Toks Häuschen, am Lokschuppen; je zwei Felder vom Gleis, frei umgehbar`, () => {
+    it(`Seed ${seed}: Klangsteine der Bahn: am Bahnhof Bär am Kopf, am Lokschuppen; je zwei Felder vom Gleis, frei umgehbar`, () => {
       expect(trainStoneFaults(w, laid), `Seed ${seed}`).toEqual([]);
     });
 

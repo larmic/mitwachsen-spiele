@@ -1,6 +1,6 @@
 // Klangsteine der Bahn – rein und deterministisch: Das Paket der Bahn setzt sie beim Legen (`WorldPack.lay`), so wie es
 // das Gleis legt, und nur mit dem Ausbau, zu dem sie gehören; vorher und ohne Paket (vor der Eis-Welt) gibt
-// es sie nicht. Am Bahnhof Bär ab Ausbau 1 (`bahnhof`, neben Toks Häuschen, zwei Felder vom Bahnhof und vom Gleis,
+// es sie nicht. Am Bahnhof Bär ab Ausbau 1 (`bahnhof`, am Kopf des Bahnhofs, zwei Felder vom Bahnhof und vom Gleis,
 // notfalls drei oder vier),
 // am Lokschuppen ab Ausbau 2 (`lokschuppen`, Toks Geschichte, auf dem Platz, den die Grotte neben dem Schuppen frei hält,
 // `Cell.stone`). Teil des Pakets der Bahn (index.ts).
@@ -10,7 +10,7 @@ import type { Point } from '../../../../data/games/mitwachsen';
 import type { StoryId } from '../../../../data/games/mitwachsen-stories';
 import type { Cell } from '../../mitwachsen-cell';
 import type { Laid } from '../../mitwachsen-pack-types';
-import { hutOf, type Station } from './mitwachsen-bear';
+import { headOf, type Station } from './mitwachsen-bear';
 import { builtOf } from './mitwachsen-built';
 import { N8, kept, key, near, standable, walk } from './mitwachsen-ground';
 import { shedOf, type Line } from './mitwachsen-line';
@@ -38,8 +38,8 @@ function fits(map: ReadonlyMap<string, Cell>, [x, y]: Point, region: Cell['regio
 
 /**
  * Platz des Steins am Bahnhof Bär: unter den Feldern genau zwei Felder von Bahnsteig und Gleis (passt dort keins, drei,
- * dann vier, `STONE_GAPS`) das, das passt (`fits`, erreichbar über `reach`) und Toks Häuschen am nächsten liegt (am Kopf
- * des Bahnhofs fern vom Bett, der Weg vom Bett zum Bahnsteig bleibt, wie er war); undefined, wenn keins passt
+ * dann vier, `STONE_GAPS`) das, das passt (`fits`, erreichbar über `reach`) und dem Kopf des Bahnhofs am nächsten liegt (`headOf`:
+ * fern vom Bett, der Weg vom Bett zum Bahnsteig bleibt, wie er war); undefined, wenn keins passt
  */
 export function bearStone(
   map: ReadonlyMap<string, Cell>,
@@ -48,7 +48,7 @@ export function bearStone(
   reach: ReadonlySet<string>,
 ): Point | undefined {
   const all = [...station.lane, ...station.platform];
-  const head = hutOf(station, bed)?.at ?? all.at(-1)!;
+  const head = headOf(station, bed) ?? all.at(-1)!;
   const far = (p: Point) => Math.hypot(p[0] - head[0], p[1] - head[1]);
   const max = Math.max(...STONE_GAPS);
   const rings = new Map<number, Point[]>();

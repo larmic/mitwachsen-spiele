@@ -1,4 +1,4 @@
-// Strecke des Schlittens: Spur im Kessel und Gang, Schuppen, Halte und Warteplätze (Eigenschafts-Tests über Seeds).
+// Strecke des Schlittens: Spur im Kessel und Gang, Laternenpfahl, Halte und Warteplätze (Eigenschafts-Tests über Seeds).
 // Eigene Datei, damit sie im tiefen Lauf neben den Fahrregeln (mitwachsen-sled.test.ts) in einem eigenen Worker läuft
 import { describe, expect, it } from 'vitest';
 import { DIRS } from '../../../../lib/games/front';
@@ -10,7 +10,7 @@ import { PLATE_ROW } from '../../mitwachsen-plate';
 import { canStep, createWorld, type World } from '../../mitwachsen-world';
 import { EIS_PACK, seedChunks, seedRange, seedsFor, worldOf } from '../../test-worlds';
 import { BESIDE, plateRow } from '../../mitwachsen-bay';
-import { SHED_NEAR, SLIDE_GAP, shedOf, trackU } from './mitwachsen-sled-ground';
+import { SLIDE_GAP, YARD_NEAR, postOf, trackU, yardOf } from './mitwachsen-sled-ground';
 import { RIDE_SEATS, STOP_STAGES, onFootpath, sledRoute, trackAt, type Route } from './mitwachsen-sled-route';
 
 const ICE = [EIS_PACK];
@@ -27,7 +27,7 @@ const around = ([x, y]: Point, r: number): Point[] =>
 /** So weit von der Tür (Schachbrett) darf die Strecke dicht an Warteplätze, Plattformen und Klangsteine (aus der Bucht hinaus) */
 const BAY_EXIT = 10;
 
-/** Was an Strecke, Schuppen und Halten einer Welt nicht stimmt (leer, wenn alles passt) */
+/** Was an Strecke, Laternenpfahl und Halten einer Welt nicht stimmt (leer, wenn alles passt) */
 function routeFaults(w: World, r: Route): string[] {
   const inner = r.path.findIndex((p) => keyOf(p) === keyOf(trackAt(w.gates.get('eis')!, 0))); // davor Kessel und Gang
   if (inner < 2) return ['keine Tür auf der Strecke'];
@@ -116,18 +116,26 @@ function stopFaults(w: World, r: Route): string[] {
 }
 
 /**
- * Schuppen gleich neben der Plattform des Eis-Portals am Schneebett, nicht auf der Strecke; kein Wohnort, kein
- * Wohnplatz der Eis-Tiere auf Strecke oder Schuppen; je Halt 8 feste Warteplätze abseits davon
+ * Freier Platz hinter dem Halt gleich neben der Plattform des Eis-Portals am Schneebett, nicht auf der Strecke, darauf
+ * der Laternenpfahl (ein festes Feld, `Route.shed`; kein Schuppen mehr, Issue 25); kein Wohnort, kein Wohnplatz der
+ * Eis-Tiere auf Strecke oder Platz; je Halt 8 feste Warteplätze abseits davon
  */
 function shedFaults(w: World, r: Route): string[] {
   const wrong: string[] = [];
   const plate = w.portals.get('eiskessel')!.home;
-  const [sx, sy] = r.shed.reduce(([a, b], [x, y]) => [a + x / r.shed.length, b + y / r.shed.length], [0, 0]);
-  const shedR = Math.hypot(sx - plate[0], sy - plate[1]);
-  if (shedR < SHED_NEAR.near || shedR > SHED_NEAR.far) wrong.push(`Schuppen ${shedR.toFixed(1)} von der Plattform`);
-  for (const p of r.shed)
-    if (r.on.has(keyOf(p)) || w.realm(...p) !== 'eis' || w.cell(...p).solid) wrong.push(`Schuppen ${keyOf(p)}`);
-  const taken = new Set([...r.path, ...r.shed].map(keyOf));
+  const [home, next] = [r.path[0]!, r.path[1]!];
+  const back: Point = [home[0] - next[0], home[1] - next[1]];
+  const yard = yardOf(home, back);
+  const [sx, sy] = yard.reduce(([a, b], [x, y]) => [a + x / yard.length, b + y / yard.length], [0, 0]);
+  const yardR = Math.hypot(sx - plate[0], sy - plate[1]);
+  if (yardR < YARD_NEAR.near || yardR > YARD_NEAR.far) wrong.push(`Platz ${yardR.toFixed(1)} von der Plattform`);
+  for (const p of yard)
+    if (r.on.has(keyOf(p)) || w.realm(...p) !== 'eis' || w.cell(...p).solid) wrong.push(`Platz ${keyOf(p)}`);
+  // der Laternenpfahl: genau ein Feld des Platzes, schräg hinter dem Halt (das Feld gleich dahinter bleibt frei)
+  if (r.shed.length !== 1 || keyOf(r.shed[0]!) !== keyOf(postOf(home, back))) wrong.push('Laternenpfahl');
+  if (!yard.some((p) => keyOf(p) === keyOf(r.shed[0]!))) wrong.push('Laternenpfahl nicht auf dem Platz');
+  if (keyOf(r.shed[0]!) === keyOf([home[0] + back[0], home[1] + back[1]])) wrong.push('Laternenpfahl hinter dem Halt');
+  const taken = new Set([...r.path, ...yard].map(keyOf));
   for (const [id, p] of w.spawns) if (id.startsWith('eis:') && taken.has(keyOf(p))) wrong.push(`Wohnort ${id}`);
   if (w.spotsOf('eis').some((p) => taken.has(keyOf(p)))) wrong.push('Wohnplatz auf der Strecke');
   for (const seats of [r.seats.home, r.seats.out]) {
@@ -137,7 +145,7 @@ function shedFaults(w: World, r: Route): string[] {
   return wrong;
 }
 
-/** Der Fußweg vom Bett der Lichtung zum Schneebett bleibt frei, auch wenn Schlitten, Rentier und Schuppen dort stehen */
+/** Der Fußweg vom Bett der Lichtung zum Schneebett bleibt frei, auch wenn Schlitten, Rentier und Laternenpfahl dort stehen */
 function footFaults(w: World, r: Route): string[] {
   const shut = new Set([...r.shed, ...r.path.slice(0, 2), ...r.path.slice(-2)].map(keyOf));
   const start = w.homes.lichtung.wake[0]!;
@@ -175,8 +183,10 @@ describe('Strecke des Schlittens (Eis-Welt)', () => {
     }
   });
 
-  it('shedOf: 3 Felder breit, 2 tief, gleich hinter dem Halt in Fahrtrichtung', () => {
-    expect(shedOf([10, 10], [1, 0])).toEqual([
+  it('yardOf: 3 Felder breit, 2 tief, gleich hinter dem Halt in Fahrtrichtung; postOf: schräg dahinter, eines dieser Felder', () => {
+    expect(postOf([10, 10], [1, 0])).toEqual([11, 11]);
+    expect(postOf([0, 0], [0, -1])).toEqual([1, -1]);
+    expect(yardOf([10, 10], [1, 0])).toEqual([
       [11, 9],
       [11, 10],
       [11, 11],
@@ -184,7 +194,7 @@ describe('Strecke des Schlittens (Eis-Welt)', () => {
       [12, 10],
       [12, 11],
     ]);
-    expect(shedOf([0, 0], [0, -1]).map(([, y]) => y)).toEqual([-1, -1, -1, -2, -2, -2]);
+    expect(yardOf([0, 0], [0, -1]).map(([, y]) => y)).toEqual([-1, -1, -1, -2, -2, -2]);
   });
 
   it('ohne Paket der Eis-Welt keine Strecke; je Welt einmal berechnet', () => {
@@ -198,7 +208,7 @@ describe('Strecke des Schlittens (Eis-Welt)', () => {
   // 50, dann 25 Seeds brachten test:deep in gates:ci über 150 s, darum 20 wie die anderen Welt-Tests. Die Welten werden
   // hier frisch gebaut (nicht `worldOf`), sonst blieben sie alle im Speicher
   it.each(seedChunks(seedsFor(seedRange(1, 20)), 10))(
-    'Strecke, Schuppen und Halte: zusammenhängend und begehbar, neben der Rutschspur, fern von Platte, Warteplätzen und Plattformen, Halt im Bereich, Fußweg frei (Seeds $label)',
+    'Strecke, Laternenpfahl und Halte: zusammenhängend und begehbar, neben der Rutschspur, fern von Platte, Warteplätzen und Plattformen, Halt im Bereich, Fußweg frei (Seeds $label)',
     ({ seeds }) => {
       const wrong: string[] = [];
       let fallback = 0;

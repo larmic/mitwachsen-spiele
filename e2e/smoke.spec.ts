@@ -1224,7 +1224,7 @@ test('Spiel: Zug mit offener Eis-Welt per Entwickler-Schalter: die Figur sitzt i
 // Bau 2 per Entwickler-Schalter (`?entwickler=bahn&bau=1&tor=1`, fester Seed 1; @3d, weil die Welt am Prellbock neu
 // gebaut wird und 3D ihre Stücke tauscht): Das Hau-ruck ist gemacht, Tok wartet in der Bucht. Ein neuer Druck zum Zug an
 // Bahnhof Bär steigt ein; beim Abfahren steht Ausbau 2 im Spielstand, am Prellbock klopft Tok, der Prellbock versinkt,
-// der Zug fährt bis Bahnhof Fledermaus in der Grotte; dort zieht der Maulwurf ins Gehege, Tok wohnt im Lokschuppen.
+// der Zug fährt bis Bahnhof Fledermaus in der Grotte; dort zieht der Maulwurf ins Gehege, Tok wohnt auf seinem Platz daneben (kein Lokschuppen).
 // Gespeichert wird im Blick hinein nichts; für das Kind: „Bahn und Höhle für das Kind …“
 test(
   'Spiel: Bau 2 per Entwickler-Schalter: Prellbock versinkt, Fahrt bis Bahnhof Fledermaus, Maulwurf zieht ein, speichert nichts, ohne Fehler',
@@ -1291,7 +1291,7 @@ test(
         station: el.rides.some((r) => r.id === 'bahn:felsdach'),
       };
     });
-    expect(done).toEqual({ ride: false, realm: 'hoehle', mole: true, tok: true, shed: true, station: true });
+    expect(done).toEqual({ ride: false, realm: 'hoehle', mole: true, tok: true, shed: false, station: true });
     await page.evaluate(() => dispatchEvent(new Event('pagehide')));
     expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('larmic.games.')))).toEqual(
       [],
@@ -1637,7 +1637,7 @@ test('Spiel: Bahn und Höhle für das Kind – Tok, Bau 1, erste Fahrt, Hau-ruck
     };
   });
   expect(await look()).toMatchObject({ ride: false, realm: 'hoehle', tok: 'herald:solo', built: 2 });
-  expect(end).toEqual({ mole: true, shed: true, station: true });
+  expect(end).toEqual({ mole: true, shed: false, station: true }); // kein Lokschuppen (Issue 25)
 
   // 7. Gespeichert: Höhlentor offen, Ausbau 2, Stufe `offen`, der Maulwurf zu Hause
   await page.evaluate(() => dispatchEvent(new Event('pagehide')));
@@ -3235,7 +3235,7 @@ const sledStage = (game: Locator) =>
 
 /**
  * Die Figur wach `gap` Felder neben den Sitz des Schlittens stellen (quer zur Strecke, nicht aufs Zugtier und nicht in
- * den Schuppen dahinter), auf freie, begehbare Felder, von denen sie Schritt für Schritt zum Sitz kommt. Liefert die
+ * den Laternenpfahl dahinter), auf freie, begehbare Felder, von denen sie Schritt für Schritt zum Sitz kommt. Liefert die
  * Pfeiltaste zum Sitz und die zurück (null: kein Platz, dann scheitert der Test mit dem Seed)
  */
 const besideSeat = (page: Page, game: Locator, gap: 1 | 2) =>
@@ -3413,7 +3413,7 @@ test('Spiel: Schlitten – ein gehaltener Pfeil stößt nur an, ein neuer Druck 
 });
 
 test(
-  'Spiel: Schlitten wird gezeichnet (Schuppen, Schlitten, Rentier; die Figur sitzt darin), ohne Fehler',
+  'Spiel: Schlitten wird gezeichnet (Laternenpfahl, Schlitten, Rentier; die Figur sitzt darin), ohne Fehler',
   { tag: '@3d' },
   async ({ page }) => {
     const errors = watchErrors(page);
@@ -3429,7 +3429,7 @@ test(
     const shown = () =>
       game.evaluate((node, id) => {
         const el = node as unknown as SledGame;
-        const ids = [id, `${id}:rentier`, `${id}:schuppen`];
+        const ids = [id, `${id}:rentier`, `${id}:laterne`];
         const has = (k: string) => (el.r3d ? el.r3d.bodies.has(k) : el.rides.some((r) => r.id === k));
         return { sled: ids.every(has), player: el.r3d ? el.r3d.bodies.has('player') : true };
       }, SLED);

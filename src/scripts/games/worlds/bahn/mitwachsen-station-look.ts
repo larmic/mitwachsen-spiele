@@ -1,12 +1,12 @@
 // Bahnhof Bär und der Zug im Bild – rein, ohne DOM, gleich für 2D und 3D (Körper über den Haken `View2D.bodies`, wie
 // Schlitten und Schuppen): ab Ausbau 1 die Reihen des Bahnsteigs (Planken, helle Kante, Stirnseite aus Holz), das
-// Grasdach mit Bank, das Schild „Bär auf Grün“ und Toks Häuschen, dazu der Zug aus Lok und zwei Wagen am Bahnsteig, im
+// Grasdach mit Bank und das Schild „Bär auf Grün“, dazu der Zug aus Lok und zwei Wagen am Bahnsteig, im
 // hinteren Wagen Tok. Solange Tok baut (`State.work`, mitwachsen-build.ts), ploppt der Bahnhof zum Augenblick `pop` auf
 // (er wächst kurz aus dem Boden), der Zug rollt von `roll` an das Gleis entlang heran, die Tür des hinteren Wagens geht
 // zu `door` auf, und Tok sitzt ab `board` darin. Der Zug rollt aus dem Tunnelportal heran: Was von ihm noch im Tunnel
 // ist, ist nicht zu sehen. Bei reduzierter Bewegung kein Aufploppen, kein Dampf, der Zug rückt in
 // ruhigen Sprüngen vor. Der Zug fährt nie durch die Figur: Steht sie auf dem Gleis, hält er davor. Wo alles steht,
-// rechnet `stationOf` je Welt einmal aus den Feldern (Gleis vom Prellbock an Bahnhof Bär, Bahnsteig, Häuschen; Reihen
+// rechnet `stationOf` je Welt einmal aus den Feldern (Gleis vom Prellbock an Bahnhof Bär, Bahnsteig; Reihen
 // und Dach aus mitwachsen-platform.ts). Die Türen gehen zum Bahnsteig des Halts auf, an dem er steht (`sideAt`).
 // Fahren: Der Zug steht, wo die Regeln ihn parken (`parked`: an Bahnhof Bär, am Prellbock in der Bucht, an Bahnhof
 // Fledermaus), und fährt mit der Figur im mittleren Wagen das Gleis entlang (zwischen den Takten gleitend, bei
@@ -56,14 +56,13 @@ import { batPlatform, bearPlatform, underRoof, type Standing } from './mitwachse
 import { capOf } from './mitwachsen-build2';
 import { FLIES, fireflies } from './mitwachsen-feast-look';
 
-/** Bahnhof Bär in einer Welt: das Gleis vom Prellbock an (Ausbau 1, bis an den Prellbock vor der Tür), Reihen, Häuschen */
+/** Bahnhof Bär in einer Welt: das Gleis vom Prellbock an (Ausbau 1, bis an den Prellbock vor der Tür), Reihen */
 export type BearStation = {
   line: Point[];
   rows: { edge: Point; back: Point }[];
-  hut?: { at: Point; row: number };
   /** vom Gleis zum Bahnsteig */
   side: Point;
-  /** die beiden Reihen unter dem Dach (`bearRoof`) */
+  /** die beiden Reihen unter dem Dach (`BEAR_ROOF`) */
   roof: readonly [number, number];
   /** Stelle des Tunnelportals im Gleis (undefined: keins gefunden) */
   portal?: number;
@@ -98,7 +97,6 @@ export function stationOf(world: World): BearStation | null {
     ? {
         line,
         rows: p.rows,
-        ...(p.hut ? { hut: p.hut } : {}),
         side: p.side,
         roof: p.roof,
         ...(portal > 0 ? { portal } : {}),
@@ -189,7 +187,7 @@ export function stationBodies(state: State, world: World, at: RideAt): readonly 
 }
 
 /**
- * Bahnsteig, Dachplatte (ein eigener Körper), Pfosten mit Bank, Schild und Häuschen; beim Bau erst ab `pop`, dann
+ * Bahnsteig, Dachplatte (ein eigener Körper), Pfosten mit Bank und Schild; beim Bau erst ab `pop`, dann
  * wachsen sie kurz aus dem Boden
  */
 function stationParts(
@@ -203,8 +201,7 @@ function stationParts(
   const rise = work === undefined || reduced ? 0 : Math.max(0, 1 - (work - BUILD.pop) / POP_FOR) * -0.9;
   const dir = dirTo(...st.side);
   const out: RideBody[] = st.rows.map(({ edge, back }, i) => {
-    const hut = st.hut?.row === i;
-    const k = `bahn:reihe:${i % 2}${+hut}`;
+    const k = `bahn:reihe:${i % 2}`;
     return {
       id: `bahn:reihe:${i}`,
       key: k,
@@ -212,7 +209,7 @@ function stationParts(
       y: (edge[1] + back[1]) / 2,
       z: world.cell(...edge).h + rise,
       dir,
-      parts: model(k, () => rowParts(i % 2 === 1, hut)),
+      parts: model(k, () => rowParts(i % 2 === 1)),
     };
   });
   const under = st.roof.flatMap((i) => (st.rows[i] ? [st.rows[i].edge, st.rows[i].back] : []));

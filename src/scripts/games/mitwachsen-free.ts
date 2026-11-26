@@ -47,7 +47,7 @@ export function freeNear(
 type Placed = { id: string; x: number; y: number; spawn: readonly [number, number] };
 
 /**
- * Nach einem Neubau der Welt im Spiel (`World.relay`, etwa Bau 1 der Bahn: Häuschen und Tunnelportal sind fest): Wer auf
+ * Nach einem Neubau der Welt im Spiel (`World.relay`, etwa Bau 1 der Bahn: der Klangstein am Bahnhof ist fest): Wer auf
  * einem Feld steht, auf dem man nicht mehr stehen kann, kommt auf das nächste freie Feld derselben Gegend; ein Wohnort
  * dort wird zu dem, den die neue Welt kennt (`World.spawns`), sonst zum neuen Feld. Die Figur genauso. Gibt `s` selbst
  * zurück, wenn niemand im Weg stand

@@ -1,7 +1,7 @@
 // Fahrregeln aller Fahrzeuge – rein, ohne DOM, allgemein: die Fahr-Engine im Paket der Fahrzeuge (`WorldRules.ride`).
 // Sie kennt kein einzelnes Fahrzeug; was eines ausmacht (Eintrag in `RIDES`, Strecke, wann es erscheint), sagt das Paket
 // seiner Welt (`WorldRules.vehicle`: der Schlitten aus der Eis-Welt, der Zug aus dem Paket der Bahn). Ein Fahrzeug
-// pendelt auf seiner Strecke zwischen dem Halt in der Welt (`home`: am Schuppen bzw. Bahnhof Fledermaus, bei Ausbau 1 der
+// pendelt auf seiner Strecke zwischen dem Halt in der Welt (`home`: im Kessel bzw. Bahnhof Fledermaus, bei Ausbau 1 der
 // Prellbock in der Bucht) und dem Halt auf der Lichtung (`out`). Es erscheint, sobald die Welt es will (`ready`, dann
 // gut 2 s; der Zug kommt mit Bau 1), und steht danach immer am Halt der Gegend, in der die Figur ist (`parked`); wo,
 // wird nie gespeichert. Ein neuer Druck zum Fahrzeug oder Antippen steigt ein, ein gehaltener Pfeil stößt nur an; 2 s
@@ -85,12 +85,12 @@ function hop(c: Ctx, s: Rider, world: World, a: Walker, events: RideEvents): boo
   return true;
 }
 
-/** Sicherheitsnetz am Halt: Steht ein Tier auf Sitz, Zugtier, Wagen oder Schuppen, hüpft es beiseite */
+/** Sicherheitsnetz am Halt: Steht ein Tier auf Sitz, Zugtier, Wagen oder Laternenpfahl, hüpft es beiseite */
 function clear(c: Ctx, s: Rider, world: World, at: Parked, events: RideEvents) {
   for (const a of s.animals) if (at.cells.has(key(a.x, a.y))) hop(c, s, world, a, events);
 }
 
-/** Fällig und Erscheinen: Will die Welt es (`ready`), erscheint es `DUE` Takte später am Halt an seinem Schuppen */
+/** Fällig und Erscheinen: Will die Welt es (`ready`), erscheint es `DUE` Takte später an seinem Halt `home` */
 function due(c: Ctx, s: Rider, world: World, events: RideEvents) {
   if (!c.v.ready?.(s, world)) {
     s.rideDue = -1; // geht die Figur weg, beginnt es von vorn
@@ -186,7 +186,7 @@ function nudge(c: Ctx, s: Rider, at: Parked, events: RideEvents) {
 
 /**
  * Am Halt, ohne Fahrt: Zugtier schnaubt, Sitz (beim Zug jeder Wagen) steigt ein (neuer Druck, Antippen) oder stößt an,
- * Schuppen ist eine Wand (`bump` wie an jeder Wand)
+ * Laternenpfahl ist eine Wand (`bump` wie an jeder Wand)
  */
 function atStop(c: Ctx, s: Rider, world: World, at: Parked, cmd: MoveCmd, events: RideEvents): boolean {
   const p = s.player;
@@ -200,7 +200,7 @@ function atStop(c: Ctx, s: Rider, world: World, at: Parked, cmd: MoveCmd, events
   const seat = at.board.has(key(tx, ty));
   if (!seat && tx === at.pull[0] && ty === at.pull[1]) events.push(ev(c, 'snort', at.pull));
   else if (!seat)
-    events.push({ type: 'bump' }); // Schuppen
+    events.push({ type: 'bump' }); // Laternenpfahl
   else if (cmd.fresh) board(c, s, world, at, events);
   else nudge(c, s, at, events);
   return true;
@@ -459,7 +459,7 @@ export function rideRules(v: Vehicle): One {
       }
       const at = parked(v.spec, c.r, s, world);
       if (at) return dozes(c, s) ? doze(c, s, at, cmd, events) : atStop(c, s, world, at, cmd, events);
-      return !!cmd.tap; // Antippen ohne Fahrzeug am Halt (Schuppen von fern): nichts, nie laufen
+      return !!cmd.tap; // Antippen ohne Fahrzeug am Halt (Laternenpfahl von fern): nichts, nie laufen
     },
     blocks(s, world, a, x, y) {
       const stage = stageOf(s.packs, id);

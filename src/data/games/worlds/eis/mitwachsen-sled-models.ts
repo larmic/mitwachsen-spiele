@@ -1,9 +1,9 @@
 // Modelle des Schlittens der Eis-Welt, nur im Welt-Paket (Teile wie in `front.ts`: vorn, rechts, unten, Länge, Breite,
 // Höhe, Farbe, oben; eigene Voxel-Grafik): ein niedriger, langer Holzschlitten in Himmelblau mit weißer Decke und
 // silbernen Kufen, in dem die Figur sitzt (nie auf dem Tier); das Schlittenrentier mit rotem Geschirr und goldenen
-// Glöckchen (es gehört zum Schlitten, kein Tier der Leiste, darum nicht in `SPECIES`); der Schuppen aus Eisblöcken mit
-// Laterne an der Tür. Varianten: goldener Rahmen bis zur ersten Fahrt, Wimpel mit Schneeflocke danach, Laterne am
-// Schlitten am Abend und in der Nacht (dann leuchtet auch die am Schuppen), kurz offene Seitenwände beim Anstoßen.
+// Glöckchen (es gehört zum Schlitten, kein Tier der Leiste, darum nicht in `SPECIES`); der Laternenpfahl am Halt im
+// Kessel (bis Issue 25 ein Schuppen aus Eisblöcken). Varianten: goldener Rahmen bis zur ersten Fahrt, Wimpel mit Schneeflocke danach, Laterne am
+// Schlitten am Abend und in der Nacht (dann leuchtet auch die am Pfahl), kurz offene Seitenwände beim Anstoßen.
 // Spec: docs/specs/mitwachsen.md (Abschnitt „Der Schlitten“)
 
 import type { Part } from '../../../../lib/games/front';
@@ -94,36 +94,18 @@ export const REINDEER: readonly Part[] = [
   ...both([-0.44, 0.13, 0.32, 0.36, 0.02, 0.025, LEATHER]), // Zugriemen zum Schlitten
 ];
 
-const BLOCKS = [ICE_COLORS.ice, ICE_COLORS.slide] as const;
-/** Mauer aus Eisblöcken in zwei Lagen, versetzt: von (f, r) aus `len` lang (entlang `along`), `thick` dick */
-function wall(f: number, r: number, along: 'f' | 'r', len: number, thick: number): Part[] {
-  const out: Part[] = [];
-  for (let row = 0; row < 3; row++)
-    for (let a = row % 2 ? -0.25 : 0, i = 0; a < len - 1e-6; a += 0.5, i++) {
-      const s = Math.max(0, a);
-      const l = Math.min(len, a + 0.5) - s;
-      const [side, top] = BLOCKS[(row + i) % 2]!;
-      const z = row * 0.36;
-      out.push(along === 'r' ? [f, r + s, z, thick, l, 0.36, side, top] : [f + s, r, z, l, thick, 0.36, side, top]);
-    }
-  return out;
-}
-
-/** Schuppen aus Eisblöcken, 2 Felder tief und 3 breit (Mitte in seiner Mitte, vorn die Tür zum Halt) */
-const SHED: readonly Part[] = [
-  ...wall(-0.98, -1.45, 'r', 2.9, 0.25), // Rückwand
-  ...wall(-0.73, -1.45, 'f', 1.71, 0.25), // Seiten
-  ...wall(-0.73, 1.2, 'f', 1.71, 0.25),
-  ...wall(0.73, -1.2, 'r', 0.65, 0.25), // vorn, mit Tor für den Schlitten
-  ...wall(0.73, 0.55, 'r', 0.65, 0.25),
-  [0.73, -0.55, 0.78, 0.25, 1.1, 0.3, ...ICE_COLORS.ice], // Sturz über dem Tor
-  [-1.02, -1.5, 1.08, 2.04, 3, 0.1, ...ICE_COLORS.ice], // Dach mit Schnee
-  [-0.96, -1.44, 1.18, 1.92, 2.88, 0.08, ...ICE_COLORS.snow],
-  [0.98, 0.6, 0.86, 0.12, 0.03, 0.03, IRON], // Haken der Laterne
+const POST = '#8a6a4c'; // Holz des Pfahls
+/** Laternenpfahl am Halt im Kessel (Mitte auf seinem Feld, der Arm nach vorn zur Strecke), Schnee am Fuß und obenauf */
+const POST_PARTS: readonly Part[] = [
+  [-0.2, -0.2, 0, 0.4, 0.4, 0.07, ...ICE_COLORS.snow],
+  [-0.07, -0.07, 0, 0.14, 0.14, 1.2, POST],
+  [-0.1, -0.1, 1.2, 0.2, 0.2, 0.06, ...ICE_COLORS.snow],
+  [0.07, -0.03, 1.04, 0.3, 0.06, 0.06, POST], // Arm
+  [0.27, -0.015, 0.98, 0.03, 0.03, 0.06, IRON], // Haken der Laterne
 ];
-/** Schuppen; seine Laterne an der Tür brennt am Abend und in der Nacht (`lit`) */
-export const shedParts = (lit: boolean): Part[] => [
-  ...SHED,
-  [1.02, 0.56, 0.64, 0.12, 0.12, 0.16, ...(lit ? LAMP : GLASS)],
-  [1.01, 0.55, 0.8, 0.14, 0.14, 0.03, IRON],
+/** Laternenpfahl; seine Laterne brennt am Abend und in der Nacht (`lit`) */
+export const postParts = (lit: boolean): Part[] => [
+  ...POST_PARTS,
+  [0.21, -0.07, 0.78, 0.15, 0.14, 0.18, ...(lit ? LAMP : GLASS)],
+  [0.2, -0.08, 0.96, 0.17, 0.16, 0.03, IRON],
 ];

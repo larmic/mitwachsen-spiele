@@ -88,7 +88,7 @@ export type Ruled = {
  * Eine Fahrt mit einem Fahrzeug (nicht gespeichert; Regeln im Paket der Fahrzeuge, worlds/fahrt/mitwachsen-ride.ts): `phase`
  * eingestiegen (`seated`, gleich geht es los), unterwegs (`go`), hält vor einem Hindernis (`stop`), angekommen (`arrive`,
  * gleich steigt die Figur aus); `at` Takt, an dem die Phase begann; `pos` Fortschritt auf der Strecke in Feldern,
- * `speed` Felder je Takt; `to` Halt, zu dem es fährt: sein Zuhause am Schuppen in der Welt (`home`) oder der Halt auf der
+ * `speed` Felder je Takt; `to` Halt, zu dem es fährt: sein Zuhause in der Welt (`home`) oder der Halt auf der
  * Lichtung (`out`; für das Kind die Heimfahrt); `feast` die Festfahrt (erste Heimfahrt);
  * `jingleAt` Takt des letzten Bimmelns; `greeted` Tiere, die auf der Festfahrt schon gewinkt haben; `stopover` ein Halt
  * unterwegs, den das Paket des Fahrzeugs beim Abfahren ansagt (`Vehicle.depart`, `Vehicle.hold`): steht noch aus

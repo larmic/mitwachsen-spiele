@@ -68,29 +68,33 @@ describe('Aussehen des Schlittens (mitwachsen-sled-look.ts)', () => {
     expect(view.rideFx!({ ...e, id: 'hoehle' }, at())).toBeUndefined(); // der Zug antwortet selbst
   });
 
-  it('Körper je Stufe: noch nichts, dann Schuppen, Schlitten mit goldenem Rahmen und Rentier; danach mit Wimpel', () => {
+  it('Körper je Stufe: noch nichts, dann Laternenpfahl (kein Schuppen mehr, Issue 25), Schlitten mit goldenem Rahmen und Rentier; danach mit Wimpel', () => {
     expect(bodies(at())).toEqual([]); // noch nicht erschienen
     expect(sledBodies(at(undefined, 'fest'), createWorld(1, []), AT)).toEqual([]); // ohne Paket keine Strecke
     const ready = bodies(at(undefined, 'bereit'));
-    expect(ready.map((b) => b.id)).toEqual([`${SLED_ID}:schuppen`, SLED_ID, `${SLED_ID}:rentier`]);
+    expect(ready.map((b) => b.id)).toEqual([`${SLED_ID}:laterne`, SLED_ID, `${SLED_ID}:rentier`]);
     expect(xy(part(ready, SLED_ID))).toEqual(HOME.seat);
     expect(xy(part(ready, `${SLED_ID}:rentier`))).toEqual(HOME.pull);
     expect(part(ready, SLED_ID)!.dir).toBe(part(ready, `${SLED_ID}:rentier`)!.dir); // das Rentier zieht vorn
     expect(colors(part(ready, SLED_ID)).has(GOLD.top)).toBe(true); // goldener Rahmen bis zur ersten Fahrt
     expect(colors(part(ready, SLED_ID)).has(RIDES[0].color)).toBe(true); // Himmelblau
-    // der Schuppen steht in der Mitte seiner Felder, die Tür zum Halt
-    const shed = part(ready, `${SLED_ID}:schuppen`)!;
-    const cells = new Set(r.shed.map(keyOf));
-    expect(cells.has(keyOf([Math.round(shed.x - 0.5 + 1e-9), Math.round(shed.y - 0.5 + 1e-9)]))).toBe(true);
+    // der Laternenpfahl steht auf seinem einen Feld (`Route.shed`), schmal und höher als die Figur
+    const post = part(ready, `${SLED_ID}:laterne`)!;
+    expect(r.shed).toHaveLength(1);
+    expect(xy(post)).toEqual(r.shed[0]);
+    for (const [f, rr, , l, wd] of post.parts)
+      expect(Math.max(Math.abs(f), Math.abs(f + l), Math.abs(rr), Math.abs(rr + wd))).toBeLessThanOrEqual(0.5);
+    expect(Math.max(...post.parts.map((p) => p[2] + p[5]))).toBeGreaterThan(1);
     const fest = bodies(at(undefined, 'fest'));
     expect(colors(part(fest, SLED_ID)).has(GOLD.top)).toBe(false);
     expect(part(fest, SLED_ID)!.parts.length).toBeGreaterThan(part(ready, SLED_ID)!.parts.length - 3); // Wimpel
     expect(part(fest, SLED_ID)!.key).not.toBe(part(ready, SLED_ID)!.key);
-    // am Abend: Laterne am Schlitten, die am Schuppen brennt
+    // am Abend: Laterne am Schlitten, die am Pfahl brennt
     const lit = bodies(at(undefined, 'fest'), { lit: true });
     expect(colors(part(lit, SLED_ID)).has(LAMP)).toBe(true);
     expect(colors(part(fest, SLED_ID)).has(LAMP)).toBe(false);
-    expect(colors(part(lit, `${SLED_ID}:schuppen`)).has(LAMP)).toBe(true);
+    expect(colors(part(lit, `${SLED_ID}:laterne`)).has(LAMP)).toBe(true);
+    expect(colors(part(fest, `${SLED_ID}:laterne`)).has(LAMP)).toBe(false);
   });
 
   it('schläft er (die Fahr-Engine fehlt noch, Vorladen), kein goldener Rahmen; sonst derselbe Schlitten', () => {
@@ -103,9 +107,9 @@ describe('Aussehen des Schlittens (mitwachsen-sled-look.ts)', () => {
     expect(colors(part(bodies({ ...ready, dozing: ['hoehle'] }), SLED_ID)).has(GOLD.top)).toBe(true);
   });
 
-  it('steht am Halt der Gegend der Figur: auf der Lichtung erst nach der ersten Heimfahrt (der Schuppen bleibt im Kessel)', () => {
+  it('steht am Halt der Gegend der Figur: auf der Lichtung erst nach der ersten Heimfahrt (der Laternenpfahl bleibt im Kessel)', () => {
     const lichtung = world.homes.lichtung.bed;
-    expect(bodies(at(lichtung, 'bereit')).map((b) => b.id)).toEqual([`${SLED_ID}:schuppen`]);
+    expect(bodies(at(lichtung, 'bereit')).map((b) => b.id)).toEqual([`${SLED_ID}:laterne`]);
     const out = bodies(at(lichtung, 'fest'));
     expect(xy(part(out, SLED_ID))).toEqual(OUT.seat);
     expect(xy(part(out, `${SLED_ID}:rentier`))).toEqual(OUT.pull);
@@ -121,7 +125,7 @@ describe('Aussehen des Schlittens (mitwachsen-sled-look.ts)', () => {
     const all = states.flatMap((s) => [...bodies(s), ...bodies(s, { lit: true })]);
     for (const b of all) if (!seen.has(b.key)) seen.set(b.key, b.parts);
     expect(all.filter((b) => seen.get(b.key) !== b.parts)).toEqual([]);
-    expect(seen.size).toBeLessThanOrEqual(12 + 2 + 1); // Schlitten, Schuppen, Rentier
+    expect(seen.size).toBeLessThanOrEqual(12 + 2 + 1); // Schlitten, Laternenpfahl, Rentier
     expect([...seen.keys()].every((k) => k.startsWith('ride:'))).toBe(true);
   });
 
@@ -196,7 +200,7 @@ describe('Aussehen des Schlittens (mitwachsen-sled-look.ts)', () => {
         .map(([x, y]) => keyOf(xy({ ...narrow({ x, y, z: 0, dir: 'n' }, g) } as RideBody))),
     );
     expect([...jumps].every((k) => allowed.has(k))).toBe(true);
-    // heim rückwärts; angekommen läuft das Rentier ein Stück geradeaus weiter (in den Schuppen bzw. hinter den Halt)
+    // heim rückwärts; angekommen läuft das Rentier ein Stück geradeaus weiter (hinter den Halt)
     const back = bodies({ ...go, ride: ride({ to: 'home', pos: 9, phase: 'stop' }) });
     expect(xy(part(back, SLED_ID))).toEqual(r.path[len - 9]);
     const end = bodies({ ...go, ride: ride({ pos: len, phase: 'arrive' }) });

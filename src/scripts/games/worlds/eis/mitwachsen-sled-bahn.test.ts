@@ -1,5 +1,5 @@
 // Schlitten und Höhlenbahn in einer Welt (das Kind hat beide): Die Strecke des Schlittens, seine
-// Halte, sein Schuppen und die Warteplätze liegen nie auf Gleis oder Bahnsteig der Bahn; wo sie sich nicht in die Quere
+// Halte, sein Laternenpfahl und die Warteplätze liegen nie auf Gleis oder Bahnsteig der Bahn; wo sie sich nicht in die Quere
 // kommen, fährt der Schlitten wie ohne Bahn. Eigene Datei, damit die Welten mit beiden Paketen im tiefen Lauf in einem
 // eigenen Worker entstehen
 import { describe, expect, it } from 'vitest';
@@ -14,21 +14,24 @@ const keyOf = ([x, y]: Point) => `${x},${y}`;
 const cellsOf = (r: Route) => [...r.path, ...r.shed, r.stops.home, r.stops.out, ...r.seats.home, ...r.seats.out];
 
 describe('Schlitten und Höhlenbahn in einer Welt', () => {
-  it.each(SEEDS)('Seed %i: Strecke, Halte, Schuppen und Warteplätze nie auf Gleis oder Bahnsteig der Bahn', (seed) => {
-    const w = worldOf(seed, [EIS_PACK, HOEHLE_PACK, BAHN_PACK], BUILT);
-    const r = sledRoute(w);
-    const bad: string[] = [];
-    if (!r) bad.push('kein Schlitten');
-    else
-      for (const p of cellsOf(r)) {
-        const c = w.cell(...p);
-        if (c.ride === 'hoehle' || c.stop) bad.push(keyOf(p));
-      }
-    // die Bahn liegt wirklich (sonst prüfte der Test nichts)
-    const g = w.gates.get('hoehle')!;
-    if (!w.cell(g.mid[0] + 2 * g.out[1] - g.out[0], g.mid[1] - 2 * g.out[0] - g.out[1]).rail) bad.push('kein Gleis');
-    expect(bad, `Seed ${seed}`).toEqual([]);
-  });
+  it.each(SEEDS)(
+    'Seed %i: Strecke, Halte, Laternenpfahl und Warteplätze nie auf Gleis oder Bahnsteig der Bahn',
+    (seed) => {
+      const w = worldOf(seed, [EIS_PACK, HOEHLE_PACK, BAHN_PACK], BUILT);
+      const r = sledRoute(w);
+      const bad: string[] = [];
+      if (!r) bad.push('kein Schlitten');
+      else
+        for (const p of cellsOf(r)) {
+          const c = w.cell(...p);
+          if (c.ride === 'hoehle' || c.stop) bad.push(keyOf(p));
+        }
+      // die Bahn liegt wirklich (sonst prüfte der Test nichts)
+      const g = w.gates.get('hoehle')!;
+      if (!w.cell(g.mid[0] + 2 * g.out[1] - g.out[0], g.mid[1] - 2 * g.out[0] - g.out[1]).rail) bad.push('kein Gleis');
+      expect(bad, `Seed ${seed}`).toEqual([]);
+    },
+  );
 
   it.each(SAME)('Seed %i: Kommt die Bahn dem Schlitten nicht in die Quere, fährt er wie ohne sie', (seed) => {
     const plain = sledRoute(worldOf(seed, [EIS_PACK, HOEHLE_PACK]))!;

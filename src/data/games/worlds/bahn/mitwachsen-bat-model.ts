@@ -1,10 +1,8 @@
-// Modelle von Bahnhof Fledermaus und Lokschuppen in der Grotte, nur im Paket der Bahn (Teile wie in `front.ts`: vorn,
-// rechts, unten, Länge, Breite, Höhe, Farbe, oben; eigene Voxel-Grafik, keine Lore, keine Druse). Mit Bau 2 entstehen
-// sie: der Bahnsteig aus lila geschichtetem Stein (in den Schichten des Höhlentors, `BANDS`), eine Stufe über dem Gleis,
+// Modelle von Bahnhof Fledermaus in der Grotte, nur im Paket der Bahn (Teile wie in `front.ts`: vorn,
+// rechts, unten, Länge, Breite, Höhe, Farbe, oben; eigene Voxel-Grafik, keine Lore, keine Druse). Mit Bau 2 entsteht
+// er: der Bahnsteig aus lila geschichtetem Stein (in den Schichten des Höhlentors, `BANDS`), eine Stufe über dem Gleis,
 // mit heller lila Kante; ein kleines, hohes Steindach auf zwei Pfosten hinten mit Kristall-Lampen obendrauf (nur hell gefärbt, kein Licht) und
-// dem Schild „Fledermaus auf Lila“ (ohne Text); daneben der Lokschuppen, vorn zum Gleis offen, hinten eine Wand aus
-// demselben Stein, ein Dach mit Kristallfirst, darunter wohnt Tok (und der Siebenschläfer schläft dort). Kein Gold: Hier
-// gibt es nichts zu tun.
+// dem Schild „Fledermaus auf Lila“ (ohne Text). Kein Bau daneben: Tok steht auf seinem Platz im Freien. Kein Gold: Hier gibt es nichts zu tun.
 // Spec: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 2)
 
 import type { Part } from '../../../../lib/games/front';
@@ -59,26 +57,3 @@ export const BAT_SIGN: readonly Part[] = [
   [-0.03, -0.44, 0.16, 0.06, 0.88, 0.88, B.sign, B.sign],
   ...pixels(BAT, B.bat, 0.03, 0, 0.94, 0.09),
 ];
-
-/**
- * Lokschuppen, Mitte in der Mitte seines Platzes, vorn zum Gleis offen: hinten die Wand aus geschichtetem Stein
- * (`depth` Felder vom Gleis weg tief, `long` lang), zwei Pfosten vorn, ein flaches Dach mit Kristallfirst
- */
-export function shedParts(depth: number, long: number): Part[] {
-  const [hd, hl] = [depth / 2, long / 2];
-  return [
-    ...[0, 1, 2, 3].map((k): Part => [hd - 1, -hl, k * 0.4, 1, long, 0.4, B.bands[k % B.bands.length]!]),
-    ...[-hl, hl - 0.16].map((r): Part => [-hd + 0.04, r, 0, 0.16, 0.16, 1.6, B.bands[0]]),
-    [-hd - 0.1, -hl - 0.1, 1.6, depth + 0.2, long + 0.2, 0.18, ...B.roof],
-    ...[0, 1, 2].map((k): Part => [
-      -0.12,
-      -hl + 0.5 + (k * (long - 1.14)) / 2,
-      1.78,
-      0.24,
-      0.14,
-      0.18,
-      B.crystal[k]!,
-      B.glow,
-    ]),
-  ];
-}

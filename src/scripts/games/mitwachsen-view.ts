@@ -200,7 +200,7 @@ export type View2D = {
   /**
    * Fahrzeug dieser Welt (Eis-Welt: Schlitten, worlds/eis/mitwachsen-sled-look.ts; Bahn: Zug,
    * worlds/bahn/mitwachsen-train-look.ts; Haken in mitwachsen-ride-view.ts), gleich für 2D und 3D: Körper je Bild
-   * (Fahrzeug samt sitzender Figur, Zugtier, Schuppen), flache Marken am Boden (Spur, Fleck am Halt) und Ton, Hüpfer,
+   * (Fahrzeug samt sitzender Figur, Zugtier, Laternenpfahl), flache Marken am Boden (Spur, Fleck am Halt) und Ton, Hüpfer,
    * Herz und Funken zu jedem seiner Ereignisse (ein Ereignis eines anderen Fahrzeugs: undefined)
    */
   bodies?(state: State, world: World, at: RideAt): readonly RideBody[];

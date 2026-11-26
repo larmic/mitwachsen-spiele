@@ -42,8 +42,8 @@ export const STORY_TEXTS: Record<StoryId, { title: string; text: string }> = {
     text: 'In der Grotte wohnen kleine Lichtgeister. Sie spielen so gern Verstecken. Hast du die Laterne dabei, kannst du sie sehen. Hörst du sie kichern?',
   },
   lokschuppen: {
-    title: 'Im Lokschuppen',
-    text: 'Tok hat eine Spitzhacke, aber er haut damit nichts kaputt. Er klopft nur die Nägel in die Schienen: pink, pink, pink. Sein bester Freund ist der Maulwurf. Der sitzt immer oben auf Toks Helm und zeigt, wo es langgeht, denn unter der Erde kennt er sich aus. Abends fährt die kleine Bahn in den Schuppen, und der Siebenschläfer schläft schon im Wagen.',
+    title: 'Bei Tok',
+    text: 'Tok hat eine Spitzhacke, aber er haut damit nichts kaputt. Er klopft nur die Nägel in die Schienen: pink, pink, pink. Sein bester Freund ist der Maulwurf. Der sitzt immer oben auf Toks Helm und zeigt, wo es langgeht, denn unter der Erde kennt er sich aus. Abends hält die kleine Bahn am Bahnhof, und der Siebenschläfer schläft schon im Wagen.',
   },
   bahnhof: {
     title: 'Am Bahnhof Bär',
