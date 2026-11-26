@@ -21,7 +21,7 @@ import type { Part } from '../../../../lib/games/front';
 import type { RideBody } from '../../mitwachsen-ride-view';
 import type { World } from '../../mitwachsen-world';
 import { shedIn } from './mitwachsen-build2';
-import { batPlatform, type Platform } from './mitwachsen-platform';
+import { batPlatform, underRoof, type Platform, type Standing } from './mitwachsen-platform';
 
 /** Bahnhof Fledermaus in einer Welt: Reihen des Bahnsteigs (Kante am Gleis, hinten), vom Gleis weg, Reihen unter dem Dach */
 export type BatStation = Platform;
@@ -36,7 +36,7 @@ const model = (k: string, make: () => Part[]) => memo.get(k) ?? (memo.set(k, mak
 export const batOf = (world: World): BatStation | null => batPlatform(world);
 
 /** Körper von Bahnhof Fledermaus und Lokschuppen (ab Ausbau 2 in der Welt; sonst leer) */
-export function batBodies(world: World): RideBody[] {
+export function batBodies(world: World, state: Standing): RideBody[] {
   const st = batOf(world);
   if (!st) return [];
   const dir = dirTo(...st.side);
@@ -51,7 +51,16 @@ export function batBodies(world: World): RideBody[] {
       y = under.reduce((s, p) => s + p[1], 0) / 4;
     const z = world.cell(...under[0]!).h;
     out.push(
-      { id: 'bahn:felsdach', key: 'bahn:felsdach', x, y, z, dir, parts: BAT_ROOF },
+      {
+        id: 'bahn:felsdach',
+        key: 'bahn:felsdach',
+        x,
+        y,
+        z,
+        dir,
+        parts: BAT_ROOF,
+        ...(underRoof(st, state) ? { sheer: true } : {}),
+      },
       { id: 'bahn:felspfosten', key: 'bahn:felspfosten', x, y, z, dir, parts: BAT_POSTS },
       {
         id: 'bahn:felsschild',

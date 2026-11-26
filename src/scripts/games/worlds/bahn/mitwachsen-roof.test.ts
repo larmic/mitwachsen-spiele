@@ -21,7 +21,7 @@ import { initialState } from '../../mitwachsen-state';
 import { BAHN_PACK, HOEHLE_PACK, SAMPLE_SEEDS, worldOf } from '../../test-worlds';
 import { batBodies } from './mitwachsen-bat-look';
 import { withBuilt } from './mitwachsen-built';
-import { ROOF_HALF, batPlatform, bearPlatform } from './mitwachsen-platform';
+import { ROOF_HALF, batPlatform, bearPlatform, underRoof } from './mitwachsen-platform';
 import { stationBodies } from './mitwachsen-station-look';
 
 const AT: RideAt = { now: 0, frac: 1, reduced: false, lit: false };
@@ -88,7 +88,7 @@ describe('Dach der Bahnhöfe: klein und hoch', () => {
       const w = worldOf(seed, [HOEHLE_PACK, BAHN_PACK], { bahn: { built: 2 } });
       const s = { ...initialState(w, { packs: OPEN, openGates: ['eis', 'hoehle'] }), sleeping: false };
       const bodies = stationBodies(s, w, AT); // samt Bahnhof Fledermaus (`batBodies`)
-      expect(batBodies(w).map((b) => b.id)).toContain('bahn:felspfosten');
+      expect(batBodies(w, s).map((b) => b.id)).toContain('bahn:felspfosten');
       for (const [st, roof, posts, sign, models] of [
         [bearPlatform(w), 'bahn:dach', 'bahn:pfosten', 'bahn:schild', [ROOF, ROOF_POSTS, SIGN]],
         [batPlatform(w), 'bahn:felsdach', 'bahn:felspfosten', 'bahn:felsschild', [BAT_ROOF, BAT_POSTS, BAT_SIGN]],
@@ -113,5 +113,42 @@ describe('Dach der Bahnhöfe: klein und hoch', () => {
         expect(b.y).toBeCloseTo((backs[0]![1] + backs[1]![1]) / 2 + st.side[1] * 0.04);
       }
     }
+  });
+
+  it('Durchblick (Issue 23): Die Platte ist genau dann durchscheinend, wenn die Figur unter ihr oder auf dem Feld gleich dahinter (nördlich) steht; nie Pfosten, Schild oder Reihen, nie während einer Fahrt', () => {
+    let seen = 0;
+    for (const seed of SAMPLE_SEEDS) {
+      const w = worldOf(seed, [HOEHLE_PACK, BAHN_PACK], { bahn: { built: 2 } });
+      const base = { ...initialState(w, { packs: OPEN, openGates: ['eis', 'hoehle'] }), sleeping: false };
+      for (const [st, roof] of [
+        [bearPlatform(w), 'bahn:dach'],
+        [batPlatform(w), 'bahn:felsdach'],
+      ] as const) {
+        if (!st) continue; // Seed ohne Gleis
+        seen++;
+        const sheerAt = (x: number, y: number, ride?: object) => {
+          const s = { ...base, player: { ...base.player, x, y }, ...(ride ? { ride } : {}) };
+          return stationBodies(s as typeof base, w, AT)
+            .filter((b) => b.sheer)
+            .map((b) => b.id);
+        };
+        const backs = st.roof.map((i) => st.rows[i]!.back);
+        const hidden = new Set(backs.flatMap(([x, y]) => [`${x},${y}`, `${x},${y - 1}`]));
+        expect(hidden.size, `Seed ${seed} ${roof}`).toBe(backs[0]![0] === backs[1]![0] ? 3 : 4); // seitlich am Gleis: drei Felder in einer Spalte
+        const [x0, y0] = backs[0]!;
+        for (let dx = -3; dx <= 3; dx++)
+          for (let dy = -3; dy <= 3; dy++) {
+            const [x, y] = [x0 + dx, y0 + dy];
+            expect(sheerAt(x, y), `Seed ${seed} ${roof} (${dx}, ${dy})`).toEqual(hidden.has(`${x},${y}`) ? [roof] : []);
+            expect(underRoof(st, { player: { x, y } })).toBe(hidden.has(`${x},${y}`));
+          }
+        for (const [x, y] of backs) {
+          expect(sheerAt(x, y)).toEqual([roof]); // unter der Platte
+          expect(sheerAt(x, y - 1)).toEqual([roof]); // gleich dahinter
+          expect(sheerAt(x, y, { phase: 'seated' })).toEqual([]); // im Zug sitzt sie nicht unter dem Dach
+        }
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
   });
 });

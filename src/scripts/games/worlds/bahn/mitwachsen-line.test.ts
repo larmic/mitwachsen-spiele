@@ -167,7 +167,7 @@ function exitFaults(w: World): string[] {
   const base = { ...initialState(w, { packs, openGates: ['eis', 'hoehle'] }), sleeping: false, wokeAt: -100 };
   const r = trainRoute(w, base);
   if (!r) return [];
-  const bodies = [...stationBodies(base, w, AT), ...batBodies(w)];
+  const bodies = [...stationBodies(base, w, AT), ...batBodies(w, base)];
   for (const [end, st, roof] of [
     ['out', bearPlatform(w), 'bahn:dach'],
     ['home', batPlatform(w), 'bahn:felsdach'],
@@ -624,7 +624,8 @@ describe('Gleis der Höhlenbahn als Boden (Paket der Bahn)', () => {
       if (!dormouse || w.cell(...dormouse).shed !== 'hoehle' || !free.has(key(dormouse)))
         bad.push('Siebenschläfer nicht im Schuppen');
       if (dormouse && shed.home && key(dormouse) === key(shed.home)) bad.push('Siebenschläfer auf Toks Platz');
-      if (!batBodies(w).some((b) => b.id === 'bahn:schuppen')) bad.push('Lokschuppen nicht im Bild');
+      if (!batBodies(w, { player: { x: 1e6, y: 1e6 } }).some((b) => b.id === 'bahn:schuppen'))
+        bad.push('Lokschuppen nicht im Bild');
       expect(bad, `Seed ${seed}`).toEqual([]);
     });
 

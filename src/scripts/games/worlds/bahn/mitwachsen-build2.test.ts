@@ -45,6 +45,8 @@ const OPEN_GATES = ['eis', 'hoehle'] as const;
 const RULES = [HOEHLE_PACK, BAHN_PACK, FAHRT_PACK];
 const TICK: Cmd = { type: 'tick' };
 const TOK = animalId('hoehle', 'tok');
+/** Die Figur weit weg von jedem Dach */
+const AWAY = { player: { x: 1e6, y: 1e6 } };
 const AT: RideAt = { now: 0, frac: 1, reduced: false, lit: false };
 const cheb = (a: Point, b: Point) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
 
@@ -243,10 +245,10 @@ describe('Bau 2: bei der nächsten Fahrt nach dem Hau-ruck (mitwachsen-build2.ts
 
   it('Bahnhof Fledermaus und Lokschuppen stehen ab Ausbau 2 in der Welt (Bahnsteig eine Stufe hoch, feste Rückwand); vorher nichts', () => {
     expect(batOf(W1)).toBeNull();
-    expect(batBodies(W1)).toEqual([]);
+    expect(batBodies(W1, AWAY)).toEqual([]);
     const st = batOf(W2)!;
     expect(st.rows).toHaveLength(7);
-    const bodies = batBodies(W2).map((b) => b.id);
+    const bodies = batBodies(W2, AWAY).map((b) => b.id);
     expect(bodies).toEqual(
       expect.arrayContaining(['bahn:fels:0', 'bahn:felsdach', 'bahn:felsschild', 'bahn:schuppen']),
     );

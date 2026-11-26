@@ -5,7 +5,7 @@
 // (der Körper mit `seat`); solange sie fährt, zeichnen beide Ansichten sie nicht selbst.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Der Schlitten“)
 
-import type { Dir, Part, Projection } from '../../lib/games/front';
+import { drawModel, type Dir, type Part, type Projection } from '../../lib/games/front';
 import type { RideId } from '../../data/games/mitwachsen-rides';
 import { dirTo } from './mitwachsen-free';
 import type { MoveCmd } from './mitwachsen-rider';
@@ -26,6 +26,7 @@ export type RideBody = {
   parts: readonly Part[];
   seat?: true;
   glow?: true; // eine Lampe vorn leuchtet, ohne dass die Figur darin sitzt (die Dunkelmaske der Grotte öffnet dort ein kleines Loch)
+  sheer?: true; // durchscheinend gezeichnet (Dachplatte eines Bahnhofs, solange die Figur darunter steht)
   beacon?: true; // der Körper selbst glimmt, wie weit die Figur auch weg ist (kleines Loch der Dunkelmaske mitten auf ihm: der Erdhügel)
 };
 
@@ -57,6 +58,16 @@ export type RideFx = {
   zzz?: true;
   chorus?: readonly string[];
 };
+
+/** Deckkraft eines durchscheinenden Körpers (`RideBody.sheer`), gleich in 2D und 3D */
+export const SHEER = 0.35;
+
+/** Einen Körper in 2D zeichnen, durchscheinend mit `sheer` */
+export function drawRide(ctx: CanvasRenderingContext2D, P: Projection, r: RideBody) {
+  ctx.globalAlpha = r.sheer ? SHEER : 1;
+  drawModel(ctx, P, r.parts, r.x + 0.5, r.y + 0.5, r.z, r.dir);
+  ctx.globalAlpha = 1;
+}
 
 /** So viel später (ms) hüpfen die Tiere, die antworten (`RideFx.chorus`: Murmeltiere pfeifen zurück, wenn der Zug tutet) */
 export const CHORUS_MS = 400;
