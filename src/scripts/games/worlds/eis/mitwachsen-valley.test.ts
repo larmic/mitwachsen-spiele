@@ -8,6 +8,7 @@ import { HILL, KESSEL, KESSEL_COLORS } from '../../../../data/games/worlds/eis/m
 import { KESSEL_WILDS } from './mitwachsen-kessel';
 import { FROST, HEAPS } from './mitwachsen-frost';
 import { hillOf } from './mitwachsen-hill';
+import { sledRoute } from './mitwachsen-sled-route';
 import { loopOf, simple } from './mitwachsen-loop';
 import { bergPeak } from './mitwachsen-ice-sky';
 import { ICE_CRYSTALS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
@@ -762,5 +763,22 @@ describe('Gletschertal im Kessel (Eis-Welt)', () => {
     expect(VALLEY_SEEDS.flatMap(loopFaults)).toEqual([]);
     const with_ = VALLEY_SEEDS.filter((seed) => loopOf(worldOf(seed, ICE)).length).length;
     expect(with_ / VALLEY_SEEDS.length).toBeGreaterThanOrEqual(0.8); // gemessen über 60 Täler: 59
+  });
+
+  // Issue 17: In Seed 2 stand eine Tanne direkt vor dem Schlitten, in Seed 28 ein Kristall (gemessen: 10 von 120 Tälern)
+  it(`Schlitten im Tal: nichts Hohes steht vor Schlitten und Zugtier zur Kamera hin (${VALLEY_SEEDS.length} Seeds, dazu 2 und 28)`, () => {
+    const wrong: string[] = [];
+    for (const seed of [...VALLEY_SEEDS, 2, 28]) {
+      const w = worldOf(seed, ICE);
+      const r = sledRoute(w);
+      if (!r) continue;
+      for (const [x, y] of [r.path[0]!, r.path[1]!])
+        for (const d of [1, 2]) {
+          const c = w.cell(x, y + d);
+          if (c.solid && (c.deco || c.h > w.cell(x, y).h + 1))
+            wrong.push(`Seed ${seed}: ${c.deco ?? 'Stufe'} bei ${x},${y + d}`);
+        }
+    }
+    expect(wrong).toEqual([]);
   });
 });

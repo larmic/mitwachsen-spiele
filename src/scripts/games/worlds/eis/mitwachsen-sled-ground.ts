@@ -141,18 +141,50 @@ export function sledGround(gang: Gang, place: Valley, map: Map<string, Cell>): R
     if (!way) continue;
     const track = induced([...straight, ...way, stop], height);
     for (const [x, y] of [...track, ...shed]) map.set(key(x, y), cleared(map.get(key(x, y))!));
+    clearFront(
+      map,
+      frontOf(stop, before).filter(([x, y]) => !no(x, y)),
+    );
     for (const [x, y] of track) map.set(key(x, y), { ...map.get(key(x, y))!, ride: RIDE });
     return new Set([...track, ...shed].map((p) => key(...p)));
   }
   return new Set();
 }
 
+/** Vor Schlitten und Zugtier weichen Tannen und Eisblöcke samt den Schneewehen im Lee der Tanne: Nichts verdeckt sie */
+function clearFront(map: Map<string, Cell>, cells: readonly Point[]) {
+  for (const [x, y] of cells) {
+    const c = map.get(key(x, y));
+    if (!c || !blocked(c)) continue;
+    const lee = c.tree === 'snowpine' ? [1, 2] : [];
+    for (const d of lee) {
+      const n = map.get(key(x + d, y));
+      if (n?.deco === 'snowdrift') map.set(key(x + d, y), { ...n, deco: null });
+    }
+    map.set(key(x, y), cleared(c));
+  }
+}
+
 type YardSpot = { stop: Point; dir: Point; shed: Point[]; cost: number };
+
+/**
+ * Felder vor Schlitten und Zugtier zur Kamera hin (sie schaut von Süden): je zwei Felder südlich vom Halt und vom Feld
+ * davor. Steht dort etwas Hohes, verdeckt es das Fahrzeug (Issue 17: in 10 von 120 Tälern, sechsmal eine Tanne, viermal
+ * ein Kristall)
+ */
+const frontOf = (stop: Point, before: Point): Point[] =>
+  [stop, before].flatMap(([x, y]): Point[] => [
+    [x, y + 1],
+    [x, y + 2],
+  ]);
+/** So viel teurer ist ein Platz, vor dem etwas Festes steht, das nie weicht (Kristall, Schneehaufen, Kiste, Klippe) */
+const HIDDEN = 1000;
 
 /**
  * Plätze für den Halt mit seinem freien Platz, der beste zuerst: Mitte `YARD_NEAR` von der Plattform des Eis-Portals am Schneebett, auf der
  * Seite der Strecke (über die Rutschspur führt sie nie), alle Felder samt Halt und dem Feld davor eben und erlaubt.
- * Bevorzugt, wo am wenigsten weichen muss, dann so nah wie möglich an der Plattform. Ohne Plattform keiner.
+ * Bevorzugt, wo nichts Festes vor dem Fahrzeug steht (zur Kamera hin, `frontOf`), dann wo am wenigsten weichen muss,
+ * dann so nah wie möglich an der Plattform. Ohne Plattform keiner.
  */
 function yardSpots(
   gang: Gang,
@@ -181,8 +213,11 @@ function yardSpots(
       if (all.some(([x, y]) => no(x, y))) continue;
       const h = height(...stop);
       if (all.some(([x, y]) => height(x, y) !== h)) continue;
-      const clear = all.filter(([x, y]) => blocked(map.get(key(x, y))!)).length;
-      spots.push({ stop, dir, shed, cost: clear * 100 + r });
+      // was vor dem Fahrzeug steht: Tannen und Eisblöcke weichen (zählen wie auf dem Platz), anderes Festes verdeckt es
+      const front = frontOf(stop, all.at(-1)!).map((p) => map.get(key(...p)));
+      const clear = [...all.map((p) => map.get(key(...p))), ...front].filter((c) => c && blocked(c)).length;
+      const hidden = front.filter((c) => c?.solid && !blocked(c)).length;
+      spots.push({ stop, dir, shed, cost: hidden * HIDDEN + clear * 100 + r });
     }
   return spots.sort((a, b) => a.cost - b.cost || a.stop[0] - b.stop[0] || a.stop[1] - b.stop[1]);
 }
