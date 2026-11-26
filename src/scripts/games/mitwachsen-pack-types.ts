@@ -223,6 +223,7 @@ export type WorldPack<
   Ride = unknown,
   Herald = unknown,
   Vehicle = unknown,
+  Sight = unknown,
 > = {
   id: PackId;
   gate?: GateId; // das Tor, hinter dem seine Welt liegt (`REGIONS`: `behind` der Gegend `id`); ohne eigene Welt keins
@@ -243,6 +244,11 @@ export type WorldPack<
   lays?(packs: Readonly<Record<string, unknown>>): boolean;
   lead?: Rules;
   rules?: WorldRules<Ride, Herald, Vehicle>;
+  /**
+   * Sehenswürdigkeiten dieses Pakets (`Sight` in mitwachsen-sight.ts): jedes Spielzeug, zu dem das Kind hingeführt wird,
+   * bis es es einmal gefunden hat. Wer ein neues Spielzeug baut, trägt es hier ein (Regel in CLAUDE.md)
+   */
+  sights?: readonly Sight[];
   dawn?(packs: Readonly<Record<string, unknown>>): Record<string, unknown>;
   away?(packs: Readonly<Record<string, unknown>>): readonly string[];
   view?: View;
