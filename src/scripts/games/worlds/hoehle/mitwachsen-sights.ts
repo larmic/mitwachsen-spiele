@@ -19,20 +19,24 @@ export const SIGHTS: readonly Sight[] = [
     },
     ready: (s) => s.lamp !== 'hoehle',
     call: (_, [x, y]) => ({ type: 'lantern', x, y }),
+    color: '#ffe08a',
   },
   {
     id: 'hoehle:saeulen',
     cells: (world) => cellsOf(world, 'hoehle', 'saeulen', (c) => c.deco === 'column'),
     call: (world, [x, y]) => ({ type: 'column', x, y, note: world.cell(x, y).note ?? 0 }),
+    color: '#b48cf0',
   },
   {
     id: 'hoehle:netze',
     cells: (world) => webs(world),
     call: (_, [x, y]) => ({ type: 'web', x, y }),
+    color: '#f3ecff',
   },
   {
     id: 'hoehle:steg',
     cells: (world) => cellsOf(world, 'hoehle', 'steg', (c) => c.deco === 'jetty' && jettyEnd(c)),
     call: (_, [x, y]) => ({ type: 'olm', x, y }),
+    color: '#6fd6f0',
   },
 ];

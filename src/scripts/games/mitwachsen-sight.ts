@@ -77,7 +77,8 @@ export type Sighted = Rider &
  * Eine Sehenswürdigkeit: feste Kennung (steht im Spielstand), ihre Felder in dieser Welt, die noch locken (`cells`,
  * leer: hier keins; es zählen nur die in der Gegend der Figur), ob schon gelockt werden darf (`ready`, ohne: immer) und
  * ob sie nach dem Spielstand schon gefunden ist (`done`: Klangstein gehört, Fahrzeug gefahren; ohne: es zählt das
- * Ereignis aus `SIGHT_OF`). `call`: ihr Ruf, wenn sie vom Feld `at` aus lockt
+ * Ereignis aus `SIGHT_OF`). `call`: ihr Ruf, wenn sie vom Feld `at` aus lockt. `color`: Farbe ihres Zeichens auf der
+ * Karte, sobald sie gefunden ist (Issue 32); `marks`: wo es dann steht (ohne: auf ihren Feldern `cells`; leer: keins)
  */
 export type Sight = {
   id: string;
@@ -85,6 +86,8 @@ export type Sight = {
   ready?(s: Sighted, world: World): boolean;
   done?(s: Sighted): boolean;
   call(world: World, at: Point): SightCall;
+  color: string;
+  marks?(world: World, s: Sighted): readonly Point[];
 };
 
 /**
@@ -159,6 +162,8 @@ export const STONES: Sight = {
   id: 'klangstein',
   cells: (world, s) => [...world.stones].flatMap(([id, p]) => (heardStone(s, id) ? [] : [p])),
   call: (world, at) => ({ type: 'story', id: world.cell(...at).story ?? 'bett' }),
+  color: '#e08a2c',
+  marks: (world, s) => [...world.stones].flatMap(([id, p]) => (heardStone(s, id) ? [p] : [])), // je gehörter Stein
 };
 
 /**
@@ -169,6 +174,17 @@ export const sightsOf = (packs: readonly { sights?: readonly Sight[] }[]): Sight
   STONES,
   ...packs.flatMap((p) => p.sights ?? []),
 ];
+
+/**
+ * Zeichen auf der Karte: je gefundener Sehenswürdigkeit (in `found`, oder nach dem Spielstand, `done`; Klangsteine je
+ * gehörtem Stein) ihre Felder in ihrer Farbe. Nicht Gefundenes fehlt: Die Karte verrät nichts
+ */
+export const marksOf = (s: Sighted, world: World, sights: readonly Sight[]): { at: Point; color: string }[] =>
+  sights.flatMap((x) => {
+    const own = x.marks?.(world, s);
+    const at = own ?? (s.found.includes(x.id) || x.done?.(s) ? x.cells(world, s) : []);
+    return at.map((p) => ({ at: p, color: x.color }));
+  });
 
 /**
  * Ruhezeiten und Vorrang: Nichts lockt im Schlaf, beim Fahren, am Abend, kurz nach dem Aufwachen, solange der Pinguin

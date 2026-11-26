@@ -18,6 +18,7 @@ import { plateToy } from './mitwachsen-plate-toy';
 import { postcard } from './mitwachsen-plate';
 import { NOTE_COLORS, StoryPlayer } from './mitwachsen-story';
 import { FriendLook, SIGHT_SPARKS, sightScore } from './mitwachsen-sight-look';
+import { marksOf, sightsOf } from './mitwachsen-sight';
 import {
   DEFAULT_FIGURE,
   cleanName,
@@ -1027,14 +1028,17 @@ class LarmicMitwachsen extends HTMLElement {
       this.ctx.clearRect(0, 0, w, h);
       this.renderer.overlay(this.world, this.state, scene, this.r3d.project);
     } else this.renderer.draw(this.world, this.state, scene);
-    // Karte etwa zehnmal pro Sekunde
-    if (t - this.lastMap > 100) {
-      this.lastMap = t;
-      const m = this.map.clientWidth;
-      this.mapCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this.mapCtx.imageSmoothingEnabled = false;
-      drawMap(this.mapCtx, this.world, this.state, player.x, player.y, m, this.seen, this.reduced.matches ? 0 : t);
-    }
+    if (t - this.lastMap > 100) this.drawMiniMap(player, dpr, t); // Karte etwa zehnmal pro Sekunde
+  }
+
+  /** Karte oben rechts, um die gleitende Figur; dazu die Zeichen gefundener Sehenswürdigkeiten (mitwachsen-sight.ts) */
+  private drawMiniMap(player: { x: number; y: number }, dpr: number, t: number) {
+    this.lastMap = t;
+    const [ctx, now] = [this.mapCtx, this.reduced.matches ? 0 : t];
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    const marks = marksOf(this.state, this.world, sightsOf(this.packs.loaded));
+    drawMap(ctx, this.world, this.state, player.x, player.y, this.map.clientWidth, this.seen, now, marks);
   }
 
   /**
