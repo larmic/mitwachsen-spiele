@@ -1,5 +1,7 @@
 # mitwachsen-spiele.de
 
+> **Umgezogen (27.11.2026):** Dieses Repo ist archiviert. Das Spiel heißt jetzt „Weltenbummler“ und lebt mit voller Historie in [mitwachsen-spiele/weltenbummler](https://github.com/mitwachsen-spiele/weltenbummler) (https://weltenbummler.mitwachsen-spiele.de/), die Homepage in [mitwachsen-spiele/website](https://github.com/mitwachsen-spiele/website) (https://www.mitwachsen-spiele.de/). Der Umzug steht in #71.
+
 Mitwachsen: ein ruhiges Spiel für Kinder ab 3 Jahren, das man zusammen mit Mama oder Papa spielt. Ohne Werbung, ohne Punkte, kostenlos im Browser. Gebaut mit [Astro](https://astro.build), ausgeliefert als statische Seite über GitHub Pages unter https://www.mitwachsen-spiele.de.
 
 Das Spiel stammt von [larmic.de](https://larmic.de) und hat hier eine eigene Seite bekommen.
